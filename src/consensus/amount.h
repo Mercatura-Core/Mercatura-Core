@@ -8,22 +8,22 @@
 
 #include <cstdint>
 
-/** Amount in satoshis (Can be negative) */
+/** Amount in Mercatura base units (can be negative). */
 typedef int64_t CAmount;
 
-/** The amount of satoshis in one BTC. */
-static constexpr CAmount COIN = 100000000;
+/** Number of base units in one MCA. */
+static constexpr CAmount COIN = 100;
 
-/** No amount larger than this (in satoshi) is valid.
+/** One indivisible Mercatura Cent: 0.01 MCA. */
+static constexpr CAmount CENT = 1;
+
+/** No monetary value larger than this is valid.
  *
- * Note that this constant is *not* the total money supply, which in Bitcoin
- * currently happens to be less than 21,000,000 BTC for various reasons, but
- * rather a sanity check. As this sanity check is used by consensus-critical
- * validation code, the exact value of the MAX_MONEY constant is consensus
- * critical; in unusual circumstances like a(nother) overflow bug that allowed
- * for the creation of coins out of thin air modification could lead to a fork.
- * */
-static constexpr CAmount MAX_MONEY = 21000000 * COIN;
+ * This is a consensus-critical sanity bound, not a total supply cap.
+ * Mercatura preserves Bitcoin Core's existing raw integer safety ceiling
+ * while using 100 base units per MCA.
+ */
+static constexpr CAmount MAX_MONEY = 2'100'000'000'000'000;
 inline bool MoneyRange(const CAmount& nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 
 #endif // BITCOIN_CONSENSUS_AMOUNT_H

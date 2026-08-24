@@ -193,6 +193,11 @@ bool OptionsModel::Init(bilingual_str& error)
     QVariant unit = settings.value("DisplayBitcoinUnit");
     if (unit.canConvert<BitcoinUnit>()) {
         m_display_bitcoin_unit = unit.value<BitcoinUnit>();
+        if (m_display_bitcoin_unit == BitcoinUnit::mBTC ||
+            m_display_bitcoin_unit == BitcoinUnit::uBTC) {
+            m_display_bitcoin_unit = BitcoinUnit::BTC;
+            settings.setValue("DisplayBitcoinUnit", QVariant::fromValue(m_display_bitcoin_unit));
+        }
     } else {
         m_display_bitcoin_unit = BitcoinUnit::BTC;
         settings.setValue("DisplayBitcoinUnit", QVariant::fromValue(m_display_bitcoin_unit));

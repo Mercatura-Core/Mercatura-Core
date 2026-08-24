@@ -27,7 +27,7 @@ std::string FormatMoney(const CAmount n)
         quotient = -quotient;
         remainder = -remainder;
     }
-    std::string str = strprintf("%d.%08d", quotient, remainder);
+    std::string str = strprintf("%d.%02d", quotient, remainder);
 
     // Right-trim excess zeros before the decimal point:
     int nTrim = 0;
@@ -77,7 +77,9 @@ std::optional<CAmount> ParseMoney(const std::string& money_string)
     if (*p) {
         return std::nullopt;
     }
-    if (strWhole.size() > 10) // guard against 63 bit overflow
+    // Mercatura permits at most 14 whole MCA digits under MAX_MONEY.
+    // Reject longer inputs before multiplying by COIN.
+    if (strWhole.size() > 14)
         return std::nullopt;
     if (nUnits < 0 || nUnits > COIN)
         return std::nullopt;

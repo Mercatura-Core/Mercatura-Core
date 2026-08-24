@@ -6,6 +6,7 @@
 #include <common/signmessage.h>
 #include <hash.h>
 #include <key.h>
+#include <key_io.h>
 #include <script/parsing.h>
 #include <span.h>
 #include <sync.h>
@@ -404,36 +405,32 @@ BOOST_AUTO_TEST_CASE(util_FormatRFC1123DateTime)
 BOOST_AUTO_TEST_CASE(util_FormatMoney)
 {
     BOOST_CHECK_EQUAL(FormatMoney(0), "0.00");
-    BOOST_CHECK_EQUAL(FormatMoney((COIN/10000)*123456789), "12345.6789");
-    BOOST_CHECK_EQUAL(FormatMoney(-COIN), "-1.00");
-
-    BOOST_CHECK_EQUAL(FormatMoney(COIN*100000000), "100000000.00");
-    BOOST_CHECK_EQUAL(FormatMoney(COIN*10000000), "10000000.00");
-    BOOST_CHECK_EQUAL(FormatMoney(COIN*1000000), "1000000.00");
-    BOOST_CHECK_EQUAL(FormatMoney(COIN*100000), "100000.00");
-    BOOST_CHECK_EQUAL(FormatMoney(COIN*10000), "10000.00");
-    BOOST_CHECK_EQUAL(FormatMoney(COIN*1000), "1000.00");
-    BOOST_CHECK_EQUAL(FormatMoney(COIN*100), "100.00");
-    BOOST_CHECK_EQUAL(FormatMoney(COIN*10), "10.00");
+    BOOST_CHECK_EQUAL(FormatMoney(CENT), "0.01");
+    BOOST_CHECK_EQUAL(FormatMoney(10 * CENT), "0.10");
+    BOOST_CHECK_EQUAL(FormatMoney(99 * CENT), "0.99");
     BOOST_CHECK_EQUAL(FormatMoney(COIN), "1.00");
-    BOOST_CHECK_EQUAL(FormatMoney(COIN/10), "0.10");
-    BOOST_CHECK_EQUAL(FormatMoney(COIN/100), "0.01");
-    BOOST_CHECK_EQUAL(FormatMoney(COIN/1000), "0.001");
-    BOOST_CHECK_EQUAL(FormatMoney(COIN/10000), "0.0001");
-    BOOST_CHECK_EQUAL(FormatMoney(COIN/100000), "0.00001");
-    BOOST_CHECK_EQUAL(FormatMoney(COIN/1000000), "0.000001");
-    BOOST_CHECK_EQUAL(FormatMoney(COIN/10000000), "0.0000001");
-    BOOST_CHECK_EQUAL(FormatMoney(COIN/100000000), "0.00000001");
+    BOOST_CHECK_EQUAL(FormatMoney(1234567), "12345.67");
+    BOOST_CHECK_EQUAL(FormatMoney(-COIN), "-1.00");
+    BOOST_CHECK_EQUAL(FormatMoney(-1234567), "-12345.67");
 
-    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::max()), "92233720368.54775807");
-    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::max() - 1), "92233720368.54775806");
-    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::max() - 2), "92233720368.54775805");
-    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::max() - 3), "92233720368.54775804");
-    // ...
-    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::min() + 3), "-92233720368.54775805");
-    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::min() + 2), "-92233720368.54775806");
-    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::min() + 1), "-92233720368.54775807");
-    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::min()), "-92233720368.54775808");
+    BOOST_CHECK_EQUAL(FormatMoney(COIN * 100000000), "100000000.00");
+    BOOST_CHECK_EQUAL(FormatMoney(COIN * 10000000), "10000000.00");
+    BOOST_CHECK_EQUAL(FormatMoney(COIN * 1000000), "1000000.00");
+    BOOST_CHECK_EQUAL(FormatMoney(COIN * 100000), "100000.00");
+    BOOST_CHECK_EQUAL(FormatMoney(COIN * 10000), "10000.00");
+    BOOST_CHECK_EQUAL(FormatMoney(COIN * 1000), "1000.00");
+    BOOST_CHECK_EQUAL(FormatMoney(COIN * 100), "100.00");
+    BOOST_CHECK_EQUAL(FormatMoney(COIN * 10), "10.00");
+
+    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::max()), "92233720368547758.07");
+    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::max() - 1), "92233720368547758.06");
+    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::max() - 2), "92233720368547758.05");
+    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::max() - 3), "92233720368547758.04");
+
+    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::min() + 3), "-92233720368547758.05");
+    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::min() + 2), "-92233720368547758.06");
+    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::min() + 1), "-92233720368547758.07");
+    BOOST_CHECK_EQUAL(FormatMoney(std::numeric_limits<CAmount>::min()), "-92233720368547758.08");
 }
 
 BOOST_AUTO_TEST_CASE(util_ParseMoney)
@@ -442,45 +439,44 @@ BOOST_AUTO_TEST_CASE(util_ParseMoney)
     BOOST_CHECK_EQUAL(ParseMoney(".").value(), 0);
     BOOST_CHECK_EQUAL(ParseMoney("0.").value(), 0);
     BOOST_CHECK_EQUAL(ParseMoney(".0").value(), 0);
-    BOOST_CHECK_EQUAL(ParseMoney(".6789").value(), 6789'0000);
+    BOOST_CHECK_EQUAL(ParseMoney(".67").value(), 67);
     BOOST_CHECK_EQUAL(ParseMoney("12345.").value(), COIN * 12345);
+    BOOST_CHECK_EQUAL(ParseMoney("12345.67").value(), 1'234'567);
 
-    BOOST_CHECK_EQUAL(ParseMoney("12345.6789").value(), (COIN/10000)*123456789);
-
-    BOOST_CHECK_EQUAL(ParseMoney("10000000.00").value(), COIN*10000000);
-    BOOST_CHECK_EQUAL(ParseMoney("1000000.00").value(), COIN*1000000);
-    BOOST_CHECK_EQUAL(ParseMoney("100000.00").value(), COIN*100000);
-    BOOST_CHECK_EQUAL(ParseMoney("10000.00").value(), COIN*10000);
-    BOOST_CHECK_EQUAL(ParseMoney("1000.00").value(), COIN*1000);
-    BOOST_CHECK_EQUAL(ParseMoney("100.00").value(), COIN*100);
-    BOOST_CHECK_EQUAL(ParseMoney("10.00").value(), COIN*10);
+    BOOST_CHECK_EQUAL(ParseMoney("10000000.00").value(), COIN * 10000000);
+    BOOST_CHECK_EQUAL(ParseMoney("1000000.00").value(), COIN * 1000000);
+    BOOST_CHECK_EQUAL(ParseMoney("100000.00").value(), COIN * 100000);
+    BOOST_CHECK_EQUAL(ParseMoney("10000.00").value(), COIN * 10000);
+    BOOST_CHECK_EQUAL(ParseMoney("1000.00").value(), COIN * 1000);
+    BOOST_CHECK_EQUAL(ParseMoney("100.00").value(), COIN * 100);
+    BOOST_CHECK_EQUAL(ParseMoney("10.00").value(), COIN * 10);
     BOOST_CHECK_EQUAL(ParseMoney("1.00").value(), COIN);
     BOOST_CHECK_EQUAL(ParseMoney("1").value(), COIN);
     BOOST_CHECK_EQUAL(ParseMoney("   1").value(), COIN);
     BOOST_CHECK_EQUAL(ParseMoney("1   ").value(), COIN);
     BOOST_CHECK_EQUAL(ParseMoney("  1 ").value(), COIN);
-    BOOST_CHECK_EQUAL(ParseMoney("0.1").value(), COIN/10);
-    BOOST_CHECK_EQUAL(ParseMoney("0.01").value(), COIN/100);
-    BOOST_CHECK_EQUAL(ParseMoney("0.001").value(), COIN/1000);
-    BOOST_CHECK_EQUAL(ParseMoney("0.0001").value(), COIN/10000);
-    BOOST_CHECK_EQUAL(ParseMoney("0.00001").value(), COIN/100000);
-    BOOST_CHECK_EQUAL(ParseMoney("0.000001").value(), COIN/1000000);
-    BOOST_CHECK_EQUAL(ParseMoney("0.0000001").value(), COIN/10000000);
-    BOOST_CHECK_EQUAL(ParseMoney("0.00000001").value(), COIN/100000000);
-    BOOST_CHECK_EQUAL(ParseMoney(" 0.00000001 ").value(), COIN/100000000);
-    BOOST_CHECK_EQUAL(ParseMoney("0.00000001 ").value(), COIN/100000000);
-    BOOST_CHECK_EQUAL(ParseMoney(" 0.00000001").value(), COIN/100000000);
 
-    // Parsing amount that cannot be represented should fail
-    BOOST_CHECK(!ParseMoney("100000000.00"));
-    BOOST_CHECK(!ParseMoney("0.000000001"));
+    BOOST_CHECK_EQUAL(ParseMoney("0.1").value(), 10);
+    BOOST_CHECK_EQUAL(ParseMoney("0.01").value(), CENT);
 
-    // Parsing empty string should fail
+    // Mercatura has no denomination smaller than one Cent.
+    BOOST_CHECK(!ParseMoney("0.001"));
+    BOOST_CHECK(!ParseMoney("0.009"));
+    BOOST_CHECK(!ParseMoney("0.00000001"));
+    BOOST_CHECK(!ParseMoney(".6789"));
+    BOOST_CHECK(!ParseMoney("12345.6789"));
+
+    // MAX_MONEY is a transaction/value safety bound, not a supply cap.
+    BOOST_CHECK_EQUAL(ParseMoney("21000000000000.00").value(), MAX_MONEY);
+    BOOST_CHECK(!ParseMoney("21000000000000.01"));
+    BOOST_CHECK(!ParseMoney("999999999999999.00"));
+
+    // Parsing empty string should fail.
     BOOST_CHECK(!ParseMoney(""));
     BOOST_CHECK(!ParseMoney(" "));
     BOOST_CHECK(!ParseMoney("  "));
 
-    // Parsing two numbers should fail
+    // Parsing two numbers should fail.
     BOOST_CHECK(!ParseMoney(".."));
     BOOST_CHECK(!ParseMoney("0..0"));
     BOOST_CHECK(!ParseMoney("1 2"));
@@ -488,18 +484,15 @@ BOOST_AUTO_TEST_CASE(util_ParseMoney)
     BOOST_CHECK(!ParseMoney(" 1.2 3 "));
     BOOST_CHECK(!ParseMoney(" 1 2.3 "));
 
-    // Embedded whitespace should fail
+    // Embedded whitespace should fail.
     BOOST_CHECK(!ParseMoney(" -1 .2  "));
     BOOST_CHECK(!ParseMoney("  1 .2  "));
     BOOST_CHECK(!ParseMoney(" +1 .2  "));
 
-    // Attempted 63 bit overflow should fail
-    BOOST_CHECK(!ParseMoney("92233720368.54775808"));
-
-    // Parsing negative amounts must fail
+    // Parsing negative monetary amounts must fail.
     BOOST_CHECK(!ParseMoney("-1"));
 
-    // Parsing strings with embedded NUL characters should fail
+    // Strings with embedded NUL characters must fail.
     BOOST_CHECK(!ParseMoney("\0-1"s));
     BOOST_CHECK(!ParseMoney(STRING_WITH_EMBEDDED_NULL_CHAR));
     BOOST_CHECK(!ParseMoney("1\0"s));
@@ -1505,8 +1498,9 @@ BOOST_AUTO_TEST_CASE(test_tracked_vector)
 BOOST_AUTO_TEST_CASE(message_sign)
 {
     const std::array<unsigned char, 32> privkey_bytes = {
-        // just some random data
-        // derived address from this private key: 15CRxFdyRpGZLW9w8HnHvVduizdL5jKNbs
+        // Just some deterministic test data.
+        // Mercatura mainnet P2PKH address:
+        // MC6bBgYNvqSNEB8GMGSEAmFFCDWVaRcnF5
         0xD9, 0x7F, 0x51, 0x08, 0xF1, 0x1C, 0xDA, 0x6E,
         0xEE, 0xBA, 0xAA, 0x42, 0x0F, 0xEF, 0x07, 0x26,
         0xB1, 0xF8, 0x98, 0x06, 0x0B, 0x98, 0x48, 0x9F,
@@ -1515,11 +1509,9 @@ BOOST_AUTO_TEST_CASE(message_sign)
 
     const std::string message = "Trust no one";
 
-    const std::string expected_signature =
-        "IPojfrX2dfPnH26UegfbGQQLrdK844DlHq5157/P6h57WyuS/Qsl+h/WSVGDF4MUi4rWSswW38oimDYfNNUBUOk=";
-
     CKey privkey;
     std::string generated_signature;
+    std::string generated_signature_again;
 
     BOOST_REQUIRE_MESSAGE(!privkey.IsValid(),
         "Confirm the private key is invalid");
@@ -1532,14 +1524,52 @@ BOOST_AUTO_TEST_CASE(message_sign)
     BOOST_REQUIRE_MESSAGE(privkey.IsValid(),
         "Confirm the private key is valid");
 
-    BOOST_CHECK_MESSAGE(MessageSign(privkey, message, generated_signature),
+    const std::string address =
+        EncodeDestination(PKHash(privkey.GetPubKey().GetID()));
+
+    BOOST_CHECK_EQUAL(
+        address,
+        "MC6bBgYNvqSNEB8GMGSEAmFFCDWVaRcnF5");
+
+    BOOST_CHECK_MESSAGE(
+        MessageSign(privkey, message, generated_signature),
         "Sign with a valid private key");
 
-    BOOST_CHECK_EQUAL(expected_signature, generated_signature);
+    BOOST_CHECK_MESSAGE(
+        MessageSign(privkey, message, generated_signature_again),
+        "Repeat deterministic message signing");
+
+    BOOST_CHECK_EQUAL(
+        generated_signature,
+        generated_signature_again);
+
+    BOOST_CHECK_EQUAL(
+        MessageVerify(address, generated_signature, message),
+        MessageVerificationResult::OK);
 }
 
 BOOST_AUTO_TEST_CASE(message_verify)
 {
+    const std::array<unsigned char, 32> privkey_bytes = {
+        0xD9, 0x7F, 0x51, 0x08, 0xF1, 0x1C, 0xDA, 0x6E,
+        0xEE, 0xBA, 0xAA, 0x42, 0x0F, 0xEF, 0x07, 0x26,
+        0xB1, 0xF8, 0x98, 0x06, 0x0B, 0x98, 0x48, 0x9F,
+        0xA3, 0x09, 0x84, 0x63, 0xC0, 0x03, 0x28, 0x66
+    };
+
+    CKey privkey;
+    privkey.Set(privkey_bytes.begin(), privkey_bytes.end(), true);
+
+    BOOST_REQUIRE(privkey.IsValid());
+
+    const std::string address =
+        EncodeDestination(PKHash(privkey.GetPubKey().GetID()));
+
+    std::string valid_signature;
+
+    BOOST_REQUIRE(
+        MessageSign(privkey, "Trust no one", valid_signature));
+
     BOOST_CHECK_EQUAL(
         MessageVerify(
             "invalid address",
@@ -1549,45 +1579,45 @@ BOOST_AUTO_TEST_CASE(message_verify)
 
     BOOST_CHECK_EQUAL(
         MessageVerify(
-            "3B5fQsEXEaV8v6U3ejYc8XaKXAkyQj2MjV",
+            "SWgeXAXER3MxMEZ554s6FoMx2RhghyJaDT",
             "signature should be irrelevant",
             "message too"),
         MessageVerificationResult::ERR_ADDRESS_NO_KEY);
 
     BOOST_CHECK_EQUAL(
         MessageVerify(
-            "1KqbBpLy5FARmTPD4VZnDDpYjkUvkr82Pm",
+            address,
             "invalid signature, not in base64 encoding",
             "message should be irrelevant"),
         MessageVerificationResult::ERR_MALFORMED_SIGNATURE);
 
     BOOST_CHECK_EQUAL(
         MessageVerify(
-            "1KqbBpLy5FARmTPD4VZnDDpYjkUvkr82Pm",
+            address,
             "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
             "message should be irrelevant"),
         MessageVerificationResult::ERR_PUBKEY_NOT_RECOVERED);
 
     BOOST_CHECK_EQUAL(
         MessageVerify(
-            "15CRxFdyRpGZLW9w8HnHvVduizdL5jKNbs",
-            "IPojfrX2dfPnH26UegfbGQQLrdK844DlHq5157/P6h57WyuS/Qsl+h/WSVGDF4MUi4rWSswW38oimDYfNNUBUOk=",
+            address,
+            valid_signature,
             "I never signed this"),
         MessageVerificationResult::ERR_NOT_SIGNED);
 
     BOOST_CHECK_EQUAL(
         MessageVerify(
-            "15CRxFdyRpGZLW9w8HnHvVduizdL5jKNbs",
-            "IPojfrX2dfPnH26UegfbGQQLrdK844DlHq5157/P6h57WyuS/Qsl+h/WSVGDF4MUi4rWSswW38oimDYfNNUBUOk=",
+            address,
+            valid_signature,
             "Trust no one"),
         MessageVerificationResult::OK);
 
     BOOST_CHECK_EQUAL(
         MessageVerify(
-            "11canuhp9X2NocwCq7xNrQYTmUgZAnLK3",
-            "IIcaIENoYW5jZWxsb3Igb24gYnJpbmsgb2Ygc2Vjb25kIGJhaWxvdXQgZm9yIGJhbmtzIAaHRtbCeDZINyavx14=",
-            "Trust me"),
-        MessageVerificationResult::OK);
+            "MSjkRFFNaGLEf8MYHUDiTVRtCyN6NGDnkw",
+            valid_signature,
+            "Trust no one"),
+        MessageVerificationResult::ERR_NOT_SIGNED);
 }
 
 BOOST_AUTO_TEST_CASE(message_hash)

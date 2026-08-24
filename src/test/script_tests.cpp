@@ -387,6 +387,29 @@ public:
         return *this;
     }
 
+    static UniValue LegacyFixtureValueFromAmount(const CAmount amount)
+    {
+        static constexpr CAmount LEGACY_COIN{100'000'000};
+
+        int64_t quotient = amount / LEGACY_COIN;
+        int64_t remainder = amount % LEGACY_COIN;
+
+        if (amount < 0) {
+            quotient = -quotient;
+            remainder = -remainder;
+        }
+
+        return UniValue(
+            UniValue::VNUM,
+            strprintf(
+                "%s%d.%08d",
+                amount < 0 ? "-" : "",
+                quotient,
+                remainder
+            )
+        );
+    }
+
     UniValue GetJSON()
     {
         DoPush();
@@ -396,7 +419,7 @@ public:
             for (unsigned i = 0; i < scriptWitness.stack.size(); i++) {
                 wit.push_back(HexStr(scriptWitness.stack[i]));
             }
-            wit.push_back(ValueFromAmount(nValue));
+            wit.push_back(LegacyFixtureValueFromAmount(nValue));
             array.push_back(std::move(wit));
         }
         array.push_back(FormatScript(spendTx.vin[0].scriptSig));
@@ -949,7 +972,9 @@ BOOST_AUTO_TEST_CASE(script_json_test)
                     witness.stack.push_back(witness_value.value());
                 }
             }
-            nValue = AmountFromValue(test[pos][i]);
+            // Historical script fixtures encode raw amounts with
+            // Bitcoin Core's original 8-decimal representation.
+            nValue = AmountFromValue(test[pos][i], /*decimals=*/8);
             pos++;
         }
         if (test.size() < 4 + pos) // Allow size > 3; extra stuff ignored (useful for comments)

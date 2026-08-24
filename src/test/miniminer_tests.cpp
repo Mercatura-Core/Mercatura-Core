@@ -15,9 +15,9 @@
 
 BOOST_FIXTURE_TEST_SUITE(miniminer_tests, TestingSetup)
 
-const CAmount low_fee{CENT/2000}; // 500 ṩ
-const CAmount med_fee{CENT/200}; // 5000 ṩ
-const CAmount high_fee{CENT/10}; // 100_000 ṩ
+const CAmount low_fee{500};
+const CAmount med_fee{5'000};
+const CAmount high_fee{100'000};
 
 
 static inline CTransactionRef make_tx(const std::vector<COutPoint>& inputs, size_t num_outputs)
@@ -129,7 +129,7 @@ BOOST_FIXTURE_TEST_CASE(miniminer_1p1c, TestChain100Setup)
     TryAddToMempool(pool, entry.Fee(low_fee).FromTx(tx4));
     const auto tx5 = make_tx({COutPoint{tx4->GetHash(), 0}}, /*num_outputs=*/1);
     TryAddToMempool(pool, entry.Fee(low_fee).FromTx(tx5));
-    const CAmount tx5_delta{CENT/100};
+    const CAmount tx5_delta{10'000};
     // Make tx5's modified fee much higher than its base fee. This should cause it to pass
     // the fee-related checks despite being low-feerate.
     pool.PrioritiseTransaction(tx5->GetHash(), tx5_delta);
@@ -470,7 +470,7 @@ BOOST_FIXTURE_TEST_CASE(miniminer_overlap, TestChain100Setup)
     // Extremely high feerate: everybody's bumpfee is from their full ancestor set.
     {
         node::MiniMiner mini_miner(pool, all_unspent_outpoints);
-        const CFeeRate very_high_feerate(COIN);
+        const CFeeRate very_high_feerate(100'000'000);
         BOOST_CHECK(tx3_anc_feerate < very_high_feerate);
         BOOST_CHECK(mini_miner.IsReadyToCalculate());
         auto bump_fees = mini_miner.CalculateBumpFees(very_high_feerate);
@@ -576,9 +576,10 @@ BOOST_FIXTURE_TEST_CASE(miniminer_overlap, TestChain100Setup)
     BOOST_CHECK(miniminer_manual.IsReadyToCalculate());
     BOOST_CHECK(miniminer_pool.IsReadyToCalculate());
     for (const auto& sequences : {miniminer_manual.Linearize(), miniminer_pool.Linearize()}) {
-        // tx2 and tx4 selected first: high feerate with nothing to bump
-        BOOST_CHECK_EQUAL(Find(sequences, tx4->GetHash()), 0);
-        BOOST_CHECK_EQUAL(Find(sequences, tx2->GetHash()), 1);
+        // tx2 and tx4 are tied at the highest feerate; txid breaks the tie.
+        const auto tx2_pos = Find(sequences, tx2->GetHash());
+        const auto tx4_pos = Find(sequences, tx4->GetHash());
+        BOOST_CHECK((tx2_pos == 0 && tx4_pos == 1) || (tx2_pos == 1 && tx4_pos == 0));
 
         // tx5 + tx7 CPFP
         BOOST_CHECK_EQUAL(Find(sequences, tx5->GetHash()), 2);

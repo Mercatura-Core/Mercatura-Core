@@ -151,7 +151,7 @@ public:
 
 private:
     BitcoinUnit currentUnit{BitcoinUnit::BTC};
-    CAmount singleStep{CAmount(100000)}; // satoshis
+    CAmount singleStep{CENT}; // One Mercatura Cent
     mutable QSize cachedMinimumSizeHint;
     bool m_allow_empty{true};
     CAmount m_min_amount{CAmount(0)};

@@ -61,9 +61,9 @@ BOOST_FIXTURE_TEST_CASE(rbf_helper_functions, TestChain100Setup)
     LOCK2(::cs_main, pool.cs);
     TestMemPoolEntryHelper entry;
 
-    const CAmount low_fee{CENT/100};
-    const CAmount normal_fee{CENT/10};
-    const CAmount high_fee{CENT};
+    const CAmount low_fee{10'000};
+    const CAmount normal_fee{100'000};
+    const CAmount high_fee{1'000'000};
 
     // Create a parent tx1 and child tx2 with normal fees:
     const auto tx1 = make_tx(/*inputs=*/ {m_coinbase_txns[0]}, /*output_values=*/ {10 * COIN});
@@ -167,7 +167,7 @@ BOOST_FIXTURE_TEST_CASE(rbf_conflicts_calculator, TestChain100Setup)
     LOCK2(::cs_main, pool.cs);
     TestMemPoolEntryHelper entry;
 
-    const CAmount normal_fee{CENT/10};
+    const CAmount normal_fee{100'000};
 
     // Create two parent transactions with 51 outputs each
     const int NUM_OUTPUTS = 51;
@@ -252,8 +252,8 @@ BOOST_FIXTURE_TEST_CASE(improves_feerate, TestChain100Setup)
     LOCK2(::cs_main, pool.cs);
     TestMemPoolEntryHelper entry;
 
-    const CAmount low_fee{CENT/100};
-    const CAmount normal_fee{CENT/10};
+    const CAmount low_fee{10'000};
+    const CAmount normal_fee{100'000};
 
     // low feerate parent with normal feerate child
     const auto tx1 = make_tx(/*inputs=*/ {m_coinbase_txns[0], m_coinbase_txns[1]}, /*output_values=*/ {10 * COIN});
@@ -342,8 +342,8 @@ BOOST_FIXTURE_TEST_CASE(calc_feerate_diagram_rbf, TestChain100Setup)
     LOCK2(::cs_main, pool.cs);
     TestMemPoolEntryHelper entry;
 
-    const CAmount low_fee{CENT/100};
-    const CAmount high_fee{CENT};
+    const CAmount low_fee{10'000};
+    const CAmount high_fee{1'000'000};
 
     // low -> high -> medium fee transactions that would result in two chunks together since they
     // are all same size
