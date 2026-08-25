@@ -42,6 +42,8 @@ HeadersSyncState::HeadersSyncState(NodeId id,
                                        + MAX_FUTURE_BLOCK_TIME};
     m_max_commitments = 6 * max_seconds_since_start / m_params.commitment_period;
 
+    ResetDifficultyHistory();
+
     LogDebug(BCLog::NET, "Initial headers sync started with peer=%d: height=%i, max_commitments=%i, min_work=%s\n", m_id, m_current_height, m_max_commitments, m_minimum_required_work.ToString());
 }
 
@@ -52,6 +54,8 @@ void HeadersSyncState::Finalize()
 {
     Assume(m_download_state != State::FINAL);
     ClearShrink(m_header_commitments);
+    m_difficulty_history.clear();
+    m_difficulty_history.shrink_to_fit();
     m_last_header_received.SetNull();
     ClearShrink(m_redownloaded_headers);
     m_redownload_buffer_last_hash.SetNull();
@@ -60,6 +64,70 @@ void HeadersSyncState::Finalize()
     m_current_height = 0;
 
     m_download_state = State::FINAL;
+}
+
+void HeadersSyncState::ResetDifficultyHistory()
+{
+    m_difficulty_history.clear();
+
+    assert(m_consensus_params.nDGWPastBlocks > 0);
+
+    std::vector<const CBlockIndex*> history;
+    const CBlockIndex* pindex = &m_chain_start;
+
+    for (int64_t count = 0;
+         pindex != nullptr && count < m_consensus_params.nDGWPastBlocks;
+         ++count) {
+        history.push_back(pindex);
+        pindex = pindex->pprev;
+    }
+
+    for (auto it = history.rbegin(); it != history.rend(); ++it) {
+        m_difficulty_history.emplace_back((*it)->GetBlockHeader());
+
+        CBlockIndex& current = m_difficulty_history.back();
+        current.nHeight = (*it)->nHeight;
+        current.pprev =
+            m_difficulty_history.size() > 1
+                ? &m_difficulty_history[m_difficulty_history.size() - 2]
+                : nullptr;
+    }
+
+    assert(!m_difficulty_history.empty());
+}
+
+bool HeadersSyncState::ValidateDifficultyAndAddHeader(
+    const CBlockHeader& header,
+    const int64_t height)
+{
+    assert(!m_difficulty_history.empty());
+
+    const CBlockIndex& previous = m_difficulty_history.back();
+
+    if (header.nBits !=
+        GetNextWorkRequired(&previous, &header, m_consensus_params)) {
+        return false;
+    }
+
+    m_difficulty_history.emplace_back(header);
+
+    CBlockIndex& current = m_difficulty_history.back();
+    current.nHeight = height;
+    current.pprev =
+        m_difficulty_history.size() > 1
+            ? &m_difficulty_history[m_difficulty_history.size() - 2]
+            : nullptr;
+
+    if (m_difficulty_history.size() >
+        static_cast<size_t>(m_consensus_params.nDGWPastBlocks)) {
+        m_difficulty_history.pop_front();
+
+        // The oldest retained entry is the end of the DGW window.
+        // Do not leave its pprev pointing at the erased deque element.
+        m_difficulty_history.front().pprev = nullptr;
+    }
+
+    return true;
 }
 
 /** Process the next batch of headers received from our peer.
@@ -168,6 +236,7 @@ bool HeadersSyncState::ValidateAndStoreHeadersCommitments(std::span<const CBlock
         m_redownload_buffer_first_prev_hash = m_chain_start.GetBlockHash();
         m_redownload_buffer_last_hash = m_chain_start.GetBlockHash();
         m_redownload_chain_work = m_chain_start.nChainWork;
+        ResetDifficultyHistory();
         m_download_state = State::REDOWNLOAD;
         LogDebug(BCLog::NET, "Initial headers sync transition with peer=%d: reached sufficient work at height=%i, redownloading from height=%i\n", m_id, m_current_height, m_redownload_buffer_last_height);
     }
@@ -181,14 +250,11 @@ bool HeadersSyncState::ValidateAndProcessSingleHeader(const CBlockHeader& curren
 
     int next_height = m_current_height + 1;
 
-    // Verify that the difficulty isn't growing too fast; an adversary with
-    // limited hashing capability has a greater chance of producing a high
-    // work chain if they compress the work into as few blocks as possible,
-    // so don't let anyone give a chain that would violate the difficulty
-    // adjustment maximum.
-    if (!PermittedDifficultyTransition(m_consensus_params, next_height,
-                m_last_header_received.nBits, current.nBits)) {
-        LogDebug(BCLog::NET, "Initial headers sync aborted with peer=%d: invalid difficulty transition at height=%i (presync phase)\n", m_id, next_height);
+    // Validate the exact Mercatura DGW target before counting this header's
+    // claimed work. This prevents a peer from manufacturing apparent
+    // chainwork with impossible difficulty transitions during presync.
+    if (!ValidateDifficultyAndAddHeader(current, next_height)) {
+        LogDebug(BCLog::NET, "Initial headers sync aborted with peer=%d: invalid difficulty at height=%i (presync phase)\n", m_id, next_height);
         return false;
     }
 
@@ -226,17 +292,10 @@ bool HeadersSyncState::ValidateAndStoreRedownloadedHeader(const CBlockHeader& he
         return false;
     }
 
-    // Check that the difficulty adjustments are within our tolerance:
-    uint32_t previous_nBits{0};
-    if (!m_redownloaded_headers.empty()) {
-        previous_nBits = m_redownloaded_headers.back().nBits;
-    } else {
-        previous_nBits = m_chain_start.nBits;
-    }
-
-    if (!PermittedDifficultyTransition(m_consensus_params, next_height,
-                previous_nBits, header.nBits)) {
-        LogDebug(BCLog::NET, "Initial headers sync aborted with peer=%d: invalid difficulty transition at height=%i (redownload phase)\n", m_id, next_height);
+    // Validate the exact Mercatura DGW target again while redownloading the
+    // committed chain.
+    if (!ValidateDifficultyAndAddHeader(header, next_height)) {
+        LogDebug(BCLog::NET, "Initial headers sync aborted with peer=%d: invalid difficulty at height=%i (redownload phase)\n", m_id, next_height);
         return false;
     }
 

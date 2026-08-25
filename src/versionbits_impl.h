@@ -10,16 +10,16 @@
 #include <versionbits.h>
 
 /** BIP 9 defines a finite-state-machine to deploy a softfork in multiple stages.
- *  State transitions happen during retarget period if conditions are met
+ *  State transitions happen during signalling periods if conditions are met
  *  In case of reorg, transitions can go backward. Without transition, state is
  *  inherited between periods. All blocks of a period share the same state.
  */
 enum class ThresholdState : uint8_t {
     DEFINED,   // First state that each softfork starts out as. The genesis block is by definition in this state for each deployment.
     STARTED,   // For blocks past the starttime.
-    LOCKED_IN, // For at least one retarget period after the first retarget period with STARTED blocks of which at least threshold have the associated bit set in nVersion, until min_activation_height is reached.
-    ACTIVE,    // For all blocks after the LOCKED_IN retarget period (final state)
-    FAILED,    // For all blocks once the first retarget period after the timeout time is hit, if LOCKED_IN wasn't already reached (final state)
+    LOCKED_IN, // For at least one signalling period after the first signalling period with STARTED blocks of which at least threshold have the associated bit set in nVersion, until min_activation_height is reached.
+    ACTIVE,    // For all blocks after the LOCKED_IN signalling period (final state)
+    FAILED,    // For all blocks once the first signalling period after the timeout time is hit, if LOCKED_IN wasn't already reached (final state)
 };
 
 /** Get a string with the state name */

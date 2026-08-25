@@ -23,6 +23,31 @@ void initialize_pow()
     SelectParams(ChainType::MAIN);
 }
 
+static bool HasRequiredDGWHistory(
+    const CBlockIndex& block,
+    const Consensus::Params& params)
+{
+    if (params.fPowNoRetargeting ||
+        block.nHeight < params.nDGWPastBlocks) {
+        return true;
+    }
+
+    const CBlockIndex* current = &block;
+
+    // DGW evaluates nDGWPastBlocks entries including pindexLast itself,
+    // so it needs nDGWPastBlocks - 1 predecessor links.
+    for (int64_t count = 1;
+         count < params.nDGWPastBlocks;
+         ++count) {
+        if (current->pprev == nullptr) {
+            return false;
+        }
+        current = current->pprev;
+    }
+
+    return true;
+}
+
 FUZZ_TARGET(pow, .init = initialize_pow)
 {
     FuzzedDataProvider fuzzed_data_provider(buffer.data(), buffer.size());
@@ -63,9 +88,12 @@ FUZZ_TARGET(pow, .init = initialize_pow)
         }
         {
             (void)GetBlockProof(current_block);
-            (void)CalculateNextWorkRequired(&current_block, fuzzed_data_provider.ConsumeIntegralInRange<int64_t>(0, std::numeric_limits<int64_t>::max()), consensus_params);
-            if (current_block.nHeight != std::numeric_limits<int>::max() && current_block.nHeight - (consensus_params.DifficultyAdjustmentInterval() - 1) >= 0) {
-                (void)GetNextWorkRequired(&current_block, &(*block_header), consensus_params);
+
+            if (HasRequiredDGWHistory(current_block, consensus_params)) {
+                (void)GetNextWorkRequired(
+                    &current_block,
+                    &(*block_header),
+                    consensus_params);
             }
         }
         {
@@ -91,34 +119,69 @@ FUZZ_TARGET(pow_transition, .init = initialize_pow)
 {
     FuzzedDataProvider fuzzed_data_provider(buffer.data(), buffer.size());
     const Consensus::Params& consensus_params{Params().GetConsensus()};
+
+    const arith_uint256 pow_limit{
+        UintToArith256(consensus_params.powLimit)};
+
+    auto normalize_bits =
+        [&](uint32_t nbits) {
+            const auto target{
+                DeriveTarget(nbits, consensus_params.powLimit)};
+
+            // Keep targets large enough that the strongest 1/3 DGW
+            // adjustment cannot round all the way down to zero.
+            if (!target || *target < arith_uint256{3}) {
+                return pow_limit.GetCompact();
+            }
+
+            return nbits;
+        };
+
     std::vector<std::unique_ptr<CBlockIndex>> blocks;
 
-    const uint32_t old_time{fuzzed_data_provider.ConsumeIntegral<uint32_t>()};
-    const uint32_t new_time{fuzzed_data_provider.ConsumeIntegral<uint32_t>()};
-    const int32_t version{fuzzed_data_provider.ConsumeIntegral<int32_t>()};
-    uint32_t nbits{fuzzed_data_provider.ConsumeIntegral<uint32_t>()};
+    const int64_t history_count{
+        fuzzed_data_provider.ConsumeIntegralInRange<int64_t>(
+            1,
+            consensus_params.nDGWPastBlocks + 1)};
 
-    const arith_uint256 pow_limit = UintToArith256(consensus_params.powLimit);
-    arith_uint256 old_target;
-    old_target.SetCompact(nbits);
-    if (old_target > pow_limit) {
-        nbits = pow_limit.GetCompact();
-    }
-    // Create one difficulty adjustment period worth of headers
-    for (int height = 0; height < consensus_params.DifficultyAdjustmentInterval(); ++height) {
+    for (int64_t height = 0;
+         height < history_count;
+         ++height) {
         CBlockHeader header;
-        header.nVersion = version;
-        header.nTime = old_time;
-        header.nBits = nbits;
-        if (height == consensus_params.DifficultyAdjustmentInterval() - 1) {
-            header.nTime = new_time;
-        }
-        auto current_block{std::make_unique<CBlockIndex>(header)};
-        current_block->pprev = blocks.empty() ? nullptr : blocks.back().get();
-        current_block->nHeight = height;
-        blocks.emplace_back(std::move(current_block));
+        header.nVersion =
+            fuzzed_data_provider.ConsumeIntegral<int32_t>();
+        header.nTime =
+            fuzzed_data_provider.ConsumeIntegral<uint32_t>();
+        header.nBits =
+            normalize_bits(
+                fuzzed_data_provider.ConsumeIntegral<uint32_t>());
+
+        auto current{
+            std::make_unique<CBlockIndex>(header)};
+
+        current->pprev =
+            blocks.empty() ? nullptr : blocks.back().get();
+        current->nHeight =
+            static_cast<int>(height);
+
+        blocks.emplace_back(std::move(current));
     }
-    auto last_block{blocks.back().get()};
-    unsigned int new_nbits{GetNextWorkRequired(last_block, nullptr, consensus_params)};
-    Assert(PermittedDifficultyTransition(consensus_params, last_block->nHeight + 1, last_block->nBits, new_nbits));
+
+    CBlockHeader next_header;
+    next_header.nVersion =
+        fuzzed_data_provider.ConsumeIntegral<int32_t>();
+    next_header.nTime =
+        fuzzed_data_provider.ConsumeIntegral<uint32_t>();
+
+    const uint32_t new_nbits{
+        GetNextWorkRequired(
+            blocks.back().get(),
+            &next_header,
+            consensus_params)};
+
+    // GetNextWorkRequired() must always return a usable target within
+    // the configured proof-of-work limit for this normalized history.
+    Assert(DeriveTarget(
+        new_nbits,
+        consensus_params.powLimit).has_value());
 }

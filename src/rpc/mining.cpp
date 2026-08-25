@@ -58,7 +58,7 @@ using util::ToString;
 
 /**
  * Return average network hashes per second based on the last 'lookup' blocks,
- * or from the last difficulty change if 'lookup' is -1.
+ * or over Mercatura's DGW lookback window if 'lookup' is -1.
  * If 'height' is -1, compute the estimate from current chain tip.
  * If 'height' is a valid block height, compute the estimate at the time when a given block was found.
  */
@@ -80,9 +80,10 @@ static UniValue GetNetworkHashPS(int lookup, int height, const CChain& active_ch
     if (pb == nullptr || !pb->nHeight)
         return 0;
 
-    // If lookup is -1, then use blocks since last difficulty change.
+    // With every-block DGW there is no periodic "last difficulty change".
+    // Use Mercatura's rolling DGW lookback window by default.
     if (lookup == -1)
-        lookup = pb->nHeight % Params().GetConsensus().DifficultyAdjustmentInterval() + 1;
+        lookup = Params().GetConsensus().nDGWPastBlocks;
 
     // If lookup is larger than chain, then set it to chain length.
     if (lookup > pb->nHeight)
@@ -994,7 +995,7 @@ static RPCHelpMan getblocktemplate()
     result.pushKV("coinbasevalue", block.vtx[0]->vout[0].nValue);
     result.pushKV("longpollid", tip.GetHex() + ToString(nTransactionsUpdatedLast));
     result.pushKV("target", hashTarget.GetHex());
-    result.pushKV("mintime", GetMinimumTime(pindexPrev, consensusParams.DifficultyAdjustmentInterval()));
+    result.pushKV("mintime", GetMinimumTime(pindexPrev, consensusParams.BIP94TimewarpInterval()));
     result.pushKV("mutable", std::move(aMutable));
     result.pushKV("noncerange", "00000000ffffffff");
     int64_t nSigOpLimit = MAX_BLOCK_SIGOPS_COST;

@@ -59,7 +59,7 @@ def create_deterministic_address_bcrt1_p2tr_op_true(explicit_internal_key=None):
     taproot_info = taproot_construct(internal_key, [("only-path", CScript([OP_TRUE]))])
     address = output_key_to_p2tr(taproot_info.output_pubkey)
     if explicit_internal_key is None:
-        assert_equal(address, 'bcrt1p9yfmy5h72durp7zrhlw9lf7jpwjgvwdg0jr0lqmmjtgg83266lqsekaqka')
+        assert_equal(address, 'mcrt1p9yfmy5h72durp7zrhlw9lf7jpwjgvwdg0jr0lqmmjtgg83266lqsf4z42f')
     return (address, taproot_info)
 
 
@@ -136,7 +136,7 @@ def program_to_witness(version, program, main=False):
     assert 0 <= version <= 16
     assert 2 <= len(program) <= 40
     assert version > 0 or len(program) in [20, 32]
-    return encode_segwit_address("bc" if main else "bcrt", version, program)
+    return encode_segwit_address("mca" if main else "mcrt", version, program)
 
 def script_to_p2wsh(script, main=False):
     script = check_script(script)
@@ -175,7 +175,7 @@ def check_script(script):
 
 def bech32_to_bytes(address):
     hrp = address.split('1')[0]
-    if hrp not in ['bc', 'tb', 'bcrt']:
+    if hrp not in ['mca', 'tmca', 'mcrt', 'bc', 'tb', 'bcrt']:
         return (None, None)
     version, payload = decode_segwit_address(hrp, address)
     if version is None:

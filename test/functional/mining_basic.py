@@ -50,7 +50,7 @@ from test_framework.wallet import (
 )
 
 
-DIFFICULTY_ADJUSTMENT_INTERVAL = 144
+BIP94_TIMEWARP_INTERVAL = 144
 MAX_FUTURE_BLOCK_TIME = 2 * 3600
 MAX_TIMEWARP = 600
 VERSIONBITS_TOP_BITS = 0x20000000
@@ -195,9 +195,9 @@ class MiningTest(BitcoinTestFramework):
         node = self.nodes[0]
         self.restart_node(0, extra_args=['-test=bip94'])
 
-        self.log.info("Mine until the last block of the retarget period")
+        self.log.info("Mine until the last block before the BIP94 timewarp boundary")
         blockchain_info = self.nodes[0].getblockchaininfo()
-        n = DIFFICULTY_ADJUSTMENT_INTERVAL - blockchain_info['blocks'] % DIFFICULTY_ADJUSTMENT_INTERVAL - 2
+        n = BIP94_TIMEWARP_INTERVAL - blockchain_info['blocks'] % BIP94_TIMEWARP_INTERVAL - 2
         t = blockchain_info['time']
 
         for _ in range(n):
@@ -210,7 +210,7 @@ class MiningTest(BitcoinTestFramework):
         self.generate(self.wallet, 1, sync_fun=self.no_op)
         assert_equal(node.getblock(node.getbestblockhash())['time'], t + MAX_FUTURE_BLOCK_TIME)
 
-        self.log.info("First block template of retarget period can't use wall clock time")
+        self.log.info("Block template at BIP94 timewarp boundary can't use wall clock time")
         self.nodes[0].setmocktime(t)
         # The template will have an adjusted timestamp, which we then modify
         tmpl = node.getblocktemplate(NORMAL_GBT_REQUEST_PARAMS)

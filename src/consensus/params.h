@@ -50,16 +50,16 @@ struct BIP9Deployment {
     /** Timeout/expiry MedianTime for the deployment attempt. */
     int64_t nTimeout{NEVER_ACTIVE};
     /** If lock in occurs, delay activation until at least this block
-     *  height.  Note that activation will only occur on a retarget
+     *  height. Note that activation will only occur on a signalling-period
      *  boundary.
      */
     int min_activation_height{0};
-    /** Period of blocks to check signalling in (usually retarget period, ie params.DifficultyAdjustmentInterval()) */
+    /** Period of blocks used when checking versionbits signalling. */
     uint32_t period{2016};
     /**
-     * Minimum blocks including miner confirmation of the total of 2016 blocks in a retargeting period,
-     * which is also used for BIP9 deployments.
-     * Examples: 1916 for 95%, 1512 for testchains.
+     * Minimum signalling blocks required within the configured BIP9 period.
+     * Examples: 1916 for 95%, 1512 for testchains when using a 2016-block
+     * signalling period.
      */
     uint32_t threshold{1916};
 
@@ -112,18 +112,37 @@ struct Params {
     uint256 powLimit;
     bool fPowAllowMinDifficultyBlocks;
     /**
-      * Enforce BIP94 timewarp attack mitigation. On testnet4 this also enforces
-      * the block storm mitigation.
+      * Enforce the retained BIP94 timewarp attack mitigation.
+      * Mercatura's DGW handles proof-of-work difficulty independently.
       */
     bool enforce_BIP94;
     bool fPowNoRetargeting;
     int64_t nPowTargetSpacing;
-    int64_t nPowTargetTimespan;
+    /**
+     * Periodic boundary used by Bitcoin Core's retained BIP94 timewarp
+     * protection. This is independent of Mercatura's every-block DGW.
+     */
+    int64_t nBIP94TimewarpInterval{0};
+
+    /**
+     * Window used when checking unknown versionbits warnings. This is not
+     * a proof-of-work difficulty-adjustment interval.
+     */
+    int64_t nVersionBitsWarningPeriod{0};
+    /**
+     * Dark Gravity Wave v3 parameters.
+     * These are independent of Bitcoin's legacy periodic difficulty
+     * adjustment interval.
+     */
+    int64_t nDGWPastBlocks{0};
+    int64_t nDGWTargetTimespan{0};
+    int64_t nDGWMinTimespan{0};
+    int64_t nDGWMaxTimespan{0};
     std::chrono::seconds PowTargetSpacing() const
     {
         return std::chrono::seconds{nPowTargetSpacing};
     }
-    int64_t DifficultyAdjustmentInterval() const { return nPowTargetTimespan / nPowTargetSpacing; }
+    int64_t BIP94TimewarpInterval() const { return nBIP94TimewarpInterval; }
     /** The best chain should have at least this much work */
     uint256 nMinimumChainWork;
     /** By default assume that the signatures in ancestors of this block are valid */

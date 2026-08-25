@@ -132,7 +132,7 @@ public:
      *  download-twice mechanism).
      *
      * id: node id (for logging)
-     * consensus_params: parameters needed for difficulty adjustment validation
+     * consensus_params: parameters needed for proof-of-work difficulty validation
      * chain_start: best known fork point that the peer's headers branch from
      * minimum_required_work: amount of chain work required to accept the chain
      */
@@ -199,6 +199,15 @@ private:
      */
     bool ValidateAndStoreHeadersCommitments(std::span<const CBlockHeader> headers);
 
+    /** Rebuild the rolling difficulty history from the known chain start. */
+    void ResetDifficultyHistory();
+
+    /**
+     * Validate a header's exact Mercatura difficulty and append it to the
+     * rolling DGW history on success.
+     */
+    bool ValidateDifficultyAndAddHeader(const CBlockHeader& header, int64_t height);
+
     /** In PRESYNC, process and update state for a single header */
     bool ValidateAndProcessSingleHeader(const CBlockHeader& current);
 
@@ -240,6 +249,13 @@ private:
      * Any peer giving us more headers than this will have its sync aborted. This serves as a
      * memory bound on m_header_commitments. */
     uint64_t m_max_commitments{0};
+
+    /**
+     * Rolling block-index history used to validate Mercatura's exact DGW
+     * difficulty during headers presync and redownload. At most
+     * nDGWPastBlocks entries are retained.
+     */
+    std::deque<CBlockIndex> m_difficulty_history;
 
     /** Store the latest header received while in PRESYNC (initialized to m_chain_start) */
     CBlockHeader m_last_header_received;

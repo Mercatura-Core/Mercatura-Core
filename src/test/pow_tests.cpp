@@ -14,71 +14,276 @@
 
 BOOST_FIXTURE_TEST_SUITE(pow_tests, BasicTestingSetup)
 
-/* Test calculation of next difficulty target with no constraints applying */
-BOOST_AUTO_TEST_CASE(get_next_work)
+static std::vector<CBlockIndex> BuildDGWChain(
+    int count,
+    uint32_t nbits,
+    int64_t start_time,
+    int64_t spacing)
 {
-    const auto chainParams = CreateChainParams(*m_node.args, ChainType::MAIN);
-    int64_t nLastRetargetTime = 1261130161; // Block #30240
-    CBlockIndex pindexLast;
-    pindexLast.nHeight = 32255;
-    pindexLast.nTime = 1262152739;  // Block #32255
-    pindexLast.nBits = 0x1d00ffff;
+    std::vector<CBlockIndex> blocks(count);
 
-    // Here (and below): expected_nbits is calculated in
-    // CalculateNextWorkRequired(); redoing the calculation here would be just
-    // reimplementing the same code that is written in pow.cpp. Rather than
-    // copy that code, we just hardcode the expected result.
-    unsigned int expected_nbits = 0x1d00d86aU;
-    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, chainParams->GetConsensus()), expected_nbits);
-    BOOST_CHECK(PermittedDifficultyTransition(chainParams->GetConsensus(), pindexLast.nHeight+1, pindexLast.nBits, expected_nbits));
+    for (int i = 0; i < count; ++i) {
+        blocks[i].pprev = i == 0 ? nullptr : &blocks[i - 1];
+        blocks[i].nHeight = i;
+        blocks[i].nTime = start_time + i * spacing;
+        blocks[i].nBits = nbits;
+    }
+
+    return blocks;
 }
 
-/* Test the constraint on the upper bound for next work */
-BOOST_AUTO_TEST_CASE(get_next_work_pow_limit)
+BOOST_AUTO_TEST_CASE(dgw_parameters)
 {
-    const auto chainParams = CreateChainParams(*m_node.args, ChainType::MAIN);
-    int64_t nLastRetargetTime = 1231006505; // Block #0
-    CBlockIndex pindexLast;
-    pindexLast.nHeight = 2015;
-    pindexLast.nTime = 1233061996;  // Block #2015
-    pindexLast.nBits = 0x1d00ffff;
-    unsigned int expected_nbits = 0x1d00ffffU;
-    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, chainParams->GetConsensus()), expected_nbits);
-    BOOST_CHECK(PermittedDifficultyTransition(chainParams->GetConsensus(), pindexLast.nHeight+1, pindexLast.nBits, expected_nbits));
+    const auto main_params =
+        CreateChainParams(*m_node.args, ChainType::MAIN);
+    const auto& consensus = main_params->GetConsensus();
+
+    BOOST_CHECK_EQUAL(consensus.nPowTargetSpacing, 150);
+    BOOST_CHECK_EQUAL(consensus.nDGWPastBlocks, 24);
+    BOOST_CHECK_EQUAL(consensus.nDGWTargetTimespan, 3600);
+    BOOST_CHECK_EQUAL(consensus.nDGWMinTimespan, 1200);
+    BOOST_CHECK_EQUAL(consensus.nDGWMaxTimespan, 10800);
 }
 
-/* Test the constraint on the lower bound for actual time taken */
-BOOST_AUTO_TEST_CASE(get_next_work_lower_limit_actual)
+BOOST_AUTO_TEST_CASE(dgw_startup_holds_launch_difficulty)
 {
-    const auto chainParams = CreateChainParams(*m_node.args, ChainType::MAIN);
-    int64_t nLastRetargetTime = 1279008237; // Block #66528
-    CBlockIndex pindexLast;
-    pindexLast.nHeight = 68543;
-    pindexLast.nTime = 1279297671;  // Block #68543
-    pindexLast.nBits = 0x1c05a3f4;
-    unsigned int expected_nbits = 0x1c0168fdU;
-    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, chainParams->GetConsensus()), expected_nbits);
-    BOOST_CHECK(PermittedDifficultyTransition(chainParams->GetConsensus(), pindexLast.nHeight+1, pindexLast.nBits, expected_nbits));
-    // Test that reducing nbits further would not be a PermittedDifficultyTransition.
-    unsigned int invalid_nbits = expected_nbits-1;
-    BOOST_CHECK(!PermittedDifficultyTransition(chainParams->GetConsensus(), pindexLast.nHeight+1, pindexLast.nBits, invalid_nbits));
+    const auto main_params =
+        CreateChainParams(*m_node.args, ChainType::MAIN);
+    const auto& consensus = main_params->GetConsensus();
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+
+    auto blocks = BuildDGWChain(
+        24,
+        START_BITS,
+        1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    CBlockHeader next_block;
+    next_block.nTime =
+        blocks.back().GetBlockTime() + consensus.nPowTargetSpacing;
+
+    BOOST_CHECK_EQUAL(
+        GetNextWorkRequired(&blocks.back(), &next_block, consensus),
+        START_BITS);
 }
 
-/* Test the constraint on the upper bound for actual time taken */
-BOOST_AUTO_TEST_CASE(get_next_work_upper_limit_actual)
+BOOST_AUTO_TEST_CASE(dgw_first_activation_nominal_spacing)
 {
-    const auto chainParams = CreateChainParams(*m_node.args, ChainType::MAIN);
-    int64_t nLastRetargetTime = 1263163443; // NOTE: Not an actual block time
-    CBlockIndex pindexLast;
-    pindexLast.nHeight = 46367;
-    pindexLast.nTime = 1269211443;  // Block #46367
-    pindexLast.nBits = 0x1c387f6f;
-    unsigned int expected_nbits = 0x1d00e1fdU;
-    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, chainParams->GetConsensus()), expected_nbits);
-    BOOST_CHECK(PermittedDifficultyTransition(chainParams->GetConsensus(), pindexLast.nHeight+1, pindexLast.nBits, expected_nbits));
-    // Test that increasing nbits further would not be a PermittedDifficultyTransition.
-    unsigned int invalid_nbits = expected_nbits+1;
-    BOOST_CHECK(!PermittedDifficultyTransition(chainParams->GetConsensus(), pindexLast.nHeight+1, pindexLast.nBits, invalid_nbits));
+    const auto main_params =
+        CreateChainParams(*m_node.args, ChainType::MAIN);
+    const auto& consensus = main_params->GetConsensus();
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+
+    // Heights 1 through 24 form the first complete 24-block DGW window.
+    // Twenty-four blocks contain twenty-three timestamp intervals:
+    // 23 * 150 = 3450 seconds.
+    auto blocks = BuildDGWChain(
+        25,
+        START_BITS,
+        1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    CBlockHeader next_block;
+    next_block.nTime =
+        blocks.back().GetBlockTime() + consensus.nPowTargetSpacing;
+
+    constexpr uint32_t EXPECTED_BITS{0x1c0f5546U};
+
+    BOOST_CHECK_EQUAL(
+        GetNextWorkRequired(&blocks.back(), &next_block, consensus),
+        EXPECTED_BITS);
+}
+
+BOOST_AUTO_TEST_CASE(dgw_lower_timespan_clamp)
+{
+    const auto main_params =
+        CreateChainParams(*m_node.args, ChainType::MAIN);
+    const auto& consensus = main_params->GetConsensus();
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+
+    auto blocks = BuildDGWChain(
+        25,
+        START_BITS,
+        1'700'000'000,
+        1);
+
+    CBlockHeader next_block;
+    next_block.nTime = blocks.back().GetBlockTime() + 1;
+
+    // Actual window span is below 1200 seconds, so the locked lower
+    // clamp applies: target * 1200 / 3600 == target / 3.
+    constexpr uint32_t EXPECTED_BITS{0x1c055550U};
+
+    BOOST_CHECK_EQUAL(
+        GetNextWorkRequired(&blocks.back(), &next_block, consensus),
+        EXPECTED_BITS);
+}
+
+BOOST_AUTO_TEST_CASE(dgw_upper_timespan_clamp)
+{
+    const auto main_params =
+        CreateChainParams(*m_node.args, ChainType::MAIN);
+    const auto& consensus = main_params->GetConsensus();
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+
+    auto blocks = BuildDGWChain(
+        25,
+        START_BITS,
+        1'700'000'000,
+        1000);
+
+    CBlockHeader next_block;
+    next_block.nTime = blocks.back().GetBlockTime() + 1000;
+
+    // Actual window span exceeds 10800 seconds, so the locked upper
+    // clamp applies: target * 10800 / 3600 == target * 3.
+    constexpr uint32_t EXPECTED_BITS{0x1c2fffd0U};
+
+    BOOST_CHECK_EQUAL(
+        GetNextWorkRequired(&blocks.back(), &next_block, consensus),
+        EXPECTED_BITS);
+}
+
+BOOST_AUTO_TEST_CASE(dgw_historical_averaging_recurrence)
+{
+    const auto main_params =
+        CreateChainParams(*m_node.args, ChainType::MAIN);
+    const auto& consensus = main_params->GetConsensus();
+
+    constexpr uint32_t TARGET_A{0x1c0ffff0U};
+    constexpr uint32_t TARGET_B{0x1c07fff8U};
+
+    auto blocks = BuildDGWChain(
+        25,
+        TARGET_A,
+        1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    // Alternate two targets across the 24-block DGW window.
+    // The newest block (height 24) uses TARGET_A.
+    for (int i = 1; i <= 24; ++i) {
+        blocks[i].nBits = (i % 2 == 0) ? TARGET_A : TARGET_B;
+    }
+
+    // Make the timestamp span of the 24-block window exactly equal
+    // to the locked 3600-second DGW target timespan so this vector
+    // isolates the historical DGWv3 averaging recurrence.
+    blocks[1].nTime =
+        blocks.back().GetBlockTime() - consensus.nDGWTargetTimespan;
+
+    CBlockHeader next_block;
+    next_block.nTime =
+        blocks.back().GetBlockTime() + consensus.nPowTargetSpacing;
+
+    // This hard-coded result locks DGWv3's established recurrence:
+    //
+    //     avg = (previous_avg * count + target) / (count + 1)
+    //
+    // It intentionally differs from a conventional arithmetic mean.
+    constexpr uint32_t EXPECTED_BITS{0x1c0c28e9U};
+
+    BOOST_CHECK_EQUAL(
+        GetNextWorkRequired(&blocks.back(), &next_block, consensus),
+        EXPECTED_BITS);
+}
+
+BOOST_AUTO_TEST_CASE(dgw_pow_limit_ceiling)
+{
+    const auto main_params =
+        CreateChainParams(*m_node.args, ChainType::MAIN);
+    const auto& consensus = main_params->GetConsensus();
+
+    // Mainnet's current inherited powLimit encodes exactly as 0x1d00ffff.
+    // Final Mercatura powLimit values are intentionally deferred until
+    // the later genesis/initial-difficulty phase.
+    constexpr uint32_t POW_LIMIT_BITS{0x1d00ffffU};
+
+    auto blocks = BuildDGWChain(
+        25,
+        POW_LIMIT_BITS,
+        1'700'000'000,
+        1000);
+
+    CBlockHeader next_block;
+    next_block.nTime = blocks.back().GetBlockTime() + 1000;
+
+    // The 23,000-second historical span exceeds the 10,800-second
+    // maximum. The 3x adjustment would make the target easier than
+    // powLimit, so DGW must cap it back to powLimit.
+    BOOST_CHECK_EQUAL(
+        GetNextWorkRequired(&blocks.back(), &next_block, consensus),
+        POW_LIMIT_BITS);
+}
+
+BOOST_AUTO_TEST_CASE(testnet_min_difficulty_delay)
+{
+    const auto test_params =
+        CreateChainParams(*m_node.args, ChainType::TESTNET);
+    const auto& consensus = test_params->GetConsensus();
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+
+    auto blocks = BuildDGWChain(
+        25,
+        START_BITS,
+        1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    CBlockHeader exactly_two_spacings;
+    exactly_two_spacings.nTime =
+        blocks.back().GetBlockTime() +
+        consensus.nPowTargetSpacing * 2;
+
+    // Exactly 300 seconds does not trigger the exception because the
+    // consensus rule uses a strict greater-than comparison.
+    constexpr uint32_t NORMAL_DGW_BITS{0x1c0f5546U};
+
+    BOOST_CHECK_EQUAL(
+        GetNextWorkRequired(
+            &blocks.back(),
+            &exactly_two_spacings,
+            consensus),
+        NORMAL_DGW_BITS);
+
+    CBlockHeader delayed;
+    delayed.nTime =
+        blocks.back().GetBlockTime() +
+        consensus.nPowTargetSpacing * 2 + 1;
+
+    const uint32_t pow_limit_bits =
+        UintToArith256(consensus.powLimit).GetCompact();
+
+    BOOST_CHECK_EQUAL(
+        GetNextWorkRequired(&blocks.back(), &delayed, consensus),
+        pow_limit_bits);
+}
+
+BOOST_AUTO_TEST_CASE(regtest_no_retarget)
+{
+    const auto regtest_params =
+        CreateChainParams(*m_node.args, ChainType::REGTEST);
+    const auto& consensus = regtest_params->GetConsensus();
+
+    constexpr uint32_t START_BITS{0x2070ffffU};
+
+    auto blocks = BuildDGWChain(
+        30,
+        START_BITS,
+        1'700'000'000,
+        1);
+
+    CBlockHeader next_block;
+    next_block.nTime = blocks.back().GetBlockTime() + 100000;
+
+    BOOST_CHECK(consensus.fPowNoRetargeting);
+
+    BOOST_CHECK_EQUAL(
+        GetNextWorkRequired(&blocks.back(), &next_block, consensus),
+        START_BITS);
 }
 
 BOOST_AUTO_TEST_CASE(CheckProofOfWork_test_negative_target)
@@ -165,8 +370,10 @@ void sanity_check_chainparams(const ArgsManager& args, ChainType chain_type)
     // hash genesis is correct
     BOOST_CHECK_EQUAL(consensus.hashGenesisBlock, chainParams->GenesisBlock().GetHash());
 
-    // target timespan is an even multiple of spacing
-    BOOST_CHECK_EQUAL(consensus.nPowTargetTimespan % consensus.nPowTargetSpacing, 0);
+    // DGW's nominal window must exactly match its configured block spacing.
+    BOOST_CHECK_EQUAL(
+        consensus.nDGWTargetTimespan,
+        consensus.nDGWPastBlocks * consensus.nPowTargetSpacing);
 
     // genesis nBits is positive, doesn't overflow and is lower than powLimit
     arith_uint256 pow_compact;
@@ -176,10 +383,17 @@ void sanity_check_chainparams(const ArgsManager& args, ChainType chain_type)
     BOOST_CHECK(!over);
     BOOST_CHECK(UintToArith256(consensus.powLimit) >= pow_compact);
 
-    // check max target * 4*nPowTargetTimespan doesn't overflow -- see pow.cpp:CalculateNextWorkRequired()
+    // Check that the largest DGW multiplication cannot overflow.
+    // DarkGravityWave() multiplies the averaged target by at most
+    // nDGWMaxTimespan before dividing by nDGWTargetTimespan.
     if (!consensus.fPowNoRetargeting) {
-        arith_uint256 targ_max{UintToArith256(uint256{"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"})};
-        targ_max /= consensus.nPowTargetTimespan*4;
+        BOOST_REQUIRE(consensus.nDGWMaxTimespan > 0);
+
+        arith_uint256 targ_max{
+            UintToArith256(uint256{
+                "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"})};
+        targ_max /= consensus.nDGWMaxTimespan;
+
         BOOST_CHECK(UintToArith256(consensus.powLimit) < targ_max);
     }
 }

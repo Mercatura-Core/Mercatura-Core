@@ -535,13 +535,11 @@ class BlockchainTest(BitcoinTestFramework):
         hashes_per_second = self.nodes[0].getnetworkhashps()
         assert abs(hashes_per_second * 300 - 1) < 0.0001
 
-        # Test setting the first param of getnetworkhashps to -1 returns the average network
-        # hashes per second from the last difficulty change.
-        current_block_height = self.nodes[0].getmininginfo()['blocks']
-        blocks_since_last_diff_change = current_block_height % DIFFICULTY_ADJUSTMENT_INTERVAL + 1
-        expected_hashes_per_second_since_diff_change = self.nodes[0].getnetworkhashps(blocks_since_last_diff_change)
+        # With every-block DGW, -1 uses Mercatura's 24-block DGW lookback
+        # window rather than blocks since a periodic difficulty adjustment.
+        expected_hashes_per_second_dgw_window = self.nodes[0].getnetworkhashps(24)
 
-        assert_equal(self.nodes[0].getnetworkhashps(-1), expected_hashes_per_second_since_diff_change)
+        assert_equal(self.nodes[0].getnetworkhashps(-1), expected_hashes_per_second_dgw_window)
 
         # Ensure long lookups get truncated to chain length
         hashes_per_second = self.nodes[0].getnetworkhashps(self.nodes[0].getblockcount() + 1000)

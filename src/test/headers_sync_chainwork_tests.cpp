@@ -13,6 +13,7 @@
 #include <validation.h>
 
 #include <cstddef>
+#include <deque>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -91,6 +92,15 @@ struct HeadersGeneratorSetup : public RegTestingSetup {
                 /*minimum_required_work=*/CHAIN_WORK};
     }
 
+    /**
+     * Generate headers whose nBits values follow GetNextWorkRequired()
+     * under the supplied consensus parameters.
+     */
+    std::vector<CBlockHeader> GenerateDGWHeaders(
+        size_t count,
+        const Consensus::Params& consensus,
+        uint32_t spacing);
+
 private:
     /** Search for a nonce to meet (regtest) proof of work */
     void FindProofOfWork(CBlockHeader& starting_header);
@@ -129,6 +139,53 @@ std::vector<CBlockHeader> HeadersGeneratorSetup::GenerateHeaders(
     return headers;
 }
 
+std::vector<CBlockHeader> HeadersGeneratorSetup::GenerateDGWHeaders(
+    const size_t count,
+    const Consensus::Params& consensus,
+    const uint32_t spacing)
+{
+    std::vector<CBlockHeader> headers;
+    headers.reserve(count);
+
+    // Keep a synthetic block-index chain solely so the production
+    // GetNextWorkRequired() function can evaluate the exact DGW history.
+    std::deque<CBlockIndex> history;
+    history.emplace_back(chain_start.GetBlockHeader());
+    history.back().nHeight = chain_start.nHeight;
+    history.back().pprev = nullptr;
+
+    uint256 prev_hash{chain_start.GetBlockHash()};
+    int64_t prev_time{chain_start.GetBlockTime()};
+
+    for (size_t i = 0; i < count; ++i) {
+        CBlockHeader next_header;
+        next_header.nVersion = genesis.nVersion;
+        next_header.hashPrevBlock = prev_hash;
+        next_header.hashMerkleRoot = uint256::ONE;
+        next_header.nTime =
+            static_cast<uint32_t>(prev_time + spacing);
+        next_header.nBits =
+            GetNextWorkRequired(&history.back(), &next_header, consensus);
+
+        // The supplied test parameters use regtest's easy powLimit, so these
+        // headers remain cheap to mine while still exercising real DGW.
+        FindProofOfWork(next_header);
+
+        headers.push_back(next_header);
+
+        history.emplace_back(next_header);
+        CBlockIndex& current = history.back();
+        current.nHeight =
+            chain_start.nHeight + static_cast<int>(i) + 1;
+        current.pprev = &history[history.size() - 2];
+
+        prev_hash = next_header.GetHash();
+        prev_time = next_header.nTime;
+    }
+
+    return headers;
+}
+
 // In this test, we construct two sets of headers from genesis, one with
 // sufficient proof of work and one without.
 // 1. We deliver the first set of headers and verify that the headers sync state
@@ -140,6 +197,117 @@ std::vector<CBlockHeader> HeadersGeneratorSetup::GenerateHeaders(
 // 3. Repeat the second set of headers in both phases to demonstrate behavior
 //    when the chain a peer provides has too little work.
 BOOST_FIXTURE_TEST_SUITE(headers_sync_chainwork_tests, HeadersGeneratorSetup)
+
+BOOST_AUTO_TEST_CASE(dgw_exact_difficulty_presync)
+{
+    // Start with regtest's easy proof-of-work parameters, but enable the
+    // Mercatura DGW path locally for this test.
+    auto consensus{Params().GetConsensus()};
+    consensus.fPowNoRetargeting = false;
+    consensus.fPowAllowMinDifficultyBlocks = false;
+    consensus.enforce_BIP94 = false;
+
+    BOOST_REQUIRE_EQUAL(consensus.nDGWPastBlocks, 24);
+    BOOST_REQUIRE_EQUAL(consensus.nPowTargetSpacing, 150);
+
+    auto valid_chain{
+        GenerateDGWHeaders(
+            /*count=*/25,
+            consensus,
+            /*spacing=*/consensus.nPowTargetSpacing)};
+
+    BOOST_REQUIRE_EQUAL(valid_chain.size(), 25);
+
+    // Blocks 1-24 retain launch difficulty. Block 25 is the first real
+    // DGW calculation and therefore must differ at nominal spacing because
+    // the 24-block history contains 23 timestamp intervals.
+    BOOST_CHECK_EQUAL(valid_chain[23].nBits, genesis.nBits);
+    BOOST_CHECK_NE(valid_chain[24].nBits, valid_chain[23].nBits);
+
+    HeadersSyncState valid_hss{
+        /*id=*/0,
+        consensus,
+        HeadersSyncParams{
+            .commitment_period = COMMITMENT_PERIOD,
+            .redownload_buffer_size = REDOWNLOAD_BUFFER_SIZE,
+        },
+        chain_start,
+        /*minimum_required_work=*/CHAIN_WORK};
+
+    const auto valid_result{
+        valid_hss.ProcessNextHeaders(
+            valid_chain,
+            /*full_headers_message=*/true)};
+
+    BOOST_REQUIRE(valid_result.success);
+    BOOST_CHECK_EQUAL(valid_hss.GetState(), State::PRESYNC);
+    BOOST_CHECK_EQUAL(
+        valid_hss.GetPresyncHeight(),
+        chain_start.nHeight + static_cast<int64_t>(valid_chain.size()));
+
+    // Now replay the first 24 valid headers into a separate sync state.
+    HeadersSyncState invalid_hss{
+        /*id=*/0,
+        consensus,
+        HeadersSyncParams{
+            .commitment_period = COMMITMENT_PERIOD,
+            .redownload_buffer_size = REDOWNLOAD_BUFFER_SIZE,
+        },
+        chain_start,
+        /*minimum_required_work=*/CHAIN_WORK};
+
+    const auto prefix{
+        std::span{valid_chain}.first(24)};
+
+    const auto prefix_result{
+        invalid_hss.ProcessNextHeaders(
+            prefix,
+            /*full_headers_message=*/true)};
+
+    BOOST_REQUIRE(prefix_result.success);
+    BOOST_REQUIRE_EQUAL(invalid_hss.GetState(), State::PRESYNC);
+
+    // Take the valid first-DGW header and claim a slightly harder target.
+    // Mine it properly at its claimed target so rejection must come from
+    // Mercatura's exact difficulty rule, not from proof-of-work failure.
+    CBlockHeader invalid_header{valid_chain[24]};
+
+    arith_uint256 invalid_target;
+    invalid_target.SetCompact(invalid_header.nBits);
+    invalid_target /= 2;
+    invalid_header.nBits = invalid_target.GetCompact();
+
+    invalid_header.nNonce = 0;
+    while (!CheckProofOfWork(
+        invalid_header.GetHash(),
+        invalid_header.nBits,
+        consensus)) {
+        ++invalid_header.nNonce;
+    }
+
+    BOOST_REQUIRE(
+        GetBlockProof(invalid_header) >
+        GetBlockProof(valid_chain[24]));
+
+    const arith_uint256 work_before{
+        invalid_hss.GetPresyncWork()};
+
+    const std::vector<CBlockHeader> invalid_headers{
+        invalid_header};
+
+    const auto invalid_result{
+        invalid_hss.ProcessNextHeaders(
+            invalid_headers,
+            /*full_headers_message=*/true)};
+
+    BOOST_CHECK(!invalid_result.success);
+    BOOST_CHECK_EQUAL(invalid_hss.GetState(), State::FINAL);
+
+    // The fake higher-work header must be rejected before its claimed work
+    // can contribute to the PRESYNC chainwork total.
+    BOOST_CHECK(
+        invalid_hss.GetPresyncWork() == work_before);
+}
 
 BOOST_AUTO_TEST_CASE(sneaky_redownload)
 {

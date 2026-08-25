@@ -2,16 +2,15 @@
 # Copyright (c) 2025-present The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-"""Test mining on an alternate mainnet
+"""Inherited Bitcoin Core alternate-mainnet mining fixture.
 
-Test mining related RPCs that involve difficulty adjustment, which
-regtest doesn't have.
+This test exercises Bitcoin's former 2016-block periodic difficulty adjustment
+and is not valid for Mercatura's every-block DGW consensus. It is intentionally
+excluded from Mercatura's default functional-test runner and retained only as
+reference material until Mercatura-specific mainnet genesis, powLimit, launch
+nBits, and related launch parameters are finalized.
 
-It uses an alternate mainnet chain. See data/README.md for how it was generated.
-
-Mine one retarget period worth of blocks with a short interval in
-order to maximally raise the difficulty. Verify this using the getmininginfo RPC.
-
+See data/README.md for the inherited fixture details.
 """
 
 from test_framework.test_framework import BitcoinTestFramework

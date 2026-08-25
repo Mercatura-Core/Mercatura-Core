@@ -309,8 +309,8 @@ public:
     explicit WarningBitsConditionChecker(const CChainParams& chainparams, std::array<ThresholdConditionCache, Consensus::MAX_VERSION_BITS_DEPLOYMENTS>& caches, int bit)
     : m_params{chainparams.GetConsensus()}, m_caches{caches}, m_bit(bit)
     {
+        period = m_params.nVersionBitsWarningPeriod;
         if (chainparams.IsTestChain()) {
-            period = chainparams.GetConsensus().DifficultyAdjustmentInterval();
             threshold = period * 3 / 4; // 75% for test nets per BIP9 suggestion
         }
     }

@@ -291,7 +291,6 @@ BASE_SCRIPTS = [
     'wallet_importdescriptors.py',
     'wallet_crosschain.py',
     'mining_basic.py',
-    'mining_mainnet.py',
     'feature_signet.py',
     'p2p_mutated_blocks.py',
     'rpc_named_arguments.py',
@@ -395,7 +394,11 @@ BASE_SCRIPTS = [
 ALL_SCRIPTS = EXTENDED_SCRIPTS + BASE_SCRIPTS
 
 NON_SCRIPTS = [
-    # These are python files that live in the functional tests directory, but are not test scripts.
+    # These are python files that live in the functional tests directory, but are not active test scripts.
+    # Mercatura retains mining_mainnet.py only as an upstream Bitcoin
+    # periodic-retarget reference fixture until mainnet launch parameters
+    # and a Mercatura-specific DGW fixture are finalized.
+    "mining_mainnet.py",
     "combine_logs.py",
     "create_cache.py",
     "test_runner.py",
