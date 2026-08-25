@@ -268,13 +268,44 @@ BOOST_AUTO_TEST_CASE(MempoolSizeLimitTest)
     BOOST_CHECK_EQUAL(pool.GetMinFee(pool.DynamicMemoryUsage() * 9 / 2).GetFeePerK(), llround((maxFeeRateRemoved.GetFeePerK() + DEFAULT_INCREMENTAL_RELAY_FEE)/8.0));
     // ... with a 1/4 halflife when mempool is < 1/4 its target size
 
-    SetMockTime(42 + 7*CTxMemPool::ROLLING_FEE_HALFLIFE + CTxMemPool::ROLLING_FEE_HALFLIFE/2 + CTxMemPool::ROLLING_FEE_HALFLIFE/4);
-    BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(), DEFAULT_INCREMENTAL_RELAY_FEE);
-    // ... but feerate should never drop below DEFAULT_INCREMENTAL_RELAY_FEE
+    // Continue advancing by full half-lives until the rolling minimum reaches
+    // the configured incremental relay floor. The number of half-lives depends
+    // on the fee scale, so do not hardcode Bitcoin's original timing.
+    int64_t decay_time{
+        42 + 2 * CTxMemPool::ROLLING_FEE_HALFLIFE +
+        CTxMemPool::ROLLING_FEE_HALFLIFE / 2 +
+        CTxMemPool::ROLLING_FEE_HALFLIFE / 4
+    };
 
-    SetMockTime(42 + 8*CTxMemPool::ROLLING_FEE_HALFLIFE + CTxMemPool::ROLLING_FEE_HALFLIFE/2 + CTxMemPool::ROLLING_FEE_HALFLIFE/4);
-    BOOST_CHECK_EQUAL(pool.GetMinFee(1).GetFeePerK(), 0);
-    // ... unless it has gone all the way to 0 (after getting past DEFAULT_INCREMENTAL_RELAY_FEE/2)
+    bool reached_incremental_floor{false};
+    for (int i = 0; i < 64; ++i) {
+        decay_time += CTxMemPool::ROLLING_FEE_HALFLIFE;
+        SetMockTime(decay_time);
+
+        if (pool.GetMinFee(1).GetFeePerK() == DEFAULT_INCREMENTAL_RELAY_FEE) {
+            reached_incremental_floor = true;
+            break;
+        }
+    }
+    BOOST_REQUIRE(reached_incremental_floor);
+    // ... feerate should not drop below DEFAULT_INCREMENTAL_RELAY_FEE while nonzero.
+
+    bool reached_zero{false};
+    for (int i = 0; i < 64; ++i) {
+        decay_time += CTxMemPool::ROLLING_FEE_HALFLIFE;
+        SetMockTime(decay_time);
+
+        const CAmount min_fee{pool.GetMinFee(1).GetFeePerK()};
+        if (min_fee == 0) {
+            reached_zero = true;
+            break;
+        }
+
+        BOOST_CHECK_EQUAL(min_fee, DEFAULT_INCREMENTAL_RELAY_FEE);
+    }
+    BOOST_CHECK(reached_zero);
+    // ... unless the underlying rolling rate has fallen below half the
+    // incremental relay floor, at which point GetMinFee() resets it to zero.
 }
 
 inline CTransactionRef make_tx(std::vector<CAmount>&& output_values, std::vector<CTransactionRef>&& inputs=std::vector<CTransactionRef>(), std::vector<uint32_t>&& input_indices=std::vector<uint32_t>())

@@ -152,13 +152,37 @@ BOOST_FIXTURE_TEST_CASE(rbf_helper_functions, TestChain100Setup)
                            == std::nullopt);
     BOOST_CHECK(PaysForRBF(high_fee, high_fee - 1, 1, CFeeRate(0), unused_txid).has_value());
     BOOST_CHECK(PaysForRBF(high_fee + 1, high_fee, 1, CFeeRate(0), unused_txid).has_value());
-    // Additional fees must cover the replacement's vsize at incremental relay fee
-    BOOST_CHECK(PaysForRBF(high_fee, high_fee + 1, 11, incremental_relay_feerate, unused_txid).has_value());
-    BOOST_CHECK(PaysForRBF(high_fee, high_fee + 1, 10, incremental_relay_feerate, unused_txid) == std::nullopt);
-    BOOST_CHECK(PaysForRBF(high_fee, high_fee + 2, 11, higher_relay_feerate, unused_txid).has_value());
-    BOOST_CHECK(PaysForRBF(high_fee, high_fee + 4, 20, higher_relay_feerate, unused_txid) == std::nullopt);
-    BOOST_CHECK(PaysForRBF(low_fee, high_fee, 99999999, incremental_relay_feerate, unused_txid).has_value());
-    BOOST_CHECK(PaysForRBF(low_fee, high_fee + 99999999, 99999999, incremental_relay_feerate, unused_txid) == std::nullopt);
+    // Additional fees must cover the replacement's fee-policy size at the
+    // incremental relay feerate. Derive the boundary from CFeeRate so these
+    // tests remain correct with Mercatura's started-1000-byte fee policy.
+    const size_t replacement_size{11};
+    const CAmount incremental_required{
+        incremental_relay_feerate.GetFee(replacement_size)
+    };
+    BOOST_REQUIRE(incremental_required > 0);
+    BOOST_CHECK(PaysForRBF(high_fee, high_fee + incremental_required - 1,
+                           replacement_size, incremental_relay_feerate, unused_txid).has_value());
+    BOOST_CHECK(PaysForRBF(high_fee, high_fee + incremental_required,
+                           replacement_size, incremental_relay_feerate, unused_txid) == std::nullopt);
+
+    const CAmount higher_required{
+        higher_relay_feerate.GetFee(replacement_size)
+    };
+    BOOST_REQUIRE(higher_required > 0);
+    BOOST_CHECK(PaysForRBF(high_fee, high_fee + higher_required - 1,
+                           replacement_size, higher_relay_feerate, unused_txid).has_value());
+    BOOST_CHECK(PaysForRBF(high_fee, high_fee + higher_required,
+                           replacement_size, higher_relay_feerate, unused_txid) == std::nullopt);
+
+    const size_t large_replacement_size{99'999'999};
+    const CAmount large_required{
+        incremental_relay_feerate.GetFee(large_replacement_size)
+    };
+    BOOST_REQUIRE(large_required > 0);
+    BOOST_CHECK(PaysForRBF(low_fee, low_fee + large_required - 1,
+                           large_replacement_size, incremental_relay_feerate, unused_txid).has_value());
+    BOOST_CHECK(PaysForRBF(low_fee, low_fee + large_required,
+                           large_replacement_size, incremental_relay_feerate, unused_txid) == std::nullopt);
 }
 
 BOOST_FIXTURE_TEST_CASE(rbf_conflicts_calculator, TestChain100Setup)

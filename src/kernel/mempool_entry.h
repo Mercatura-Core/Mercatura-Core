@@ -109,9 +109,12 @@ public:
     const CAmount& GetFee() const { return nFee; }
     int32_t GetTxSize() const
     {
-        return GetVirtualTransactionSize(nTxWeight, sigOpCost, ::nBytesPerSigOp);
+        return GetTransactionFeeSize(*tx, sigOpCost, ::nBytesPerSigOp);
     }
-    int32_t GetAdjustedWeight() const { return GetSigOpsAdjustedWeight(nTxWeight, sigOpCost, ::nBytesPerSigOp); }
+    int32_t GetAdjustedWeight() const
+    {
+        return GetTransactionFeeWeight(*tx, sigOpCost, ::nBytesPerSigOp);
+    }
     int32_t GetTxWeight() const { return nTxWeight; }
     std::chrono::seconds GetTime() const { return std::chrono::seconds{nTime}; }
     unsigned int GetHeight() const { return entryHeight; }

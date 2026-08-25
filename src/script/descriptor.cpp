@@ -1018,6 +1018,10 @@ public:
      */
     virtual std::optional<int64_t> MaxSatSize(bool use_max_sig) const { return {}; }
 
+    std::optional<int64_t> MaxSatisfactionSize(bool use_max_sig) const final {
+        return MaxSatSize(use_max_sig);
+    }
+
     std::optional<int64_t> MaxSatisfactionWeight(bool) const override { return {}; }
 
     std::optional<int64_t> MaxSatisfactionElems() const override { return {}; }
@@ -1387,6 +1391,15 @@ public:
 
     std::optional<int64_t> ScriptSize() const override { return 1 + 1 + 20 + 1; }
 
+    std::optional<int64_t> MaxSatSize(bool use_max_sig) const override {
+        if (const auto sat_size = m_subdescriptor_args[0]->MaxSatSize(use_max_sig)) {
+            if (const auto subscript_size = m_subdescriptor_args[0]->ScriptSize()) {
+                return 1 + *subscript_size + *sat_size;
+            }
+        }
+        return {};
+    }
+
     std::optional<int64_t> MaxSatisfactionWeight(bool use_max_sig) const override {
         if (const auto sat_size = m_subdescriptor_args[0]->MaxSatSize(use_max_sig)) {
             if (const auto subscript_size = m_subdescriptor_args[0]->ScriptSize()) {
@@ -1518,6 +1531,10 @@ public:
     bool IsSingleType() const final { return true; }
 
     std::optional<int64_t> ScriptSize() const override { return 1 + 1 + 32; }
+
+    std::optional<int64_t> MaxSatSize(bool) const override {
+        return 1 + 65;
+    }
 
     std::optional<int64_t> MaxSatisfactionWeight(bool) const override {
         // FIXME: We assume keypath spend, which can lead to very large underestimations.
@@ -1721,6 +1738,10 @@ public:
     bool IsSingleType() const final { return true; }
 
     std::optional<int64_t> ScriptSize() const override { return 1 + 1 + 32; }
+
+    std::optional<int64_t> MaxSatSize(bool) const override {
+        return 1 + 65;
+    }
 
     std::optional<int64_t> MaxSatisfactionWeight(bool) const override {
         // We can't know whether there is a script path, so assume key path spend.

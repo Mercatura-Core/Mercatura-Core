@@ -25,8 +25,16 @@ namespace wallet {
  * Use CoinControl to determine whether to expect signature grinding when calculating the size of the input spend. */
 int CalculateMaximumSignedInputSize(const CTxOut& txout, const CWallet* pwallet, const CCoinControl* coin_control);
 int CalculateMaximumSignedInputSize(const CTxOut& txout, COutPoint outpoint, const SigningProvider* pwallet, bool can_grind_r, const CCoinControl* coin_control);
+
+/** Get the maximum BIP141 weight of the specified output as a signed input. */
+int CalculateMaximumSignedInputWeight(const CTxOut& txout, const CWallet* pwallet, const CCoinControl* coin_control);
+int CalculateMaximumSignedInputWeight(const CTxOut& txout, COutPoint outpoint, const SigningProvider* pwallet, bool can_grind_r, const CCoinControl* coin_control);
 struct TxSize {
+    // Mercatura full serialized size used for fee accounting.
+    // The legacy vsize name is retained for now to minimize wallet churn.
     int64_t vsize{-1};
+
+    // Bitcoin-style BIP141 weight retained for transaction-weight limits.
     int64_t weight{-1};
 };
 

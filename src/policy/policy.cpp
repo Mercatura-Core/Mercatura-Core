@@ -25,41 +25,18 @@
 
 CAmount GetDustThreshold(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
 {
-    // "Dust" is defined in terms of dustRelayFee,
-    // which has units of Mercatura base units per kilobyte.
-    // If you'd pay more in fees than the value of the output
-    // to spend something, then we consider it dust.
-    // A typical spendable non-segwit txout is 34 bytes big, and will
-    // need a CTxIn of at least 148 bytes to spend:
-    // so dust is a spendable txout less than
-    // 182*dustRelayFee/1000 (in Mercatura base units).
-    // 546 base units at the inherited default rate of 3000 base units/kvB.
-    // A typical spendable segwit P2WPKH txout is 31 bytes big, and will
-    // need a CTxIn of at least 67 bytes to spend:
-    // so dust is a spendable txout less than
-    // 98*dustRelayFee/1000 (in Mercatura base units).
-    // 294 base units at the inherited default rate of 3000 base units/kvB.
-    if (txout.scriptPubKey.IsUnspendable())
+    // Unspendable outputs do not need to be spent and are never considered dust.
+    if (txout.scriptPubKey.IsUnspendable()) {
         return 0;
-
-    uint64_t nSize{GetSerializeSize(txout)};
-    int witnessversion = 0;
-    std::vector<unsigned char> witnessprogram;
-
-    // Note this computation is for spending a Segwit v0 P2WPKH output (a 33 bytes
-    // public key + an ECDSA signature). For Segwit v1 Taproot outputs the minimum
-    // satisfaction is lower (a single BIP340 signature) but this computation was
-    // kept to not further reduce the dust level.
-    // See discussion in https://github.com/bitcoin/bitcoin/pull/22779 for details.
-    if (txout.scriptPubKey.IsWitnessProgram(witnessversion, witnessprogram)) {
-        // sum the sizes of the parts of a transaction input
-        // with 75% segwit discount applied to the script size.
-        nSize += (32 + 4 + 1 + (107 / WITNESS_SCALE_FACTOR) + 4);
-    } else {
-        nSize += (32 + 4 + 1 + 107 + 4); // the 148 mentioned above
     }
 
-    return dustRelayFeeIn.GetFee(nSize);
+    // Mercatura does not apply the SegWit witness discount to fee or dust
+    // accounting. Estimate the future input at its full 148-byte size.
+    const uint64_t nSize{GetSerializeSize(txout) + 148};
+
+    // Mercatura's recommended dust floor is 0.02 MCA = 2 base units.
+    // A higher configured dust relay feerate may raise this threshold.
+    return std::max<CAmount>(2, dustRelayFeeIn.GetFee(nSize));
 }
 
 bool IsDust(const CTxOut& txout, const CFeeRate& dustRelayFeeIn)
@@ -391,4 +368,18 @@ int64_t GetVirtualTransactionSize(const CTransaction& tx, int64_t nSigOpCost, un
 int64_t GetVirtualTransactionInputSize(const CTxIn& txin, int64_t nSigOpCost, unsigned int bytes_per_sigop)
 {
     return GetVirtualTransactionSize(GetTransactionInputWeight(txin), nSigOpCost, bytes_per_sigop);
+}
+
+int64_t GetTransactionFeeWeight(const CTransaction& tx, int64_t nSigOpCost, unsigned int bytes_per_sigop)
+{
+    const int64_t serialized_weight{
+        static_cast<int64_t>(GetSerializeSize(TX_WITH_WITNESS(tx))) * WITNESS_SCALE_FACTOR
+    };
+    return GetSigOpsAdjustedWeight(serialized_weight, nSigOpCost, bytes_per_sigop);
+}
+
+int64_t GetTransactionFeeSize(const CTransaction& tx, int64_t nSigOpCost, unsigned int bytes_per_sigop)
+{
+    return (GetTransactionFeeWeight(tx, nSigOpCost, bytes_per_sigop) + WITNESS_SCALE_FACTOR - 1) /
+           WITNESS_SCALE_FACTOR;
 }

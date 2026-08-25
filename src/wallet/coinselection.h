@@ -20,9 +20,9 @@
 
 namespace wallet {
 //! lower bound for randomly-chosen target change amount
-static constexpr CAmount CHANGE_LOWER{50000};
+static constexpr CAmount CHANGE_LOWER{2};
 //! upper bound for randomly-chosen target change amount
-static constexpr CAmount CHANGE_UPPER{1000000};
+static constexpr CAmount CHANGE_UPPER{40};
 
 /** A UTXO under consideration for use in funding a new transaction. */
 struct COutput {
@@ -47,8 +47,13 @@ public:
      * If < 0: a conflicting tx is on chain and has this many confirmations. */
     int depth;
 
-    /** Pre-computed estimated size of this output as a fully-signed input in a transaction. Can be -1 if it could not be calculated */
+    /** Pre-computed full serialized size of this output as a fully-signed input.
+     * Used for Mercatura fee accounting. Can be -1 if it could not be calculated. */
     int input_bytes;
+
+    /** Pre-computed BIP141 weight of this output as a fully-signed input.
+     * Used for transaction and coin-selection weight limits. Can be -1 if unknown. */
+    int input_weight;
 
     /** Whether we know how to spend this output, ignoring the lack of keys */
     bool solvable;
@@ -72,11 +77,12 @@ public:
     /** The fee necessary to bump this UTXO's ancestor transactions to the target feerate */
     CAmount ancestor_bump_fees{0};
 
-    COutput(const COutPoint& outpoint, const CTxOut& txout, int depth, int input_bytes, bool solvable, bool safe, int64_t time, bool from_me, const std::optional<CFeeRate> feerate = std::nullopt)
+    COutput(const COutPoint& outpoint, const CTxOut& txout, int depth, int input_bytes, bool solvable, bool safe, int64_t time, bool from_me, const std::optional<CFeeRate> feerate = std::nullopt, int input_weight = -1)
         : outpoint{outpoint},
           txout{txout},
           depth{depth},
           input_bytes{input_bytes},
+          input_weight{input_weight},
           solvable{solvable},
           safe{safe},
           time{time},
@@ -89,8 +95,8 @@ public:
         }
     }
 
-    COutput(const COutPoint& outpoint, const CTxOut& txout, int depth, int input_bytes, bool solvable, bool safe, int64_t time, bool from_me, const CAmount fees)
-        : COutput(outpoint, txout, depth, input_bytes, solvable, safe, time, from_me)
+    COutput(const COutPoint& outpoint, const CTxOut& txout, int depth, int input_bytes, bool solvable, bool safe, int64_t time, bool from_me, const CAmount fees, int input_weight = -1)
+        : COutput(outpoint, txout, depth, input_bytes, solvable, safe, time, from_me, std::nullopt, input_weight)
     {
         // if input_bytes is unknown, then fees should be 0, if input_bytes is known, then the fees should be a positive integer or 0 (input_bytes known and fees = 0 only happens in the tests)
         assert((input_bytes < 0 && fees == 0) || (input_bytes > 0 && fees >= 0));
@@ -136,7 +142,7 @@ struct CoinSelectionParams {
     FastRandomContext& rng_fast;
     /** Size of a change output in bytes, determined by the output type. */
     int change_output_size = 0;
-    /** Size of the input to spend a change output in virtual bytes. */
+    /** Full serialized size of the input used to spend a change output for Mercatura fee accounting. */
     int change_spend_size = 0;
     /** Mininmum change to target in Knapsack solver and CoinGrinder:
      * select coins to cover the payment and at least this value of change. */

@@ -28,7 +28,7 @@ void WalletModelTransaction::setWtx(const CTransactionRef& newTx)
 
 unsigned int WalletModelTransaction::getTransactionSize()
 {
-    return wtx ? GetVirtualTransactionSize(*wtx) : 0;
+    return wtx ? GetTransactionFeeSize(*wtx) : 0;
 }
 
 CAmount WalletModelTransaction::getTransactionFee() const

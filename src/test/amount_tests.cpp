@@ -116,6 +116,20 @@ BOOST_AUTO_TEST_CASE(GetFeeTest)
     BOOST_CHECK(5 * feeRate == CFeeRate(0));
 }
 
+BOOST_AUTO_TEST_CASE(MercaturaFeePolicyBoundaryTest)
+{
+    const CFeeRate fee_rate{1};
+
+    BOOST_CHECK_EQUAL(fee_rate.GetFee(0), CAmount(0));
+    BOOST_CHECK_EQUAL(fee_rate.GetFee(1), CAmount(1));
+    BOOST_CHECK_EQUAL(fee_rate.GetFee(999), CAmount(1));
+    BOOST_CHECK_EQUAL(fee_rate.GetFee(1000), CAmount(1));
+    BOOST_CHECK_EQUAL(fee_rate.GetFee(1001), CAmount(2));
+    BOOST_CHECK_EQUAL(fee_rate.GetFee(1999), CAmount(2));
+    BOOST_CHECK_EQUAL(fee_rate.GetFee(2000), CAmount(2));
+    BOOST_CHECK_EQUAL(fee_rate.GetFee(2001), CAmount(3));
+}
+
 BOOST_AUTO_TEST_CASE(BinaryOperatorTest)
 {
     CFeeRate a, b;

@@ -169,6 +169,15 @@ struct Descriptor {
      */
     virtual std::optional<int64_t> MaxSatisfactionWeight(bool use_max_sig) const = 0;
 
+    /** Get the maximum serialized size of a satisfaction in raw bytes.
+     *
+     * This is used by Mercatura fee accounting, where witness and non-witness
+     * bytes count equally.
+     *
+     * @param use_max_sig Whether to assume ECDSA signatures will have a high-r.
+     */
+    virtual std::optional<int64_t> MaxSatisfactionSize(bool use_max_sig) const { return {}; }
+
     /** Get the maximum size number of stack elements for satisfying this descriptor. */
     virtual std::optional<int64_t> MaxSatisfactionElems() const = 0;
 

@@ -38,6 +38,11 @@ BOOST_FIXTURE_TEST_CASE(SubtractFee, TestChain100Setup)
     CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
     auto wallet = CreateSyncedWallet(*m_node.chain, WITH_LOCK(Assert(m_node.chainman)->GetMutex(), return m_node.chainman->ActiveChain()), coinbaseKey);
 
+    // Use a higher test-only discard rate so Mercatura's coarse monetary
+    // granularity leaves room between the transaction fee and minimum viable
+    // change. This preserves the original subtract-fee test semantics.
+    wallet->m_discard_rate = CFeeRate{20};
+
     // Check that a subtract-from-recipient transaction slightly less than the
     // coinbase input amount does not create a change output (because it would
     // be uneconomical to add and spend the output), and make sure it pays the
@@ -46,7 +51,7 @@ BOOST_FIXTURE_TEST_CASE(SubtractFee, TestChain100Setup)
     auto check_tx = [&wallet](CAmount leftover_input_amount) {
         CRecipient recipient{PubKeyDestination({}), 50 * COIN - leftover_input_amount, /*subtract_fee=*/true};
         CCoinControl coin_control;
-        coin_control.m_feerate.emplace(10000);
+        coin_control.m_feerate.emplace(10);
         coin_control.fOverrideFeeRate = true;
         // We need to use a change type with high cost of change so that the leftover amount will be dropped to fee instead of added as a change output
         coin_control.m_change_type = OutputType::LEGACY;
@@ -64,8 +69,8 @@ BOOST_FIXTURE_TEST_CASE(SubtractFee, TestChain100Setup)
     const CAmount fee{check_tx(0)};
 
     // Send slightly less than full input amount to recipient, check leftover
-    // input amount is paid to recipient not the miner (to_reduce == fee - 123)
-    BOOST_CHECK_EQUAL(fee, check_tx(123));
+    // input amount is paid to recipient not the miner (to_reduce == fee - 1)
+    BOOST_CHECK_EQUAL(fee, check_tx(1));
 
     // Send full input minus fee amount to recipient, check leftover input
     // amount is paid to recipient not the miner (to_reduce == 0)
@@ -73,9 +78,9 @@ BOOST_FIXTURE_TEST_CASE(SubtractFee, TestChain100Setup)
 
     // Send full input minus more than the fee amount to recipient, check
     // leftover input amount is paid to recipient not the miner (to_reduce ==
-    // -123). This overpays the recipient instead of overpaying the miner more
+    // -1). This overpays the recipient instead of overpaying the miner more
     // than double the necessary fee.
-    BOOST_CHECK_EQUAL(fee, check_tx(fee + 123));
+    BOOST_CHECK_EQUAL(fee, check_tx(fee + 1));
 }
 
 BOOST_FIXTURE_TEST_CASE(wallet_duplicated_preset_inputs_test, TestChain100Setup)

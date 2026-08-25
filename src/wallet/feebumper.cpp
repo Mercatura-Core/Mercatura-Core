@@ -118,10 +118,9 @@ static feebumper::Result CheckFeeRate(const CWallet& wallet, const CMutableTrans
 
 static CFeeRate EstimateFeeRate(const CWallet& wallet, const CWalletTx& wtx, const CAmount old_fee, const CCoinControl& coin_control)
 {
-    // Get the fee rate of the original transaction. This is calculated from
-    // the tx fee/vsize, so it may have been rounded down. Add 1 Mercatura base unit to the
-    // result.
-    int64_t txSize = GetVirtualTransactionSize(*(wtx.tx));
+    // Get the fee rate of the original transaction using Mercatura's full-byte
+    // fee size. It may have been rounded down, so add 1 Mercatura base unit.
+    int64_t txSize = GetTransactionFeeSize(*(wtx.tx));
     CFeeRate feerate(old_fee, txSize);
     feerate += CFeeRate(1);
 

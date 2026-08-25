@@ -135,14 +135,17 @@ PSBTAnalysis AnalyzePSBT(PartiallySignedTransaction psbtx)
             }
         }
 
-        if (success) {
-            CTransaction ctx = CTransaction(mtx);
-            size_t size(GetVirtualTransactionSize(ctx, GetTransactionSigOpCost(ctx, view, STANDARD_SCRIPT_VERIFY_FLAGS), ::nBytesPerSigOp));
-            result.estimated_vsize = size;
-            // Estimate fee rate
-            CFeeRate feerate(fee, size);
-            result.estimated_feerate = feerate;
-        }
+            if (success) {
+                CTransaction ctx = CTransaction(mtx);
+                const int64_t sigop_cost{GetTransactionSigOpCost(ctx, view, STANDARD_SCRIPT_VERIFY_FLAGS)};
+                const size_t vsize{static_cast<size_t>(GetVirtualTransactionSize(ctx, sigop_cost, ::nBytesPerSigOp))};
+                const size_t fee_size{static_cast<size_t>(GetTransactionFeeSize(ctx, sigop_cost, ::nBytesPerSigOp))};
+
+                result.estimated_vsize = vsize;
+
+                // Mercatura fee estimation uses full serialized size with no witness discount.
+                result.estimated_feerate = CFeeRate(fee, fee_size);
+            }
 
     }
 

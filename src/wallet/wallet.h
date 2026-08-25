@@ -103,13 +103,13 @@ void NotifyWalletLoaded(WalletContext& context, const std::shared_ptr<CWallet>& 
 std::unique_ptr<WalletDatabase> MakeWalletDatabase(const std::string& name, const DatabaseOptions& options, DatabaseStatus& status, bilingual_str& error);
 
 //! -fallbackfee default
-static const CAmount DEFAULT_FALLBACK_FEE = 0;
+static const CAmount DEFAULT_FALLBACK_FEE = 1;
 //! -discardfee default
-static const CAmount DEFAULT_DISCARD_FEE = 10000;
+static const CAmount DEFAULT_DISCARD_FEE = 1;
 //! -mintxfee default
-static const CAmount DEFAULT_TRANSACTION_MINFEE = 1000;
+static const CAmount DEFAULT_TRANSACTION_MINFEE = 1;
 //! -consolidatefeerate default
-static const CAmount DEFAULT_CONSOLIDATE_FEERATE{10000}; // 10 sat/vbyte
+static const CAmount DEFAULT_CONSOLIDATE_FEERATE{1}; // 0.01 MCA/kvB
 /**
  * maximum fee increase allowed to do partial spend avoidance, even for nodes with this feature disabled by default
  *
@@ -121,7 +121,7 @@ static const CAmount DEFAULT_MAX_AVOIDPARTIALSPEND_FEE = 0;
 //! discourage APS fee higher than this amount
 constexpr CAmount HIGH_APS_FEE{CENT};
 //! minimum recommended increment for replacement txs
-static const CAmount WALLET_INCREMENTAL_RELAY_FEE = 5000;
+static const CAmount WALLET_INCREMENTAL_RELAY_FEE = 1;
 //! Default for -spendzeroconfchange
 static const bool DEFAULT_SPEND_ZEROCONF_CHANGE = true;
 //! Default for -walletrejectlongchains
@@ -133,12 +133,12 @@ static const bool DEFAULT_WALLET_RBF = true;
 static const bool DEFAULT_WALLETBROADCAST = true;
 static const bool DEFAULT_DISABLE_WALLET = false;
 static const bool DEFAULT_WALLETCROSSCHAIN = false;
-//! -maxtxfee default
-constexpr CAmount DEFAULT_TRANSACTION_MAXFEE{COIN / 10};
-//! Discourage users to set fees higher than this amount (in Mercatura base units) per kB
-constexpr CAmount HIGH_TX_FEE_PER_KB{COIN / 100};
-//! -maxtxfee will warn if called with a higher fee than this amount (in Mercatura base units)
-constexpr CAmount HIGH_MAX_TX_FEE{100 * HIGH_TX_FEE_PER_KB};
+//! -maxtxfee default: 100 MCA absolute wallet transaction-fee ceiling.
+constexpr CAmount DEFAULT_TRANSACTION_MAXFEE{100 * COIN};
+//! Warn about fee rates above 10 MCA per 1,000 effective bytes.
+constexpr CAmount HIGH_TX_FEE_PER_KB{10 * COIN};
+//! -maxtxfee will warn above 1,000 MCA.
+constexpr CAmount HIGH_MAX_TX_FEE{10 * DEFAULT_TRANSACTION_MAXFEE};
 //! Pre-calculated constants for input size estimation in *virtual size*
 static constexpr size_t DUMMY_NESTED_P2WPKH_INPUT_SIZE = 91;
 

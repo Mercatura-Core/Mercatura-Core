@@ -774,7 +774,11 @@ void OutputGroup::Insert(const std::shared_ptr<COutput>& output, size_t ancestor
     // same transaction, their clusters will be merged, potentially exceeding the mempool's max cluster count.
     m_max_cluster_count = std::max(m_max_cluster_count, cluster_count);
 
-    if (output->input_bytes > 0) {
+    if (output->input_weight > 0) {
+        m_weight += output->input_weight;
+    } else if (output->input_bytes > 0) {
+        // Legacy/test fallback for COutput instances without a separate
+        // BIP141 weight estimate.
         m_weight += output->input_bytes * WITNESS_SCALE_FACTOR;
     }
 }
@@ -811,7 +815,7 @@ CAmount GenerateChangeTarget(const CAmount payment_value, const CAmount change_f
     if (payment_value <= CHANGE_LOWER / 2) {
         return change_fee + CHANGE_LOWER;
     } else {
-        // random value between 50ksat and min (payment_value * 2, 1milsat)
+        // Random change target from 0.02 MCA up to min(payment_value * 2, 0.40 MCA).
         const auto upper_bound = std::min(payment_value * 2, CHANGE_UPPER);
         return change_fee + rng.randrange(upper_bound - CHANGE_LOWER) + CHANGE_LOWER;
     }
@@ -915,6 +919,11 @@ void SelectionResult::AddInputs(const OutputSet& inputs, bool subtract_fee_outpu
     m_use_effective = !subtract_fee_outputs;
 
     m_weight += std::accumulate(inputs.cbegin(), inputs.cend(), 0, [](int sum, const auto& coin) {
+        if (coin->input_weight > 0) {
+            return sum + coin->input_weight;
+        }
+        // Legacy/test fallback for COutput instances without a separate
+        // BIP141 weight estimate.
         return sum + std::max(coin->input_bytes, 0) * WITNESS_SCALE_FACTOR;
     });
 }

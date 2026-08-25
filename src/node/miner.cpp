@@ -236,9 +236,11 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     return std::move(pblocktemplate);
 }
 
-bool BlockAssembler::TestChunkBlockLimits(FeePerWeight chunk_feerate, int64_t chunk_sigops_cost) const
+bool BlockAssembler::TestChunkBlockLimits(int64_t chunk_weight, int64_t chunk_sigops_cost) const
 {
-    if (nBlockWeight + chunk_feerate.size >= m_options.nBlockMaxWeight) {
+    // Fee ranking uses Mercatura's undiscounted fee weight, but block-fit
+    // accounting remains on the real transaction weight until Phase 6.
+    if (nBlockWeight + chunk_weight >= m_options.nBlockMaxWeight) {
         return false;
     }
     if (nBlockSigOpsCost + chunk_sigops_cost >= MAX_BLOCK_SIGOPS_COST) {
@@ -301,12 +303,14 @@ void BlockAssembler::addChunks()
         }
 
         int64_t chunk_sig_ops = 0;
+        int64_t chunk_weight = 0;
         for (const auto& tx : selected_transactions) {
             chunk_sig_ops += tx.get().GetSigOpCost();
+            chunk_weight += tx.get().GetTxWeight();
         }
 
-        // Check to see if this chunk will fit.
-        if (!TestChunkBlockLimits(chunk_feerate, chunk_sig_ops) || !TestChunkTransactions(selected_transactions)) {
+        // Check actual block weight separately from Mercatura fee-ranking weight.
+        if (!TestChunkBlockLimits(chunk_weight, chunk_sig_ops) || !TestChunkTransactions(selected_transactions)) {
             // This chunk won't fit, so we skip it and will try the next best one.
             m_mempool->SkipBuilderChunk();
             ++nConsecutiveFailed;

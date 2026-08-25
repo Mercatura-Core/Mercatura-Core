@@ -44,7 +44,7 @@ static constexpr unsigned int MAX_STANDARD_TX_SIGOPS_COST{MAX_BLOCK_SIGOPS_COST/
 /** The maximum number of potentially executed legacy signature operations in a single standard tx */
 static constexpr unsigned int MAX_TX_LEGACY_SIGOPS{2'500};
 /** Default for -incrementalrelayfee, which sets the minimum feerate increase for mempool limiting or replacement **/
-static constexpr unsigned int DEFAULT_INCREMENTAL_RELAY_FEE{100};
+static constexpr unsigned int DEFAULT_INCREMENTAL_RELAY_FEE{1};
 /** Default for -bytespersigop */
 static constexpr unsigned int DEFAULT_BYTES_PER_SIGOP{20};
 /** Default for -permitbaremultisig */
@@ -64,9 +64,9 @@ static constexpr unsigned int MAX_STANDARD_SCRIPTSIG_SIZE{1650};
  * standard and should be done with care and ideally rarely. It makes sense to
  * only increase the dust limit after prior releases were already not creating
  * outputs below the new threshold */
-static constexpr unsigned int DUST_RELAY_TX_FEE{3000};
+static constexpr unsigned int DUST_RELAY_TX_FEE{1};
 /** Default for -minrelaytxfee, minimum relay fee for transactions */
-static constexpr unsigned int DEFAULT_MIN_RELAY_TX_FEE{100};
+static constexpr unsigned int DEFAULT_MIN_RELAY_TX_FEE{1};
 /** Maximum number of transactions per cluster (default) */
 static constexpr unsigned int DEFAULT_CLUSTER_LIMIT{64};
 /** Maximum size of cluster in virtual kilobytes */
@@ -180,6 +180,22 @@ bool SpendsNonAnchorWitnessProg(const CTransaction& tx, const CCoinsViewCache& p
 int64_t GetVirtualTransactionSize(int64_t nWeight, int64_t nSigOpCost, unsigned int bytes_per_sigop);
 int64_t GetVirtualTransactionSize(const CTransaction& tx, int64_t nSigOpCost, unsigned int bytes_per_sigop);
 int64_t GetVirtualTransactionInputSize(const CTxIn& tx, int64_t nSigOpCost, unsigned int bytes_per_sigop);
+
+/**
+ * Compute Mercatura fee-policy weight with no witness discount.
+ *
+ * Every serialized transaction byte, including witness data, contributes
+ * WITNESS_SCALE_FACTOR fee-weight units. Sigop adjustment is preserved.
+ */
+int64_t GetTransactionFeeWeight(const CTransaction& tx, int64_t nSigOpCost, unsigned int bytes_per_sigop);
+
+/** Compute Mercatura effective fee size in bytes with no witness discount. */
+int64_t GetTransactionFeeSize(const CTransaction& tx, int64_t nSigOpCost, unsigned int bytes_per_sigop);
+
+static inline int64_t GetTransactionFeeSize(const CTransaction& tx)
+{
+    return GetTransactionFeeSize(tx, 0, 0);
+}
 
 static inline int64_t GetVirtualTransactionSize(const CTransaction& tx)
 {

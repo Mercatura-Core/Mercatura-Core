@@ -746,6 +746,36 @@ BOOST_AUTO_TEST_CASE(test_witness)
     CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
 }
 
+BOOST_AUTO_TEST_CASE(MercaturaUndiscountedFeeSizeTest)
+{
+    CMutableTransaction legacy;
+    legacy.vin.emplace_back(COutPoint{Txid::FromUint256(uint256::ONE), 0});
+    legacy.vout.emplace_back(1, CScript() << OP_TRUE);
+
+    const CTransaction legacy_tx{legacy};
+    const int64_t legacy_full_size{static_cast<int64_t>(GetSerializeSize(TX_WITH_WITNESS(legacy_tx)))};
+
+    BOOST_CHECK_EQUAL(GetTransactionFeeSize(legacy_tx), legacy_full_size);
+    BOOST_CHECK_EQUAL(GetTransactionFeeWeight(legacy_tx, 0, 0),
+                      legacy_full_size * WITNESS_SCALE_FACTOR);
+    BOOST_CHECK_EQUAL(GetTransactionFeeSize(legacy_tx),
+                      GetVirtualTransactionSize(legacy_tx));
+
+    CMutableTransaction witness{legacy};
+    witness.vin[0].scriptWitness.stack.emplace_back(100, 0x42);
+
+    const CTransaction witness_tx{witness};
+    const int64_t witness_full_size{static_cast<int64_t>(GetSerializeSize(TX_WITH_WITNESS(witness_tx)))};
+
+    BOOST_CHECK_EQUAL(GetTransactionFeeSize(witness_tx), witness_full_size);
+    BOOST_CHECK_EQUAL(GetTransactionFeeWeight(witness_tx, 0, 0),
+                      witness_full_size * WITNESS_SCALE_FACTOR);
+
+    // Bitcoin-style virtual size discounts witness data. Mercatura fee policy does not.
+    BOOST_CHECK_GT(GetTransactionFeeSize(witness_tx),
+                   GetVirtualTransactionSize(witness_tx));
+}
+
 BOOST_AUTO_TEST_CASE(test_IsStandard)
 {
     FillableSigningProvider keystore;
@@ -777,9 +807,9 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
 
     CheckIsStandard(t);
 
-    // Check dust with default relay fee:
-    CAmount nDustThreshold = 182 * g_dust.GetFeePerK() / 1000;
-    BOOST_CHECK_EQUAL(nDustThreshold, 546);
+    // Mercatura's default dust floor is 0.02 MCA = 2 base units.
+    const CAmount nDustThreshold = GetDustThreshold(t.vout[0], g_dust);
+    BOOST_CHECK_EQUAL(nDustThreshold, 2);
 
     // Add dust outputs up to allowed maximum, still standard!
     for (size_t i{0}; i < MAX_DUST_OUTPUTS_PER_TX; ++i) {
@@ -820,6 +850,14 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     // not dust:
     t.vout[0].nValue = 674;
     CheckIsStandard(t);
+
+    // Mercatura does not apply Bitcoin's witness discount to dust accounting.
+    // P2WPKH output: 31 serialized bytes + 148-byte full input estimate = 179 bytes.
+    t.vout[0].scriptPubKey = CScript() << OP_0 << std::vector<unsigned char>(20, 0);
+    BOOST_CHECK_EQUAL(GetDustThreshold(t.vout[0], g_dust), 663);
+
+    // Restore the P2PKH output and default dust relay rate.
+    t.vout[0].scriptPubKey = GetScriptForDestination(PKHash(key.GetPubKey()));
     g_dust = CFeeRate{DUST_RELAY_TX_FEE};
 
     t.vout[0].scriptPubKey = CScript() << OP_1;
@@ -952,71 +990,71 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     assert(t.vout.size() == 1);
     t.vout.insert(t.vout.end(), MAX_DUST_OUTPUTS_PER_TX, {0, t.vout[0].scriptPubKey});
 
-    // Check compressed P2PK outputs dust threshold (must have leading 02 or 03)
+    // Check compressed P2PK outputs use Mercatura's 2-base-unit dust floor.
     t.vout[0].scriptPubKey = CScript() << std::vector<unsigned char>(33, 0x02) << OP_CHECKSIG;
-    t.vout[0].nValue = 576;
+    t.vout[0].nValue = 2;
     CheckIsStandard(t);
-    t.vout[0].nValue = 575;
+    t.vout[0].nValue = 1;
     CheckIsNotStandard(t, "dust");
 
-    // Check uncompressed P2PK outputs dust threshold (must have leading 04/06/07)
+    // Check uncompressed P2PK outputs use Mercatura's 2-base-unit dust floor.
     t.vout[0].scriptPubKey = CScript() << std::vector<unsigned char>(65, 0x04) << OP_CHECKSIG;
-    t.vout[0].nValue = 672;
+    t.vout[0].nValue = 2;
     CheckIsStandard(t);
-    t.vout[0].nValue = 671;
+    t.vout[0].nValue = 1;
     CheckIsNotStandard(t, "dust");
 
-    // Check P2PKH outputs dust threshold
+    // Check P2PKH outputs use Mercatura's 2-base-unit dust floor.
     t.vout[0].scriptPubKey = CScript() << OP_DUP << OP_HASH160 << std::vector<unsigned char>(20, 0) << OP_EQUALVERIFY << OP_CHECKSIG;
-    t.vout[0].nValue = 546;
+    t.vout[0].nValue = 2;
     CheckIsStandard(t);
-    t.vout[0].nValue = 545;
+    t.vout[0].nValue = 1;
     CheckIsNotStandard(t, "dust");
 
-    // Check P2SH outputs dust threshold
+    // Check P2SH outputs use Mercatura's 2-base-unit dust floor.
     t.vout[0].scriptPubKey = CScript() << OP_HASH160 << std::vector<unsigned char>(20, 0) << OP_EQUAL;
-    t.vout[0].nValue = 540;
+    t.vout[0].nValue = 2;
     CheckIsStandard(t);
-    t.vout[0].nValue = 539;
+    t.vout[0].nValue = 1;
     CheckIsNotStandard(t, "dust");
 
-    // Check P2WPKH outputs dust threshold
+    // Check P2WPKH outputs use the same full-byte Mercatura dust policy.
     t.vout[0].scriptPubKey = CScript() << OP_0 << std::vector<unsigned char>(20, 0);
-    t.vout[0].nValue = 294;
+    t.vout[0].nValue = 2;
     CheckIsStandard(t);
-    t.vout[0].nValue = 293;
+    t.vout[0].nValue = 1;
     CheckIsNotStandard(t, "dust");
 
-    // Check P2WSH outputs dust threshold
+    // Check P2WSH outputs use the same full-byte Mercatura dust policy.
     t.vout[0].scriptPubKey = CScript() << OP_0 << std::vector<unsigned char>(32, 0);
-    t.vout[0].nValue = 330;
+    t.vout[0].nValue = 2;
     CheckIsStandard(t);
-    t.vout[0].nValue = 329;
+    t.vout[0].nValue = 1;
     CheckIsNotStandard(t, "dust");
 
-    // Check P2TR outputs dust threshold (Invalid xonly key ok!)
+    // Check P2TR outputs use the same full-byte Mercatura dust policy.
     t.vout[0].scriptPubKey = CScript() << OP_1 << std::vector<unsigned char>(32, 0);
-    t.vout[0].nValue = 330;
+    t.vout[0].nValue = 2;
     CheckIsStandard(t);
-    t.vout[0].nValue = 329;
+    t.vout[0].nValue = 1;
     CheckIsNotStandard(t, "dust");
 
     // Check future Witness Program versions dust threshold (non-32-byte pushes are undefined for version 1)
     for (int op = OP_1; op <= OP_16; op += 1) {
         t.vout[0].scriptPubKey = CScript() << (opcodetype)op << std::vector<unsigned char>(2, 0);
-        t.vout[0].nValue = 240;
+        t.vout[0].nValue = 2;
         CheckIsStandard(t);
 
-        t.vout[0].nValue = 239;
+        t.vout[0].nValue = 1;
         CheckIsNotStandard(t, "dust");
     }
 
     // Check anchor outputs
     t.vout[0].scriptPubKey = CScript() << OP_1 << ANCHOR_BYTES;
     BOOST_CHECK(t.vout[0].scriptPubKey.IsPayToAnchor());
-    t.vout[0].nValue = 240;
+    t.vout[0].nValue = 2;
     CheckIsStandard(t);
-    t.vout[0].nValue = 239;
+    t.vout[0].nValue = 1;
     CheckIsNotStandard(t, "dust");
 }
 
