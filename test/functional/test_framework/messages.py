@@ -30,18 +30,21 @@ import unittest
 
 from test_framework.crypto.siphash import siphash256
 from test_framework.util import (
+    MCA_BASE_UNITS_PER_COIN,
     assert_equal,
     assert_not_equal,
 )
 
 MAX_LOCATOR_SZ = 101
 MAX_BLOCK_WEIGHT = 4000000
-DEFAULT_BLOCK_RESERVED_WEIGHT = 8000
-MINIMUM_BLOCK_RESERVED_WEIGHT = 2000
+MERCATURA_INITIAL_BLOCK_CAPACITY = 1 << 20
+MERCATURA_MAX_BLOCK_CAPACITY = 1 << 30
+DEFAULT_BLOCK_RESERVED_SIZE = 2000
+MINIMUM_BLOCK_RESERVED_SIZE = 500
 MAX_BLOOM_FILTER_SIZE = 36000
 MAX_BLOOM_HASH_FUNCS = 50
 
-COIN = 100000000  # 1 btc in satoshis
+COIN = MCA_BASE_UNITS_PER_COIN  # 1 MCA in base units
 MAX_MONEY = 21000000 * COIN
 
 MAX_BIP125_RBF_SEQUENCE = 0xfffffffd  # Sequence number that is rbf-opt-in (BIP 125) and csv-opt-out (BIP 68)
@@ -721,6 +724,10 @@ class CTransaction:
 
     def get_vsize(self):
         return math.ceil(self.get_weight() / WITNESS_SCALE_FACTOR)
+
+    def get_fee_size(self):
+        """Return Mercatura fee size: complete serialized bytes including witness."""
+        return len(self.serialize_with_witness())
 
     def __repr__(self):
         return "CTransaction(version=%i vin=%s vout=%s wit=%s nLockTime=%i)" \

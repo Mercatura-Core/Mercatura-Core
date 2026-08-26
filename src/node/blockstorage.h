@@ -119,8 +119,48 @@ using kernel::BlockTreeDB;
 static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
 /** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
 static const unsigned int UNDOFILE_CHUNK_SIZE = 0x100000; // 1 MiB
-/** The maximum size of a blk?????.dat file (since 0.8) */
+/** The normal target size of a blk?????.dat file (since 0.8).
+ *
+ * Mercatura blocks may eventually exceed this target. In that case the
+ * individual block file is enlarged only as much as necessary for that block.
+ */
 static const unsigned int MAX_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
+
+/**
+ * Return the blk*.dat size limit needed to store an entry of add_size bytes.
+ *
+ * Normal block files retain Bitcoin Core's 128 MiB target. A single Mercatura
+ * block larger than that target receives a dedicated file large enough to hold
+ * it. The arithmetic is widened before adding one, so uint32_t add_size cannot
+ * overflow this calculation.
+ */
+static constexpr uint64_t GetBlockFileSizeLimit(uint32_t add_size, bool fast_prune)
+{
+    const uint64_t target{
+        fast_prune ? 0x10000ULL /* 64 KiB */ : uint64_t{MAX_BLOCKFILE_SIZE}
+    };
+
+    return uint64_t{add_size} >= target
+        ? uint64_t{add_size} + 1
+        : target;
+}
+
+/**
+ * Check whether a bounded partial raw-block read is allowed.
+ *
+ * Complete stored blocks may exceed MAX_SIZE, but an individual partial read
+ * remains bounded by the generic deserialization safety limit.
+ */
+static constexpr bool IsRawBlockPartAllowed(
+    uint64_t block_size,
+    uint64_t offset,
+    uint64_t size)
+{
+    return size > 0 &&
+           size <= MAX_SIZE &&
+           offset <= block_size &&
+           size <= block_size - offset;
+}
 
 /** Size of header written by WriteBlock before a serialized CBlock (8 bytes) */
 static constexpr uint32_t STORAGE_HEADER_BYTES{std::tuple_size_v<MessageStartChars> + sizeof(unsigned int)};
@@ -315,6 +355,7 @@ protected:
 public:
     using Options = kernel::BlockManagerOpts;
     using ReadRawBlockResult = util::Expected<std::vector<std::byte>, ReadRawError>;
+    using ReadRawBlockSizeResult = util::Expected<uint32_t, ReadRawError>;
 
     explicit BlockManager(const util::SignalInterrupt& interrupt, Options opts);
 
@@ -469,6 +510,10 @@ public:
     /** Functions for disk access for blocks */
     bool ReadBlock(CBlock& block, const FlatFilePos& pos, const std::optional<uint256>& expected_hash) const;
     bool ReadBlock(CBlock& block, const CBlockIndex& index) const;
+
+    /** Read only the serialized block size stored in the blk*.dat record header. */
+    ReadRawBlockSizeResult ReadRawBlockSize(const FlatFilePos& pos) const;
+
     ReadRawBlockResult ReadRawBlock(const FlatFilePos& pos, std::optional<std::pair<size_t, size_t>> block_part = std::nullopt) const;
 
     bool ReadBlockUndo(CBlockUndo& blockundo, const CBlockIndex& index) const;

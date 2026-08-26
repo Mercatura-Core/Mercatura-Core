@@ -674,7 +674,7 @@ static RPCHelpMan getblocktemplate()
                         }},
                         {RPCResult::Type::NUM, "fee", "difference in value between transaction inputs and outputs (in Mercatura base units); for coinbase transactions, this is a negative Number of the total collected block fees (ie, not including the block subsidy); if key is not present, fee is unknown and clients MUST NOT assume there isn't one"},
                         {RPCResult::Type::NUM, "sigops", "total SigOps cost, as counted for purposes of block limits; if key is not present, sigop cost is unknown and clients MUST NOT assume it is zero"},
-                        {RPCResult::Type::NUM, "weight", "total transaction weight, as counted for purposes of block limits"},
+                        {RPCResult::Type::NUM, "weight", "BIP141 transaction weight, retained for mining-client compatibility; Mercatura block capacity is enforced using full serialized bytes"},
                     }},
                 }},
                 {RPCResult::Type::OBJ_DYN, "coinbaseaux", "data that should be included in the coinbase's scriptSig content",
@@ -691,8 +691,8 @@ static RPCHelpMan getblocktemplate()
                 }},
                 {RPCResult::Type::STR_HEX, "noncerange", "A range of valid nonces"},
                 {RPCResult::Type::NUM, "sigoplimit", "limit of sigops in blocks"},
-                {RPCResult::Type::NUM, "sizelimit", "limit of block size"},
-                {RPCResult::Type::NUM, "weightlimit", /*optional=*/true, "limit of block weight"},
+                {RPCResult::Type::NUM, "sizelimit", "authoritative Mercatura full serialized block-byte limit for this template"},
+                {RPCResult::Type::NUM, "weightlimit", /*optional=*/true, "non-binding BIP141 compatibility upper bound equal to four times sizelimit; sizelimit is authoritative"},
                 {RPCResult::Type::NUM_TIME, "curtime", "current timestamp in " + UNIX_EPOCH_TIME + ". Adjusted for the proposed BIP94 timewarp rule."},
                 {RPCResult::Type::STR, "bits", "compressed target of next block"},
                 {RPCResult::Type::NUM, "height", "The height of the next block"},
@@ -999,17 +999,39 @@ static RPCHelpMan getblocktemplate()
     result.pushKV("mutable", std::move(aMutable));
     result.pushKV("noncerange", "00000000ffffffff");
     int64_t nSigOpLimit = MAX_BLOCK_SIGOPS_COST;
-    int64_t nSizeLimit = MAX_BLOCK_SERIALIZED_SIZE;
+
+    BlockAssembler::Options assembler_options;
+    ApplyArgsManOptions(*node.args, assembler_options);
+
+    const int64_t nSizeLimit{
+        static_cast<int64_t>(
+            GetBlockTemplateMaxCapacityBytes(
+                pindexPrev->nHeight + 1,
+                assembler_options))
+    };
+
     if (fPreSegWit) {
-        CHECK_NONFATAL(nSigOpLimit % WITNESS_SCALE_FACTOR == 0);
+        CHECK_NONFATAL(
+            nSigOpLimit % WITNESS_SCALE_FACTOR == 0);
         nSigOpLimit /= WITNESS_SCALE_FACTOR;
-        CHECK_NONFATAL(nSizeLimit % WITNESS_SCALE_FACTOR == 0);
-        nSizeLimit /= WITNESS_SCALE_FACTOR;
     }
+
     result.pushKV("sigoplimit", nSigOpLimit);
+
+    // BIP22 sizelimit is Mercatura's authoritative serialized-byte ceiling.
+    // Witness and non-witness bytes count equally for capacity.
     result.pushKV("sizelimit", nSizeLimit);
+
     if (!fPreSegWit) {
-        result.pushKV("weightlimit", MAX_BLOCK_WEIGHT);
+        // Preserve BIP145 compatibility without reintroducing a weight-based
+        // consensus restriction. For a block of at most N serialized bytes,
+        // genuine BIP141 weight can never exceed 4*N.
+        const int64_t compatibility_weight_limit{
+            nSizeLimit * WITNESS_SCALE_FACTOR
+        };
+        result.pushKV(
+            "weightlimit",
+            compatibility_weight_limit);
     }
     result.pushKV("curtime", block.GetBlockTime());
     result.pushKV("bits", strprintf("%08x", block.nBits));

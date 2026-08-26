@@ -28,10 +28,11 @@ from test_framework.messages import (
     CBlock,
     CBlockHeader,
     COIN,
-    DEFAULT_BLOCK_RESERVED_WEIGHT,
-    MAX_BLOCK_WEIGHT,
+    DEFAULT_BLOCK_RESERVED_SIZE,
+    MERCATURA_INITIAL_BLOCK_CAPACITY,
+    MERCATURA_MAX_BLOCK_CAPACITY,
     MAX_SEQUENCE_NONFINAL,
-    MINIMUM_BLOCK_RESERVED_WEIGHT,
+    MINIMUM_BLOCK_RESERVED_SIZE,
     ser_uint256,
     WITNESS_SCALE_FACTOR,
 )
@@ -75,7 +76,9 @@ class MiningTest(BitcoinTestFramework):
         mining_info = self.nodes[0].getmininginfo()
         assert_equal(mining_info['blocks'], 200)
         assert_equal(mining_info['currentblocktx'], 0)
-        assert_equal(mining_info['currentblockweight'], DEFAULT_BLOCK_RESERVED_WEIGHT)
+        # currentblockweight remains a genuine BIP141 weight statistic.
+        # Mercatura's mining capacity is accounted separately in serialized bytes.
+        assert_greater_than(mining_info['currentblockweight'], 0)
 
         self.log.info('test blockversion')
         self.restart_node(0, extra_args=[f'-mocktime={t}', '-blockversion=1337'])
@@ -98,29 +101,33 @@ class MiningTest(BitcoinTestFramework):
         # Mature with regular coinbases to prevent interference with other tests
         self.generate(self.wallet, 100, sync_fun=self.no_op)
 
-        # Generate three transactions that must be mined in sequence
+        # Generate three transactions that must be mined in sequence.
+        # Mercatura fee rates use MCA per 1,000 effective serialized bytes.
         #
-        #      tx_a (1 sat/vbyte)
+        #      tx_a (0.10 MCA/kB)
         #        |
         #        |
-        #      tx_b (2 sat/vbyte)
+        #      tx_b (0.20 MCA/kB)
         #        |
         #        |
-        #      tx_c (3 sat/vbyte)
+        #      tx_c (0.30 MCA/kB)
         #
+        # These rates are deliberately separated enough that deterministic
+        # integer base-unit rounding preserves their fee ordering.
         tx_a = wallet_sigops.send_self_transfer(from_node=node,
-                                                fee_rate=Decimal("0.00001"))
+                                                fee_rate=Decimal("0.10"))
         tx_b = wallet_sigops.send_self_transfer(from_node=node,
-                                                fee_rate=Decimal("0.00002"),
+                                                fee_rate=Decimal("0.20"),
                                                 utxo_to_spend=tx_a["new_utxo"])
         tx_c = wallet_sigops.send_self_transfer(from_node=node,
-                                                fee_rate=Decimal("0.00003"),
+                                                fee_rate=Decimal("0.30"),
                                                 utxo_to_spend=tx_b["new_utxo"])
 
-        # Generate transaction without sigops. It will go first because it pays
-        # higher fees (100 sat/vbyte) and descends from a different coinbase.
+        # Generate a transaction without sigops. It will go first because it
+        # pays a substantially higher fee and descends from a different
+        # coinbase.
         tx_d = self.wallet.send_self_transfer(from_node=node,
-                                              fee_rate=Decimal("0.00100"))
+                                              fee_rate=Decimal("1.00"))
 
         block_template_txs = node.getblocktemplate(NORMAL_GBT_REQUEST_PARAMS)['transactions']
 
@@ -143,28 +150,52 @@ class MiningTest(BitcoinTestFramework):
         self.restart_node(0, extra_args=['-minrelaytxfee=0', '-persistmempool=0'])
         node = self.nodes[0]
 
-        # test default (no parameter), zero and a bunch of arbitrary blockmintxfee rates [sat/kvB]
-        for blockmintxfee_sat_kvb in (DEFAULT_BLOCK_MIN_TX_FEE, 0, 5, 10, 50, 100, 500, 1000, 2500, 5000, 21000, 333333, 2500000):
-            blockmintxfee_btc_kvb = blockmintxfee_sat_kvb / Decimal(COIN)
-            if blockmintxfee_sat_kvb == DEFAULT_BLOCK_MIN_TX_FEE:
-                self.log.info(f"-> Default -blockmintxfee setting ({blockmintxfee_sat_kvb} sat/kvB)...")
+        # Test the default, zero, and a range of Mercatura fee rates.
+        # Values here are integer MCA base units per 1,000 bytes.
+        for blockmintxfee_base_units_kvb in (
+            DEFAULT_BLOCK_MIN_TX_FEE,
+            0,
+            2,
+            5,
+            10,
+            25,
+            50,
+            100,
+            250,
+            500,
+            1000,
+            2500,
+            5000,
+            10000,
+            25000,
+        ):
+            blockmintxfee_mca_kvb = (
+                Decimal(blockmintxfee_base_units_kvb) / Decimal(COIN)
+            )
+            if blockmintxfee_base_units_kvb == DEFAULT_BLOCK_MIN_TX_FEE:
+                self.log.info(f"-> Default -blockmintxfee setting ({blockmintxfee_base_units_kvb} base units/kB)...")
             else:
-                blockmintxfee_parameter = f"-blockmintxfee={blockmintxfee_btc_kvb:.8f}"
-                self.log.info(f"-> Test {blockmintxfee_parameter} ({blockmintxfee_sat_kvb} sat/kvB)...")
+                blockmintxfee_parameter = f"-blockmintxfee={blockmintxfee_mca_kvb:.2f}"
+                self.log.info(f"-> Test {blockmintxfee_parameter} ({blockmintxfee_base_units_kvb} base units/kB)...")
                 self.restart_node(0, extra_args=[blockmintxfee_parameter, '-minrelaytxfee=0', '-persistmempool=0'])
-            assert_equal(node.getmininginfo()['blockmintxfee'], blockmintxfee_btc_kvb)
+            assert_equal(node.getmininginfo()['blockmintxfee'], blockmintxfee_mca_kvb)
 
             # submit one tx with exactly the blockmintxfee rate, and one slightly below
-            tx_with_min_feerate = self.wallet.send_self_transfer(from_node=node, fee_rate=blockmintxfee_btc_kvb, confirmed_only=True)
-            assert_equal(tx_with_min_feerate["fee"], get_fee(tx_with_min_feerate["tx"].get_vsize(), blockmintxfee_btc_kvb))
-            if blockmintxfee_sat_kvb >= 10:
-                lowerfee_btc_kvb = blockmintxfee_btc_kvb - Decimal(10)/COIN  # 0.01 sat/vbyte lower
-                assert_greater_than(blockmintxfee_btc_kvb, lowerfee_btc_kvb)
-                assert_greater_than_or_equal(lowerfee_btc_kvb, 0)
-                tx_below_min_feerate = self.wallet.send_self_transfer(from_node=node, fee_rate=lowerfee_btc_kvb, confirmed_only=True)
-                assert_equal(tx_below_min_feerate["fee"], get_fee(tx_below_min_feerate["tx"].get_vsize(), lowerfee_btc_kvb))
+            tx_with_min_feerate = self.wallet.send_self_transfer(from_node=node, fee_rate=blockmintxfee_mca_kvb, confirmed_only=True)
+            assert_equal(tx_with_min_feerate["fee"], get_fee(tx_with_min_feerate["tx"].get_fee_size(), blockmintxfee_mca_kvb))
+            if blockmintxfee_base_units_kvb >= 10:
+                # Ten base units/kB lower is enough to make the
+                # resulting transaction fee measurably lower at this size.
+                lowerfee_mca_kvb = (
+                    blockmintxfee_mca_kvb
+                    - Decimal(10) / Decimal(COIN)
+                )
+                assert_greater_than(blockmintxfee_mca_kvb, lowerfee_mca_kvb)
+                assert_greater_than_or_equal(lowerfee_mca_kvb, 0)
+                tx_below_min_feerate = self.wallet.send_self_transfer(from_node=node, fee_rate=lowerfee_mca_kvb, confirmed_only=True)
+                assert_equal(tx_below_min_feerate["fee"], get_fee(tx_below_min_feerate["tx"].get_fee_size(), lowerfee_mca_kvb))
             else:  # go below zero fee by using modified fees
-                tx_below_min_feerate = self.wallet.send_self_transfer(from_node=node, fee_rate=blockmintxfee_btc_kvb, confirmed_only=True)
+                tx_below_min_feerate = self.wallet.send_self_transfer(from_node=node, fee_rate=blockmintxfee_mca_kvb, confirmed_only=True)
                 node.prioritisetransaction(tx_below_min_feerate["txid"], 0, -11)
 
             # check that tx below specified fee-rate is neither in template nor in the actual block
@@ -173,7 +204,7 @@ class MiningTest(BitcoinTestFramework):
 
             # Unless blockmintxfee is 0, the template shouldn't contain free transactions.
             # Note that the real block assembler uses package feerates, but we didn't create dependent transactions so it's ok to use base feerate.
-            if blockmintxfee_btc_kvb > 0:
+            if blockmintxfee_mca_kvb > 0:
                 for txid in block_template_txids:
                     tx = node.getmempoolentry(txid)
                     assert_greater_than(tx['fees']['base'], 0)
@@ -265,109 +296,188 @@ class MiningTest(BitcoinTestFramework):
 
     def send_transactions(self, utxos, fee_rate, target_vsize):
         """
-        Helper to create and send transactions with the specified target virtual size and fee rate.
+        Create and send transactions with the specified target virtual size
+        and fee rate. Return their txids so the test can measure their actual
+        witness-inclusive serialized sizes.
         """
+        txids = []
         for utxo in utxos:
-            self.wallet.send_self_transfer(
+            result = self.wallet.send_self_transfer(
                 from_node=self.nodes[0],
                 utxo_to_spend=utxo,
                 target_vsize=target_vsize,
                 fee_rate=fee_rate,
             )
+            txids.append(result["txid"])
+        return txids
 
-    def verify_block_template(self, expected_tx_count, expected_weight):
+    def verify_block_template_size(self, max_transaction_bytes):
         """
-        Create a block template and check that it satisfies the expected transaction count and total weight.
+        Create a block template and verify that its non-coinbase transactions
+        fit within the serialized-byte budget left after the miner reservation.
         """
         response = self.nodes[0].getblocktemplate(NORMAL_GBT_REQUEST_PARAMS)
-        self.log.info(f"Testing block template: contains {expected_tx_count} transactions, and total weight <= {expected_weight}")
-        assert_equal(len(response["transactions"]), expected_tx_count)
-        total_weight = sum(transaction["weight"] for transaction in response["transactions"])
-        assert_greater_than_or_equal(expected_weight, total_weight)
+        total_serialized_bytes = sum(
+            len(bytes.fromhex(transaction["data"]))
+            for transaction in response["transactions"]
+        )
 
-    def test_block_max_weight(self):
-        self.log.info("Testing default and custom -blockmaxweight startup options.")
+        self.log.info(
+            f"Block template contains {len(response['transactions'])} "
+            f"transactions totaling {total_serialized_bytes} serialized bytes; "
+            f"limit is below {max_transaction_bytes} bytes"
+        )
 
-        LARGE_TXS_COUNT = 10
-        LARGE_VSIZE = int(((MAX_BLOCK_WEIGHT - DEFAULT_BLOCK_RESERVED_WEIGHT) / WITNESS_SCALE_FACTOR) / LARGE_TXS_COUNT)
-        HIGH_FEERATE = Decimal("0.0003")
+        # BlockAssembler rejects a chunk when adding it would make the capacity
+        # counter equal to or exceed the configured maximum.
+        assert_greater_than(max_transaction_bytes, total_serialized_bytes)
 
-        # Ensure the mempool is empty
+        return response, total_serialized_bytes
+
+    def test_block_max_size(self):
+        self.log.info("Testing Mercatura serialized-byte block creation limits.")
+
+        LARGE_TXS_COUNT = 12
+        NORMAL_TXS_COUNT = 4
+        LARGE_VSIZE = 90_000
+        NORMAL_VSIZE = 500
+        HIGH_FEERATE = Decimal("0.10")
+        NORMAL_FEERATE = Decimal("0.02")
+
+        # Ensure the mempool is empty.
         assert_equal(len(self.nodes[0].getrawmempool()), 0)
 
-        # Generate UTXOs and send 10 large transactions with a high fee rate
-        utxos = [self.wallet.get_utxo(confirmed_only=True) for _ in range(LARGE_TXS_COUNT + 4)] # Add 4 more utxos that will be used in the test later
-        self.send_transactions(utxos[:LARGE_TXS_COUNT], HIGH_FEERATE, LARGE_VSIZE)
+        # Twelve independent near-standard-size transactions guarantee that
+        # the mempool contains more transaction data than the initial 1 MiB
+        # Mercatura block-capacity era can mine in one template.
+        utxos = [
+            self.wallet.get_utxo(confirmed_only=True)
+            for _ in range(LARGE_TXS_COUNT + NORMAL_TXS_COUNT)
+        ]
 
-        # Send 2 normal transactions with a lower fee rate
-        NORMAL_VSIZE = int(2000 / WITNESS_SCALE_FACTOR)
-        NORMAL_FEERATE = Decimal("0.0001")
-        self.send_transactions(utxos[LARGE_TXS_COUNT:LARGE_TXS_COUNT + 2], NORMAL_FEERATE, NORMAL_VSIZE)
-
-        # Check that the mempool contains all transactions
-        self.log.info(f"Testing that the mempool contains {LARGE_TXS_COUNT + 2} transactions.")
-        assert_equal(len(self.nodes[0].getrawmempool()), LARGE_TXS_COUNT + 2)
-
-        # Verify the block template includes only the 10 high-fee transactions
-        self.log.info("Testing that the block template includes only the 10 large transactions.")
-        self.verify_block_template(
-            expected_tx_count=LARGE_TXS_COUNT,
-            expected_weight=MAX_BLOCK_WEIGHT - DEFAULT_BLOCK_RESERVED_WEIGHT,
+        large_txids = self.send_transactions(
+            utxos[:LARGE_TXS_COUNT],
+            HIGH_FEERATE,
+            LARGE_VSIZE,
+        )
+        normal_txids = self.send_transactions(
+            utxos[LARGE_TXS_COUNT:],
+            NORMAL_FEERATE,
+            NORMAL_VSIZE,
         )
 
-        # Test block template creation with custom -blockmaxweight
-        custom_block_weight = MAX_BLOCK_WEIGHT - 2000
-        # Reducing the weight by 2000 units will prevent 1 large transaction from fitting into the block.
-        self.restart_node(0, extra_args=[f"-blockmaxweight={custom_block_weight}"])
+        all_txids = large_txids + normal_txids
+        assert_equal(len(self.nodes[0].getrawmempool()), len(all_txids))
 
-        self.log.info("Testing the block template with custom -blockmaxweight to include 9 large and 2 normal transactions.")
-        self.verify_block_template(
-            expected_tx_count=11,
-            expected_weight=MAX_BLOCK_WEIGHT - DEFAULT_BLOCK_RESERVED_WEIGHT - 2000,
+        mempool_serialized_bytes = sum(
+            len(bytes.fromhex(self.nodes[0].getrawtransaction(txid)))
+            for txid in all_txids
         )
 
-        # Ensure the block weight does not exceed the maximum
-        self.log.info(f"Testing that the block weight will never exceed {MAX_BLOCK_WEIGHT - DEFAULT_BLOCK_RESERVED_WEIGHT}.")
-        self.restart_node(0, extra_args=[f"-blockmaxweight={MAX_BLOCK_WEIGHT}"])
-        self.log.info("Sending 2 additional normal transactions to fill the mempool to the maximum block weight.")
-        self.send_transactions(utxos[LARGE_TXS_COUNT + 2:], NORMAL_FEERATE, NORMAL_VSIZE)
-        self.log.info(f"Testing that the mempool's weight matches the maximum block weight: {MAX_BLOCK_WEIGHT}.")
-        assert_equal(self.nodes[0].getmempoolinfo()['bytes'] * WITNESS_SCALE_FACTOR, MAX_BLOCK_WEIGHT)
-
-        self.log.info("Testing that the block template includes only 10 transactions and cannot reach full block weight.")
-        self.verify_block_template(
-            expected_tx_count=LARGE_TXS_COUNT,
-            expected_weight=MAX_BLOCK_WEIGHT - DEFAULT_BLOCK_RESERVED_WEIGHT,
+        self.log.info(
+            f"Mempool transactions total {mempool_serialized_bytes} "
+            "witness-inclusive serialized bytes."
+        )
+        assert_greater_than(
+            mempool_serialized_bytes,
+            MERCATURA_INITIAL_BLOCK_CAPACITY,
         )
 
-        self.log.info("Test -blockreservedweight startup option.")
-        # Lowering the -blockreservedweight by 4000 will allow for two more transactions.
-        self.restart_node(0, extra_args=["-blockreservedweight=4000"])
-        self.verify_block_template(
-            expected_tx_count=12,
-            expected_weight=MAX_BLOCK_WEIGHT - 4000,
+        # Default mining policy must automatically use the current consensus
+        # capacity: 1 MiB at these low regtest heights.
+        default_tx_budget = (
+            MERCATURA_INITIAL_BLOCK_CAPACITY - DEFAULT_BLOCK_RESERVED_SIZE
         )
 
-        self.log.info("Test that node will fail to start when user provide invalid -blockreservedweight")
+        default_template, default_template_bytes = self.verify_block_template_size(
+            default_tx_budget
+        )
+
+        # The mempool deliberately exceeds one block, so at least one
+        # transaction must remain unmined.
+        assert_greater_than(
+            len(all_txids),
+            len(default_template["transactions"]),
+        )
+
+        # A miner may voluntarily choose a smaller serialized block ceiling.
+        custom_block_size = 600_000
+        self.restart_node(
+            0,
+            extra_args=[f"-blockmaxsize={custom_block_size}"],
+        )
+
+        custom_template, custom_template_bytes = self.verify_block_template_size(
+            custom_block_size - DEFAULT_BLOCK_RESERVED_SIZE
+        )
+
+        # The materially smaller local ceiling must reduce the amount of
+        # serialized transaction data selected.
+        assert_greater_than(
+            default_template_bytes,
+            custom_template_bytes,
+        )
+
+        # A configured miner maximum may be as high as Mercatura's final
+        # scheduled 1024 MiB ceiling, but at the current height the template
+        # must still be clamped to the active 1 MiB consensus capacity.
+        self.restart_node(
+            0,
+            extra_args=[f"-blockmaxsize={MERCATURA_MAX_BLOCK_CAPACITY}"],
+        )
+
+        self.verify_block_template_size(default_tx_budget)
+
+        # Reserved template space is also expressed directly in bytes.
+        custom_reserved_size = 20_000
+        self.restart_node(
+            0,
+            extra_args=[
+                f"-blockmaxsize={custom_block_size}",
+                f"-blockreservedsize={custom_reserved_size}",
+            ],
+        )
+
+        self.verify_block_template_size(
+            custom_block_size - custom_reserved_size
+        )
+
+        # Values above Mercatura's final scheduled consensus ceiling are
+        # configuration errors.
         self.stop_node(0)
         self.nodes[0].assert_start_raises_init_error(
-            extra_args=[f"-blockreservedweight={MAX_BLOCK_WEIGHT + 1}"],
-            expected_msg=f"Error: Specified -blockreservedweight ({MAX_BLOCK_WEIGHT + 1}) exceeds consensus maximum block weight ({MAX_BLOCK_WEIGHT})",
+            extra_args=[f"-blockmaxsize={MERCATURA_MAX_BLOCK_CAPACITY + 1}"],
+            expected_msg=(
+                f"Error: Specified -blockmaxsize "
+                f"({MERCATURA_MAX_BLOCK_CAPACITY + 1}) exceeds Mercatura's "
+                f"maximum scheduled block capacity "
+                f"({MERCATURA_MAX_BLOCK_CAPACITY} bytes)"
+            ),
         )
 
-        self.log.info(f"Test that node will fail to start when user provide -blockreservedweight below {MINIMUM_BLOCK_RESERVED_WEIGHT}")
-        self.stop_node(0)
         self.nodes[0].assert_start_raises_init_error(
-            extra_args=[f"-blockreservedweight={MINIMUM_BLOCK_RESERVED_WEIGHT - 1}"],
-            expected_msg=f"Error: Specified -blockreservedweight ({MINIMUM_BLOCK_RESERVED_WEIGHT - 1}) is lower than minimum safety value of ({MINIMUM_BLOCK_RESERVED_WEIGHT})",
+            extra_args=[
+                f"-blockreservedsize={MERCATURA_MAX_BLOCK_CAPACITY + 1}"
+            ],
+            expected_msg=(
+                f"Error: Specified -blockreservedsize "
+                f"({MERCATURA_MAX_BLOCK_CAPACITY + 1}) exceeds Mercatura's "
+                f"maximum scheduled block capacity "
+                f"({MERCATURA_MAX_BLOCK_CAPACITY} bytes)"
+            ),
         )
 
-        self.log.info("Test that node will fail to start when user provide invalid -blockmaxweight")
-        self.stop_node(0)
         self.nodes[0].assert_start_raises_init_error(
-            extra_args=[f"-blockmaxweight={MAX_BLOCK_WEIGHT + 1}"],
-            expected_msg=f"Error: Specified -blockmaxweight ({MAX_BLOCK_WEIGHT + 1}) exceeds consensus maximum block weight ({MAX_BLOCK_WEIGHT})",
+            extra_args=[f"-blockreservedsize={MINIMUM_BLOCK_RESERVED_SIZE - 1}"],
+            expected_msg=(
+                f"Error: Specified -blockreservedsize "
+                f"({MINIMUM_BLOCK_RESERVED_SIZE - 1}) is lower than "
+                f"minimum safety value of ({MINIMUM_BLOCK_RESERVED_SIZE} bytes)"
+            ),
         )
+
+        # Restore the node for the remainder of mining_basic.py.
+        self.start_node(0)
 
     def test_height_in_locktime(self):
         self.log.info("Sanity check generated blocks have their coinbase timelocked to their height.")
@@ -511,7 +621,7 @@ class MiningTest(BitcoinTestFramework):
 
         self.test_fees_and_sigops()
         self.test_blockmintxfee_parameter()
-        self.test_block_max_weight()
+        self.test_block_max_size()
         self.test_timewarp()
         self.test_pruning()
         self.test_height_in_locktime()

@@ -351,38 +351,85 @@ class MiniWallet:
     def create_self_transfer(
             self,
             *,
-            fee_rate=Decimal("0.003"),
+            fee_rate=Decimal("0.01"),
             fee=Decimal("0"),
             utxo_to_spend=None,
             target_vsize=0,
             confirmed_only=False,
             **kwargs,
     ):
-        """Create and return a tx with the specified fee. If fee is 0, use fee_rate, where the resulting fee may be exact or at most one satoshi higher than needed."""
-        utxo_to_spend = utxo_to_spend or self.get_utxo(confirmed_only=confirmed_only)
+        """
+        Create and return a transaction with the specified fee.
+
+        If fee is zero, calculate the fee from Mercatura's effective fee size,
+        which is the complete witness-inclusive serialized transaction size.
+        Bitcoin BIP141 vsize remains available separately for tests that need it.
+        """
+        utxo_to_spend = utxo_to_spend or self.get_utxo(
+            confirmed_only=confirmed_only
+        )
         assert fee_rate >= 0
         assert fee >= 0
-        # calculate fee
-        if self._mode in (MiniWalletMode.RAW_OP_TRUE, MiniWalletMode.ADDRESS_OP_TRUE):
-            vsize = Decimal(104)  # anyone-can-spend
+
+        # Preserve the inherited structural vsize assertions. These describe
+        # the transaction form, but are not used for Mercatura fee accounting.
+        if self._mode in (
+            MiniWalletMode.RAW_OP_TRUE,
+            MiniWalletMode.ADDRESS_OP_TRUE,
+        ):
+            expected_vsize = Decimal(104)
         elif self._mode == MiniWalletMode.RAW_P2PK:
-            vsize = Decimal(168)  # P2PK (73 bytes scriptSig + 35 bytes scriptPubKey + 60 bytes other)
+            expected_vsize = Decimal(168)
         else:
             assert False
-        if target_vsize and not fee:  # respect fee_rate if target vsize is passed
-            fee = get_fee(target_vsize, fee_rate)
-        send_value = utxo_to_spend["value"] - (fee or (fee_rate * vsize / 1000))
+
+        if fee:
+            required_fee = fee
+            fee_size = None
+        else:
+            # Build a provisional transaction first. Transaction output values
+            # occupy a fixed-width serialized field, so replacing the output
+            # amount with the final fee-adjusted amount does not change size.
+            provisional_output = int(COIN * utxo_to_spend["value"]) - 1
+            if provisional_output <= 0:
+                raise RuntimeError(
+                    f"UTXO value {utxo_to_spend['value']} is too small "
+                    "to construct a provisional transaction"
+                )
+
+            provisional_tx = self.create_self_transfer_multi(
+                utxos_to_spend=[utxo_to_spend],
+                amount_per_output=provisional_output,
+                target_vsize=target_vsize,
+                **kwargs,
+            )
+
+            fee_size = provisional_tx["tx"].get_fee_size()
+            required_fee = get_fee(fee_size, fee_rate)
+
+        send_value = utxo_to_spend["value"] - required_fee
         if send_value <= 0:
-            raise RuntimeError(f"UTXO value {utxo_to_spend['value']} is too small to cover fees {(fee or (fee_rate * vsize / 1000))}")
-        # create tx
+            raise RuntimeError(
+                f"UTXO value {utxo_to_spend['value']} is too small "
+                f"to cover fees {required_fee}"
+            )
+
         tx = self.create_self_transfer_multi(
             utxos_to_spend=[utxo_to_spend],
             amount_per_output=int(COIN * send_value),
             target_vsize=target_vsize,
             **kwargs,
         )
+
+        if fee_size is not None:
+            # Changing only the fixed-width output value must not alter the
+            # transaction's Mercatura fee size.
+            assert_equal(tx["tx"].get_fee_size(), fee_size)
+            assert_equal(tx["fee"], required_fee)
+
         if not target_vsize:
-            assert_equal(tx["tx"].get_vsize(), vsize)
+            assert_equal(tx["tx"].get_vsize(), expected_vsize)
+
         tx["new_utxo"] = tx.pop("new_utxos")[0]
 
         return tx

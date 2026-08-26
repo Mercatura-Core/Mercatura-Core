@@ -64,7 +64,8 @@ private:
     std::unique_ptr<CBlockTemplate> pblocktemplate;
 
     // Information on the current status of the block
-    uint64_t nBlockWeight;
+    uint64_t nBlockCapacityBytes;
+    uint64_t nBlockMaxCapacityBytes;
     uint64_t nBlockTx;
     uint64_t nBlockSigOpsCost;
     CAmount nFees;
@@ -79,8 +80,9 @@ private:
 
 public:
     struct Options : BlockCreateOptions {
-        // Configuration parameters for the block size
-        size_t nBlockMaxWeight{DEFAULT_BLOCK_MAX_WEIGHT};
+        // Optional local serialized block-size ceiling. When unset, the
+        // current height-dependent Mercatura consensus capacity is used.
+        std::optional<size_t> nBlockMaxSize{};
         CFeeRate blockMinFeeRate{DEFAULT_BLOCK_MIN_TX_FEE};
         // Whether to call TestBlockValidity() at the end of CreateNewBlock().
         bool test_block_validity{true};
@@ -94,7 +96,7 @@ public:
 
     /** The number of transactions in the last assembled block (excluding coinbase transaction) */
     inline static std::optional<int64_t> m_last_block_num_txs{};
-    /** The weight of the last assembled block (including reserved weight for block header, txs count and coinbase tx) */
+    /** Actual BIP141 weight of the last assembled block, retained for RPC compatibility. */
     inline static std::optional<int64_t> m_last_block_weight{};
 
 private:
@@ -115,7 +117,7 @@ private:
 
     // helper functions for addChunks()
     /** Test if a new chunk would "fit" in the block */
-    bool TestChunkBlockLimits(int64_t chunk_weight, int64_t chunk_sigops_cost) const;
+    bool TestChunkBlockLimits(uint64_t chunk_capacity_bytes, int64_t chunk_sigops_cost) const;
     /** Perform locktime checks on each transaction in a chunk:
       * This check should always succeed, and is here
       * only as an extra check in case of a bug */
@@ -134,8 +136,18 @@ int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParam
 /** Update an old GenerateCoinbaseCommitment from CreateNewBlock after the block txs have changed */
 void RegenerateCommitments(CBlock& block, ChainstateManager& chainman);
 
-/** Apply -blockmintxfee and -blockmaxweight options from ArgsManager to BlockAssembler options. */
+/** Apply block creation options from ArgsManager to BlockAssembler options. */
 void ApplyArgsManOptions(const ArgsManager& gArgs, BlockAssembler::Options& options);
+
+/**
+ * Return the effective serialized-byte ceiling for a block template at height.
+ *
+ * This is the lower of Mercatura's height-dependent consensus capacity and
+ * the miner's optional local -blockmaxsize setting.
+ */
+uint64_t GetBlockTemplateMaxCapacityBytes(
+    int height,
+    const BlockAssembler::Options& options);
 
 /* Compute the block's merkle root, insert or replace the coinbase transaction and the merkle root into the block */
 void AddMerkleRootAndCoinbase(CBlock& block, CTransactionRef coinbase, uint32_t version, uint32_t timestamp, uint32_t nonce);

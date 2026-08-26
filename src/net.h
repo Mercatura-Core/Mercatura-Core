@@ -1385,7 +1385,11 @@ public:
     //! check if the outbound target is reached
     //! if param historicalBlockServingLimit is set true, the function will
     //! response true if the limit for serving historical blocks has been reached
-    bool OutboundTargetReached(bool historicalBlockServingLimit) const EXCLUSIVE_LOCKS_REQUIRED(!m_total_bytes_sent_mutex);
+    bool OutboundTargetReached(
+        bool historicalBlockServingLimit,
+        uint64_t block_capacity_bytes = 0,
+        std::chrono::seconds block_interval = std::chrono::seconds{0}) const
+        EXCLUSIVE_LOCKS_REQUIRED(!m_total_bytes_sent_mutex);
 
     //! response the bytes left in the current max outbound cycle
     //! in case of no limit, it will always response 0

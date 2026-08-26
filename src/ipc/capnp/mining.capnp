@@ -14,7 +14,7 @@ $Proxy.includeTypes("ipc/capnp/mining-types.h");
 
 const maxMoney :Int64 = 2100000000000000;
 const maxDouble :Float64 = 1.7976931348623157e308;
-const defaultBlockReservedWeight :UInt32 = 8000;
+const defaultBlockReservedSize :UInt32 = 2000;
 const defaultCoinbaseOutputMaxAdditionalSigops :UInt32 = 400;
 
 interface Mining $Proxy.wrap("interfaces::Mining") {
@@ -42,7 +42,7 @@ interface BlockTemplate $Proxy.wrap("interfaces::BlockTemplate") {
 
 struct BlockCreateOptions $Proxy.wrap("node::BlockCreateOptions") {
     useMempool @0 :Bool = true $Proxy.name("use_mempool");
-    blockReservedWeight @1 :UInt64 = .defaultBlockReservedWeight $Proxy.name("block_reserved_weight");
+    blockReservedSize @1 :UInt64 = .defaultBlockReservedSize $Proxy.name("block_reserved_size");
     coinbaseOutputMaxAdditionalSigops @2 :UInt64 = .defaultCoinbaseOutputMaxAdditionalSigops $Proxy.name("coinbase_output_max_additional_sigops");
 }
 

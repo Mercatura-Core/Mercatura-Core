@@ -153,7 +153,16 @@ BOOST_FIXTURE_TEST_CASE(stale_tip_peer_management, OutboundTest)
 
     const auto time_init{GetTime<std::chrono::seconds>()};
     SetMockTime(time_init);
-    const auto time_later{time_init + 3 * std::chrono::seconds{m_node.chainman->GetConsensus().nPowTargetSpacing} + 1s};
+    // Mercatura targets 150-second blocks, so three block intervals are
+    // shorter than Bitcoin Core's inherited 10-minute stale-tip check cadence.
+    // Advance beyond both conditions before expecting an extra outbound peer.
+    const auto time_later{
+        time_init +
+        10min +
+        3 * std::chrono::seconds{
+            m_node.chainman->GetConsensus().nPowTargetSpacing} +
+        1s
+    };
     connman->Init(options);
     std::vector<CNode *> vNodes;
 

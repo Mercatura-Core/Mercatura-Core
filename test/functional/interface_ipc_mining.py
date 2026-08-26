@@ -9,7 +9,7 @@ from contextlib import AsyncExitStack
 from io import BytesIO
 from test_framework.blocktools import NULL_OUTPOINT
 from test_framework.messages import (
-    MAX_BLOCK_WEIGHT,
+    MERCATURA_INITIAL_BLOCK_CAPACITY,
     CBlockHeader,
     CTransaction,
     CTxIn,
@@ -295,11 +295,15 @@ class IPCMiningTest(BitcoinTestFramework):
 
     def run_ipc_option_override_test(self):
         self.log.info("Running IPC option override test")
-        # Set an absurd reserved weight. `-blockreservedweight` is RPC-only, so
-        # with this setting RPC templates would be empty. IPC clients set
-        # blockReservedWeight per template request and are unaffected; later in
-        # the test the IPC template includes a mempool transaction.
-        self.restart_node(0, extra_args=[f"-blockreservedweight={MAX_BLOCK_WEIGHT}"])
+        # Reserve the entire active 1 MiB block capacity for RPC mining
+        # templates. IPC clients provide blockReservedSize per request and are
+        # therefore unaffected; later the IPC template includes a mempool tx.
+        self.restart_node(
+            0,
+            extra_args=[
+                f"-blockreservedsize={MERCATURA_INITIAL_BLOCK_CAPACITY}"
+            ],
+        )
 
         async def async_routine():
             ctx, mining = await make_mining_ctx(self)
@@ -312,20 +316,20 @@ class IPCMiningTest(BitcoinTestFramework):
                 block = await mining_get_block(template, ctx)
                 assert_equal(len(block.vtx), 2)
 
-                self.log.debug("Use absurdly large reserved weight to force an empty template")
-                opts.blockReservedWeight = MAX_BLOCK_WEIGHT
+                self.log.debug("Reserve the full active block capacity to force an empty template")
+                opts.blockReservedSize = MERCATURA_INITIAL_BLOCK_CAPACITY
                 empty_template = await mining_create_block_template(mining, stack, ctx, opts)
                 assert empty_template is not None
                 empty_block = await mining_get_block(empty_template, ctx)
                 assert_equal(len(empty_block.vtx), 1)
 
-            self.log.debug("Enforce minimum reserved weight for IPC clients too")
-            opts.blockReservedWeight = 0
+            self.log.debug("Enforce minimum reserved size for IPC clients too")
+            opts.blockReservedSize = 0
             try:
                 await mining.createNewBlock(ctx, opts)
                 raise AssertionError("createNewBlock unexpectedly succeeded")
             except capnp.lib.capnp.KjException as e:
-                assert_capnp_failed(e, "remote exception: std::exception: block_reserved_weight (0) must be at least 2000 weight units")
+                assert_capnp_failed(e, "remote exception: std::exception: block_reserved_size (0) must be at least 500 bytes")
 
         asyncio.run(capnp.run(async_routine()))
 

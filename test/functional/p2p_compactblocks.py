@@ -416,7 +416,12 @@ class CompactBlocksTest(BitcoinTestFramework):
         for _ in range(num_transactions):
             tx = CTransaction()
             tx.vin.append(CTxIn(COutPoint(utxo[0], utxo[1]), b''))
-            tx.vout.append(CTxOut(utxo[2] - 1000, CScript([OP_TRUE, OP_DROP] * 15 + [OP_TRUE])))
+            # Bitcoin's inherited test subtracts 1000 satoshis per chained
+            # transaction. Mercatura has only 100 base units per MCA, so 1000
+            # base units would equal 10 MCA and can make these synthetic test
+            # outputs negative. One base unit is sufficient for this compact-
+            # block reconstruction test and matches Mercatura's minimum fee unit.
+            tx.vout.append(CTxOut(utxo[2] - 1, CScript([OP_TRUE, OP_DROP] * 15 + [OP_TRUE])))
             utxo = [tx.txid_int, 0, tx.vout[0].nValue]
             block.vtx.append(tx)
 

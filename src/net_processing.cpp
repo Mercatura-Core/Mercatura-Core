@@ -3,12 +3,15 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <cstdio>
+#include <cstring>
 #include <net_processing.h>
 
 #include <addrman.h>
 #include <arith_uint256.h>
 #include <banman.h>
 #include <blockencodings.h>
+#include <blockchunk.h>
 #include <blockfilter.h>
 #include <chain.h>
 #include <chainparams.h>
@@ -195,6 +198,18 @@ static constexpr double MAX_ADDR_RATE_PER_SECOND{0.1};
  *  based increments won't go above this, but the MAX_ADDR_TO_SEND increment following GETADDR
  *  is exempt from this limit). */
 static constexpr size_t MAX_ADDR_PROCESSING_TOKEN_BUCKET{MAX_ADDR_TO_SEND};
+/**
+ * Largest serialized block payload that Mercatura permits through an
+ * ordinary single P2P message.
+ *
+ * Larger blocks use BLKMETA + sequential BLKCHUNK transport instead. Do not
+ * raise generic MAX_SIZE, MAX_PROTOCOL_MESSAGE_LENGTH, or BIP324 packet limits
+ * to accommodate Mercatura block-capacity growth.
+ */
+static constexpr uint64_t MAX_MONOLITHIC_BLOCK_MESSAGE_BYTES{
+    std::min<uint64_t>(MAX_SIZE, MAX_PROTOCOL_MESSAGE_LENGTH)
+};
+
 /** The compactblocks version we support. See BIP 152. */
 static constexpr uint64_t CMPCTBLOCKS_VERSION{2};
 /** For private broadcast, send a transaction to this many peers. */
@@ -396,6 +411,56 @@ struct Peer {
     Mutex m_getdata_requests_mutex;
     /** Work queue of items requested by this peer **/
     std::deque<CInv> m_getdata_requests GUARDED_BY(m_getdata_requests_mutex);
+
+    /**
+     * A large witness block that this peer requested and for which we sent
+     * BLKMETA. Only one chunked transfer is active per peer at a time.
+     *
+     * Chunk requests are served strictly in sequence so a peer cannot use the
+     * chunk protocol as an arbitrary repeated blk*.dat read interface.
+     */
+    struct OutboundChunkedBlock {
+        uint256 block_hash;
+        FlatFilePos block_pos;
+        uint64_t total_size{0};
+        uint32_t chunk_count{0};
+        uint32_t next_chunk_index{0};
+    };
+
+    std::optional<OutboundChunkedBlock> m_outbound_chunked_block
+        GUARDED_BY(NetEventsInterface::g_msgproc_mutex);
+
+    /** Close an anonymous temporary block-transfer file on every exit path. */
+    struct ChunkTempFileCloser {
+        void operator()(std::FILE* file) const
+        {
+            if (file != nullptr) {
+                std::fclose(file);
+            }
+        }
+    };
+
+    using ChunkTempFile =
+        std::unique_ptr<std::FILE, ChunkTempFileCloser>;
+
+    /**
+     * A large witness block that we requested from this peer and are receiving
+     * through Mercatura's pull-based chunk protocol.
+     *
+     * The serialized bytes are accumulated in an anonymous temporary file,
+     * avoiding a second complete serialized-block allocation in memory.
+     */
+    struct InboundChunkedBlock {
+        uint256 block_hash;
+        uint64_t total_size{0};
+        uint32_t chunk_count{0};
+        uint32_t next_chunk_index{0};
+        uint64_t bytes_received{0};
+        ChunkTempFile file;
+    };
+
+    std::optional<InboundChunkedBlock> m_inbound_chunked_block
+        GUARDED_BY(NetEventsInterface::g_msgproc_mutex);
 
     /** Time of the last getheaders message to this peer */
     NodeClock::time_point m_last_getheaders_timestamp GUARDED_BY(NetEventsInterface::g_msgproc_mutex){};
@@ -910,6 +975,17 @@ private:
      */
     bool BlockRequested(NodeId nodeid, const CBlockIndex& block, std::list<QueuedBlock>::iterator** pit = nullptr) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
+    /**
+     * Refresh the download timeout only when hash is the first validated
+     * block currently in flight from this peer.
+     *
+     * This lets Mercatura's sequential large-block chunks make bounded
+     * progress without allowing traffic for later blocks to hide a stalled
+     * front block.
+     */
+    void RefreshBlockDownloadProgress(NodeId nodeid, const uint256& hash)
+        EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+
     bool TipMayBeStale() EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
     /** Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
@@ -1268,6 +1344,33 @@ bool PeerManagerImpl::BlockRequested(NodeId nodeid, const CBlockIndex& block, st
         *pit = &itInFlight->second.second;
     }
     return true;
+}
+
+void PeerManagerImpl::RefreshBlockDownloadProgress(
+    NodeId nodeid,
+    const uint256& hash)
+{
+    CNodeState* state{State(nodeid)};
+
+    if (state == nullptr || state->vBlocksInFlight.empty()) {
+        return;
+    }
+
+    const QueuedBlock& first_block{
+        state->vBlocksInFlight.front()
+    };
+
+    if (first_block.pindex->GetBlockHash() != hash) {
+        return;
+    }
+
+    // Reset the timeout only after concrete progress on the first block.
+    // Invalid, unsolicited, out-of-order, or zero-length chunks never reach
+    // this function.
+    state->m_downloading_since =
+        std::max(
+            state->m_downloading_since,
+            GetTime<std::chrono::microseconds>());
 }
 
 void PeerManagerImpl::MaybeSetPeerAsAnnouncingHeaderAndIDs(NodeId nodeid)
@@ -2104,7 +2207,18 @@ void PeerManagerImpl::BlockDisconnected(const std::shared_ptr<const CBlock> &blo
  */
 void PeerManagerImpl::NewPoWValidBlock(const CBlockIndex *pindex, const std::shared_ptr<const CBlock>& pblock)
 {
-    auto pcmpctblock = std::make_shared<const CBlockHeaderAndShortTxIDs>(*pblock, FastRandomContext().rand64());
+    // Compact blocks remain an optimization for blocks that fit safely inside
+    // Mercatura's ordinary P2P message envelope. Larger blocks must never be
+    // serialized as one CMPCTBLOCK; they are announced normally and fetched
+    // through BLKMETA + sequential BLKCHUNK messages.
+    std::shared_ptr<const CBlockHeaderAndShortTxIDs> pcmpctblock;
+    if (GetBlockCapacityBytes(*pblock) <=
+        MAX_MONOLITHIC_BLOCK_MESSAGE_BYTES) {
+        pcmpctblock =
+            std::make_shared<const CBlockHeaderAndShortTxIDs>(
+                *pblock,
+                FastRandomContext().rand64());
+    }
 
     LOCK(cs_main);
 
@@ -2115,39 +2229,82 @@ void PeerManagerImpl::NewPoWValidBlock(const CBlockIndex *pindex, const std::sha
     if (!DeploymentActiveAt(*pindex, m_chainman, Consensus::DEPLOYMENT_SEGWIT)) return;
 
     uint256 hashBlock(pblock->GetHash());
-    const std::shared_future<CSerializedNetMsg> lazy_ser{
-        std::async(std::launch::deferred, [&] { return NetMsg::Make(NetMsgType::CMPCTBLOCK, *pcmpctblock); })};
 
     {
-        auto most_recent_block_txs = std::make_unique<std::map<GenTxid, CTransactionRef>>();
-        for (const auto& tx : pblock->vtx) {
-            most_recent_block_txs->emplace(tx->GetHash(), tx);
-            most_recent_block_txs->emplace(tx->GetWitnessHash(), tx);
+        // The recent-transaction lookup map contains both txid and wtxid
+        // entries for every transaction. Keep this optimization for ordinary
+        // blocks, but do not duplicate potentially very large Mercatura blocks
+        // into an additional map when they already require chunked transport.
+        std::unique_ptr<const std::map<GenTxid, CTransactionRef>>
+            most_recent_block_txs;
+
+        if (pcmpctblock) {
+            auto tx_map{
+                std::make_unique<
+                    std::map<GenTxid, CTransactionRef>>()
+            };
+
+            for (const auto& tx : pblock->vtx) {
+                tx_map->emplace(tx->GetHash(), tx);
+                tx_map->emplace(tx->GetWitnessHash(), tx);
+            }
+
+            most_recent_block_txs = std::move(tx_map);
         }
 
         LOCK(m_most_recent_block_mutex);
         m_most_recent_block_hash = hashBlock;
         m_most_recent_block = pblock;
         m_most_recent_compact_block = pcmpctblock;
-        m_most_recent_block_txs = std::move(most_recent_block_txs);
+        m_most_recent_block_txs =
+            std::move(most_recent_block_txs);
     }
 
-    m_connman.ForEachNode([this, pindex, &lazy_ser, &hashBlock](CNode* pnode) EXCLUSIVE_LOCKS_REQUIRED(::cs_main) {
+    std::optional<CSerializedNetMsg> serialized_cmpctblock;
+
+    m_connman.ForEachNode(
+        [this,
+         pindex,
+         &pcmpctblock,
+         &serialized_cmpctblock,
+         &hashBlock](CNode* pnode)
+            EXCLUSIVE_LOCKS_REQUIRED(::cs_main) {
         AssertLockHeld(::cs_main);
 
-        if (pnode->GetCommonVersion() < INVALID_CB_NO_BAN_VERSION || pnode->fDisconnect)
+        if (pnode->GetCommonVersion() < INVALID_CB_NO_BAN_VERSION ||
+            pnode->fDisconnect) {
             return;
+        }
+
         ProcessBlockAvailability(pnode->GetId());
-        CNodeState &state = *State(pnode->GetId());
+        CNodeState& state = *State(pnode->GetId());
+
+        if (!pcmpctblock) {
+            return;
+        }
+
         // If the peer has, or we announced to them the previous block already,
-        // but we don't think they have this one, go ahead and announce it
-        if (state.m_requested_hb_cmpctblocks && !PeerHasHeader(&state, pindex) && PeerHasHeader(&state, pindex->pprev)) {
+        // but we don't think they have this one, go ahead and announce it.
+        if (state.m_requested_hb_cmpctblocks &&
+            !PeerHasHeader(&state, pindex) &&
+            PeerHasHeader(&state, pindex->pprev)) {
+            LogDebug(
+                BCLog::NET,
+                "%s sending header-and-ids %s to peer=%d\n",
+                "PeerManager::NewPoWValidBlock",
+                hashBlock.ToString(),
+                pnode->GetId());
 
-            LogDebug(BCLog::NET, "%s sending header-and-ids %s to peer=%d\n", "PeerManager::NewPoWValidBlock",
-                    hashBlock.ToString(), pnode->GetId());
+            if (!serialized_cmpctblock) {
+                serialized_cmpctblock =
+                    NetMsg::Make(
+                        NetMsgType::CMPCTBLOCK,
+                        *pcmpctblock);
+            }
 
-            const CSerializedNetMsg& ser_cmpctblock{lazy_ser.get()};
-            PushMessage(*pnode, ser_cmpctblock.Copy());
+            PushMessage(
+                *pnode,
+                serialized_cmpctblock->Copy());
             state.pindexBestHeaderSent = pindex;
         }
     });
@@ -2362,6 +2519,7 @@ void PeerManagerImpl::ProcessGetBlockData(CNode& pfrom, Peer& peer, const CInv& 
     const CBlockIndex* tip{nullptr};
     bool can_direct_fetch{false};
     FlatFilePos block_pos{};
+    int block_height{-1};
     {
         LOCK(cs_main);
         pindex = m_chainman.m_blockman.LookupBlockIndex(inv.hash);
@@ -2372,8 +2530,23 @@ void PeerManagerImpl::ProcessGetBlockData(CNode& pfrom, Peer& peer, const CInv& 
             LogDebug(BCLog::NET, "%s: ignoring request from peer=%i for old block that isn't in the main chain\n", __func__, pfrom.GetId());
             return;
         }
-        // disconnect node in case we have reached the outbound limit for serving historical blocks
-        if (m_connman.OutboundTargetReached(true) &&
+        // Disconnect the node if the historical-serving portion of the
+        // outbound target is exhausted. Reserve bandwidth using Mercatura's
+        // capacity at the next valid height and this network's block interval.
+        const int next_block_height{
+            m_chainman.ActiveChain().Height() + 1
+        };
+        const uint64_t relay_block_capacity{
+            GetMaxBlockCapacityBytes(next_block_height)
+        };
+        const std::chrono::seconds relay_block_interval{
+            m_chainparams.GetConsensus().nPowTargetSpacing
+        };
+
+        if (m_connman.OutboundTargetReached(
+                true,
+                relay_block_capacity,
+                relay_block_interval) &&
             (((m_chainman.m_best_header != nullptr) && (m_chainman.m_best_header->GetBlockTime() - pindex->GetBlockTime() > HISTORICAL_BLOCK_AGE)) || inv.IsMsgFilteredBlk()) &&
             !pfrom.HasPermission(NetPermissionFlags::Download) // nodes with the download permission may exceed target
         ) {
@@ -2398,6 +2571,125 @@ void PeerManagerImpl::ProcessGetBlockData(CNode& pfrom, Peer& peer, const CInv& 
         }
         can_direct_fetch = CanDirectFetch();
         block_pos = pindex->GetBlockPos();
+        block_height = pindex->nHeight;
+    }
+
+    // Mercatura retains the existing bounded P2P message limits. A serialized
+    // full block which cannot fit safely in one legacy transport message is
+    // announced using the pull-based chunk protocol instead.
+    //
+    // Only direct full-block requests are handled here. Compact/filtered block
+    // response paths retain their existing behavior and are audited separately.
+    if (inv.IsMsgBlk() ||
+        inv.IsMsgWitnessBlk() ||
+        inv.IsMsgCmpctBlk() ||
+        inv.IsMsgFilteredBlk()) {
+        const auto raw_block_size{
+            m_chainman.m_blockman.ReadRawBlockSize(block_pos)
+        };
+
+        if (!raw_block_size) {
+            LogError(
+                "Cannot read serialized block size from disk, %s\n",
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        const uint64_t serialized_block_size{raw_block_size.value()};
+        const uint64_t consensus_capacity{
+            GetMaxBlockCapacityBytes(block_height)
+        };
+
+        if (serialized_block_size > consensus_capacity) {
+            LogError(
+                "Stored block %s has serialized size %u above Mercatura capacity %u at height %d, %s\n",
+                inv.hash.ToString(),
+                serialized_block_size,
+                consensus_capacity,
+                block_height,
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        if (serialized_block_size >
+            MAX_MONOLITHIC_BLOCK_MESSAGE_BYTES) {
+            // Compact and filtered block representations remain bounded
+            // legacy protocols. Large Mercatura blocks are never served
+            // through CMPCTBLOCK, MERKLEBLOCK, or BLOCKTXN.
+            if (inv.IsMsgCmpctBlk() ||
+                inv.IsMsgFilteredBlk()) {
+                LogDebug(
+                    BCLog::NET,
+                    "Peer requested monolithic compact/filtered representation of oversized Mercatura block %s (%u bytes), %s\n",
+                    inv.hash.ToString(),
+                    serialized_block_size,
+                    pfrom.DisconnectMsg(fLogIPs));
+                pfrom.fDisconnect = true;
+                return;
+            }
+
+            // Mercatura chunk transport always carries the exact
+            // witness-inclusive serialization stored in blk*.dat. A peer
+            // requesting a future large block must therefore request the
+            // witness form explicitly.
+            if (!inv.IsMsgWitnessBlk()) {
+                LogDebug(
+                    BCLog::NET,
+                    "Peer requested oversized non-witness block %s; large Mercatura blocks require MSG_WITNESS_BLOCK, %s\n",
+                    inv.hash.ToString(),
+                    pfrom.DisconnectMsg(fLogIPs));
+                pfrom.fDisconnect = true;
+                return;
+            }
+
+            if (pfrom.GetCommonVersion() < MERCATURA_CHUNKED_BLOCK_VERSION) {
+                LogDebug(
+                    BCLog::NET,
+                    "Peer protocol version %d cannot receive Mercatura large block %s (%u bytes), %s\n",
+                    pfrom.GetCommonVersion(),
+                    inv.hash.ToString(),
+                    serialized_block_size,
+                    pfrom.DisconnectMsg(fLogIPs));
+                pfrom.fDisconnect = true;
+                return;
+            }
+
+            MercaturaBlockMeta meta;
+            meta.block_hash = inv.hash;
+            meta.total_size = serialized_block_size;
+            meta.chunk_size =
+                static_cast<uint32_t>(MERCATURA_BLOCK_CHUNK_SIZE);
+            meta.chunk_count =
+                static_cast<uint32_t>(
+                    GetMercaturaBlockChunkCount(serialized_block_size));
+
+            Assume(IsMercaturaBlockMetaStructurallyValid(meta));
+            Assume(!peer.m_outbound_chunked_block);
+
+            peer.m_outbound_chunked_block = Peer::OutboundChunkedBlock{
+                .block_hash = inv.hash,
+                .block_pos = block_pos,
+                .total_size = serialized_block_size,
+                .chunk_count = meta.chunk_count,
+                .next_chunk_index = 0,
+            };
+
+            LogDebug(
+                BCLog::NET,
+                "sending blkmeta for block %s (%u bytes, %u chunks) peer=%d\n",
+                inv.hash.ToString(),
+                meta.total_size,
+                meta.chunk_count,
+                pfrom.GetId());
+
+            MakeAndPushMessage(
+                pfrom,
+                NetMsgType::BLKMETA,
+                meta);
+            return;
+        }
     }
 
     std::shared_ptr<const CBlock> pblock;
@@ -2555,7 +2847,9 @@ void PeerManagerImpl::ProcessGetData(CNode& pfrom, Peer& peer, const std::atomic
 
     // Only process one BLOCK item per call, since they're uncommon and can be
     // expensive to process.
-    if (it != peer.m_getdata_requests.end() && !pfrom.fPauseSend) {
+    if (it != peer.m_getdata_requests.end() &&
+        !pfrom.fPauseSend &&
+        !peer.m_outbound_chunked_block) {
         const CInv &inv = *it++;
         if (inv.IsGenBlkMsg()) {
             ProcessGetBlockData(pfrom, peer, inv);
@@ -4213,6 +4507,609 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
         return;
     }
 
+    if (msg_type == NetMsgType::BLKMETA) {
+        if (pfrom.GetCommonVersion() < MERCATURA_CHUNKED_BLOCK_VERSION) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d sent blkmeta below Mercatura chunk protocol version, %s\n",
+                pfrom.GetId(),
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        if (m_chainman.m_blockman.LoadingBlocks()) {
+            LogDebug(
+                BCLog::NET,
+                "Ignoring blkmeta from peer=%d while importing/reindexing\n",
+                pfrom.GetId());
+            return;
+        }
+
+        MercaturaBlockMeta meta;
+        vRecv >> meta;
+
+        if (peer.m_inbound_chunked_block) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d sent blkmeta while another Mercatura block transfer is active, %s\n",
+                pfrom.GetId(),
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        if (!IsMercaturaBlockMetaStructurallyValid(meta)) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d sent structurally invalid blkmeta for %s, %s\n",
+                pfrom.GetId(),
+                meta.block_hash.ToString(),
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        // BLKMETA is only valid when the complete witness-inclusive block
+        // cannot safely fit in one ordinary P2P message.
+        if (meta.total_size <= MAX_MONOLITHIC_BLOCK_MESSAGE_BYTES) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d sent blkmeta for small block %s (%u bytes), %s\n",
+                pfrom.GetId(),
+                meta.block_hash.ToString(),
+                meta.total_size,
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        const CBlockIndex* pindex{nullptr};
+        bool requested_from_this_peer{false};
+
+        {
+            LOCK(cs_main);
+
+            pindex =
+                m_chainman.m_blockman.LookupBlockIndex(meta.block_hash);
+
+            const auto range{
+                mapBlocksInFlight.equal_range(meta.block_hash)
+            };
+
+            for (auto it = range.first; it != range.second; ++it) {
+                if (it->second.first == pfrom.GetId()) {
+                    requested_from_this_peer = true;
+                    break;
+                }
+            }
+        }
+
+        if (!requested_from_this_peer || pindex == nullptr) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d sent blkmeta for unrequested block %s, %s\n",
+                pfrom.GetId(),
+                meta.block_hash.ToString(),
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        const uint64_t consensus_capacity{
+            GetMaxBlockCapacityBytes(pindex->nHeight)
+        };
+
+        if (meta.total_size > consensus_capacity) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d announced block %s size %u above Mercatura capacity %u at height %d, %s\n",
+                pfrom.GetId(),
+                meta.block_hash.ToString(),
+                meta.total_size,
+                consensus_capacity,
+                pindex->nHeight,
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        // The peer responded correctly to our block request. Start the
+        // per-progress timeout window for the first chunk.
+        WITH_LOCK(
+            cs_main,
+            RefreshBlockDownloadProgress(
+                pfrom.GetId(),
+                meta.block_hash));
+
+        std::FILE* raw_file{std::tmpfile()};
+        if (raw_file == nullptr) {
+            LogError(
+                "Failed to create anonymous Mercatura block transfer file for %s, %s\n",
+                meta.block_hash.ToString(),
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        peer.m_inbound_chunked_block =
+            Peer::InboundChunkedBlock{
+                .block_hash = meta.block_hash,
+                .total_size = meta.total_size,
+                .chunk_count = meta.chunk_count,
+                .next_chunk_index = 0,
+                .bytes_received = 0,
+                .file = Peer::ChunkTempFile{raw_file},
+            };
+
+        MercaturaBlockChunkRequest request;
+        request.block_hash = meta.block_hash;
+        request.chunk_index = 0;
+
+        LogDebug(
+            BCLog::NET,
+            "accepted blkmeta for block %s (%u bytes, %u chunks), requesting chunk 0 peer=%d\n",
+            meta.block_hash.ToString(),
+            meta.total_size,
+            meta.chunk_count,
+            pfrom.GetId());
+
+        MakeAndPushMessage(
+            pfrom,
+            NetMsgType::GETBLKCHUNK,
+            request);
+
+        return;
+    }
+
+    if (msg_type == NetMsgType::BLKCHUNK) {
+        if (pfrom.GetCommonVersion() < MERCATURA_CHUNKED_BLOCK_VERSION) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d sent blkchunk below Mercatura chunk protocol version, %s\n",
+                pfrom.GetId(),
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        if (m_chainman.m_blockman.LoadingBlocks()) {
+            LogDebug(
+                BCLog::NET,
+                "Ignoring blkchunk from peer=%d while importing/reindexing\n",
+                pfrom.GetId());
+            return;
+        }
+
+        MercaturaBlockChunk chunk;
+        vRecv >> chunk;
+
+        if (!peer.m_inbound_chunked_block) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d sent blkchunk without an active Mercatura block transfer, %s\n",
+                pfrom.GetId(),
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        auto& transfer{*peer.m_inbound_chunked_block};
+
+        if (chunk.block_hash != transfer.block_hash) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d sent chunk for unexpected block %s instead of %s, %s\n",
+                pfrom.GetId(),
+                chunk.block_hash.ToString(),
+                transfer.block_hash.ToString(),
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        if (chunk.chunk_index != transfer.next_chunk_index ||
+            chunk.chunk_index >= transfer.chunk_count) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d sent unexpected chunk %u; expected %u of %u, %s\n",
+                pfrom.GetId(),
+                chunk.chunk_index,
+                transfer.next_chunk_index,
+                transfer.chunk_count,
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        const uint64_t expected_size{
+            GetMercaturaBlockChunkPayloadSize(
+                transfer.total_size,
+                chunk.chunk_index)
+        };
+
+        if (expected_size == 0 ||
+            expected_size > MERCATURA_BLOCK_CHUNK_SIZE ||
+            chunk.data.size() != expected_size) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d sent invalid blkchunk size %u for block %s chunk %u; expected %u, %s\n",
+                pfrom.GetId(),
+                chunk.data.size(),
+                transfer.block_hash.ToString(),
+                chunk.chunk_index,
+                expected_size,
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        if (transfer.bytes_received > transfer.total_size ||
+            expected_size > transfer.total_size - transfer.bytes_received) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d exceeded announced block size while sending %s, %s\n",
+                pfrom.GetId(),
+                transfer.block_hash.ToString(),
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        const size_t written{
+            std::fwrite(
+                chunk.data.data(),
+                1,
+                chunk.data.size(),
+                transfer.file.get())
+        };
+
+        if (written != chunk.data.size()) {
+            LogError(
+                "Failed writing Mercatura block %s chunk %u to temporary storage, %s\n",
+                transfer.block_hash.ToString(),
+                chunk.chunk_index,
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            peer.m_inbound_chunked_block.reset();
+            return;
+        }
+
+        transfer.bytes_received += expected_size;
+        ++transfer.next_chunk_index;
+
+        // One complete validated chunk reached temporary storage. Refresh the
+        // timeout only if this is still the first in-flight block for the peer.
+        WITH_LOCK(
+            cs_main,
+            RefreshBlockDownloadProgress(
+                pfrom.GetId(),
+                transfer.block_hash));
+
+        if (transfer.next_chunk_index < transfer.chunk_count) {
+            MercaturaBlockChunkRequest request;
+            request.block_hash = transfer.block_hash;
+            request.chunk_index = transfer.next_chunk_index;
+
+            LogDebug(
+                BCLog::NET,
+                "received Mercatura chunk %u/%u for block %s; requesting next peer=%d\n",
+                chunk.chunk_index + 1,
+                transfer.chunk_count,
+                transfer.block_hash.ToString(),
+                pfrom.GetId());
+
+            MakeAndPushMessage(
+                pfrom,
+                NetMsgType::GETBLKCHUNK,
+                request);
+
+            return;
+        }
+
+        if (transfer.bytes_received != transfer.total_size) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d completed block %s with %u bytes instead of announced %u, %s\n",
+                pfrom.GetId(),
+                transfer.block_hash.ToString(),
+                transfer.bytes_received,
+                transfer.total_size,
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            peer.m_inbound_chunked_block.reset();
+            return;
+        }
+
+        const uint256 expected_hash{transfer.block_hash};
+        const uint64_t expected_total_size{transfer.total_size};
+        auto completed_file{std::move(transfer.file)};
+
+        peer.m_inbound_chunked_block.reset();
+
+        if (std::fflush(completed_file.get()) != 0 ||
+            std::fseek(completed_file.get(), 0, SEEK_SET) != 0) {
+            LogError(
+                "Failed to rewind completed Mercatura block %s temporary storage, %s\n",
+                expected_hash.ToString(),
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            WITH_LOCK(
+                cs_main,
+                RemoveBlockRequest(
+                    expected_hash,
+                    pfrom.GetId()));
+            return;
+        }
+
+        std::shared_ptr<CBlock> pblock{
+            std::make_shared<CBlock>()
+        };
+
+        try {
+            AutoFile block_stream{completed_file.release()};
+            block_stream >> TX_WITH_WITNESS(*pblock);
+
+            if (static_cast<uint64_t>(block_stream.tell()) !=
+                expected_total_size) {
+                LogDebug(
+                    BCLog::NET,
+                    "Peer %d sent trailing or incomplete serialized data for block %s, %s\n",
+                    pfrom.GetId(),
+                    expected_hash.ToString(),
+                    pfrom.DisconnectMsg(fLogIPs));
+                pfrom.fDisconnect = true;
+                WITH_LOCK(
+                    cs_main,
+                    RemoveBlockRequest(
+                        expected_hash,
+                        pfrom.GetId()));
+                return;
+            }
+        } catch (const std::exception& e) {
+            LogDebug(
+                BCLog::NET,
+                "Failed to deserialize Mercatura chunked block %s from peer=%d: %s\n",
+                expected_hash.ToString(),
+                pfrom.GetId(),
+                e.what());
+            pfrom.fDisconnect = true;
+            WITH_LOCK(
+                cs_main,
+                RemoveBlockRequest(
+                    expected_hash,
+                    pfrom.GetId()));
+            return;
+        }
+
+        if (pblock->GetHash() != expected_hash) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d completed Mercatura chunk transfer with wrong block hash %s instead of %s, %s\n",
+                pfrom.GetId(),
+                pblock->GetHash().ToString(),
+                expected_hash.ToString(),
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            WITH_LOCK(
+                cs_main,
+                RemoveBlockRequest(
+                    expected_hash,
+                    pfrom.GetId()));
+            return;
+        }
+
+        LogDebug(
+            BCLog::NET,
+            "completed inbound Mercatura chunk transfer for block %s (%u bytes) peer=%d\n",
+            expected_hash.ToString(),
+            expected_total_size,
+            pfrom.GetId());
+
+        const CBlockIndex* prev_block{
+            WITH_LOCK(
+                m_chainman.GetMutex(),
+                return m_chainman.m_blockman.LookupBlockIndex(
+                    pblock->hashPrevBlock))
+        };
+
+        if (prev_block &&
+            IsBlockMutated(
+                /*block=*/*pblock,
+                /*check_witness_root=*/
+                    DeploymentActiveAfter(
+                        prev_block,
+                        m_chainman,
+                        Consensus::DEPLOYMENT_SEGWIT))) {
+            LogDebug(
+                BCLog::NET,
+                "Received mutated Mercatura chunked block from peer=%d\n",
+                peer.m_id);
+            Misbehaving(peer, "mutated chunked block");
+            WITH_LOCK(
+                cs_main,
+                RemoveBlockRequest(
+                    expected_hash,
+                    peer.m_id));
+            return;
+        }
+
+        bool force_processing{false};
+        bool min_pow_checked{false};
+
+        {
+            LOCK(cs_main);
+
+            // The metadata handler already required this exact block to be
+            // in flight from this peer. Preserve normal BLOCK semantics here.
+            force_processing = IsBlockRequested(expected_hash);
+
+            RemoveBlockRequest(
+                expected_hash,
+                pfrom.GetId());
+
+            mapBlockSource.emplace(
+                expected_hash,
+                std::make_pair(
+                    pfrom.GetId(),
+                    true));
+
+            if (prev_block &&
+                prev_block->nChainWork +
+                        GetBlockProof(*pblock) >=
+                    GetAntiDoSWorkThreshold()) {
+                min_pow_checked = true;
+            }
+        }
+
+        ProcessBlock(
+            pfrom,
+            pblock,
+            force_processing,
+            min_pow_checked);
+
+        return;
+    }
+
+    if (msg_type == NetMsgType::GETBLKCHUNK) {
+        if (pfrom.GetCommonVersion() < MERCATURA_CHUNKED_BLOCK_VERSION) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d used getblkchunk below Mercatura chunk protocol version, %s\n",
+                pfrom.GetId(),
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        if (m_chainman.m_blockman.LoadingBlocks()) {
+            LogDebug(
+                BCLog::NET,
+                "Ignoring getblkchunk from peer=%d while importing/reindexing\n",
+                pfrom.GetId());
+            return;
+        }
+
+        MercaturaBlockChunkRequest req;
+        vRecv >> req;
+
+        if (!peer.m_outbound_chunked_block) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d requested block chunk without an active Mercatura large-block transfer, %s\n",
+                pfrom.GetId(),
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        auto& transfer{*peer.m_outbound_chunked_block};
+
+        if (req.block_hash != transfer.block_hash) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d requested chunk for unexpected block %s instead of %s, %s\n",
+                pfrom.GetId(),
+                req.block_hash.ToString(),
+                transfer.block_hash.ToString(),
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        if (req.chunk_index != transfer.next_chunk_index ||
+            req.chunk_index >= transfer.chunk_count) {
+            LogDebug(
+                BCLog::NET,
+                "Peer %d requested unexpected chunk %u; expected %u of %u, %s\n",
+                pfrom.GetId(),
+                req.chunk_index,
+                transfer.next_chunk_index,
+                transfer.chunk_count,
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            return;
+        }
+
+        const uint64_t expected_size{
+            GetMercaturaBlockChunkPayloadSize(
+                transfer.total_size,
+                req.chunk_index)
+        };
+
+        if (expected_size == 0 ||
+            expected_size > MERCATURA_BLOCK_CHUNK_SIZE) {
+            LogError(
+                "Invalid Mercatura outbound chunk size for block %s chunk %u\n",
+                transfer.block_hash.ToString(),
+                req.chunk_index);
+            pfrom.fDisconnect = true;
+            peer.m_outbound_chunked_block.reset();
+            return;
+        }
+
+        const uint64_t offset{
+            uint64_t{req.chunk_index} * MERCATURA_BLOCK_CHUNK_SIZE
+        };
+
+        const auto raw_chunk{
+            m_chainman.m_blockman.ReadRawBlock(
+                transfer.block_pos,
+                std::pair{
+                    static_cast<size_t>(offset),
+                    static_cast<size_t>(expected_size)})
+        };
+
+        if (!raw_chunk || raw_chunk->size() != expected_size) {
+            LogError(
+                "Failed to read Mercatura block %s chunk %u from disk, %s\n",
+                transfer.block_hash.ToString(),
+                req.chunk_index,
+                pfrom.DisconnectMsg(fLogIPs));
+            pfrom.fDisconnect = true;
+            peer.m_outbound_chunked_block.reset();
+            return;
+        }
+
+        MercaturaBlockChunk chunk;
+        chunk.block_hash = transfer.block_hash;
+        chunk.chunk_index = req.chunk_index;
+        chunk.data.resize(raw_chunk->size());
+
+        std::memcpy(
+            chunk.data.data(),
+            raw_chunk->data(),
+            raw_chunk->size());
+
+        LogDebug(
+            BCLog::NET,
+            "sending blkchunk %u/%u for block %s (%u bytes) peer=%d\n",
+            req.chunk_index + 1,
+            transfer.chunk_count,
+            transfer.block_hash.ToString(),
+            chunk.data.size(),
+            pfrom.GetId());
+
+        MakeAndPushMessage(
+            pfrom,
+            NetMsgType::BLKCHUNK,
+            chunk);
+
+        ++transfer.next_chunk_index;
+
+        if (transfer.next_chunk_index == transfer.chunk_count) {
+            LogDebug(
+                BCLog::NET,
+                "completed outbound Mercatura chunk transfer for block %s peer=%d\n",
+                transfer.block_hash.ToString(),
+                pfrom.GetId());
+
+            peer.m_outbound_chunked_block.reset();
+        }
+
+        return;
+    }
+
     if (msg_type == NetMsgType::GETDATA) {
         std::vector<CInv> vInv;
         vRecv >> vInv;
@@ -4347,7 +5244,23 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
             // Unlock m_most_recent_block_mutex to avoid cs_main lock inversion
         }
         if (recent_block) {
-            SendBlockTransactions(pfrom, peer, *recent_block, req);
+            if (GetBlockCapacityBytes(*recent_block) >
+                MAX_MONOLITHIC_BLOCK_MESSAGE_BYTES) {
+                LogDebug(
+                    BCLog::NET,
+                    "Peer %d requested BLOCKTXN for oversized Mercatura block %s, %s\n",
+                    pfrom.GetId(),
+                    req.blockhash.ToString(),
+                    pfrom.DisconnectMsg(fLogIPs));
+                pfrom.fDisconnect = true;
+                return;
+            }
+
+            SendBlockTransactions(
+                pfrom,
+                peer,
+                *recent_block,
+                req);
             return;
         }
 
@@ -4367,13 +5280,49 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
         }
 
         if (!block_pos.IsNull()) {
+            const auto raw_block_size{
+                m_chainman.m_blockman.ReadRawBlockSize(
+                    block_pos)
+            };
+
+            if (!raw_block_size) {
+                LogError(
+                    "Cannot read serialized block size for GETBLOCKTXN %s, %s\n",
+                    req.blockhash.ToString(),
+                    pfrom.DisconnectMsg(fLogIPs));
+                pfrom.fDisconnect = true;
+                return;
+            }
+
+            if (raw_block_size.value() >
+                MAX_MONOLITHIC_BLOCK_MESSAGE_BYTES) {
+                LogDebug(
+                    BCLog::NET,
+                    "Peer %d requested BLOCKTXN for oversized Mercatura block %s (%u bytes), %s\n",
+                    pfrom.GetId(),
+                    req.blockhash.ToString(),
+                    raw_block_size.value(),
+                    pfrom.DisconnectMsg(fLogIPs));
+                pfrom.fDisconnect = true;
+                return;
+            }
+
             CBlock block;
-            const bool ret{m_chainman.m_blockman.ReadBlock(block, block_pos, req.blockhash)};
+            const bool ret{
+                m_chainman.m_blockman.ReadBlock(
+                    block,
+                    block_pos,
+                    req.blockhash)
+            };
             // If height is above MAX_BLOCKTXN_DEPTH then this block cannot get
             // pruned after we release cs_main above, so this read should never fail.
             assert(ret);
 
-            SendBlockTransactions(pfrom, peer, block, req);
+            SendBlockTransactions(
+                pfrom,
+                peer,
+                block,
+                req);
             return;
         }
 
@@ -5222,7 +6171,8 @@ bool PeerManagerImpl::ProcessMessages(CNode& node, std::atomic<bool>& interruptM
 
     {
         LOCK(peer.m_getdata_requests_mutex);
-        if (!peer.m_getdata_requests.empty()) {
+        if (!peer.m_getdata_requests.empty() &&
+            !peer.m_outbound_chunked_block) {
             ProcessGetData(node, peer, interruptMsgProc);
         }
     }
@@ -5238,7 +6188,10 @@ bool PeerManagerImpl::ProcessMessages(CNode& node, std::atomic<bool>& interruptM
     // and prevents m_getdata_requests to grow unbounded
     {
         LOCK(peer.m_getdata_requests_mutex);
-        if (!peer.m_getdata_requests.empty()) return true;
+        if (!peer.m_getdata_requests.empty() &&
+            !peer.m_outbound_chunked_block) {
+            return true;
+        }
     }
 
     // Don't bother if send buffer is too full to respond anyway
@@ -5890,29 +6843,87 @@ bool PeerManagerImpl::SendMessages(CNode& node)
                 }
             }
             if (!fRevertToInv && !vHeaders.empty()) {
-                if (vHeaders.size() == 1 && state.m_requested_hb_cmpctblocks) {
-                    // We only send up to 1 block as header-and-ids, as otherwise
-                    // probably means we're doing an initial-ish-sync or they're slow
-                    LogDebug(BCLog::NET, "%s sending header-and-ids %s to peer=%d\n", __func__,
-                            vHeaders.front().GetHash().ToString(), node.GetId());
+                if (vHeaders.size() == 1 &&
+                    state.m_requested_hb_cmpctblocks) {
+                    bool compact_sent{false};
 
-                    std::optional<CSerializedNetMsg> cached_cmpctblock_msg;
-                    {
-                        LOCK(m_most_recent_block_mutex);
-                        if (m_most_recent_block_hash == pBestIndex->GetBlockHash()) {
-                            cached_cmpctblock_msg = NetMsg::Make(NetMsgType::CMPCTBLOCK, *m_most_recent_compact_block);
+                    const auto raw_block_size{
+                        m_chainman.m_blockman.ReadRawBlockSize(
+                            pBestIndex->GetBlockPos())
+                    };
+
+                    if (raw_block_size &&
+                        raw_block_size.value() <=
+                            MAX_MONOLITHIC_BLOCK_MESSAGE_BYTES) {
+                        LogDebug(
+                            BCLog::NET,
+                            "%s sending header-and-ids %s to peer=%d\n",
+                            __func__,
+                            vHeaders.front().GetHash().ToString(),
+                            node.GetId());
+
+                        std::optional<CSerializedNetMsg>
+                            cached_cmpctblock_msg;
+
+                        {
+                            LOCK(m_most_recent_block_mutex);
+
+                            if (m_most_recent_block_hash ==
+                                    pBestIndex->GetBlockHash() &&
+                                m_most_recent_compact_block) {
+                                cached_cmpctblock_msg =
+                                    NetMsg::Make(
+                                        NetMsgType::CMPCTBLOCK,
+                                        *m_most_recent_compact_block);
+                            }
+                        }
+
+                        if (cached_cmpctblock_msg) {
+                            PushMessage(
+                                node,
+                                std::move(
+                                    cached_cmpctblock_msg.value()));
+                            compact_sent = true;
+                        } else {
+                            CBlock block;
+
+                            if (m_chainman.m_blockman.ReadBlock(
+                                    block,
+                                    *pBestIndex)) {
+                                CBlockHeaderAndShortTxIDs cmpctblock{
+                                    block,
+                                    m_rng.rand64()
+                                };
+
+                                MakeAndPushMessage(
+                                    node,
+                                    NetMsgType::CMPCTBLOCK,
+                                    cmpctblock);
+
+                                compact_sent = true;
+                            }
                         }
                     }
-                    if (cached_cmpctblock_msg.has_value()) {
-                        PushMessage(node, std::move(cached_cmpctblock_msg.value()));
+
+                    if (compact_sent) {
+                        state.pindexBestHeaderSent = pBestIndex;
+                    } else if (peer.m_prefers_headers) {
+                        LogDebug(
+                            BCLog::NET,
+                            "%s: sending header %s instead of oversized compact block to peer=%d\n",
+                            __func__,
+                            vHeaders.front().GetHash().ToString(),
+                            node.GetId());
+
+                        MakeAndPushMessage(
+                            node,
+                            NetMsgType::HEADERS,
+                            TX_WITH_WITNESS(vHeaders));
+
+                        state.pindexBestHeaderSent = pBestIndex;
                     } else {
-                        CBlock block;
-                        const bool ret{m_chainman.m_blockman.ReadBlock(block, *pBestIndex)};
-                        assert(ret);
-                        CBlockHeaderAndShortTxIDs cmpctblock{block, m_rng.rand64()};
-                        MakeAndPushMessage(node, NetMsgType::CMPCTBLOCK, cmpctblock);
+                        fRevertToInv = true;
                     }
-                    state.pindexBestHeaderSent = pBestIndex;
                 } else if (peer.m_prefers_headers) {
                     if (vHeaders.size() > 1) {
                         LogDebug(BCLog::NET, "%s: %u headers, range (%s, %s), to peer=%d\n", __func__,

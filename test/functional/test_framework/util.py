@@ -26,7 +26,8 @@ from .descriptors import descsum_create
 from collections.abc import Callable
 from typing import Optional, Union
 
-SATOSHI_PRECISION = Decimal('0.00000001')
+MCA_BASE_UNITS_PER_COIN = 100
+MCA_PRECISION = Decimal('0.01')
 
 logger = logging.getLogger("TestFramework.utils")
 
@@ -320,7 +321,7 @@ def get_binary_paths(config):
     paths = types.SimpleNamespace()
     binaries = {
         "bitcoin": "BITCOIN_BIN",
-        "bitcoind": "BITCOIND",
+        "mercaturad": "BITCOIND",
         "bench_bitcoin": "BITCOIN_BENCH",
         "bitcoin-cli": "BITCOINCLI",
         "bitcoin-util": "BITCOINUTIL",
@@ -375,16 +376,21 @@ def random_bitflip(data):
     return bytes(data)
 
 
-def get_fee(tx_size, feerate_btc_kvb):
-    """Calculate the fee in BTC given a feerate is BTC/kvB. Reflects CFeeRate::GetFee"""
-    feerate_sat_kvb = int(feerate_btc_kvb * Decimal(1e8)) # Fee in sat/kvb as an int to avoid float precision errors
-    target_fee_sat = ceildiv(feerate_sat_kvb * tx_size, 1000) # Round calculated fee up to nearest sat
-    return target_fee_sat / Decimal(1e8) # Return result in  BTC
+def get_fee(tx_size, feerate_mca_kvb):
+    """Calculate a fee in MCA using Mercatura base-unit arithmetic."""
+    feerate_base_units_kvb = int(
+        feerate_mca_kvb * Decimal(MCA_BASE_UNITS_PER_COIN)
+    )
+    target_fee_base_units = ceildiv(
+        feerate_base_units_kvb * tx_size,
+        1000,
+    )
+    return Decimal(target_fee_base_units) / Decimal(MCA_BASE_UNITS_PER_COIN)
 
 
 def satoshi_round(amount: Union[int, float, str], *, rounding: str) -> Decimal:
     """Rounds a Decimal amount to the nearest satoshi using the specified rounding mode."""
-    return Decimal(amount).quantize(SATOSHI_PRECISION, rounding=rounding)
+    return Decimal(amount).quantize(MCA_PRECISION, rounding=rounding)
 
 
 def ensure_for(*, duration, f, check_interval=0.2):
@@ -535,7 +541,7 @@ def initialize_datadir(dirname, n, chain, disable_autoconnect=True):
     datadir = get_datadir_path(dirname, n)
     if not os.path.isdir(datadir):
         os.makedirs(datadir)
-    write_config(os.path.join(datadir, "bitcoin.conf"), n=n, chain=chain, disable_autoconnect=disable_autoconnect)
+    write_config(os.path.join(datadir, "mercatura.conf"), n=n, chain=chain, disable_autoconnect=disable_autoconnect)
     os.makedirs(os.path.join(datadir, 'stderr'), exist_ok=True)
     os.makedirs(os.path.join(datadir, 'stdout'), exist_ok=True)
     return datadir
@@ -615,7 +621,7 @@ def get_temp_default_datadir(temp_dir: pathlib.Path) -> tuple[dict, pathlib.Path
 
 
 def append_config(datadir, options):
-    with open(os.path.join(datadir, "bitcoin.conf"), 'a') as f:
+    with open(os.path.join(datadir, "mercatura.conf"), 'a') as f:
         for option in options:
             f.write(option + "\n")
 
@@ -623,8 +629,8 @@ def append_config(datadir, options):
 def get_auth_cookie(datadir, chain):
     user = None
     password = None
-    if os.path.isfile(os.path.join(datadir, "bitcoin.conf")):
-        with open(os.path.join(datadir, "bitcoin.conf"), 'r') as f:
+    if os.path.isfile(os.path.join(datadir, "mercatura.conf")):
+        with open(os.path.join(datadir, "mercatura.conf"), 'r') as f:
             for line in f:
                 if line.startswith("rpcuser="):
                     assert user is None  # Ensure that there is only one rpcuser line

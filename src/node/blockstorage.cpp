@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <consensus/consensus.h>
 #include <node/blockstorage.h>
 
 #include <arith_uint256.h>
@@ -851,19 +852,19 @@ FlatFilePos BlockManager::FindNextBlockPos(unsigned int nAddSize, unsigned int n
     }
 
     bool finalize_undo = false;
-    unsigned int max_blockfile_size{MAX_BLOCKFILE_SIZE};
-    // Use smaller blockfiles in test-only -fastprune mode - but avoid
-    // the possibility of having a block not fit into the block file.
-    if (m_opts.fast_prune) {
-        max_blockfile_size = 0x10000; // 64kiB
-        if (nAddSize >= max_blockfile_size) {
-            // dynamically adjust the blockfile size to be larger than the added size
-            max_blockfile_size = nAddSize + 1;
-        }
-    }
-    assert(nAddSize < max_blockfile_size);
 
-    while (m_blockfile_info[nFile].nSize + nAddSize >= max_blockfile_size) {
+    // MAX_BLOCKFILE_SIZE remains the normal blk*.dat target. If one
+    // Mercatura block itself exceeds that target, enlarge only the file that
+    // must contain that block.
+    const uint64_t max_blockfile_size{
+        GetBlockFileSizeLimit(nAddSize, m_opts.fast_prune)
+    };
+
+    assert(uint64_t{nAddSize} < max_blockfile_size);
+
+    while (uint64_t{m_blockfile_info[nFile].nSize} +
+               uint64_t{nAddSize} >=
+           max_blockfile_size) {
         // when the undo file is keeping up with the block file, we want to flush it explicitly
         // when it is lagging behind (more blocks arrive than are being connected), we let the
         // undo block write case handle it
@@ -1037,17 +1038,62 @@ bool BlockManager::ReadBlock(CBlock& block, const FlatFilePos& pos, const std::o
 {
     block.SetNull();
 
-    // Open history file to read
-    const auto block_data{ReadRawBlock(pos)};
-    if (!block_data) {
+    // Read and validate the stored record size without allocating the complete
+    // serialized block. Mercatura blocks may eventually be much larger than
+    // generic MAX_SIZE, up to the scheduled absolute block-capacity ceiling.
+    const auto block_size_result{ReadRawBlockSize(pos)};
+    if (!block_size_result) {
+        return false;
+    }
+    const uint64_t block_size{*block_size_result};
+
+    AutoFile filein{
+        OpenBlockFile(
+            pos,
+            /*fReadOnly=*/true)
+    };
+    if (filein.IsNull()) {
+        LogError(
+            "OpenBlockFile failed for %s while reading block",
+            pos.ToString());
         return false;
     }
 
     try {
-        // Read block
-        SpanReader{*block_data} >> TX_WITH_WITNESS(block);
+        // Keep block deserialization memory bounded independently of the
+        // serialized block size. BufferedFile may prefetch a small amount past
+        // the logical limit, but deserialization itself cannot advance beyond
+        // block_size and the underlying file is discarded after this read.
+        static constexpr uint64_t BLOCK_READ_BUFFER_SIZE{1ULL << 16};
+
+        BufferedFile block_stream{
+            filein,
+            BLOCK_READ_BUFFER_SIZE,
+            /*nRewindIn=*/0
+        };
+
+        if (!block_stream.SetLimit(block_size)) {
+            LogError(
+                "Failed to set serialized block read limit at %s",
+                pos.ToString());
+            return false;
+        }
+
+        block_stream >> TX_WITH_WITNESS(block);
+
+        if (block_stream.GetPos() != block_size) {
+            LogError(
+                "Serialized block size mismatch at %s while reading block: consumed %u versus stored %u",
+                pos.ToString(),
+                block_stream.GetPos(),
+                block_size);
+            return false;
+        }
     } catch (const std::exception& e) {
-        LogError("Deserialize or I/O error - %s at %s while reading block", e.what(), pos.ToString());
+        LogError(
+            "Deserialize or I/O error - %s at %s while reading block",
+            e.what(),
+            pos.ToString());
         return false;
     }
 
@@ -1080,6 +1126,58 @@ bool BlockManager::ReadBlock(CBlock& block, const CBlockIndex& index) const
     return ReadBlock(block, block_pos, index.GetBlockHash());
 }
 
+BlockManager::ReadRawBlockSizeResult BlockManager::ReadRawBlockSize(const FlatFilePos& pos) const
+{
+    if (pos.nPos < STORAGE_HEADER_BYTES) {
+        LogError("Failed for %s while reading raw block size header", pos.ToString());
+        return util::Unexpected{ReadRawError::IO};
+    }
+
+    AutoFile filein{
+        OpenBlockFile(
+            {pos.nFile, pos.nPos - STORAGE_HEADER_BYTES},
+            /*fReadOnly=*/true)
+    };
+
+    if (filein.IsNull()) {
+        LogError(
+            "OpenBlockFile failed for %s while reading raw block size",
+            pos.ToString());
+        return util::Unexpected{ReadRawError::IO};
+    }
+
+    try {
+        MessageStartChars blk_start;
+        unsigned int blk_size;
+
+        filein >> blk_start >> blk_size;
+
+        if (blk_start != GetParams().MessageStart()) {
+            LogError(
+                "Block magic mismatch for %s while reading raw block size",
+                pos.ToString());
+            return util::Unexpected{ReadRawError::IO};
+        }
+
+        if (blk_size > MERCATURA_MAX_BLOCK_CAPACITY_BYTES) {
+            LogError(
+                "Block data is larger than Mercatura's absolute block capacity for %s: %s versus %s while reading raw block size",
+                pos.ToString(),
+                blk_size,
+                MERCATURA_MAX_BLOCK_CAPACITY_BYTES);
+            return util::Unexpected{ReadRawError::IO};
+        }
+
+        return static_cast<uint32_t>(blk_size);
+    } catch (const std::exception& e) {
+        LogError(
+            "Read from block file failed: %s for %s while reading raw block size",
+            e.what(),
+            pos.ToString());
+        return util::Unexpected{ReadRawError::IO};
+    }
+}
+
 BlockManager::ReadRawBlockResult BlockManager::ReadRawBlock(const FlatFilePos& pos, std::optional<std::pair<size_t, size_t>> block_part) const
 {
     if (pos.nPos < STORAGE_HEADER_BYTES) {
@@ -1107,17 +1205,26 @@ BlockManager::ReadRawBlockResult BlockManager::ReadRawBlock(const FlatFilePos& p
             return util::Unexpected{ReadRawError::IO};
         }
 
-        if (blk_size > MAX_SIZE) {
-            LogError("Block data is larger than maximum deserialization size for %s: %s versus %s while reading raw block",
-                pos.ToString(), blk_size, MAX_SIZE);
+        if (blk_size > MERCATURA_MAX_BLOCK_CAPACITY_BYTES) {
+            LogError(
+                "Block data is larger than Mercatura's absolute block capacity for %s: %s versus %s while reading raw block",
+                pos.ToString(),
+                blk_size,
+                MERCATURA_MAX_BLOCK_CAPACITY_BYTES);
             return util::Unexpected{ReadRawError::IO};
         }
 
         if (block_part) {
             const auto [offset, size]{*block_part};
-            if (size == 0 || SaturatingAdd(offset, size) > blk_size) {
-                return util::Unexpected{ReadRawError::BadPartRange}; // Avoid logging - offset/size come from untrusted REST input
+
+            // Partial raw reads are used by untrusted interfaces such as REST
+            // and by Mercatura's bounded block-chunk transport. Keep each
+            // individual allocation under the generic deserialization safety
+            // ceiling even though the complete stored block may be much larger.
+            if (!IsRawBlockPartAllowed(blk_size, offset, size)) {
+                return util::Unexpected{ReadRawError::BadPartRange};
             }
+
             filein.seek(offset, SEEK_CUR);
             blk_size = size;
         }

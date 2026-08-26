@@ -149,7 +149,29 @@ FUZZ_TARGET(connman, .init = initialize_connman)
                 (void)connman.GetNodeCount(fuzzed_data_provider.PickValueInArray({ConnectionDirection::None, ConnectionDirection::In, ConnectionDirection::Out, ConnectionDirection::Both}));
             },
             [&] {
-                (void)connman.OutboundTargetReached(fuzzed_data_provider.ConsumeBool());
+                const bool historical{
+                    fuzzed_data_provider.ConsumeBool()
+                };
+                const uint64_t block_capacity{
+                    historical
+                        ? fuzzed_data_provider.ConsumeIntegralInRange<uint64_t>(
+                              1,
+                              uint64_t{1} << 30)
+                        : 0
+                };
+                const std::chrono::seconds block_interval{
+                    historical
+                        ? std::chrono::seconds{
+                              fuzzed_data_provider.ConsumeIntegralInRange<int64_t>(
+                                  1,
+                                  3600)}
+                        : std::chrono::seconds{0}
+                };
+
+                (void)connman.OutboundTargetReached(
+                    historical,
+                    block_capacity,
+                    block_interval);
             },
             [&] {
                 CSerializedNetMsg serialized_net_msg;

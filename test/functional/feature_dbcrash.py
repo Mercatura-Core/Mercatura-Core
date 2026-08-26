@@ -63,9 +63,10 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
         self.node1_args = ["-dbcrashratio=16", "-dbcache=8"] + self.base_args
         self.node2_args = ["-dbcrashratio=24", "-dbcache=16"] + self.base_args
 
-        # Node3 is a normal node with default args, except will mine full blocks
-        # and txs with "dust" outputs
-        self.node3_args = ["-blockmaxweight=4000000", "-dustrelayfee=0"]
+        # Node3 is a normal node with default args, except it explicitly mines
+        # up to Mercatura's initial 1 MiB block-capacity ceiling and permits
+        # transactions with "dust" outputs for this test.
+        self.node3_args = ["-blockmaxsize=1048576", "-dustrelayfee=0"]
         self.extra_args = [self.node0_args, self.node1_args, self.node2_args, self.node3_args]
 
     def setup_network(self):

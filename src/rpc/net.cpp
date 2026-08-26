@@ -10,6 +10,7 @@
 #include <chainparams.h>
 #include <clientversion.h>
 #include <core_io.h>
+#include <consensus/consensus.h>
 #include <net_permissions.h>
 #include <net_processing.h>
 #include <net_types.h>
@@ -598,6 +599,19 @@ static RPCHelpMan getnettotals()
 {
     NodeContext& node = EnsureAnyNodeContext(request.context);
     const CConnman& connman = EnsureConnman(node);
+    ChainstateManager& chainman = EnsureChainman(node);
+
+    const int next_block_height{
+        WITH_LOCK(
+            ::cs_main,
+            return chainman.ActiveChain().Height() + 1)
+    };
+    const uint64_t relay_block_capacity{
+        GetMaxBlockCapacityBytes(next_block_height)
+    };
+    const std::chrono::seconds relay_block_interval{
+        Params().GetConsensus().nPowTargetSpacing
+    };
 
     UniValue obj(UniValue::VOBJ);
     obj.pushKV("totalbytesrecv", connman.GetTotalBytesRecv());
@@ -607,8 +621,15 @@ static RPCHelpMan getnettotals()
     UniValue outboundLimit(UniValue::VOBJ);
     outboundLimit.pushKV("timeframe", count_seconds(connman.GetMaxOutboundTimeframe()));
     outboundLimit.pushKV("target", connman.GetMaxOutboundTarget());
-    outboundLimit.pushKV("target_reached", connman.OutboundTargetReached(false));
-    outboundLimit.pushKV("serve_historical_blocks", !connman.OutboundTargetReached(true));
+    outboundLimit.pushKV(
+        "target_reached",
+        connman.OutboundTargetReached(false));
+    outboundLimit.pushKV(
+        "serve_historical_blocks",
+        !connman.OutboundTargetReached(
+            true,
+            relay_block_capacity,
+            relay_block_interval));
     outboundLimit.pushKV("bytes_left_in_cycle", connman.GetOutboundTargetBytesLeft());
     outboundLimit.pushKV("time_left_in_cycle", count_seconds(connman.GetMaxOutboundTimeLeftInCycle()));
     obj.pushKV("uploadtarget", std::move(outboundLimit));

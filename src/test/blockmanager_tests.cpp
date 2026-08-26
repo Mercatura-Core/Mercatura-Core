@@ -5,6 +5,7 @@
 #include <chain.h>
 #include <chainparams.h>
 #include <clientversion.h>
+#include <consensus/consensus.h>
 #include <node/blockstorage.h>
 #include <node/context.h>
 #include <node/kernel_notifications.h>
@@ -23,9 +24,77 @@ using node::STORAGE_HEADER_BYTES;
 using node::BlockManager;
 using node::KernelNotifications;
 using node::MAX_BLOCKFILE_SIZE;
+using node::GetBlockFileSizeLimit;
+using node::IsRawBlockPartAllowed;
 
 // use BasicTestingSetup here for the data directory configuration, setup, and cleanup
 BOOST_FIXTURE_TEST_SUITE(blockmanager_tests, BasicTestingSetup)
+
+BOOST_AUTO_TEST_CASE(blockmanager_large_block_storage_limits)
+{
+    // Ordinary blocks retain Bitcoin Core's normal 128 MiB blk*.dat target.
+    BOOST_CHECK_EQUAL(
+        GetBlockFileSizeLimit(1U << 20, /*fast_prune=*/false),
+        MAX_BLOCKFILE_SIZE);
+    BOOST_CHECK_EQUAL(
+        GetBlockFileSizeLimit(MAX_BLOCKFILE_SIZE - 1, /*fast_prune=*/false),
+        MAX_BLOCKFILE_SIZE);
+
+    // An entry which itself reaches or exceeds the normal file target gets a
+    // dedicated file whose limit is one byte larger than the required entry.
+    BOOST_CHECK_EQUAL(
+        GetBlockFileSizeLimit(MAX_BLOCKFILE_SIZE, /*fast_prune=*/false),
+        uint64_t{MAX_BLOCKFILE_SIZE} + 1);
+    BOOST_CHECK_EQUAL(
+        GetBlockFileSizeLimit(MAX_BLOCKFILE_SIZE + 1, /*fast_prune=*/false),
+        uint64_t{MAX_BLOCKFILE_SIZE} + 2);
+
+    // The largest scheduled Mercatura block plus its blk*.dat storage header
+    // fits safely in the existing uint32_t block-file position representation.
+    constexpr uint64_t max_stored_block_entry{
+        MERCATURA_MAX_BLOCK_CAPACITY_BYTES + STORAGE_HEADER_BYTES
+    };
+    static_assert(max_stored_block_entry < std::numeric_limits<uint32_t>::max());
+
+    const uint64_t max_file_limit{
+        GetBlockFileSizeLimit(
+            static_cast<uint32_t>(max_stored_block_entry),
+            /*fast_prune=*/false)
+    };
+    BOOST_CHECK_GT(max_file_limit, max_stored_block_entry);
+
+    // -fastprune keeps its small target for ordinary test blocks but likewise
+    // expands safely if one entry cannot fit.
+    BOOST_CHECK_EQUAL(
+        GetBlockFileSizeLimit(1024, /*fast_prune=*/true),
+        0x10000ULL);
+    BOOST_CHECK_EQUAL(
+        GetBlockFileSizeLimit(0x10000U, /*fast_prune=*/true),
+        0x10001ULL);
+
+    // Partial reads are independently bounded by MAX_SIZE even when the
+    // complete stored block is much larger.
+    const uint64_t large_block_size{uint64_t{MAX_SIZE} * 2};
+
+    BOOST_CHECK(IsRawBlockPartAllowed(
+        large_block_size, 0, MAX_SIZE));
+    BOOST_CHECK(IsRawBlockPartAllowed(
+        large_block_size, MAX_SIZE, MAX_SIZE));
+
+    BOOST_CHECK(!IsRawBlockPartAllowed(
+        large_block_size, 0, 0));
+    BOOST_CHECK(!IsRawBlockPartAllowed(
+        large_block_size, 0, MAX_SIZE + 1));
+
+    // Range checks must not depend on offset + size arithmetic that can
+    // overflow.
+    BOOST_CHECK(IsRawBlockPartAllowed(
+        200, 150, 50));
+    BOOST_CHECK(!IsRawBlockPartAllowed(
+        200, 150, 51));
+    BOOST_CHECK(!IsRawBlockPartAllowed(
+        200, std::numeric_limits<uint64_t>::max(), 1));
+}
 
 BOOST_AUTO_TEST_CASE(blockmanager_find_block_pos)
 {
@@ -164,6 +233,10 @@ BOOST_FIXTURE_TEST_CASE(blockmanager_block_data_part, TestChain100Setup)
     auto block{blockman.ReadRawBlock(tip_block_pos)};
     BOOST_REQUIRE(block);
     BOOST_REQUIRE_GE(block->size(), 200);
+
+    const auto raw_block_size{blockman.ReadRawBlockSize(tip_block_pos)};
+    BOOST_REQUIRE(raw_block_size);
+    BOOST_CHECK_EQUAL(raw_block_size.value(), block->size());
 
     const auto expect_part{[&](size_t offset, size_t size) {
         auto res{blockman.ReadRawBlock(tip_block_pos, std::pair{offset, size})};

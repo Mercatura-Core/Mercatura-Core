@@ -147,8 +147,8 @@ class EstimateFeeTest(BitcoinTestFramework):
         self.noban_tx_relay = True
         self.extra_args = [
             [],
-            ["-blockmaxweight=72000"],
-            ["-blockmaxweight=36000"],
+            ["-blockmaxsize=18000"],
+            ["-blockmaxsize=9000"],
         ]
 
     def setup_network(self):
@@ -160,8 +160,9 @@ class EstimateFeeTest(BitcoinTestFramework):
         self.add_nodes(3, extra_args=self.extra_args)
         # Use node0 to mine blocks for input splitting
         # Node1 mines small blocks but that are bigger than the expected transaction rate.
-        # NOTE: the CreateNewBlock code starts counting block weight at 4,000 weight,
-        # (68k weight is room enough for 120 or so transactions)
+        # Mercatura block creation reserves serialized bytes for fixed block
+        # overhead. Node1 therefore has roughly 16 kB available for transactions,
+        # enough for the transaction volume expected by this test.
         # Node2 is a stingy miner, that
         # produces too small blocks (room for only 55 or so transactions)
 

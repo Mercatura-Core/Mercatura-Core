@@ -143,6 +143,29 @@ static inline int64_t GetTransactionInputWeight(const CTxIn& txin)
     return ::GetSerializeSize(TX_NO_WITNESS(txin)) * (WITNESS_SCALE_FACTOR - 1) + ::GetSerializeSize(TX_WITH_WITNESS(txin)) + ::GetSerializeSize(txin.scriptWitness.stack);
 }
 
+/**
+ * Mercatura block-capacity accounting uses complete serialized bytes,
+ * including witness data, with no witness discount.
+ *
+ * These helpers are deliberately separate from the BIP141 weight helpers
+ * above. Bitcoin weight remains available for SegWit, sigop, policy, and
+ * compatibility behavior that still depends on it.
+ */
+static inline uint64_t GetTransactionCapacityBytes(const CTransaction& tx)
+{
+    return ::GetSerializeSize(TX_WITH_WITNESS(tx));
+}
+
+static inline uint64_t GetBlockCapacityBytes(const CBlock& block)
+{
+    return ::GetSerializeSize(TX_WITH_WITNESS(block));
+}
+
+static inline bool IsBlockWithinCapacity(const CBlock& block, int64_t height)
+{
+    return GetBlockCapacityBytes(block) <= GetMaxBlockCapacityBytes(height);
+}
+
 /** Compute at which vout of the block's coinbase transaction the witness commitment occurs, or -1 if not found */
 inline int GetWitnessCommitmentIndex(const CBlock& block)
 {

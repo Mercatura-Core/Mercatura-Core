@@ -126,6 +126,21 @@ inline constexpr const char* HEADERS{"headers"};
  */
 inline constexpr const char* BLOCK{"block"};
 /**
+ * Mercatura large-block transfer metadata.
+ *
+ * Sent instead of a monolithic BLOCK response when the serialized block
+ * exceeds the safe single-message transport limit.
+ */
+inline constexpr const char* BLKMETA{"blkmeta"};
+/**
+ * Request one bounded chunk of a Mercatura large-block transfer.
+ */
+inline constexpr const char* GETBLKCHUNK{"getblkchunk"};
+/**
+ * Contains one bounded chunk of a serialized Mercatura block.
+ */
+inline constexpr const char* BLKCHUNK{"blkchunk"};
+/**
  * The getaddr message requests an addr message from the receiving node,
  * preferably one with lots of IP addresses of other receiving nodes.
  */
@@ -281,6 +296,9 @@ inline const std::array ALL_NET_MESSAGE_TYPES{std::to_array<std::string>({
     NetMsgType::TX,
     NetMsgType::HEADERS,
     NetMsgType::BLOCK,
+    NetMsgType::BLKMETA,
+    NetMsgType::GETBLKCHUNK,
+    NetMsgType::BLKCHUNK,
     NetMsgType::GETADDR,
     NetMsgType::MEMPOOL,
     NetMsgType::PING,

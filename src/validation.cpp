@@ -2293,6 +2293,18 @@ script_verify_flags GetBlockScriptFlags(const CBlockIndex& block_index, const Ch
 }
 
 
+static bool CheckBlockCapacity(const CBlock& block, BlockValidationState& state, int64_t height)
+{
+    if (!IsBlockWithinCapacity(block, height)) {
+        return state.Invalid(
+            BlockValidationResult::BLOCK_CONSENSUS,
+            "bad-blk-capacity",
+            "Mercatura block capacity limit exceeded");
+    }
+
+    return true;
+}
+
 /** Apply the effects of this block (with given index) on the UTXO set represented by coins.
  *  Validity checks that depend on the UTXO set are also done; ConnectBlock()
  *  can fail if those validity checks fail (among other reasons). */
@@ -2329,6 +2341,14 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
             return FatalError(m_chainman.GetNotifications(), state, _("Corrupt block found indicating potential hardware failure."));
         }
         LogError("%s: Consensus::CheckBlock: %s\n", __func__, state.ToString());
+        return false;
+    }
+
+    // Re-enforce Mercatura's height-dependent block-capacity rule here.
+    // ConnectBlock() does not invoke ContextualCheckBlock(), notably during
+    // -reindex-chainstate, so this consensus rule must not exist only there.
+    if (!CheckBlockCapacity(block, state, pindex->nHeight)) {
+        LogError("%s: block capacity check failed: %s\n", __func__, state.ToString());
         return false;
     }
 
@@ -3991,9 +4011,18 @@ bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensu
     // Note that witness malleability is checked in ContextualCheckBlock, so no
     // checks that use witness data may be performed here.
 
-    // Size limits
-    if (block.vtx.empty() || block.vtx.size() * WITNESS_SCALE_FACTOR > MAX_BLOCK_WEIGHT || ::GetSerializeSize(TX_NO_WITNESS(block)) * WITNESS_SCALE_FACTOR > MAX_BLOCK_WEIGHT)
-        return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-length", "size limits failed");
+    // Context-free absolute sanity limits. The exact Mercatura block-capacity
+    // rule is height-dependent and includes witness data, so it is enforced
+    // later after witness malleability has been checked.
+    static_assert(MIN_TRANSACTION_WEIGHT % WITNESS_SCALE_FACTOR == 0);
+    constexpr uint64_t MIN_VALID_TRANSACTION_SIZE_BYTES{
+        MIN_TRANSACTION_WEIGHT / WITNESS_SCALE_FACTOR};
+
+    if (block.vtx.empty() ||
+        block.vtx.size() > MERCATURA_MAX_BLOCK_CAPACITY_BYTES / MIN_VALID_TRANSACTION_SIZE_BYTES ||
+        ::GetSerializeSize(TX_NO_WITNESS(block)) > MERCATURA_MAX_BLOCK_CAPACITY_BYTES) {
+        return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-length", "absolute size limits failed");
+    }
 
     // First transaction must be coinbase, the rest must not be
     if (block.vtx.empty() || !block.vtx[0]->IsCoinBase())
@@ -4219,13 +4248,11 @@ static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& stat
     }
 
     // After the coinbase witness reserved value and commitment are verified,
-    // we can check if the block weight passes (before we've checked the
-    // coinbase witness, it would be possible for the weight to be too
-    // large by filling up the coinbase witness, which doesn't change
-    // the block hash, so we couldn't mark the block as permanently
-    // failed).
-    if (GetBlockWeight(block) > MAX_BLOCK_WEIGHT) {
-        return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-weight", strprintf("%s : weight limit failed", __func__));
+    // enforce Mercatura's height-dependent serialized-byte capacity. This
+    // must remain after CheckWitnessMalleation(): otherwise mutable coinbase
+    // witness data could affect a permanent block-validity decision.
+    if (!CheckBlockCapacity(block, state, nHeight)) {
+        return false;
     }
 
     return true;
@@ -5014,7 +5041,18 @@ void ChainstateManager::LoadExternalBlockFile(
 
     int nLoaded = 0;
     try {
-        BufferedFile blkdat{file_in, 2 * MAX_BLOCK_SERIALIZED_SIZE, MAX_BLOCK_SERIALIZED_SIZE + 8};
+        // Mercatura block files may contain blocks up to the scheduled
+        // absolute capacity ceiling. Keep the scanner's memory use independent
+        // of that serialized block size: only a small buffer and enough rewind
+        // space for a just-read block header are required.
+        static constexpr uint64_t EXTERNAL_BLOCK_BUFFER_SIZE{1ULL << 16};
+        static constexpr uint64_t EXTERNAL_BLOCK_REWIND_SIZE{128};
+
+        BufferedFile blkdat{
+            file_in,
+            EXTERNAL_BLOCK_BUFFER_SIZE,
+            EXTERNAL_BLOCK_REWIND_SIZE
+        };
         // nRewind indicates where to resume scanning in case something goes wrong,
         // such as a block fails to deserialize.
         uint64_t nRewind = blkdat.GetPos();
@@ -5036,59 +5074,134 @@ void ChainstateManager::LoadExternalBlockFile(
                 }
                 // read size
                 blkdat >> nSize;
-                if (nSize < 80 || nSize > MAX_BLOCK_SERIALIZED_SIZE)
+                if (nSize < 80 ||
+                    uint64_t{nSize} > MERCATURA_MAX_BLOCK_CAPACITY_BYTES) {
                     continue;
+                }
             } catch (const std::exception&) {
                 // no valid block header found; don't complain
                 // (this happens at the end of every blk.dat file)
                 break;
             }
             try {
-                // read block header
+                // Read only the block header first. This is enough to decide
+                // whether the block can be processed immediately, is an
+                // out-of-order child, or is already known.
                 const uint64_t nBlockPos{blkdat.GetPos()};
-                if (dbp)
+                if (dbp) {
                     dbp->nPos = nBlockPos;
-                blkdat.SetLimit(nBlockPos + nSize);
+                }
+
+                if (nBlockPos >
+                    std::numeric_limits<uint64_t>::max() -
+                        uint64_t{nSize}) {
+                    throw std::ios_base::failure{
+                        "external block record position overflow"
+                    };
+                }
+
+                const uint64_t nBlockEnd{
+                    nBlockPos + uint64_t{nSize}
+                };
+
+                if (!blkdat.SetLimit(nBlockEnd)) {
+                    throw std::ios_base::failure{
+                        "failed to set external block record limit"
+                    };
+                }
+
                 CBlockHeader header;
                 blkdat >> header;
                 const uint256 hash{header.GetHash()};
-                // Skip the rest of this block (this may read from disk into memory); position to the marker before the
-                // next block, but it's still possible to rewind to the start of the current block (without a disk read).
-                nRewind = nBlockPos + nSize;
-                blkdat.SkipTo(nRewind);
 
-                std::shared_ptr<CBlock> pblock{}; // needs to remain available after the cs_main lock is released to avoid duplicate reads from disk
+                // If anything later fails, resume scanning after this declared
+                // record rather than requiring the complete block to remain in
+                // the rewind buffer.
+                nRewind = nBlockEnd;
+
+                std::shared_ptr<CBlock> pblock{};
 
                 {
                     LOCK(cs_main);
-                    // detect out of order blocks, and store them for later
-                    if (hash != params.GetConsensus().hashGenesisBlock && !m_blockman.LookupBlockIndex(header.hashPrevBlock)) {
-                        LogDebug(BCLog::REINDEX, "%s: Out of order block %s, parent %s not known\n", __func__, hash.ToString(),
-                                 header.hashPrevBlock.ToString());
+
+                    // Detect out-of-order blocks and remember their disk
+                    // positions for recursive processing after their parent is
+                    // encountered.
+                    if (hash != params.GetConsensus().hashGenesisBlock &&
+                        !m_blockman.LookupBlockIndex(
+                            header.hashPrevBlock)) {
+                        LogDebug(
+                            BCLog::REINDEX,
+                            "%s: Out of order block %s, parent %s not known\n",
+                            __func__,
+                            hash.ToString(),
+                            header.hashPrevBlock.ToString());
+
                         if (dbp && blocks_with_unknown_parent) {
-                            blocks_with_unknown_parent->emplace(header.hashPrevBlock, *dbp);
+                            blocks_with_unknown_parent->emplace(
+                                header.hashPrevBlock,
+                                *dbp);
                         }
+
+                        // Advance through the record using the fixed-size
+                        // BufferedFile buffer. No block-sized allocation occurs.
+                        blkdat.SkipTo(nBlockEnd);
                         continue;
                     }
 
-                    // process in case the block isn't known yet
-                    const CBlockIndex* pindex = m_blockman.LookupBlockIndex(hash);
-                    if (!pindex || (pindex->nStatus & BLOCK_HAVE_DATA) == 0) {
-                        // This block can be processed immediately; rewind to its start, read and deserialize it.
-                        blkdat.SetPos(nBlockPos);
+                    const CBlockIndex* pindex{
+                        m_blockman.LookupBlockIndex(hash)
+                    };
+
+                    if (!pindex ||
+                        (pindex->nStatus & BLOCK_HAVE_DATA) == 0) {
+                        // We only consumed the 80-byte header, so the small
+                        // rewind window is sufficient to return to the start
+                        // and stream-deserialize the complete block.
+                        if (!blkdat.SetPos(nBlockPos)) {
+                            throw std::ios_base::failure{
+                                "failed to rewind external block header"
+                            };
+                        }
+
                         pblock = std::make_shared<CBlock>();
                         blkdat >> TX_WITH_WITNESS(*pblock);
-                        nRewind = blkdat.GetPos();
+
+                        if (blkdat.GetPos() != nBlockEnd) {
+                            throw std::ios_base::failure{
+                                "external block serialized size mismatch"
+                            };
+                        }
 
                         BlockValidationState state;
-                        if (AcceptBlock(pblock, state, nullptr, true, dbp, nullptr, true)) {
+                        if (AcceptBlock(
+                                pblock,
+                                state,
+                                nullptr,
+                                true,
+                                dbp,
+                                nullptr,
+                                true)) {
                             nLoaded++;
                         }
+
                         if (state.IsError()) {
                             break;
                         }
-                    } else if (hash != params.GetConsensus().hashGenesisBlock && pindex->nHeight % 1000 == 0) {
-                        LogDebug(BCLog::REINDEX, "Block Import: already had block %s at height %d\n", hash.ToString(), pindex->nHeight);
+                    } else {
+                        // Already-known blocks do not need deserialization.
+                        // Stream past the remainder using bounded memory.
+                        blkdat.SkipTo(nBlockEnd);
+
+                        if (hash !=
+                                params.GetConsensus().hashGenesisBlock &&
+                            pindex->nHeight % 1000 == 0) {
+                            LogDebug(
+                                BCLog::REINDEX,
+                                "Block Import: already had block %s at height %d\n",
+                                hash.ToString(),
+                                pindex->nHeight);
+                        }
                     }
                 }
 

@@ -3941,23 +3941,71 @@ std::chrono::seconds CConnman::GetMaxOutboundTimeLeftInCycle_() const
     return (cycleEndTime < now) ? 0s : cycleEndTime - now;
 }
 
-bool CConnman::OutboundTargetReached(bool historicalBlockServingLimit) const
+bool CConnman::OutboundTargetReached(
+    bool historicalBlockServingLimit,
+    uint64_t block_capacity_bytes,
+    std::chrono::seconds block_interval) const
 {
     AssertLockNotHeld(m_total_bytes_sent_mutex);
     LOCK(m_total_bytes_sent_mutex);
-    if (nMaxOutboundLimit == 0)
-        return false;
 
-    if (historicalBlockServingLimit)
-    {
-        // keep a large enough buffer to at least relay each block once
-        const std::chrono::seconds timeLeftInCycle = GetMaxOutboundTimeLeftInCycle_();
-        const uint64_t buffer = timeLeftInCycle / std::chrono::minutes{10} * MAX_BLOCK_SERIALIZED_SIZE;
-        if (buffer >= nMaxOutboundLimit || nMaxOutboundTotalBytesSentInCycle >= nMaxOutboundLimit - buffer)
-            return true;
+    if (nMaxOutboundLimit == 0) {
+        return false;
     }
-    else if (nMaxOutboundTotalBytesSentInCycle >= nMaxOutboundLimit)
+
+    if (historicalBlockServingLimit) {
+        // Historical serving reserves enough of the remaining upload target
+        // to relay each expected new block once. Mercatura's block interval
+        // and scheduled block capacity are supplied by the chain-aware caller
+        // instead of inheriting Bitcoin's fixed 10-minute/4-MB assumption.
+        const int64_t block_interval_seconds{
+            count_seconds(block_interval)
+        };
+
+        if (block_capacity_bytes == 0 ||
+            block_interval_seconds <= 0) {
+            // A historical-serving caller must provide meaningful chain
+            // parameters. Fail closed rather than consuming relay reserve.
+            return true;
+        }
+
+        const std::chrono::seconds time_left{
+            GetMaxOutboundTimeLeftInCycle_()
+        };
+
+        const uint64_t expected_blocks{
+            static_cast<uint64_t>(
+                count_seconds(time_left) /
+                block_interval_seconds)
+        };
+
+        // Determine whether the required reserve already equals or exceeds
+        // the complete outbound target without performing an overflowing
+        // multiplication.
+        const uint64_t blocks_to_fill_target{
+            nMaxOutboundLimit / block_capacity_bytes +
+            (nMaxOutboundLimit % block_capacity_bytes != 0)
+        };
+
+        if (expected_blocks >= blocks_to_fill_target) {
+            return true;
+        }
+
+        // Safe because expected_blocks < ceil(target / capacity), therefore
+        // this product is strictly below nMaxOutboundLimit.
+        const uint64_t buffer{
+            expected_blocks * block_capacity_bytes
+        };
+
+        if (nMaxOutboundTotalBytesSentInCycle >=
+            nMaxOutboundLimit - buffer) {
+            return true;
+        }
+    } else if (
+        nMaxOutboundTotalBytesSentInCycle >=
+        nMaxOutboundLimit) {
         return true;
+    }
 
     return false;
 }

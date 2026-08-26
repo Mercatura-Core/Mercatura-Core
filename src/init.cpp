@@ -695,8 +695,8 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-whitelistrelay", strprintf("Add 'relay' permission to whitelisted peers with default permissions. This will accept relayed transactions even when not relaying transactions (default: %d)", DEFAULT_WHITELISTRELAY), ArgsManager::ALLOW_ANY, OptionsCategory::NODE_RELAY);
 
 
-    argsman.AddArg("-blockmaxweight=<n>", strprintf("Set maximum BIP141 block weight (default: %d)", DEFAULT_BLOCK_MAX_WEIGHT), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::BLOCK_CREATION);
-    argsman.AddArg("-blockreservedweight=<n>", strprintf("Reserve space for the fixed-size block header plus the largest coinbase transaction the mining software may add to the block. Only affects mining RPC clients, not IPC clients. (default: %d).", DEFAULT_BLOCK_RESERVED_WEIGHT), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
+    argsman.AddArg("-blockmaxsize=<n>", "Set maximum serialized block size in bytes. The actual template limit is also capped by the height-dependent Mercatura consensus capacity (default: current consensus capacity)", ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
+    argsman.AddArg("-blockreservedsize=<n>", strprintf("Reserve serialized bytes for the fixed-size block header plus the largest coinbase transaction the mining software may add to the block. Only affects mining RPC clients, not IPC clients. (default: %d).", DEFAULT_BLOCK_RESERVED_SIZE), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockmintxfee=<amt>", strprintf("Set lowest fee rate (in %s/kvB) for transactions to be included in block creation. (default: %s)", CURRENCY_UNIT, FormatMoney(DEFAULT_BLOCK_MIN_TX_FEE)), ArgsManager::ALLOW_ANY, OptionsCategory::BLOCK_CREATION);
     argsman.AddArg("-blockversion=<n>", "Override block version to test forking scenarios", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::BLOCK_CREATION);
 
@@ -1069,19 +1069,31 @@ bool AppInitParameterInteraction(const ArgsManager& args)
     }
 
     {
-        const auto max_block_weight = args.GetIntArg("-blockmaxweight", DEFAULT_BLOCK_MAX_WEIGHT);
-        if (max_block_weight > MAX_BLOCK_WEIGHT) {
-            return InitError(strprintf(_("Specified -blockmaxweight (%d) exceeds consensus maximum block weight (%d)"), max_block_weight, MAX_BLOCK_WEIGHT));
+        const auto max_block_size = args.GetIntArg("-blockmaxsize", MERCATURA_MAX_BLOCK_CAPACITY_BYTES);
+        if (max_block_size <= 0) {
+            return InitError(Untranslated("Specified -blockmaxsize must be greater than zero"));
+        }
+        if (static_cast<uint64_t>(max_block_size) > MERCATURA_MAX_BLOCK_CAPACITY_BYTES) {
+            return InitError(Untranslated(strprintf(
+                "Specified -blockmaxsize (%d) exceeds Mercatura's maximum scheduled block capacity (%u bytes)",
+                max_block_size,
+                MERCATURA_MAX_BLOCK_CAPACITY_BYTES)));
         }
     }
 
     {
-        const auto block_reserved_weight = args.GetIntArg("-blockreservedweight", DEFAULT_BLOCK_RESERVED_WEIGHT);
-        if (block_reserved_weight > MAX_BLOCK_WEIGHT) {
-            return InitError(strprintf(_("Specified -blockreservedweight (%d) exceeds consensus maximum block weight (%d)"), block_reserved_weight, MAX_BLOCK_WEIGHT));
+        const auto block_reserved_size = args.GetIntArg("-blockreservedsize", DEFAULT_BLOCK_RESERVED_SIZE);
+        if (block_reserved_size > static_cast<int64_t>(MERCATURA_MAX_BLOCK_CAPACITY_BYTES)) {
+            return InitError(Untranslated(strprintf(
+                "Specified -blockreservedsize (%d) exceeds Mercatura's maximum scheduled block capacity (%u bytes)",
+                block_reserved_size,
+                MERCATURA_MAX_BLOCK_CAPACITY_BYTES)));
         }
-        if (block_reserved_weight < MINIMUM_BLOCK_RESERVED_WEIGHT) {
-            return InitError(strprintf(_("Specified -blockreservedweight (%d) is lower than minimum safety value of (%d)"), block_reserved_weight, MINIMUM_BLOCK_RESERVED_WEIGHT));
+        if (block_reserved_size < MINIMUM_BLOCK_RESERVED_SIZE) {
+            return InitError(Untranslated(strprintf(
+                "Specified -blockreservedsize (%d) is lower than minimum safety value of (%d bytes)",
+                block_reserved_size,
+                MINIMUM_BLOCK_RESERVED_SIZE)));
         }
     }
 

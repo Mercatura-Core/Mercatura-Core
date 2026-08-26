@@ -78,12 +78,26 @@ void RegenerateCommitments(CBlock& block, ChainstateManager& chainman)
 
 static BlockAssembler::Options ClampOptions(BlockAssembler::Options options)
 {
-    // Apply DEFAULT_BLOCK_RESERVED_WEIGHT when the caller left it unset.
-    options.block_reserved_weight = std::clamp<size_t>(options.block_reserved_weight.value_or(DEFAULT_BLOCK_RESERVED_WEIGHT), MINIMUM_BLOCK_RESERVED_WEIGHT, MAX_BLOCK_WEIGHT);
-    options.coinbase_output_max_additional_sigops = std::clamp<size_t>(options.coinbase_output_max_additional_sigops, 0, MAX_BLOCK_SIGOPS_COST);
-    // Limit weight to between block_reserved_weight and MAX_BLOCK_WEIGHT for sanity:
-    // block_reserved_weight can safely exceed -blockmaxweight, but the rest of the block template will be empty.
-    options.nBlockMaxWeight = std::clamp<size_t>(options.nBlockMaxWeight, *options.block_reserved_weight, MAX_BLOCK_WEIGHT);
+    // Apply the default serialized-byte reservation when the caller left it unset.
+    options.block_reserved_size = std::clamp<size_t>(
+        options.block_reserved_size.value_or(DEFAULT_BLOCK_RESERVED_SIZE),
+        MINIMUM_BLOCK_RESERVED_SIZE,
+        MERCATURA_MAX_BLOCK_CAPACITY_BYTES);
+
+    options.coinbase_output_max_additional_sigops = std::clamp<size_t>(
+        options.coinbase_output_max_additional_sigops,
+        0,
+        MAX_BLOCK_SIGOPS_COST);
+
+    // A configured local maximum is only a miner policy ceiling. Consensus
+    // applies the current height-dependent maximum later in CreateNewBlock().
+    if (options.nBlockMaxSize) {
+        options.nBlockMaxSize = std::clamp<size_t>(
+            *options.nBlockMaxSize,
+            *options.block_reserved_size,
+            MERCATURA_MAX_BLOCK_CAPACITY_BYTES);
+    }
+
     return options;
 }
 
@@ -97,21 +111,42 @@ BlockAssembler::BlockAssembler(Chainstate& chainstate, const CTxMemPool* mempool
 
 void ApplyArgsManOptions(const ArgsManager& args, BlockAssembler::Options& options)
 {
-    // Block resource limits
-    options.nBlockMaxWeight = args.GetIntArg("-blockmaxweight", options.nBlockMaxWeight);
+    // Block resource limits are expressed in serialized bytes.
+    if (args.GetArg("-blockmaxsize")) {
+        options.nBlockMaxSize = args.GetIntArg("-blockmaxsize");
+    }
     if (const auto blockmintxfee{args.GetArg("-blockmintxfee")}) {
         if (const auto parsed{ParseMoney(*blockmintxfee)}) options.blockMinFeeRate = CFeeRate{*parsed};
     }
     options.print_modified_fee = args.GetBoolArg("-printpriority", options.print_modified_fee);
-    if (!options.block_reserved_weight) {
-        options.block_reserved_weight = args.GetIntArg("-blockreservedweight");
+    if (!options.block_reserved_size) {
+        options.block_reserved_size = args.GetIntArg("-blockreservedsize");
     }
+}
+
+uint64_t GetBlockTemplateMaxCapacityBytes(
+    int height,
+    const BlockAssembler::Options& options)
+{
+    const BlockAssembler::Options clamped_options{
+        ClampOptions(options)
+    };
+    const uint64_t consensus_capacity{
+        GetMaxBlockCapacityBytes(height)
+    };
+
+    return std::min<uint64_t>(
+        clamped_options.nBlockMaxSize.value_or(
+            consensus_capacity),
+        consensus_capacity);
 }
 
 void BlockAssembler::resetBlock()
 {
-    // Reserve space for fixed-size block header, txs count, and coinbase tx.
-    nBlockWeight = *Assert(m_options.block_reserved_weight);
+    // Reserve serialized space for the fixed-size block header, transaction
+    // count, and coinbase transaction.
+    nBlockCapacityBytes = *Assert(m_options.block_reserved_size);
+    nBlockMaxCapacityBytes = 0;
     nBlockSigOpsCost = m_options.coinbase_output_max_additional_sigops;
 
     // These counters do not include coinbase tx
@@ -137,6 +172,11 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     assert(pindexPrev != nullptr);
     nHeight = pindexPrev->nHeight + 1;
 
+    nBlockMaxCapacityBytes =
+        GetBlockTemplateMaxCapacityBytes(
+            nHeight,
+            m_options);
+
     pblock->nVersion = m_chainstate.m_chainman.m_versionbitscache.ComputeBlockVersion(pindexPrev, chainparams.GetConsensus());
     // -regtest only: allow overriding block.nVersion with
     // -blockversion=N to test forking scenarios
@@ -157,7 +197,6 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     const auto time_1{SteadyClock::now()};
 
     m_last_block_num_txs = nBlockTx;
-    m_last_block_weight = nBlockWeight;
 
     // Create coinbase transaction.
     CMutableTransaction coinbaseTx;
@@ -199,6 +238,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     pblock->vtx[0] = MakeTransactionRef(std::move(coinbaseTx));
     m_chainstate.m_chainman.GenerateCoinbaseCommitment(*pblock, pindexPrev);
 
+    // Preserve currentblockweight as a genuine BIP141 statistic rather than
+    // reusing the field for Mercatura serialized-byte capacity.
+    m_last_block_weight = GetBlockWeight(*pblock);
+
     const CTransactionRef& final_coinbase{pblock->vtx[0]};
     if (final_coinbase->HasWitness()) {
         const auto& witness_stack{final_coinbase->vin[0].scriptWitness.stack};
@@ -236,11 +279,9 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     return std::move(pblocktemplate);
 }
 
-bool BlockAssembler::TestChunkBlockLimits(int64_t chunk_weight, int64_t chunk_sigops_cost) const
+bool BlockAssembler::TestChunkBlockLimits(uint64_t chunk_capacity_bytes, int64_t chunk_sigops_cost) const
 {
-    // Fee ranking uses Mercatura's undiscounted fee weight, but block-fit
-    // accounting remains on the real transaction weight until Phase 6.
-    if (nBlockWeight + chunk_weight >= m_options.nBlockMaxWeight) {
+    if (nBlockCapacityBytes + chunk_capacity_bytes >= nBlockMaxCapacityBytes) {
         return false;
     }
     if (nBlockSigOpsCost + chunk_sigops_cost >= MAX_BLOCK_SIGOPS_COST) {
@@ -266,7 +307,7 @@ void BlockAssembler::AddToBlock(const CTxMemPoolEntry& entry)
     pblocktemplate->block.vtx.emplace_back(entry.GetSharedTx());
     pblocktemplate->vTxFees.push_back(entry.GetFee());
     pblocktemplate->vTxSigOpsCost.push_back(entry.GetSigOpCost());
-    nBlockWeight += entry.GetTxWeight();
+    nBlockCapacityBytes += GetTransactionCapacityBytes(entry.GetTx());
     ++nBlockTx;
     nBlockSigOpsCost += entry.GetSigOpCost();
     nFees += entry.GetFee();
@@ -284,7 +325,7 @@ void BlockAssembler::addChunks()
     // close to full; this is just a simple heuristic to finish quickly if the
     // mempool has a lot of entries.
     const int64_t MAX_CONSECUTIVE_FAILURES = 1000;
-    constexpr int32_t BLOCK_FULL_ENOUGH_WEIGHT_DELTA = 4000;
+    constexpr uint64_t BLOCK_FULL_ENOUGH_CAPACITY_DELTA_BYTES{1000};
     int64_t nConsecutiveFailed = 0;
 
     std::vector<CTxMemPoolEntry::CTxMemPoolEntryRef> selected_transactions;
@@ -303,20 +344,20 @@ void BlockAssembler::addChunks()
         }
 
         int64_t chunk_sig_ops = 0;
-        int64_t chunk_weight = 0;
+        uint64_t chunk_capacity_bytes = 0;
         for (const auto& tx : selected_transactions) {
             chunk_sig_ops += tx.get().GetSigOpCost();
-            chunk_weight += tx.get().GetTxWeight();
+            chunk_capacity_bytes += GetTransactionCapacityBytes(tx.get().GetTx());
         }
 
-        // Check actual block weight separately from Mercatura fee-ranking weight.
-        if (!TestChunkBlockLimits(chunk_weight, chunk_sig_ops) || !TestChunkTransactions(selected_transactions)) {
+        if (!TestChunkBlockLimits(chunk_capacity_bytes, chunk_sig_ops) || !TestChunkTransactions(selected_transactions)) {
             // This chunk won't fit, so we skip it and will try the next best one.
             m_mempool->SkipBuilderChunk();
             ++nConsecutiveFailed;
 
-            if (nConsecutiveFailed > MAX_CONSECUTIVE_FAILURES && nBlockWeight +
-                    BLOCK_FULL_ENOUGH_WEIGHT_DELTA > m_options.nBlockMaxWeight) {
+            if (nConsecutiveFailed > MAX_CONSECUTIVE_FAILURES &&
+                    nBlockCapacityBytes + BLOCK_FULL_ENOUGH_CAPACITY_DELTA_BYTES >
+                        nBlockMaxCapacityBytes) {
                 // Give up if we're close to full and haven't succeeded in a while
                 return;
             }
