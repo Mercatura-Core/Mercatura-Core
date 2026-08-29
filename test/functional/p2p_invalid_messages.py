@@ -278,31 +278,41 @@ class InvalidMessagesTest(BitcoinTestFramework):
         self.test_oversized_msg(msg_headers([CBlockHeader()] * size), size)
 
     def test_invalid_pow_headers_msg(self):
-        self.log.info("Test headers message with invalid proof-of-work is logged as misbehaving and disconnects peer")
-        blockheader_tip_hash = self.nodes[0].getbestblockhash()
-        blockheader_tip = from_hex(CBlockHeader(), self.nodes[0].getblockheader(blockheader_tip_hash, False))
+        self.log.info("Test headers message with invalid MercaHash proof-of-work is logged as misbehaving and disconnects peer")
 
-        # send valid headers message first
+        # Ask mercaturad to mine a real MercaHash-valid block without submitting
+        # it. This keeps the functional test from duplicating MercaHash in
+        # Python while providing a genuine valid header for the P2P path.
         assert_equal(self.nodes[0].getblockchaininfo()['headers'], 0)
-        blockheader = CBlockHeader()
-        blockheader.hashPrevBlock = int(blockheader_tip_hash, 16)
-        blockheader.nTime = int(time.time())
-        blockheader.nBits = blockheader_tip.nBits
-        while not blockheader.hash_hex.startswith('0'):
-            blockheader.nNonce += 1
+        generated_block = self.generateblock(
+            self.nodes[0],
+            output="raw(51)",
+            transactions=[],
+            submit=False,
+            sync_fun=self.no_op,
+        )
+        blockheader = from_hex(CBlockHeader(), generated_block["hex"][:160])
+
         peer = self.nodes[0].add_p2p_connection(P2PInterface())
         peer.send_and_ping(msg_headers([blockheader]))
+
         assert_equal(self.nodes[0].getblockchaininfo()['headers'], 1)
         chaintips = self.nodes[0].getchaintips()
         assert_equal(chaintips[0]['status'], 'headers-only')
-        assert_equal(chaintips[0]['hash'], blockheader.hash_hex)
+        assert_equal(chaintips[0]['hash'], generated_block["hash"])
 
-        # invalidate PoW
-        while not blockheader.hash_hex.startswith('f'):
-            blockheader.nNonce += 1
+        # Construct a sibling header with a valid compact target encoding of 1.
+        # Its real MercaHash will therefore fail the target comparison before
+        # contextual difficulty validation can admit the header.
+        invalid_header = CBlockHeader(blockheader)
+        invalid_header.nBits = 0x01010000
+
         with self.nodes[0].assert_debug_log(['Misbehaving', 'header with invalid proof of work']):
-            peer.send_without_ping(msg_headers([blockheader]))
+            peer.send_without_ping(msg_headers([invalid_header]))
             peer.wait_for_disconnect()
+
+        # Invalid MercaHash must not enter the block index/header chain.
+        assert_equal(self.nodes[0].getblockchaininfo()['headers'], 1)
 
     def test_noncontinuous_headers_msg(self):
         self.log.info("Test headers message with non-continuous headers sequence is logged as misbehaving")
