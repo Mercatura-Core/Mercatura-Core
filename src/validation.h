@@ -54,6 +54,7 @@
 class Chainstate;
 class CTxMemPool;
 class ChainstateManager;
+class PoWHashContext;
 struct ChainTxData;
 class DisconnectedBlockTransactions;
 struct PrecomputedTransactionData;
@@ -388,8 +389,27 @@ public:
 
 /** Functions for validating blocks and updating the block tree */
 
+/**
+ * Whether the current header's cryptographic proof of work has already
+ * been checked by the caller.
+ *
+ * This is intentionally separate from min_pow_checked, which only records
+ * whether anti-DoS chainwork requirements have been satisfied.
+ */
+enum class PoWCheckStatus {
+    UNCHECKED,
+    CHECKED,
+};
+
 /** Context-independent validity checks */
-bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
+bool CheckBlock(
+    const CBlock& block,
+    BlockValidationState& state,
+    const Consensus::Params& consensusParams,
+    bool fCheckPOW = true,
+    bool fCheckMerkleRoot = true,
+    PoWCheckStatus pow_check = PoWCheckStatus::UNCHECKED,
+    PoWHashContext* pow_context = nullptr);
 
 /**
  * Verify a block, including transactions.
@@ -415,7 +435,10 @@ BlockValidationState TestBlockValidity(
     bool check_merkle_root) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
 /** Check that the proof of work on each blockheader matches the value in nBits */
-bool HasValidProofOfWork(std::span<const CBlockHeader> headers, const Consensus::Params& consensusParams);
+bool HasValidProofOfWork(
+    std::span<const CBlockHeader> headers,
+    const Consensus::Params& consensusParams,
+    PoWHashContext& pow_context);
 
 /** Check if a block has been mutated (with respect to its merkle root and witness commitments). */
 bool IsBlockMutated(const CBlock& block, bool check_witness_root);
@@ -968,11 +991,25 @@ private:
         const CBlockHeader& block,
         BlockValidationState& state,
         CBlockIndex** ppindex,
-        bool min_pow_checked) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+        bool min_pow_checked,
+        PoWCheckStatus pow_check) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
     friend Chainstate;
+    friend BlockValidationState TestBlockValidity(
+        Chainstate& chainstate,
+        const CBlock& block,
+        bool check_pow,
+        bool check_merkle_root);
 
     /** Most recent headers presync progress update, for rate-limiting. */
     MockableSteadyClock::time_point m_last_presync_update GUARDED_BY(GetMutex()){};
+
+    /**
+     * Reusable MercaHash-v1 context for chainstate/header validation.
+     *
+     * The context allocates its 128 MiB scratchpad lazily and is used only
+     * from validation paths serialized by cs_main.
+     */
+    std::unique_ptr<PoWHashContext> m_pow_hash_context;
 
     //! A queue for script verifications that have to be performed by worker threads.
     CCheckQueue<CScriptCheck> m_script_check_queue;
@@ -1262,11 +1299,19 @@ public:
      *
      * @param[in]  headers The block headers themselves
      * @param[in]  min_pow_checked  True if proof-of-work anti-DoS checks have been done by caller for headers chain
+     * @param[in]  pow_check        CHECKED only if the caller already performed
+     *                              the current header's cryptographic PoW check
      * @param[out] state This may be set to an Error state if any error occurred processing them
      * @param[out] ppindex If set, the pointer will be set to point to the last new block index object for the given headers
      * @returns false if AcceptBlockHeader fails on any of the headers, true otherwise (including if headers were already known)
      */
-    bool ProcessNewBlockHeaders(std::span<const CBlockHeader> headers, bool min_pow_checked, BlockValidationState& state, const CBlockIndex** ppindex = nullptr) LOCKS_EXCLUDED(cs_main);
+    bool ProcessNewBlockHeaders(
+        std::span<const CBlockHeader> headers,
+        bool min_pow_checked,
+        BlockValidationState& state,
+        const CBlockIndex** ppindex = nullptr,
+        PoWCheckStatus pow_check = PoWCheckStatus::UNCHECKED)
+        LOCKS_EXCLUDED(cs_main);
 
     /**
      * Sufficiently validate a block for disk storage (and store on disk).
@@ -1278,6 +1323,8 @@ public:
      *                              this block from prior storage.
      * @param[in]   min_pow_checked True if proof-of-work anti-DoS checks have
      *                              been done by caller for headers chain
+     * @param[in]   pow_check       CHECKED only if the caller already performed
+     *                              the current block header's cryptographic PoW check
      *
      * @param[out]  state       The state of the block validation.
      * @param[out]  ppindex     Optional return parameter to get the
@@ -1287,7 +1334,16 @@ public:
      *
      * @returns   False if the block or header is invalid, or if saving to disk fails (likely a fatal error); true otherwise.
      */
-    bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, BlockValidationState& state, CBlockIndex** ppindex, bool fRequested, const FlatFilePos* dbp, bool* fNewBlock, bool min_pow_checked) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+    bool AcceptBlock(
+        const std::shared_ptr<const CBlock>& pblock,
+        BlockValidationState& state,
+        CBlockIndex** ppindex,
+        bool fRequested,
+        const FlatFilePos* dbp,
+        bool* fNewBlock,
+        bool min_pow_checked,
+        PoWCheckStatus pow_check = PoWCheckStatus::UNCHECKED)
+        EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
     void ReceivedBlockTransactions(const CBlock& block, CBlockIndex* pindexNew, const FlatFilePos& pos) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 

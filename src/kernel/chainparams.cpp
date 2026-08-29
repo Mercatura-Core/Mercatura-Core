@@ -92,7 +92,7 @@ public:
         consensus.CSVHeight = 419328; // 000000000000000004a1b34462cb8aeebd5799177f7a29cf28f2d1961716b5b5
         consensus.SegwitHeight = 481824; // 0000000000000000001c8018d9cb3b742ef25114f27563e3fc4a1902167f9893
         consensus.MinBIP9WarningHeight = 483840; // segwit activation height + miner confirmation window
-        consensus.powLimit = uint256{"00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
+        consensus.powLimit = uint256{"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}; // Temporary MercaHash development ceiling.
         consensus.nPowTargetSpacing = 150; // 2.5 minutes
         consensus.nBIP94TimewarpInterval = 2016;
         consensus.nVersionBitsWarningPeriod = 2016;
@@ -134,9 +134,9 @@ public:
         m_assumed_blockchain_size = 0;
         m_assumed_chain_state_size = 0;
 
-        genesis = CreateGenesisBlock(1231006505, 1255360998, 0x1d00ffff, 1, 50 * COIN);
+        genesis = CreateGenesisBlock(1231006505, 0, 0x207fffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256{"00000000fbbf52d58fddc9cf240709a236e21d201f75cd3295be8b65b342e206"});
+        assert(consensus.hashGenesisBlock == uint256{"fbe9665a1034ef5461d30b42ced28a6297ea55b99aba450e8d3182199e8b4987"});
         assert(genesis.hashMerkleRoot == uint256{"578a273795e1fc0877ccc7a91c15854d82ad0eb7b9d3f2c2ff93f8749e9bb127"});
 
         // Mercatura development starts without DNS or fixed seeds.
@@ -190,7 +190,7 @@ public:
         consensus.CSVHeight = 770112; // 00000000025e930139bac5c6c31a403776da130831ab85be56578f3fa75369bb
         consensus.SegwitHeight = 834624; // 00000000002b980fcd729daaa248fd9316a5200e9b367f4ff2c42453e84201ca
         consensus.MinBIP9WarningHeight = 836640; // segwit activation height + miner confirmation window
-        consensus.powLimit = uint256{"00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
+        consensus.powLimit = uint256{"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}; // Temporary MercaHash development ceiling.
         consensus.nPowTargetSpacing = 150; // 2.5 minutes
         consensus.nBIP94TimewarpInterval = 2016;
         consensus.nVersionBitsWarningPeriod = 2016;
@@ -228,9 +228,9 @@ public:
         m_assumed_blockchain_size = 0;
         m_assumed_chain_state_size = 0;
 
-        genesis = CreateGenesisBlock(1296688602, 655725834, 0x1d00ffff, 1, 50 * COIN);
+        genesis = CreateGenesisBlock(1296688602, 0, 0x207fffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256{"00000000d0d7fb51ab34e4f6183aa2395bb0e8b710ef72a8ab11fd86350acf17"});
+        assert(consensus.hashGenesisBlock == uint256{"92925b2ff2241e0d04325ef3206e9dd15de8f07685c50baa142a48c8a39d6c81"});
         assert(genesis.hashMerkleRoot == uint256{"578a273795e1fc0877ccc7a91c15854d82ad0eb7b9d3f2c2ff93f8749e9bb127"});
 
         // Mercatura development starts without DNS or fixed seeds.
@@ -282,7 +282,7 @@ public:
         consensus.CSVHeight = 1;
         consensus.SegwitHeight = 1;
         consensus.MinBIP9WarningHeight = 0;
-        consensus.powLimit = uint256{"00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
+        consensus.powLimit = uint256{"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}; // Temporary MercaHash development ceiling.
         consensus.nPowTargetSpacing = 150; // 2.5 minutes
         consensus.nBIP94TimewarpInterval = 2016;
         consensus.nVersionBitsWarningPeriod = 2016;
@@ -321,9 +321,9 @@ public:
         m_assumed_blockchain_size = 31;
         m_assumed_chain_state_size = 2;
 
-        genesis = CreateGenesisBlock(1714777860, 503597708, 0x1d00ffff, 1, 50 * COIN);
+        genesis = CreateGenesisBlock(1714777860, 0, 0x207fffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256{"00000000c4ef4d4326e21ce9d701a1ceff74588774b07b54a492073ee8eacb3b"});
+        assert(consensus.hashGenesisBlock == uint256{"e7a0a75ae8ed70b08b209b3ef37a33c5075a70483833eb092de535f5a7022651"});
         assert(genesis.hashMerkleRoot == uint256{"578a273795e1fc0877ccc7a91c15854d82ad0eb7b9d3f2c2ff93f8749e9bb127"});
 
         vFixedSeeds.clear();
@@ -438,7 +438,7 @@ public:
         consensus.enforce_BIP94 = false;
         consensus.fPowNoRetargeting = false;
         consensus.MinBIP9WarningHeight = 0;
-        consensus.powLimit = uint256{"00000377ae000000000000000000000000000000000000000000000000000000"};
+        consensus.powLimit = uint256{"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}; // Temporary MercaHash development ceiling.
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = Consensus::BIP9Deployment::NEVER_ACTIVE;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = Consensus::BIP9Deployment::NO_TIMEOUT;
@@ -470,9 +470,9 @@ public:
         nDefaultPort = 27779;
         nPruneAfterHeight = 1000;
 
-        genesis = CreateGenesisBlock(1598918400, 1513277, 0x1e0377ae, 1, 50 * COIN);
+        genesis = CreateGenesisBlock(1598918400, 2, 0x207fffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256{"0000033e83958077ece028f990bccb6dc5ce6037e8a0d4b035343294022d7723"});
+        assert(consensus.hashGenesisBlock == uint256{"2f46054337be8acc359637a73a43090723db4c94aa1dc4575b0af04e4fa51fdd"});
         assert(genesis.hashMerkleRoot == uint256{"578a273795e1fc0877ccc7a91c15854d82ad0eb7b9d3f2c2ff93f8749e9bb127"});
 
         m_assumeutxo_data = {};
@@ -594,23 +594,23 @@ public:
         m_assumeutxo_data = {
             {   // For use by unit tests
                 .height = 110,
-                .hash_serialized = AssumeutxoHash{uint256{"b952555c8ab81fec46f3d4253b7af256d766ceb39fb7752b9d18cdf4a0141327"}},
+                .hash_serialized = AssumeutxoHash{uint256{"4dd4c3f3f12d7228c6c24ac646232d7927952a3cdd2532f0f3a6d5c20e3d49db"}},
                 .m_chain_tx_count = 111,
-                .blockhash = uint256{"6affe030b7965ab538f820a56ef56c8149b7dc1d1c144af57113be080db7c397"},
+                .blockhash = uint256{"a896a4410cde7ee12b0048f04b69e06ddaa5e73b1a5c7c39343b8b137d7b603c"},
             },
             {
                 // For use by fuzz target src/test/fuzz/utxo_snapshot.cpp
                 .height = 200,
-                .hash_serialized = AssumeutxoHash{uint256{"17dcc016d188d16068907cdeb38b75691a118d43053b8cd6a25969419381d13a"}},
+                .hash_serialized = AssumeutxoHash{uint256{"0113df039ba5ccca62bed5ca381abbcb5cbff8ee3e977fd2d788dabdf913ae36"}},
                 .m_chain_tx_count = 201,
-                .blockhash = uint256{"385901ccbd69dff6bbd00065d01fb8a9e464dede7cfe0372443884f9b1dcf6b9"},
+                .blockhash = uint256{"2f237d1f2cf0f736afeb173aef8e874c8c33f34797f42519510c936c9888f03a"},
             },
             {
                 // For use by test/functional/feature_assumeutxo.py and test/functional/tool_bitcoin_chainstate.py
                 .height = 299,
-                .hash_serialized = AssumeutxoHash{uint256{"d2b051ff5e8eef46520350776f4100dd710a63447a8e01d917e92e79751a63e2"}},
+                .hash_serialized = AssumeutxoHash{uint256{"8879f3a01f6d21eddfe3f26b1e05af9b696a6ae46f2bb7ffddf4ea4e9e4e3457"}},
                 .m_chain_tx_count = 334,
-                .blockhash = uint256{"7cc695046fec709f8c9394b6f928f81e81fd3ac20977bb68760fa1faa7916ea2"},
+                .blockhash = uint256{"5c95d358609c4495d1d3c941d0c2798c771fd54cde1e39e4c11dcdb9cf2e9ac2"},
             },
         };
 

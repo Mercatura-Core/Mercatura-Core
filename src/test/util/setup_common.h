@@ -27,6 +27,7 @@
 #include <functional>
 #include <type_traits>
 #include <vector>
+#include <pow.h>
 
 class arith_uint256;
 class CFeeRate;
@@ -143,6 +144,10 @@ class CScript;
  * Testing fixture that pre-creates a 100-block REGTEST-mode block chain
  */
 struct TestChain100Setup : public TestingSetup {
+    // Reuse one lazily allocated 128 MiB MercaHash scratchpad across the
+    // entire generated test chain.
+    PoWHashContext m_pow_hash_context;
+
     TestChain100Setup(
         ChainType chain_type = ChainType::REGTEST,
         TestOpts = {});

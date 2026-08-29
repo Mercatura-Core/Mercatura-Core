@@ -12,6 +12,7 @@
 #include <crypto/chacha20.h>
 #include <crypto/chacha20poly1305.h>
 #include <key.h>
+#include <kernel/messagestartchars.h>
 #include <pubkey.h>
 #include <span.h>
 
@@ -60,6 +61,18 @@ public:
      * and decryption can be tested without knowing the other side's private key.
      */
     void Initialize(const EllSwiftPubKey& their_pubkey, bool initiator, bool self_decrypt = false) noexcept;
+
+    /** Initialize using an explicitly supplied network magic.
+     *
+     * This overload is intended for reference-vector testing where the
+     * vectors were generated for a network magic different from the
+     * currently selected chain.
+     */
+    void Initialize(
+        const EllSwiftPubKey& their_pubkey,
+        bool initiator,
+        bool self_decrypt,
+        const MessageStartChars& message_start) noexcept;
 
     /** Determine whether this cipher is fully initialized. */
     explicit operator bool() const noexcept { return m_send_l_cipher.has_value(); }

@@ -21,6 +21,9 @@
 
 namespace {
 
+static constexpr MessageStartChars BITCOIN_MAINNET_MESSAGE_START{
+    0xf9, 0xbe, 0xb4, 0xd9};
+
 struct BIP324Test : BasicTestingSetup {
 void TestBIP324PacketVector(
     uint32_t in_idx,
@@ -60,7 +63,11 @@ void TestBIP324PacketVector(
     BIP324Cipher cipher(key, ellswift_ours);
     BOOST_CHECK(!cipher);
     BOOST_CHECK(cipher.GetOurPubKey() == ellswift_ours);
-    cipher.Initialize(ellswift_theirs, in_initiating);
+    cipher.Initialize(
+        ellswift_theirs,
+        in_initiating,
+        /*self_decrypt=*/false,
+        BITCOIN_MAINNET_MESSAGE_START);
     BOOST_CHECK(cipher);
 
     // Compare session variables.
@@ -107,7 +114,11 @@ void TestBIP324PacketVector(
         BIP324Cipher dec_cipher(key, ellswift_ours);
         BOOST_CHECK(!dec_cipher);
         BOOST_CHECK(dec_cipher.GetOurPubKey() == ellswift_ours);
-        dec_cipher.Initialize(ellswift_theirs, (error == 1) ^ in_initiating, /*self_decrypt=*/true);
+        dec_cipher.Initialize(
+            ellswift_theirs,
+            (error == 1) ^ in_initiating,
+            /*self_decrypt=*/true,
+            BITCOIN_MAINNET_MESSAGE_START);
         BOOST_CHECK(dec_cipher);
 
         // Compare session variables.
@@ -163,9 +174,66 @@ void TestBIP324PacketVector(
 
 BOOST_FIXTURE_TEST_SUITE(bip324_tests, BIP324Test)
 
+BOOST_AUTO_TEST_CASE(mercatura_network_magic)
+{
+    SelectParams(ChainType::MAIN);
+
+    // Mercatura production BIP324 must derive its keys using Mercatura's
+    // selected network magic, not Bitcoin mainnet's reference-vector magic.
+    BOOST_CHECK(!std::ranges::equal(
+        Params().MessageStart(),
+        BITCOIN_MAINNET_MESSAGE_START));
+
+    const auto privkey = ParseHex(
+        "61062ea5071d800bbfd59e2e8b53d47d194b095ae5a4df04936b49772ef0d4d7");
+    const auto our_pubkey_bytes = ParseHex<std::byte>(
+        "ec0adff257bbfe500c188c80b4fdd640f6b45a482bbc15fc7cef5931deff0aa186f6eb9bba7b85dc4dcc28b28722de1e3d9108b985e2967045668f66098e475b");
+    const auto their_pubkey_bytes = ParseHex<std::byte>(
+        "a4a94dfce69b4a2a0a099313d10f9f7e7d649d60501c9e1d274c300e0d89aafaffffffffffffffffffffffffffffffffffffffffffffffffffffffff8faf88d5");
+
+    CKey key;
+    key.Set(privkey.begin(), privkey.end(), true);
+
+    const EllSwiftPubKey our_pubkey{our_pubkey_bytes};
+    const EllSwiftPubKey their_pubkey{their_pubkey_bytes};
+
+    BIP324Cipher production_cipher{key, our_pubkey};
+    production_cipher.Initialize(their_pubkey, /*initiator=*/true);
+
+    BIP324Cipher explicit_mercatura_cipher{key, our_pubkey};
+    explicit_mercatura_cipher.Initialize(
+        their_pubkey,
+        /*initiator=*/true,
+        /*self_decrypt=*/false,
+        Params().MessageStart());
+
+    BIP324Cipher bitcoin_reference_cipher{key, our_pubkey};
+    bitcoin_reference_cipher.Initialize(
+        their_pubkey,
+        /*initiator=*/true,
+        /*self_decrypt=*/false,
+        BITCOIN_MAINNET_MESSAGE_START);
+
+    BOOST_CHECK(std::ranges::equal(
+        production_cipher.GetSessionID(),
+        explicit_mercatura_cipher.GetSessionID()));
+    BOOST_CHECK(std::ranges::equal(
+        production_cipher.GetSendGarbageTerminator(),
+        explicit_mercatura_cipher.GetSendGarbageTerminator()));
+    BOOST_CHECK(std::ranges::equal(
+        production_cipher.GetReceiveGarbageTerminator(),
+        explicit_mercatura_cipher.GetReceiveGarbageTerminator()));
+
+    BOOST_CHECK(!std::ranges::equal(
+        production_cipher.GetSessionID(),
+        bitcoin_reference_cipher.GetSessionID()));
+}
+
 BOOST_AUTO_TEST_CASE(packet_test_vectors) {
-    // BIP324 key derivation uses network magic in the HKDF process. We use mainnet params here
-    // as that is what the test vectors are written for.
+    // These upstream BIP324 vectors were generated using Bitcoin
+    // mainnet magic. Mercatura intentionally uses distinct network magic,
+    // so supply Bitcoin's magic explicitly while retaining Mercatura MAIN
+    // as the selected production chain parameters.
     SelectParams(ChainType::MAIN);
 
     // The test vectors are converted using the following Python code in the BIP bip-0324/ directory:

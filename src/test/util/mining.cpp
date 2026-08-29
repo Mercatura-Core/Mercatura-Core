@@ -38,6 +38,8 @@ std::vector<std::shared_ptr<CBlock>> CreateBlockChain(size_t total_height, const
 {
     std::vector<std::shared_ptr<CBlock>> ret{total_height};
     auto time{params.GenesisBlock().nTime};
+    PoWHashContext pow_context;
+
     // NOTE: here `height` does not correspond to the block height but the block height - 1.
     for (size_t height{0}; height < total_height; ++height) {
         CBlock& block{*(ret.at(height) = std::make_shared<CBlock>())};
@@ -61,7 +63,10 @@ std::vector<std::shared_ptr<CBlock>> CreateBlockChain(size_t total_height, const
         block.nBits = params.GenesisBlock().nBits;
         block.nNonce = 0;
 
-        while (!CheckProofOfWork(block.GetHash(), block.nBits, params.GetConsensus())) {
+        while (!CheckProofOfWork(
+            block,
+            params.GetConsensus(),
+            pow_context)) {
             ++block.nNonce;
             assert(block.nNonce);
         }
@@ -95,7 +100,12 @@ protected:
 
 COutPoint MineBlock(const NodeContext& node, std::shared_ptr<CBlock>& block)
 {
-    while (!CheckProofOfWork(block->GetHash(), block->nBits, Params().GetConsensus())) {
+    PoWHashContext pow_context;
+
+    while (!CheckProofOfWork(
+        *block,
+        Params().GetConsensus(),
+        pow_context)) {
         ++block->nNonce;
         assert(block->nNonce);
     }

@@ -146,8 +146,19 @@ bool BlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, s
                 pindexNew->nStatus        = diskindex.nStatus;
                 pindexNew->nTx            = diskindex.nTx;
 
-                if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, consensusParams)) {
-                    LogError("%s: CheckProofOfWork failed: %s\n", __func__, pindexNew->ToString());
+                // Mercatura uses memory-hard MercaHash-v1 for actual
+                // proof of work. Recomputing it for every historical
+                // CBlockIndex entry during startup would make startup
+                // prohibitively expensive. These entries reached disk only
+                // after admission-time PoW validation, so retain the cheap
+                // compact-target sanity check here.
+                if (!DeriveTarget(
+                        pindexNew->nBits,
+                        consensusParams.powLimit)) {
+                    LogError(
+                        "%s: invalid proof-of-work target: %s\n",
+                        __func__,
+                        pindexNew->ToString());
                     return false;
                 }
 
@@ -1099,9 +1110,16 @@ bool BlockManager::ReadBlock(CBlock& block, const FlatFilePos& pos, const std::o
 
     const auto block_hash{block.GetHash()};
 
-    // Check the header
-    if (!CheckProofOfWork(block_hash, block.nBits, GetConsensus())) {
-        LogError("Errors in block header at %s while reading block", pos.ToString());
+    // Validate the compact target encoding cheaply. Actual MercaHash-v1
+    // proof of work is checked when blocks/headers enter validation and by
+    // explicit VerifyDB validation. Recomputing a 128 MiB memory-hard hash on
+    // every ordinary disk read would make block access unnecessarily costly.
+    if (!DeriveTarget(
+            block.nBits,
+            GetConsensus().powLimit)) {
+        LogError(
+            "Invalid proof-of-work target at %s while reading block",
+            pos.ToString());
         return false;
     }
 

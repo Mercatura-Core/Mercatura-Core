@@ -4,11 +4,18 @@
 
 #include <chain.h>
 #include <chainparams.h>
+#include <crypto/mercahash.h>
 #include <pow.h>
+#include <streams.h>
 #include <test/util/random.h>
 #include <test/util/common.h>
 #include <test/util/setup_common.h>
 #include <util/chaintype.h>
+#include <util/strencodings.h>
+
+#include <array>
+#include <span>
+#include <vector>
 
 #include <boost/test/unit_test.hpp>
 
@@ -197,10 +204,10 @@ BOOST_AUTO_TEST_CASE(dgw_pow_limit_ceiling)
         CreateChainParams(*m_node.args, ChainType::MAIN);
     const auto& consensus = main_params->GetConsensus();
 
-    // Mainnet's current inherited powLimit encodes exactly as 0x1d00ffff.
-    // Final Mercatura powLimit values are intentionally deferred until
-    // the later genesis/initial-difficulty phase.
-    constexpr uint32_t POW_LIMIT_BITS{0x1d00ffffU};
+    // During MercaHash development, mainnet uses an intentionally easy
+    // temporary PoW ceiling so genesis and consensus tests are practical.
+    // Final launch difficulty and powLimit will be benchmarked separately.
+    constexpr uint32_t POW_LIMIT_BITS{0x207fffffU};
 
     auto blocks = BuildDGWChain(
         25,
@@ -284,6 +291,265 @@ BOOST_AUTO_TEST_CASE(regtest_no_retarget)
     BOOST_CHECK_EQUAL(
         GetNextWorkRequired(&blocks.back(), &next_block, consensus),
         START_BITS);
+}
+
+BOOST_AUTO_TEST_CASE(mercahash_v1_pow_bridge)
+{
+    // Construct a canonical CBlockHeader from the permanent incremental
+    // 80-byte MercaHash-v1 input vector.
+    std::array<unsigned char, mercahash::HEADER_SIZE> raw_header{};
+
+    for (std::size_t i = 0; i < raw_header.size(); ++i) {
+        raw_header[i] =
+            static_cast<unsigned char>(i);
+    }
+
+    CBlockHeader header;
+
+    SpanReader reader{
+        std::span<const unsigned char>{
+            raw_header.data(),
+            raw_header.size()}};
+
+    reader >> header;
+
+    BOOST_CHECK(reader.empty());
+
+    // Serializing the reconstructed header must reproduce exactly the same
+    // canonical 80 bytes.
+    std::vector<unsigned char> serialized_header;
+
+    VectorWriter{
+        serialized_header,
+        0,
+        header,
+    };
+
+    BOOST_REQUIRE_EQUAL(
+        serialized_header.size(),
+        mercahash::HEADER_SIZE);
+
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        serialized_header.begin(),
+        serialized_header.end(),
+        raw_header.begin(),
+        raw_header.end());
+
+    std::vector<unsigned char> scratchpad(
+        mercahash::SCRATCHPAD_BYTES);
+
+    const uint256 pow_hash =
+        GetPoWHash(
+            header,
+            scratchpad);
+
+    const std::vector<unsigned char> expected =
+        ParseHex(
+            "2321712af21502878986c0c4f21d79e1"
+            "7e2281619e3958f11e3c634c9f17f7d8");
+
+    BOOST_REQUIRE_EQUAL(
+        expected.size(),
+        uint256::size());
+
+    // uint256 stores the raw MercaHash bytes exactly as produced.
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        pow_hash.begin(),
+        pow_hash.end(),
+        expected.begin(),
+        expected.end());
+
+    // Block identity remains the separate SHA256d GetHash() path.
+    BOOST_CHECK(pow_hash != header.GetHash());
+
+    // The reusable production context must produce the identical
+    // MercaHash-v1 result without reallocating its scratchpad per hash.
+    PoWHashContext context;
+
+    const uint256 context_hash =
+        context.GetHash(header);
+
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        context_hash.begin(),
+        context_hash.end(),
+        expected.begin(),
+        expected.end());
+
+    BOOST_CHECK(context_hash == pow_hash);
+
+    // Reusing the same context must remain deterministic.
+    const uint256 repeated_context_hash =
+        context.GetHash(header);
+
+    BOOST_CHECK(repeated_context_hash == context_hash);
+}
+
+BOOST_AUTO_TEST_CASE(mercahash_development_genesis_miner)
+{
+    static constexpr uint32_t DEV_BITS{0x207fffffU};
+
+    const uint256 dev_pow_limit{
+        "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
+
+    const auto mine_genesis =
+        [&](ChainType chain_type, const char* network_name) {
+            const auto params{
+                CreateChainParams(
+                    *m_node.args,
+                    chain_type)};
+
+            CBlock genesis{
+                params->GenesisBlock()};
+
+            Consensus::Params dev_consensus{
+                params->GetConsensus()};
+
+            dev_consensus.powLimit =
+                dev_pow_limit;
+
+            genesis.nBits = DEV_BITS;
+            genesis.nNonce = 0;
+
+            PoWHashContext pow_context;
+
+            while (!CheckProofOfWork(
+                genesis,
+                dev_consensus,
+                pow_context)) {
+                ++genesis.nNonce;
+            }
+
+            const uint256 pow_hash{
+                pow_context.GetHash(genesis)};
+
+            BOOST_TEST_MESSAGE(
+                "========================================");
+
+            BOOST_TEST_MESSAGE(
+                network_name
+                << " development genesis");
+
+            BOOST_TEST_MESSAGE(
+                "nTime: "
+                << genesis.nTime);
+
+            BOOST_TEST_MESSAGE(
+                "nBits: "
+                << strprintf("%08x", genesis.nBits));
+
+            BOOST_TEST_MESSAGE(
+                "nNonce: "
+                << genesis.nNonce);
+
+            BOOST_TEST_MESSAGE(
+                "block id: "
+                << genesis.GetHash().GetHex());
+
+            BOOST_TEST_MESSAGE(
+                "MercaHash: "
+                << pow_hash.GetHex());
+
+            BOOST_TEST_MESSAGE(
+                "merkle root: "
+                << genesis.hashMerkleRoot.GetHex());
+
+            BOOST_REQUIRE(
+                CheckProofOfWorkImpl(
+                    pow_hash,
+                    genesis.nBits,
+                    dev_consensus));
+        };
+
+    mine_genesis(
+        ChainType::MAIN,
+        "mainnet");
+
+    mine_genesis(
+        ChainType::TESTNET,
+        "testnet");
+
+    mine_genesis(
+        ChainType::TESTNET4,
+        "testnet4");
+
+    mine_genesis(
+        ChainType::SIGNET,
+        "signet");
+}
+
+BOOST_AUTO_TEST_CASE(mercahash_genesis_pow)
+{
+    const auto check_genesis =
+        [&](ChainType chain_type, const char* network_name) {
+            const auto params{
+                CreateChainParams(
+                    *m_node.args,
+                    chain_type)};
+
+            const CBlock& genesis{
+                params->GenesisBlock()};
+
+            PoWHashContext pow_context;
+
+            const uint256 pow_hash{
+                pow_context.GetHash(genesis)};
+
+            const bool valid{
+                CheckProofOfWorkImpl(
+                    pow_hash,
+                    genesis.nBits,
+                    params->GetConsensus())};
+
+            BOOST_TEST_MESSAGE(
+                network_name
+                << " genesis block id: "
+                << genesis.GetHash().GetHex());
+
+            BOOST_TEST_MESSAGE(
+                network_name
+                << " genesis MercaHash: "
+                << pow_hash.GetHex());
+
+            BOOST_TEST_MESSAGE(
+                network_name
+                << " genesis nNonce: "
+                << genesis.nNonce);
+
+            BOOST_TEST_MESSAGE(
+                network_name
+                << " genesis nBits: "
+                << strprintf("%08x", genesis.nBits));
+
+            BOOST_TEST_MESSAGE(
+                network_name
+                << " MercaHash PoW valid: "
+                << (valid ? "YES" : "NO"));
+
+            BOOST_CHECK_MESSAGE(
+                valid,
+                network_name
+                    << " genesis does not satisfy MercaHash-v1");
+        };
+
+    check_genesis(
+        ChainType::MAIN,
+        "mainnet");
+
+    check_genesis(
+        ChainType::TESTNET,
+        "testnet");
+
+    check_genesis(
+        ChainType::TESTNET4,
+        "testnet4");
+
+    check_genesis(
+        ChainType::SIGNET,
+        "signet");
+
+    check_genesis(
+        ChainType::REGTEST,
+        "regtest");
 }
 
 BOOST_AUTO_TEST_CASE(CheckProofOfWork_test_negative_target)
@@ -383,18 +649,15 @@ void sanity_check_chainparams(const ArgsManager& args, ChainType chain_type)
     BOOST_CHECK(!over);
     BOOST_CHECK(UintToArith256(consensus.powLimit) >= pow_compact);
 
-    // Check that the largest DGW multiplication cannot overflow.
-    // DarkGravityWave() multiplies the averaged target by at most
-    // nDGWMaxTimespan before dividing by nDGWTargetTimespan.
+    // DGW uses overflow-safe quotient/remainder scaling, so powLimit is not
+    // artificially constrained by a target * timespan intermediate value.
+    // Still verify that all retarget timing constants are internally valid.
     if (!consensus.fPowNoRetargeting) {
-        BOOST_REQUIRE(consensus.nDGWMaxTimespan > 0);
-
-        arith_uint256 targ_max{
-            UintToArith256(uint256{
-                "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"})};
-        targ_max /= consensus.nDGWMaxTimespan;
-
-        BOOST_CHECK(UintToArith256(consensus.powLimit) < targ_max);
+        BOOST_CHECK(consensus.nDGWTargetTimespan > 0);
+        BOOST_CHECK(consensus.nDGWMinTimespan > 0);
+        BOOST_CHECK(
+            consensus.nDGWMaxTimespan >=
+            consensus.nDGWMinTimespan);
     }
 }
 

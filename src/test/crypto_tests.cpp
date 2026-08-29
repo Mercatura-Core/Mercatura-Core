@@ -8,6 +8,7 @@
 #include <crypto/hkdf_sha256_32.h>
 #include <crypto/hmac_sha256.h>
 #include <crypto/hmac_sha512.h>
+#include <crypto/mercahash.h>
 #include <crypto/poly1305.h>
 #include <crypto/ripemd160.h>
 #include <crypto/sha1.h>
@@ -23,6 +24,7 @@
 #include <util/strencodings.h>
 
 #include <algorithm>
+#include <array>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -356,6 +358,7 @@ void TestHKDF_SHA256_32(const std::string &ikm_hex, const std::string &salt_hex,
 }
 
 void TestSHA3_256(const std::string& input, const std::string& output);
+void TestSHA3_512(const std::string& input, const std::string& output);
 }; // struct CryptoTests
 } // namespace crypto_tests
 
@@ -1109,6 +1112,29 @@ void CryptoTest::TestSHA3_256(const std::string& input, const std::string& outpu
     BOOST_CHECK(std::equal(std::begin(out_bytes), std::end(out_bytes), out));
 }
 
+
+void CryptoTest::TestSHA3_512(const std::string& input, const std::string& output)
+{
+    const auto in_bytes = ParseHex(input);
+    const auto out_bytes = ParseHex(output);
+
+    SHA3_512 sha;
+    // Hash the whole thing.
+    unsigned char out[SHA3_512::OUTPUT_SIZE];
+    sha.Write(in_bytes).Finalize(out);
+    assert(out_bytes.size() == sizeof(out));
+    BOOST_CHECK(std::equal(std::begin(out_bytes), std::end(out_bytes), out));
+
+    // Reset and split randomly in 3.
+    sha.Reset();
+    int s1 = m_rng.randrange(in_bytes.size() + 1);
+    int s2 = m_rng.randrange(in_bytes.size() + 1 - s1);
+    int s3 = in_bytes.size() - s1 - s2;
+    sha.Write(std::span{in_bytes}.first(s1)).Write(std::span{in_bytes}.subspan(s1, s2));
+    sha.Write(std::span{in_bytes}.last(s3)).Finalize(out);
+    BOOST_CHECK(std::equal(std::begin(out_bytes), std::end(out_bytes), out));
+}
+
 BOOST_AUTO_TEST_CASE(keccak_tests)
 {
     // Start with the zero state.
@@ -1127,6 +1153,213 @@ BOOST_AUTO_TEST_CASE(keccak_tests)
     // Expected hash of the concatenated serialized states after 1...262144 iterations of KeccakF.
     // Verified against an independent implementation.
     BOOST_CHECK_EQUAL(out.ToString(), "5f4a7f2eca7d57740ef9f1a077b4fc67328092ec62620447fe27ad8ed5f7e34f");
+}
+
+BOOST_AUTO_TEST_CASE(mercahash_v1_vectors)
+{
+    // MercaHash-v1 workload frozen for implementation testing.
+    BOOST_CHECK_EQUAL(mercahash::HEADER_SIZE, 80U);
+    BOOST_CHECK_EQUAL(
+        mercahash::SCRATCHPAD_BYTES,
+        128ULL * 1024 * 1024);
+    BOOST_CHECK_EQUAL(mercahash::LINE_BYTES, 64U);
+    BOOST_CHECK_EQUAL(mercahash::LINE_COUNT, 2'097'152U);
+
+    BOOST_CHECK_EQUAL(mercahash::BIND_BLOCK_BYTES, 4096U);
+    BOOST_CHECK_EQUAL(mercahash::BIND_BLOCK_LINES, 64U);
+    BOOST_CHECK_EQUAL(mercahash::BIND_BLOCK_COUNT, 32'768U);
+    BOOST_CHECK_EQUAL(mercahash::BIND_ARX_INTERVAL, 16U);
+
+    BOOST_CHECK_EQUAL(mercahash::SECONDARY_INTERVAL, 16U);
+    BOOST_CHECK_EQUAL(mercahash::CROSS_LANE_INTERVAL, 64U);
+    BOOST_CHECK_EQUAL(mercahash::CHECKPOINT_INTERVAL, 1024U);
+    BOOST_CHECK_EQUAL(mercahash::FINAL_READS, 256U);
+
+    const mercahash::WorkParams params{
+        131072,
+        mercahash::ScratchpadFillMode::ALTERNATING_HALF_ROUND,
+        1,
+    };
+
+    using Header =
+        std::array<unsigned char, mercahash::HEADER_SIZE>;
+
+    using Hash =
+        std::array<unsigned char, mercahash::OUTPUT_SIZE>;
+
+    std::vector<unsigned char> scratchpad(
+        mercahash::SCRATCHPAD_BYTES);
+
+    auto check_vector =
+        [&](const Header& header, const char* expected_hex) {
+            Hash actual{};
+
+            mercahash::HashV1(
+                header,
+                scratchpad,
+                actual);
+
+            const std::vector<unsigned char> expected =
+                ParseHex(expected_hex);
+
+            BOOST_REQUIRE_EQUAL(
+                expected.size(),
+                actual.size());
+
+            BOOST_CHECK_EQUAL_COLLECTIONS(
+                actual.begin(),
+                actual.end(),
+                expected.begin(),
+                expected.end());
+
+            return actual;
+        };
+
+    Header zero{};
+
+    const Hash zero_hash =
+        check_vector(
+            zero,
+            "cc97e7cbce1d4ed2b54c9c37a81a0003"
+            "83229341a277a44829484855b9ef79dc");
+
+    Header incremental{};
+
+    for (std::size_t i = 0; i < incremental.size(); ++i) {
+        incremental[i] =
+            static_cast<unsigned char>(i);
+    }
+
+    const Hash incremental_hash =
+        check_vector(
+            incremental,
+            "2321712af21502878986c0c4f21d79e1"
+            "7e2281619e3958f11e3c634c9f17f7d8");
+
+    Header all_ff{};
+    all_ff.fill(0xff);
+
+    const Hash all_ff_hash =
+        check_vector(
+            all_ff,
+            "9c9a427928875304bb7d6351354b5e50"
+            "ec8e57c581971f68eab176371c4cd2c2");
+
+    Header mixed{};
+
+    for (std::size_t i = 0; i < mixed.size(); ++i) {
+        mixed[i] =
+            static_cast<unsigned char>(
+                (i * 37 + 11) & 0xff);
+    }
+
+    const Hash mixed_hash =
+        check_vector(
+            mixed,
+            "1244c6c9e0365baeb5958cfaa57aff58"
+            "2d81ae1d757769e823085bb00676e170");
+
+    // The four permanent inputs must not collapse to the same result.
+    BOOST_CHECK(zero_hash != incremental_hash);
+    BOOST_CHECK(zero_hash != all_ff_hash);
+    BOOST_CHECK(zero_hash != mixed_hash);
+    BOOST_CHECK(incremental_hash != all_ff_hash);
+    BOOST_CHECK(incremental_hash != mixed_hash);
+    BOOST_CHECK(all_ff_hash != mixed_hash);
+
+    // The configurable development API must remain identical to the
+    // frozen production HashV1 workload.
+    Hash configurable{};
+
+    mercahash::Hash(
+        incremental,
+        scratchpad,
+        configurable,
+        params);
+
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        configurable.begin(),
+        configurable.end(),
+        incremental_hash.begin(),
+        incremental_hash.end());
+
+    // Repeat HashV1 to verify deterministic scratchpad reuse.
+    Hash repeated{};
+
+    mercahash::HashV1(
+        incremental,
+        scratchpad,
+        repeated);
+
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        repeated.begin(),
+        repeated.end(),
+        incremental_hash.begin(),
+        incremental_hash.end());
+
+    // The diagnostic path must execute the identical hash algorithm.
+    Hash diagnostic_hash{};
+    mercahash::Diagnostics diagnostics{};
+
+    mercahash::HashWithDiagnostics(
+        incremental,
+        scratchpad,
+        diagnostic_hash,
+        params,
+        diagnostics);
+
+    BOOST_CHECK_EQUAL_COLLECTIONS(
+        diagnostic_hash.begin(),
+        diagnostic_hash.end(),
+        incremental_hash.begin(),
+        incremental_hash.end());
+
+    // One binding pass has one special block-0 dependency, followed by
+    // exactly one pseudorandom backward reference for every other block.
+    BOOST_CHECK_EQUAL(
+        diagnostics.binding_reference_accesses,
+        mercahash::BIND_BLOCK_COUNT - 1);
+
+    BOOST_CHECK(
+        diagnostics.binding_reference_unique > 0);
+
+    BOOST_CHECK_EQUAL(
+        diagnostics.binding_reference_distance_min,
+        1U);
+
+    BOOST_CHECK(
+        diagnostics.binding_reference_distance_max <
+        mercahash::BIND_BLOCK_COUNT);
+}
+
+BOOST_AUTO_TEST_CASE(sha3_512_tests)
+{
+    // Standard SHA3-512 known-answer vectors.
+    TestSHA3_512(
+        "",
+        "a69f73cca23a9ac5c8b567dc185a756e97c982164fe25859e0d1dcc1475c80a6"
+        "15b2123af1f5f94c11e3e9402c3ac558f500199d95b6d3e301758586281dcd26");
+
+    TestSHA3_512(
+        "616263",
+        "b751850b1a57168a5693cd924b6b096e08f621827444f70d884f5d0240d2712e"
+        "10e116e9192af3c91a7ec57647e3934057340b4cf408d5a56592f8274eec53f0");
+
+    // Exercise the 72-byte SHA3-512 sponge-rate boundary.
+    TestSHA3_512(
+        std::string(142, '0'),
+        "cd87417194c917561a59c7f2eb4b95145971e32e8e4ef3b23b0f190bfd29e369"
+        "2cc7975275750a27df95d5c6a99b7a341e1b8a38a750a51aca5b77bae41fbbfc");
+
+    TestSHA3_512(
+        std::string(144, '0'),
+        "f8d76fdd8a082a67eaab47b5518ac486cb9a90dcb9f3c9efcfd86d5c8b3f183"
+        "1601d3c8435f84b9e56da91283d5b98040e6e7b2c8dd9aa5bd4ebdf1823a7cf29");
+
+    TestSHA3_512(
+        std::string(146, '0'),
+        "4ed8ba5741d94caef309c190bc13d18eb0f16942ebea76dcf0c6db1a35311fc0"
+        "4611313ea7d0ff2228a131cd68a84b3872c93d75700601107b6addeaffaa7a90");
 }
 
 BOOST_AUTO_TEST_CASE(sha3_256_tests)

@@ -135,12 +135,24 @@ static RPCHelpMan getnetworkhashps()
     };
 }
 
-static bool GenerateBlock(ChainstateManager& chainman, CBlock&& block, uint64_t& max_tries, std::shared_ptr<const CBlock>& block_out, bool process_new_block)
+static bool GenerateBlock(
+    ChainstateManager& chainman,
+    CBlock&& block,
+    uint64_t& max_tries,
+    std::shared_ptr<const CBlock>& block_out,
+    bool process_new_block,
+    PoWHashContext& pow_context)
 {
     block_out.reset();
     block.hashMerkleRoot = BlockMerkleRoot(block);
 
-    while (max_tries > 0 && block.nNonce < std::numeric_limits<uint32_t>::max() && !CheckProofOfWork(block.GetHash(), block.nBits, chainman.GetConsensus()) && !chainman.m_interrupt) {
+    while (max_tries > 0 &&
+           block.nNonce < std::numeric_limits<uint32_t>::max() &&
+           !CheckProofOfWork(
+               block,
+               chainman.GetConsensus(),
+               pow_context) &&
+           !chainman.m_interrupt) {
         ++block.nNonce;
         --max_tries;
     }
@@ -165,12 +177,20 @@ static bool GenerateBlock(ChainstateManager& chainman, CBlock&& block, uint64_t&
 static UniValue generateBlocks(ChainstateManager& chainman, Mining& miner, const CScript& coinbase_output_script, int nGenerate, uint64_t nMaxTries)
 {
     UniValue blockHashes(UniValue::VARR);
+    PoWHashContext pow_context;
+
     while (nGenerate > 0 && !chainman.m_interrupt) {
         std::unique_ptr<BlockTemplate> block_template(miner.createNewBlock({ .coinbase_output_script = coinbase_output_script, .include_dummy_extranonce = true }, /*cooldown=*/false));
         CHECK_NONFATAL(block_template);
 
         std::shared_ptr<const CBlock> block_out;
-        if (!GenerateBlock(chainman, block_template->getBlock(), nMaxTries, block_out, /*process_new_block=*/true)) {
+        if (!GenerateBlock(
+                chainman,
+                block_template->getBlock(),
+                nMaxTries,
+                block_out,
+                /*process_new_block=*/true,
+                pow_context)) {
             break;
         }
 
@@ -396,8 +416,16 @@ static RPCHelpMan generateblock()
 
     std::shared_ptr<const CBlock> block_out;
     uint64_t max_tries{DEFAULT_MAX_TRIES};
+    PoWHashContext pow_context;
 
-    if (!GenerateBlock(chainman, std::move(block), max_tries, block_out, process_new_block) || !block_out) {
+    if (!GenerateBlock(
+            chainman,
+            std::move(block),
+            max_tries,
+            block_out,
+            process_new_block,
+            pow_context) ||
+        !block_out) {
         throw JSONRPCError(RPC_MISC_ERROR, "Failed to make block.");
     }
 

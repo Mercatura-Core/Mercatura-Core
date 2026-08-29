@@ -63,7 +63,8 @@ BOOST_AUTO_TEST_CASE(subsidy_limit_test)
         nSum += nSubsidy * 1000;
         BOOST_CHECK(MoneyRange(nSum));
     }
-    BOOST_CHECK_EQUAL(nSum, CAmount{2099999997690000});
+    // Temporary pre-Phase-9 subsidy schedule with Mercatura's 2-decimal base unit.
+    BOOST_CHECK_EQUAL(nSum, CAmount{2098950000});
 }
 
 BOOST_AUTO_TEST_CASE(signet_parse_tests)
@@ -142,12 +143,37 @@ BOOST_AUTO_TEST_CASE(test_assumeutxo)
     }
 
     const auto out110 = *params->AssumeutxoForHeight(110);
-    BOOST_CHECK_EQUAL(out110.hash_serialized.ToString(), "b952555c8ab81fec46f3d4253b7af256d766ceb39fb7752b9d18cdf4a0141327");
+    BOOST_CHECK_EQUAL(out110.hash_serialized.ToString(), "4dd4c3f3f12d7228c6c24ac646232d7927952a3cdd2532f0f3a6d5c20e3d49db");
     BOOST_CHECK_EQUAL(out110.m_chain_tx_count, 111U);
+    BOOST_CHECK_EQUAL(out110.blockhash.ToString(), "a896a4410cde7ee12b0048f04b69e06ddaa5e73b1a5c7c39343b8b137d7b603c");
 
-    const auto out110_2 = *params->AssumeutxoForBlockhash(uint256{"6affe030b7965ab538f820a56ef56c8149b7dc1d1c144af57113be080db7c397"});
-    BOOST_CHECK_EQUAL(out110_2.hash_serialized.ToString(), "b952555c8ab81fec46f3d4253b7af256d766ceb39fb7752b9d18cdf4a0141327");
-    BOOST_CHECK_EQUAL(out110_2.m_chain_tx_count, 111U);
+    const auto out110_by_hash = *params->AssumeutxoForBlockhash(
+        uint256{"a896a4410cde7ee12b0048f04b69e06ddaa5e73b1a5c7c39343b8b137d7b603c"});
+    BOOST_CHECK_EQUAL(out110_by_hash.height, 110);
+    BOOST_CHECK_EQUAL(out110_by_hash.hash_serialized.ToString(), "4dd4c3f3f12d7228c6c24ac646232d7927952a3cdd2532f0f3a6d5c20e3d49db");
+    BOOST_CHECK_EQUAL(out110_by_hash.m_chain_tx_count, 111U);
+
+    const auto out200 = *params->AssumeutxoForHeight(200);
+    BOOST_CHECK_EQUAL(out200.hash_serialized.ToString(), "0113df039ba5ccca62bed5ca381abbcb5cbff8ee3e977fd2d788dabdf913ae36");
+    BOOST_CHECK_EQUAL(out200.m_chain_tx_count, 201U);
+    BOOST_CHECK_EQUAL(out200.blockhash.ToString(), "2f237d1f2cf0f736afeb173aef8e874c8c33f34797f42519510c936c9888f03a");
+
+    const auto out200_by_hash = *params->AssumeutxoForBlockhash(
+        uint256{"2f237d1f2cf0f736afeb173aef8e874c8c33f34797f42519510c936c9888f03a"});
+    BOOST_CHECK_EQUAL(out200_by_hash.height, 200);
+    BOOST_CHECK_EQUAL(out200_by_hash.hash_serialized.ToString(), "0113df039ba5ccca62bed5ca381abbcb5cbff8ee3e977fd2d788dabdf913ae36");
+    BOOST_CHECK_EQUAL(out200_by_hash.m_chain_tx_count, 201U);
+
+    const auto out299 = *params->AssumeutxoForHeight(299);
+    BOOST_CHECK_EQUAL(out299.hash_serialized.ToString(), "8879f3a01f6d21eddfe3f26b1e05af9b696a6ae46f2bb7ffddf4ea4e9e4e3457");
+    BOOST_CHECK_EQUAL(out299.m_chain_tx_count, 334U);
+    BOOST_CHECK_EQUAL(out299.blockhash.ToString(), "5c95d358609c4495d1d3c941d0c2798c771fd54cde1e39e4c11dcdb9cf2e9ac2");
+
+    const auto out299_by_hash = *params->AssumeutxoForBlockhash(
+        uint256{"5c95d358609c4495d1d3c941d0c2798c771fd54cde1e39e4c11dcdb9cf2e9ac2"});
+    BOOST_CHECK_EQUAL(out299_by_hash.height, 299);
+    BOOST_CHECK_EQUAL(out299_by_hash.hash_serialized.ToString(), "8879f3a01f6d21eddfe3f26b1e05af9b696a6ae46f2bb7ffddf4ea4e9e4e3457");
+    BOOST_CHECK_EQUAL(out299_by_hash.m_chain_tx_count, 334U);
 }
 
 BOOST_AUTO_TEST_CASE(block_malleation)

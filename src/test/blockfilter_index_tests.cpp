@@ -89,7 +89,12 @@ CBlock BuildChainTestingSetup::CreateBlock(const CBlockIndex* prev,
         block.hashMerkleRoot = BlockMerkleRoot(block);
     }
 
-    while (!CheckProofOfWork(block.GetHash(), block.nBits, m_node.chainman->GetConsensus())) ++block.nNonce;
+    while (!CheckProofOfWork(
+        block,
+        m_node.chainman->GetConsensus(),
+        m_pow_hash_context)) {
+        ++block.nNonce;
+    }
 
     return block;
 }
@@ -106,7 +111,12 @@ bool BuildChainTestingSetup::BuildChain(const CBlockIndex* pindex,
         block = std::make_shared<CBlock>(CreateBlock(pindex, no_txns, coinbase_script_pub_key));
 
         BlockValidationState state;
-        if (!Assert(m_node.chainman)->ProcessNewBlockHeaders({{*block}}, true, state, &pindex)) {
+        if (!Assert(m_node.chainman)->ProcessNewBlockHeaders(
+                {{*block}},
+                /*min_pow_checked=*/true,
+                state,
+                &pindex,
+                PoWCheckStatus::CHECKED)) {
             return false;
         }
     }

@@ -48,6 +48,7 @@
 #include <primitives/block.h>
 #include <primitives/transaction.h>
 #include <private_broadcast.h>
+#include <pow.h>
 #include <protocol.h>
 #include <random.h>
 #include <scheduler.h>
@@ -723,7 +724,8 @@ private:
         EXCLUSIVE_LOCKS_REQUIRED(!m_peer_mutex, !m_headers_presync_mutex, g_msgproc_mutex);
     /** Various helpers for headers processing, invoked by ProcessHeadersMessage() */
     /** Return true if headers are continuous and have valid proof-of-work (DoS points assigned on failure) */
-    bool CheckHeadersPoW(const std::vector<CBlockHeader>& headers, Peer& peer);
+    bool CheckHeadersPoW(const std::vector<CBlockHeader>& headers, Peer& peer)
+        EXCLUSIVE_LOCKS_REQUIRED(g_msgproc_mutex);
     /** Calculate an anti-DoS work threshold for headers chains */
     arith_uint256 GetAntiDoSWorkThreshold();
     /** Deal with state tracking and headers sync for peers that send
@@ -1167,6 +1169,14 @@ private:
     void PushAddress(Peer& peer, const CAddress& addr) EXCLUSIVE_LOCKS_REQUIRED(g_msgproc_mutex);
 
     void LogBlockHeader(const CBlockIndex& index, const CNode& peer, bool via_compact_block);
+
+    /**
+     * Reusable MercaHash-v1 context for inbound headers.
+     *
+     * ProcessHeadersMessage() is serialized by g_msgproc_mutex, so this
+     * single context is never used concurrently.
+     */
+    PoWHashContext m_pow_hash_context;
 
     /// The transactions to be broadcast privately.
     PrivateBroadcast m_tx_for_private_broadcast;
@@ -2912,17 +2922,24 @@ void PeerManagerImpl::SendBlockTransactions(CNode& pfrom, Peer& peer, const CBlo
 
 bool PeerManagerImpl::CheckHeadersPoW(const std::vector<CBlockHeader>& headers, Peer& peer)
 {
-    // Do these headers have proof-of-work matching what's claimed?
-    if (!HasValidProofOfWork(headers, m_chainparams.GetConsensus())) {
-        Misbehaving(peer, "header with invalid proof of work");
-        return false;
-    }
-
-    // Are these headers connected to each other?
+    // Reject malformed/non-continuous batches before spending memory-hard
+    // MercaHash work on them. Header linkage continues to use SHA256d block
+    // identity hashes, not proof-of-work hashes.
     if (!CheckHeadersAreContinuous(headers)) {
         Misbehaving(peer, "non-continuous headers sequence");
         return false;
     }
+
+    // Verify actual MercaHash-v1 proof of work before these headers are used
+    // by the low-work headers synchronization machinery.
+    if (!HasValidProofOfWork(
+            headers,
+            m_chainparams.GetConsensus(),
+            m_pow_hash_context)) {
+        Misbehaving(peer, "header with invalid proof of work");
+        return false;
+    }
+
     return true;
 }
 
@@ -3374,9 +3391,13 @@ void PeerManagerImpl::ProcessHeadersMessage(CNode& pfrom, Peer& peer,
 
     // Now process all the headers.
     BlockValidationState state;
-    const bool processed{m_chainman.ProcessNewBlockHeaders(headers,
-                                                           /*min_pow_checked=*/true,
-                                                           state, &pindexLast)};
+    const bool processed{
+        m_chainman.ProcessNewBlockHeaders(
+            headers,
+            /*min_pow_checked=*/true,
+            state,
+            &pindexLast,
+            PoWCheckStatus::CHECKED)};
     if (!processed) {
         if (state.IsInvalid()) {
             if (!pfrom.IsInboundConn() && state.GetResult() == BlockValidationResult::BLOCK_CACHED_INVALID) {

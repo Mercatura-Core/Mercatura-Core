@@ -40,6 +40,9 @@ using node::BlockAssembler;
 
 namespace miner_tests {
 struct MinerTestingSetup : public TestingSetup {
+    // Reuse one lazily allocated MercaHash scratchpad throughout each test.
+    PoWHashContext m_pow_hash_context;
+
     void TestPackageSelection(const CScript& scriptPubKey, const std::vector<CTransactionRef>& txFirst) EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
     void TestBasicMining(const CScript& scriptPubKey, const std::vector<CTransactionRef>& txFirst, int baseheight) EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
     void TestPrioritisedMining(const CScript& scriptPubKey, const std::vector<CTransactionRef>& txFirst) EXCLUSIVE_LOCKS_REQUIRED(::cs_main);
@@ -77,9 +80,12 @@ BOOST_FIXTURE_TEST_SUITE(miner_tests, MinerTestingSetup)
 
 static CFeeRate blockMinFeeRate = CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE);
 
+// The inherited nonce values are retained only as deterministic starting
+// points for MercaHash-v1 nonce searches. They are not assumed to satisfy
+// Mercatura proof of work.
 constexpr static struct {
     unsigned int extranonce;
-    unsigned int nonce;
+    unsigned int nonce_start;
 } BLOCKINFO[]{{0, 3552706918},   {500, 37506755},   {1000, 948987788}, {400, 524762339},  {800, 258510074},  {300, 102309278},
               {1300, 54365202},  {600, 1107740426}, {1000, 203094491}, {900, 391178848},  {800, 381177271},  {600, 87188412},
               {0, 66522866},     {800, 874942736},  {1000, 89200838},  {400, 312638088},  {400, 66263693},   {500, 924648304},
@@ -147,24 +153,24 @@ void MinerTestingSetup::TestPackageSelection(const CScript& scriptPubKey, const 
     tx.vin[0].prevout.hash = txFirst[0]->GetHash();
     tx.vin[0].prevout.n = 0;
     tx.vout.resize(1);
-    tx.vout[0].nValue = 5000000000LL - 1000;
-    // This tx has a low fee: 1000 satoshis
+    tx.vout[0].nValue = 50 * COIN - 1;
+    // This tx has a low fee: 1 Mercatura base unit
     Txid hashParentTx = tx.GetHash(); // save this txid for later use
-    const auto parent_tx{entry.Fee(1000).Time(Now<NodeSeconds>()).SpendsCoinbase(true).FromTx(tx)};
+    const auto parent_tx{entry.Fee(1).Time(Now<NodeSeconds>()).SpendsCoinbase(true).FromTx(tx)};
     TryAddToMempool(tx_mempool, parent_tx);
 
-    // This tx has a medium fee: 10000 satoshis
+    // This tx has a medium fee: 10 Mercatura base units
     tx.vin[0].prevout.hash = txFirst[1]->GetHash();
-    tx.vout[0].nValue = 5000000000LL - 10000;
+    tx.vout[0].nValue = 50 * COIN - 10;
     Txid hashMediumFeeTx = tx.GetHash();
-    const auto medium_fee_tx{entry.Fee(10000).Time(Now<NodeSeconds>()).SpendsCoinbase(true).FromTx(tx)};
+    const auto medium_fee_tx{entry.Fee(10).Time(Now<NodeSeconds>()).SpendsCoinbase(true).FromTx(tx)};
     TryAddToMempool(tx_mempool, medium_fee_tx);
 
     // This tx has a high fee, but depends on the first transaction
     tx.vin[0].prevout.hash = hashParentTx;
-    tx.vout[0].nValue = 5000000000LL - 1000 - 50000; // 50k satoshi fee
+    tx.vout[0].nValue = 50 * COIN - 1 - 50; // 50 base-unit child fee
     Txid hashHighFeeTx = tx.GetHash();
-    const auto high_fee_tx{entry.Fee(50000).Time(Now<NodeSeconds>()).SpendsCoinbase(false).FromTx(tx)};
+    const auto high_fee_tx{entry.Fee(50).Time(Now<NodeSeconds>()).SpendsCoinbase(false).FromTx(tx)};
     TryAddToMempool(tx_mempool, high_fee_tx);
 
     block_template = mining->createNewBlock(options, /*cooldown=*/false);
@@ -192,7 +198,7 @@ void MinerTestingSetup::TestPackageSelection(const CScript& scriptPubKey, const 
 
     // Test that a package below the block min tx fee doesn't get included
     tx.vin[0].prevout.hash = hashHighFeeTx;
-    tx.vout[0].nValue = 5000000000LL - 1000 - 50000; // 0 fee
+    tx.vout[0].nValue = 50 * COIN - 1 - 50; // 0 additional fee
     Txid hashFreeTx = tx.GetHash();
     TryAddToMempool(tx_mempool, entry.Fee(0).FromTx(tx));
     uint64_t freeTxSize{::GetSerializeSize(TX_WITH_WITNESS(tx))};
@@ -202,7 +208,7 @@ void MinerTestingSetup::TestPackageSelection(const CScript& scriptPubKey, const 
     CAmount feeToUse = blockMinFeeRate.GetFee(2*freeTxSize) - 1;
 
     tx.vin[0].prevout.hash = hashFreeTx;
-    tx.vout[0].nValue = 5000000000LL - 1000 - 50000 - feeToUse;
+    tx.vout[0].nValue = 50 * COIN - 1 - 50 - feeToUse;
     Txid hashLowFeeTx = tx.GetHash();
     TryAddToMempool(tx_mempool, entry.Fee(feeToUse).FromTx(tx));
 
@@ -225,7 +231,7 @@ void MinerTestingSetup::TestPackageSelection(const CScript& scriptPubKey, const 
     hashLowFeeTx = tx.GetHash();
     TryAddToMempool(tx_mempool, entry.Fee(feeToUse + 2).FromTx(tx));
 
-    // waitNext() should return if fees for the new template are at least 1 sat up
+    // waitNext() should return if fees for the new template are at least 1 base unit higher
     block_template = block_template->waitNext({.fee_threshold = 1});
     BOOST_REQUIRE(block_template);
     block = block_template->getBlock();
@@ -238,9 +244,9 @@ void MinerTestingSetup::TestPackageSelection(const CScript& scriptPubKey, const 
     // Add a 0-fee transaction that has 2 outputs.
     tx.vin[0].prevout.hash = txFirst[2]->GetHash();
     tx.vout.resize(2);
-    tx.vout[0].nValue = 5000000000LL - 100000000;
-    tx.vout[1].nValue = 100000000; // 1BTC output
-    // Increase size to avoid rounding errors: when the feerate is extremely small (i.e. 1sat/kvB), evaluating the fee
+    tx.vout[0].nValue = 50 * COIN - COIN;
+    tx.vout[1].nValue = COIN; // 1 MCA output
+    // Increase size to avoid rounding errors: when the feerate is extremely small (i.e. 1 base unit/kvB), evaluating the fee
     // at smaller sizes gives us rounded values that are equal to each other, which means we incorrectly include
     // hashFreeTx2 + hashLowFeeTx2.
     BulkTransaction(tx, 4000);
@@ -251,7 +257,7 @@ void MinerTestingSetup::TestPackageSelection(const CScript& scriptPubKey, const 
     tx.vin[0].prevout.hash = hashFreeTx2;
     tx.vout.resize(1);
     feeToUse = blockMinFeeRate.GetFee(freeTxSize);
-    tx.vout[0].nValue = 5000000000LL - 100000000 - feeToUse;
+    tx.vout[0].nValue = 50 * COIN - COIN - feeToUse;
     Txid hashLowFeeTx2 = tx.GetHash();
     TryAddToMempool(tx_mempool, entry.Fee(feeToUse).SpendsCoinbase(false).FromTx(tx));
     block_template = mining->createNewBlock(options, /*cooldown=*/false);
@@ -267,8 +273,8 @@ void MinerTestingSetup::TestPackageSelection(const CScript& scriptPubKey, const 
     // This tx will be mineable, and should cause hashLowFeeTx2 to be selected
     // as well.
     tx.vin[0].prevout.n = 1;
-    tx.vout[0].nValue = 100000000 - 10000; // 10k satoshi fee
-    TryAddToMempool(tx_mempool, entry.Fee(10000).FromTx(tx));
+    tx.vout[0].nValue = COIN - 10; // 10 base-unit fee
+    TryAddToMempool(tx_mempool, entry.Fee(10).FromTx(tx));
     block_template = mining->createNewBlock(options, /*cooldown=*/false);
     BOOST_REQUIRE(block_template);
     block = block_template->getBlock();
@@ -327,7 +333,7 @@ void MinerTestingSetup::TestBasicMining(const CScript& scriptPubKey, const std::
     entry.nHeight = 11;
 
     const CAmount BLOCKSUBSIDY = 50 * COIN;
-    const CAmount LOWFEE = CENT;
+    const CAmount LOWFEE = COIN / 2; // Test-only fee large enough for oversized fixture transactions.
     const CAmount HIGHFEE = COIN;
     const CAmount HIGHERFEE = 4 * COIN;
 
@@ -677,30 +683,30 @@ void MinerTestingSetup::TestPrioritisedMining(const CScript& scriptPubKey, const
     tx.vin[0].prevout.n = 0;
     tx.vin[0].scriptSig = CScript() << OP_1;
     tx.vout.resize(1);
-    tx.vout[0].nValue = 5000000000LL; // 0 fee
+    tx.vout[0].nValue = 50 * COIN; // 0 fee
     Txid hashFreePrioritisedTx = tx.GetHash();
     TryAddToMempool(tx_mempool, entry.Fee(0).Time(Now<NodeSeconds>()).SpendsCoinbase(true).FromTx(tx));
     tx_mempool.PrioritiseTransaction(hashFreePrioritisedTx, 5 * COIN);
 
     tx.vin[0].prevout.hash = txFirst[1]->GetHash();
     tx.vin[0].prevout.n = 0;
-    tx.vout[0].nValue = 5000000000LL - 1000;
-    // This tx has a low fee: 1000 satoshis
+    tx.vout[0].nValue = 50 * COIN - 1;
+    // This tx has a low fee: 1 Mercatura base unit
     Txid hashParentTx = tx.GetHash(); // save this txid for later use
-    TryAddToMempool(tx_mempool, entry.Fee(1000).Time(Now<NodeSeconds>()).SpendsCoinbase(true).FromTx(tx));
+    TryAddToMempool(tx_mempool, entry.Fee(1).Time(Now<NodeSeconds>()).SpendsCoinbase(true).FromTx(tx));
 
-    // This tx has a medium fee: 10000 satoshis
+    // This tx has a medium fee: 10 Mercatura base units
     tx.vin[0].prevout.hash = txFirst[2]->GetHash();
-    tx.vout[0].nValue = 5000000000LL - 10000;
+    tx.vout[0].nValue = 50 * COIN - 10;
     Txid hashMediumFeeTx = tx.GetHash();
-    TryAddToMempool(tx_mempool, entry.Fee(10000).Time(Now<NodeSeconds>()).SpendsCoinbase(true).FromTx(tx));
+    TryAddToMempool(tx_mempool, entry.Fee(10).Time(Now<NodeSeconds>()).SpendsCoinbase(true).FromTx(tx));
     tx_mempool.PrioritiseTransaction(hashMediumFeeTx, -5 * COIN);
 
     // This tx also has a low fee, but is prioritised
     tx.vin[0].prevout.hash = hashParentTx;
-    tx.vout[0].nValue = 5000000000LL - 1000 - 1000; // 1000 satoshi fee
+    tx.vout[0].nValue = 50 * COIN - 1 - 1; // 1 base-unit child fee
     Txid hashPrioritsedChild = tx.GetHash();
-    TryAddToMempool(tx_mempool, entry.Fee(1000).Time(Now<NodeSeconds>()).SpendsCoinbase(false).FromTx(tx));
+    TryAddToMempool(tx_mempool, entry.Fee(1).Time(Now<NodeSeconds>()).SpendsCoinbase(false).FromTx(tx));
     tx_mempool.PrioritiseTransaction(hashPrioritsedChild, 2 * COIN);
 
     // Test that transaction selection properly updates ancestor fee calculations as prioritised
@@ -710,19 +716,19 @@ void MinerTestingSetup::TestPrioritisedMining(const CScript& scriptPubKey, const
     // FreeParent's prioritisation should not be included in that entry.
     // When FreeChild is included, FreeChild's prioritisation should also not be included.
     tx.vin[0].prevout.hash = txFirst[3]->GetHash();
-    tx.vout[0].nValue = 5000000000LL; // 0 fee
+    tx.vout[0].nValue = 50 * COIN; // 0 fee
     Txid hashFreeParent = tx.GetHash();
     TryAddToMempool(tx_mempool, entry.Fee(0).SpendsCoinbase(true).FromTx(tx));
     tx_mempool.PrioritiseTransaction(hashFreeParent, 10 * COIN);
 
     tx.vin[0].prevout.hash = hashFreeParent;
-    tx.vout[0].nValue = 5000000000LL; // 0 fee
+    tx.vout[0].nValue = 50 * COIN; // 0 fee
     Txid hashFreeChild = tx.GetHash();
     TryAddToMempool(tx_mempool, entry.Fee(0).SpendsCoinbase(false).FromTx(tx));
     tx_mempool.PrioritiseTransaction(hashFreeChild, 1 * COIN);
 
     tx.vin[0].prevout.hash = hashFreeChild;
-    tx.vout[0].nValue = 5000000000LL; // 0 fee
+    tx.vout[0].nValue = 50 * COIN; // 0 fee
     Txid hashFreeGrandchild = tx.GetHash();
     TryAddToMempool(tx_mempool, entry.Fee(0).SpendsCoinbase(false).FromTx(tx));
 
@@ -781,7 +787,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         {
             // A block template does not have proof-of-work, but it might pass
             // verification by coincidence. Grind the nonce if needed:
-            while (CheckProofOfWork(block.GetHash(), block.nBits, Assert(m_node.chainman)->GetParams().GetConsensus())) {
+            while (CheckProofOfWork(
+                block,
+                Assert(m_node.chainman)->GetParams().GetConsensus(),
+                m_pow_hash_context)) {
                 block.nNonce++;
             }
 
@@ -816,10 +825,28 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         {
             LOCK(cs_main);
             block.nVersion = VERSIONBITS_TOP_BITS;
-            block.nTime = Assert(m_node.chainman)->ActiveChain().Tip()->GetMedianTimePast()+1;
+
+            auto* chainman{
+                Assert(m_node.chainman).get()};
+
+            const CBlockIndex* tip{
+                chainman->ActiveChain().Tip()};
+
+            BOOST_REQUIRE(tip);
+
+            // This fixture mines a long synthetic MAIN-chain sequence.
+            // Advance by Mercatura's target spacing so DGW observes a
+            // realistic chain instead of MTP+1 blocks arriving almost
+            // instantaneously.
+            block.nTime =
+                tip->GetBlockTime()
+                + chainman->GetConsensus().nPowTargetSpacing;
+
             txCoinbase.version = 1;
             txCoinbase.vin[0].scriptSig = CScript{} << (current_height + 1) << bi.extranonce;
-            txCoinbase.vout.resize(1); // Ignore the (optional) segwit commitment added by CreateNewBlock (as the hardcoded nonces don't account for this)
+            // Preserve the deterministic coinbase shape historically used
+            // by this fixture.
+            txCoinbase.vout.resize(1);
             txCoinbase.vout[0].scriptPubKey = CScript();
             block.vtx[0] = MakeTransactionRef(txCoinbase);
             if (txFirst.size() == 0)
@@ -827,8 +854,18 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
             if (txFirst.size() < 4)
                 txFirst.push_back(block.vtx[0]);
             block.hashMerkleRoot = BlockMerkleRoot(block);
-            block.nNonce = bi.nonce;
+            block.nNonce = bi.nonce_start;
         }
+
+        // The inherited nonce is only a deterministic starting point. Search
+        // forward until this exact Mercatura header satisfies MercaHash-v1.
+        while (!CheckProofOfWork(
+            block,
+            Assert(m_node.chainman)->GetParams().GetConsensus(),
+            m_pow_hash_context)) {
+            ++block.nNonce;
+        }
+
         std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(block);
         // Alternate calls between Chainman's ProcessNewBlock and submitSolution
         // via the Mining interface. The former is used by net_processing as well

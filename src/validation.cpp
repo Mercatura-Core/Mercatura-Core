@@ -2333,7 +2333,14 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
     // is enforced in ContextualCheckBlockHeader(); we wouldn't want to
     // re-enforce that rule here (at least until we make it impossible for
     // the clock to go backward).
-    if (!CheckBlock(block, state, params.GetConsensus(), !fJustCheck, !fJustCheck)) {
+    if (!CheckBlock(
+            block,
+            state,
+            params.GetConsensus(),
+            /*fCheckPOW=*/!fJustCheck,
+            /*fCheckMerkleRoot=*/!fJustCheck,
+            PoWCheckStatus::UNCHECKED,
+            m_chainman.m_pow_hash_context.get())) {
         if (state.GetResult() == BlockValidationResult::BLOCK_MUTATED) {
             // We don't write down blocks to disk if they may have been
             // corrupted, so this should be impossible unless we're having hardware
@@ -3893,11 +3900,30 @@ void ChainstateManager::ReceivedBlockTransactions(const CBlock& block, CBlockInd
     }
 }
 
-static bool CheckBlockHeader(const CBlockHeader& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW = true)
+static bool CheckBlockHeader(
+    const CBlockHeader& block,
+    BlockValidationState& state,
+    const Consensus::Params& consensusParams,
+    bool fCheckPOW = true,
+    PoWHashContext* pow_context = nullptr)
 {
-    // Check proof of work matches claimed amount
-    if (fCheckPOW && !CheckProofOfWork(block.GetHash(), block.nBits, consensusParams))
-        return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "high-hash", "proof of work failed");
+    if (fCheckPOW) {
+        // Free-standing validation callers may not provide a reusable context.
+        // In that case create a local lazy context for this single check.
+        PoWHashContext local_pow_context;
+        PoWHashContext& context{
+            pow_context ? *pow_context : local_pow_context};
+
+        if (!CheckProofOfWork(
+                block,
+                consensusParams,
+                context)) {
+            return state.Invalid(
+                BlockValidationResult::BLOCK_INVALID_HEADER,
+                "high-hash",
+                "proof of work failed");
+        }
+    }
 
     return true;
 }
@@ -3983,17 +4009,35 @@ static bool CheckWitnessMalleation(const CBlock& block, bool expect_witness_comm
     return true;
 }
 
-bool CheckBlock(const CBlock& block, BlockValidationState& state, const Consensus::Params& consensusParams, bool fCheckPOW, bool fCheckMerkleRoot)
+bool CheckBlock(
+    const CBlock& block,
+    BlockValidationState& state,
+    const Consensus::Params& consensusParams,
+    bool fCheckPOW,
+    bool fCheckMerkleRoot,
+    PoWCheckStatus pow_check,
+    PoWHashContext* pow_context)
 {
     // These are checks that are independent of context.
 
     if (block.fChecked)
         return true;
 
-    // Check that the header is valid (particularly PoW).  This is mostly
-    // redundant with the call in AcceptBlockHeader.
-    if (!CheckBlockHeader(block, state, consensusParams, fCheckPOW))
+    // Check that the header is valid. The caller may explicitly report
+    // that the cryptographic PoW for this exact header has already been
+    // checked, avoiding a second memory-hard MercaHash invocation.
+    const bool check_pow{
+        fCheckPOW &&
+        pow_check == PoWCheckStatus::UNCHECKED};
+
+    if (!CheckBlockHeader(
+            block,
+            state,
+            consensusParams,
+            check_pow,
+            pow_context)) {
         return false;
+    }
 
     // Signet only: check block solution
     if (consensusParams.signet_blocks && fCheckPOW && !CheckSignetBlockSolution(block, consensusParams)) {
@@ -4095,10 +4139,19 @@ void ChainstateManager::GenerateCoinbaseCommitment(CBlock& block, const CBlockIn
     UpdateUncommittedBlockStructures(block, pindexPrev);
 }
 
-bool HasValidProofOfWork(std::span<const CBlockHeader> headers, const Consensus::Params& consensusParams)
+bool HasValidProofOfWork(
+    std::span<const CBlockHeader> headers,
+    const Consensus::Params& consensusParams,
+    PoWHashContext& pow_context)
 {
-    return std::ranges::all_of(headers,
-                               [&](const auto& header) { return CheckProofOfWork(header.GetHash(), header.nBits, consensusParams); });
+    return std::ranges::all_of(
+        headers,
+        [&](const CBlockHeader& header) {
+            return CheckProofOfWork(
+                header,
+                consensusParams,
+                pow_context);
+        });
 }
 
 bool IsBlockMutated(const CBlock& block, bool check_witness_root)
@@ -4160,7 +4213,7 @@ static bool ContextualCheckBlockHeader(const CBlockHeader& block, BlockValidatio
     assert(pindexPrev != nullptr);
     const int nHeight = pindexPrev->nHeight + 1;
 
-    // Check proof of work
+    // Check the required proof-of-work target for this height.
     const Consensus::Params& consensusParams = chainman.GetConsensus();
     if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
         return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "bad-diffbits", "incorrect proof of work");
@@ -4258,7 +4311,12 @@ static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& stat
     return true;
 }
 
-bool ChainstateManager::AcceptBlockHeader(const CBlockHeader& block, BlockValidationState& state, CBlockIndex** ppindex, bool min_pow_checked)
+bool ChainstateManager::AcceptBlockHeader(
+    const CBlockHeader& block,
+    BlockValidationState& state,
+    CBlockIndex** ppindex,
+    bool min_pow_checked,
+    PoWCheckStatus pow_check)
 {
     AssertLockHeld(cs_main);
 
@@ -4279,12 +4337,8 @@ bool ChainstateManager::AcceptBlockHeader(const CBlockHeader& block, BlockValida
             return true;
         }
 
-        if (!CheckBlockHeader(block, state, GetConsensus())) {
-            LogDebug(BCLog::VALIDATION, "%s: Consensus::CheckBlockHeader: %s, %s\n", __func__, hash.ToString(), state.ToString());
-            return false;
-        }
-
-        // Get prev block index
+        // Reject headers that cannot connect to our block index before spending
+        // memory-hard MercaHash work on them.
         CBlockIndex* pindexPrev = nullptr;
         BlockMap::iterator mi{m_blockman.m_block_index.find(block.hashPrevBlock)};
         if (mi == m_blockman.m_block_index.end()) {
@@ -4296,6 +4350,20 @@ bool ChainstateManager::AcceptBlockHeader(const CBlockHeader& block, BlockValida
             LogDebug(BCLog::VALIDATION, "header %s has prev block invalid: %s\n", hash.ToString(), block.hashPrevBlock.ToString());
             return state.Invalid(BlockValidationResult::BLOCK_INVALID_PREV, "bad-prevblk");
         }
+
+        const bool check_pow =
+            pow_check == PoWCheckStatus::UNCHECKED;
+
+        if (!CheckBlockHeader(
+                block,
+                state,
+                GetConsensus(),
+                /*fCheckPOW=*/check_pow,
+                m_pow_hash_context.get())) {
+            LogDebug(BCLog::VALIDATION, "%s: Consensus::CheckBlockHeader: %s, %s\n", __func__, hash.ToString(), state.ToString());
+            return false;
+        }
+
         if (!ContextualCheckBlockHeader(block, state, m_blockman, *this, pindexPrev)) {
             LogDebug(BCLog::VALIDATION, "%s: Consensus::ContextualCheckBlockHeader: %s, %s\n", __func__, hash.ToString(), state.ToString());
             return false;
@@ -4314,14 +4382,25 @@ bool ChainstateManager::AcceptBlockHeader(const CBlockHeader& block, BlockValida
 }
 
 // Exposed wrapper for AcceptBlockHeader
-bool ChainstateManager::ProcessNewBlockHeaders(std::span<const CBlockHeader> headers, bool min_pow_checked, BlockValidationState& state, const CBlockIndex** ppindex)
+bool ChainstateManager::ProcessNewBlockHeaders(
+    std::span<const CBlockHeader> headers,
+    bool min_pow_checked,
+    BlockValidationState& state,
+    const CBlockIndex** ppindex,
+    PoWCheckStatus pow_check)
 {
     AssertLockNotHeld(cs_main);
     {
         LOCK(cs_main);
         for (const CBlockHeader& header : headers) {
             CBlockIndex *pindex = nullptr; // Use a temp pindex instead of ppindex to avoid a const_cast
-            bool accepted{AcceptBlockHeader(header, state, &pindex, min_pow_checked)};
+            bool accepted{
+                AcceptBlockHeader(
+                    header,
+                    state,
+                    &pindex,
+                    min_pow_checked,
+                    pow_check)};
             CheckBlockIndex();
 
             if (!accepted) {
@@ -4370,7 +4449,15 @@ void ChainstateManager::ReportHeadersPresync(int64_t height, int64_t timestamp)
 }
 
 /** Store block on disk. If dbp is non-nullptr, the file is known to already reside on disk */
-bool ChainstateManager::AcceptBlock(const std::shared_ptr<const CBlock>& pblock, BlockValidationState& state, CBlockIndex** ppindex, bool fRequested, const FlatFilePos* dbp, bool* fNewBlock, bool min_pow_checked)
+bool ChainstateManager::AcceptBlock(
+    const std::shared_ptr<const CBlock>& pblock,
+    BlockValidationState& state,
+    CBlockIndex** ppindex,
+    bool fRequested,
+    const FlatFilePos* dbp,
+    bool* fNewBlock,
+    bool min_pow_checked,
+    PoWCheckStatus pow_check)
 {
     const CBlock& block = *pblock;
 
@@ -4380,7 +4467,13 @@ bool ChainstateManager::AcceptBlock(const std::shared_ptr<const CBlock>& pblock,
     CBlockIndex *pindexDummy = nullptr;
     CBlockIndex *&pindex = ppindex ? *ppindex : pindexDummy;
 
-    bool accepted_header{AcceptBlockHeader(block, state, &pindex, min_pow_checked)};
+    bool accepted_header{
+        AcceptBlockHeader(
+            block,
+            state,
+            &pindex,
+            min_pow_checked,
+            pow_check)};
     CheckBlockIndex();
 
     if (!accepted_header)
@@ -4422,7 +4515,19 @@ bool ChainstateManager::AcceptBlock(const std::shared_ptr<const CBlock>& pblock,
 
     const CChainParams& params{GetParams()};
 
-    if (!CheckBlock(block, state, params.GetConsensus()) ||
+    // AcceptBlockHeader() either checked the actual cryptographic PoW
+    // above or the caller explicitly reported that it had already been
+    // checked. Do not perform the memory-hard hash a second time here.
+    //
+    // fCheckPOW remains true so signet solution validation is preserved.
+    if (!CheckBlock(
+            block,
+            state,
+            params.GetConsensus(),
+            /*fCheckPOW=*/true,
+            /*fCheckMerkleRoot=*/true,
+            PoWCheckStatus::CHECKED,
+            m_pow_hash_context.get()) ||
         !ContextualCheckBlock(block, state, *this, pindex->pprev)) {
         if (Assume(state.IsInvalid())) {
             ActiveChainstate().InvalidBlockFound(pindex, state);
@@ -4488,10 +4593,25 @@ bool ChainstateManager::ProcessNewBlock(const std::shared_ptr<const CBlock>& blo
         // malleability that cause CheckBlock() to fail; see e.g. CVE-2012-2459 and
         // https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2019-February/016697.html.  Because CheckBlock() is
         // not very expensive, the anti-DoS benefits of caching failure (of a definitely-invalid block) are not substantial.
-        bool ret = CheckBlock(*block, state, GetConsensus());
+        bool ret = CheckBlock(
+            *block,
+            state,
+            GetConsensus(),
+            /*fCheckPOW=*/true,
+            /*fCheckMerkleRoot=*/true,
+            PoWCheckStatus::UNCHECKED,
+            m_pow_hash_context.get());
         if (ret) {
             // Store to disk
-            ret = AcceptBlock(block, state, &pindex, force_processing, nullptr, new_block, min_pow_checked);
+            ret = AcceptBlock(
+                block,
+                state,
+                &pindex,
+                force_processing,
+                nullptr,
+                new_block,
+                min_pow_checked,
+                PoWCheckStatus::CHECKED);
         }
         if (!ret) {
             if (m_options.signals) {
@@ -4555,7 +4675,14 @@ BlockValidationState TestBlockValidity(
     }
 
     // For signets CheckBlock() verifies the challenge iff fCheckPow is set.
-    if (!CheckBlock(block, state, chainstate.m_chainman.GetConsensus(), /*fCheckPow=*/check_pow, /*fCheckMerkleRoot=*/check_merkle_root)) {
+    if (!CheckBlock(
+            block,
+            state,
+            chainstate.m_chainman.GetConsensus(),
+            /*fCheckPOW=*/check_pow,
+            /*fCheckMerkleRoot=*/check_merkle_root,
+            PoWCheckStatus::UNCHECKED,
+            chainstate.m_chainman.m_pow_hash_context.get())) {
         // This should never happen, but belt-and-suspenders don't approve the
         // block if it does.
         if (state.IsValid()) NONFATAL_UNREACHABLE();
@@ -4706,6 +4833,7 @@ VerifyDBResult CVerifyDB::VerifyDB(
     CBlockIndex* pindexFailure = nullptr;
     int nGoodTransactions = 0;
     BlockValidationState state;
+    PoWHashContext pow_context;
     int reportDone = 0;
     bool skipped_no_block_data{false};
     bool skipped_l3_checks{false};
@@ -4738,7 +4866,15 @@ VerifyDBResult CVerifyDB::VerifyDB(
             return VerifyDBResult::CORRUPTED_BLOCK_DB;
         }
         // check level 1: verify block validity
-        if (nCheckLevel >= 1 && !CheckBlock(block, state, consensus_params)) {
+        if (nCheckLevel >= 1 &&
+            !CheckBlock(
+                block,
+                state,
+                consensus_params,
+                /*fCheckPOW=*/true,
+                /*fCheckMerkleRoot=*/true,
+                PoWCheckStatus::UNCHECKED,
+                &pow_context)) {
             LogError("Verification error: found bad block at %d, hash=%s (%s)",
                       pindex->nHeight, pindex->GetBlockHash().ToString(), state.ToString());
             return VerifyDBResult::CORRUPTED_BLOCK_DB;
@@ -6287,6 +6423,9 @@ ChainstateManager::ChainstateManager(const util::SignalInterrupt& interrupt, Opt
       m_blockman{interrupt, std::move(blockman_options)},
       m_validation_cache{m_options.script_execution_cache_bytes, m_options.signature_cache_bytes}
 {
+    // Construction remains cheap because PoWHashContext itself allocates its
+    // 128 MiB scratchpad only on the first real MercaHash invocation.
+    m_pow_hash_context = std::make_unique<PoWHashContext>();
 }
 
 ChainstateManager::~ChainstateManager()

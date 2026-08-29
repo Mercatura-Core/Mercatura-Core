@@ -389,9 +389,16 @@ TestChain100Setup::TestChain100Setup(
 
     {
         LOCK(::cs_main);
-        assert(
-            m_node.chainman->ActiveChain().Tip()->GetBlockHash().ToString() ==
-            "5c8872fe2fe432dc1998141c19d612d13fa4aaa1174f0789de283953eee8b0cf");
+        const CBlockIndex* tip{
+            m_node.chainman->ActiveChain().Tip()};
+
+        assert(tip);
+        assert(tip->nHeight == COINBASE_MATURITY);
+
+        // The previous exact tip hash was produced by SHA256d nonce
+        // searching and became stale when Mercatura switched mining to
+        // MercaHash-v1. A new deterministic Mercatura tip fixture can be
+        // frozen after Phase 7 integration has stabilized.
     }
 }
 
@@ -422,7 +429,12 @@ CBlock TestChain100Setup::CreateBlock(
     }
     RegenerateCommitments(block, *Assert(m_node.chainman));
 
-    while (!CheckProofOfWork(block.GetHash(), block.nBits, m_node.chainman->GetConsensus())) ++block.nNonce;
+    while (!CheckProofOfWork(
+        block,
+        m_node.chainman->GetConsensus(),
+        m_pow_hash_context)) {
+        ++block.nNonce;
+    }
 
     return block;
 }

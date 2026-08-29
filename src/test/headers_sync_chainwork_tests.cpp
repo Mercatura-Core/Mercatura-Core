@@ -43,14 +43,19 @@ using State = HeadersSyncState::State;
         }                                                                                                \
     } while (false)
 
-constexpr size_t TARGET_BLOCKS{15'000};
+// MercaHash is intentionally much more expensive than SHA256d, so keep this
+// synthetic header-sync fixture small while preserving the behavioral
+// relationships exercised by the upstream test.
+//
+// TARGET_BLOCKS / COMMITMENT_PERIOD remains 25, preserving the same number of
+// commitment opportunities used by the sneaky-redownload mismatch test.
+constexpr size_t TARGET_BLOCKS{100};
 constexpr arith_uint256 CHAIN_WORK{TARGET_BLOCKS * 2};
 
-// Subtract MAX_HEADERS_RESULTS (2000 headers/message) + an arbitrary smaller
-// value (123) so our redownload buffer is well below the number of blocks
-// required to reach the CHAIN_WORK threshold, to behave similarly to mainnet.
-constexpr size_t REDOWNLOAD_BUFFER_SIZE{TARGET_BLOCKS - (MAX_HEADERS_RESULTS + 123)};
-constexpr size_t COMMITMENT_PERIOD{600}; // Somewhat close to mainnet.
+// Keep the redownload buffer comfortably below the work threshold while still
+// exercising buffering, incremental release, and final draining behavior.
+constexpr size_t REDOWNLOAD_BUFFER_SIZE{40};
+constexpr size_t COMMITMENT_PERIOD{4};
 
 struct HeadersGeneratorSetup : public RegTestingSetup {
     const CBlock& genesis{Params().GenesisBlock()};
@@ -102,6 +107,9 @@ struct HeadersGeneratorSetup : public RegTestingSetup {
         uint32_t spacing);
 
 private:
+    // Reuse one 128 MiB scratchpad across the generated header chain.
+    PoWHashContext m_pow_hash_context;
+
     /** Search for a nonce to meet (regtest) proof of work */
     void FindProofOfWork(CBlockHeader& starting_header);
     /**
@@ -116,7 +124,10 @@ private:
 
 void HeadersGeneratorSetup::FindProofOfWork(CBlockHeader& starting_header)
 {
-    while (!CheckProofOfWork(starting_header.GetHash(), starting_header.nBits, Params().GetConsensus())) {
+    while (!CheckProofOfWork(
+        starting_header,
+        Params().GetConsensus(),
+        m_pow_hash_context)) {
         ++starting_header.nNonce;
     }
 }
@@ -278,10 +289,11 @@ BOOST_AUTO_TEST_CASE(dgw_exact_difficulty_presync)
     invalid_header.nBits = invalid_target.GetCompact();
 
     invalid_header.nNonce = 0;
+    PoWHashContext pow_context;
     while (!CheckProofOfWork(
-        invalid_header.GetHash(),
-        invalid_header.nBits,
-        consensus)) {
+        invalid_header,
+        consensus,
+        pow_context)) {
         ++invalid_header.nNonce;
     }
 

@@ -30,6 +30,8 @@ struct MinerTestingSetup : public RegTestingSetup {
     std::shared_ptr<const CBlock> BadBlock(const uint256& prev_hash);
     std::shared_ptr<CBlock> FinalizeBlock(std::shared_ptr<CBlock> pblock);
     void BuildChain(const uint256& root, int height, unsigned int invalid_rate, unsigned int branch_rate, unsigned int max_size, std::vector<std::shared_ptr<const CBlock>>& blocks);
+
+    PoWHashContext m_pow_hash_context;
 };
 } // namespace validation_block_tests
 
@@ -100,14 +102,23 @@ std::shared_ptr<CBlock> MinerTestingSetup::FinalizeBlock(std::shared_ptr<CBlock>
 
     pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
 
-    while (!CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus())) {
+    while (!CheckProofOfWork(
+        *pblock,
+        Params().GetConsensus(),
+        m_pow_hash_context)) {
         ++(pblock->nNonce);
     }
 
     // submit block header, so that miner can get the block height from the
     // global state and the node has the topology of the chain
     BlockValidationState ignored;
-    BOOST_CHECK(Assert(m_node.chainman)->ProcessNewBlockHeaders({{*pblock}}, true, ignored));
+    BOOST_CHECK(
+        Assert(m_node.chainman)->ProcessNewBlockHeaders(
+            {{*pblock}},
+            /*min_pow_checked=*/true,
+            ignored,
+            /*ppindex=*/nullptr,
+            PoWCheckStatus::CHECKED));
 
     return pblock;
 }
@@ -152,6 +163,32 @@ void MinerTestingSetup::BuildChain(const uint256& root, int height, const unsign
         blocks.push_back(GoodBlock(root));
         BuildChain(blocks.back()->GetHash(), height - 1, invalid_rate, branch_rate, max_size, blocks);
     }
+}
+
+BOOST_AUTO_TEST_CASE(missing_prev_rejected_before_mercahash)
+{
+    CBlockHeader header{Params().GenesisBlock()};
+    header.hashPrevBlock = uint256{"0000000000000000000000000000000000000000000000000000000000000001"};
+
+    // Make the PoW target invalid as well. If AcceptBlockHeader() performs
+    // MercaHash before checking whether the previous block exists, this would
+    // fail as "high-hash" instead of the cheaper missing-prev rejection.
+    header.nBits = 0;
+
+    BlockValidationState state;
+    const bool accepted{
+        Assert(m_node.chainman)->ProcessNewBlockHeaders(
+            {{header}},
+            /*min_pow_checked=*/true,
+            state)};
+
+    BOOST_CHECK(!accepted);
+    BOOST_CHECK(
+        state.GetResult() ==
+        BlockValidationResult::BLOCK_MISSING_PREV);
+    BOOST_CHECK_EQUAL(
+        state.GetRejectReason(),
+        "prev-blk-not-found");
 }
 
 BOOST_AUTO_TEST_CASE(processnewblock_signals_ordering)
