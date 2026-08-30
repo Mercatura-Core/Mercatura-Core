@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <consensus/mercatura_controller.h>
 #include <rpc/blockchain.h>
 
 #include <blockfilter.h>
@@ -2160,7 +2161,12 @@ static RPCHelpMan getblockstats()
     ret_all.pushKV("minfeerate", (minfeerate == MAX_MONEY) ? 0 : minfeerate);
     ret_all.pushKV("mintxsize", mintxsize == MAX_BLOCK_SERIALIZED_SIZE ? 0 : mintxsize);
     ret_all.pushKV("outs", outputs);
-    ret_all.pushKV("subsidy", GetBlockSubsidy(pindex.nHeight, chainman.GetParams().GetConsensus()));
+    const CAmount reported_subsidy{
+        pindex.nHeight == 0
+            ? block.vtx.front()->GetValueOut()
+            : *Assert(Consensus::GetMcaBlockSubsidy(pindex))};
+
+    ret_all.pushKV("subsidy", reported_subsidy);
     ret_all.pushKV("swtotal_size", swtotal_size);
     ret_all.pushKV("swtotal_weight", swtotal_weight);
     ret_all.pushKV("swtxs", swtxs);

@@ -7,6 +7,7 @@
 
 #include <arith_uint256.h>
 #include <chain.h>
+#include <consensus/mercatura_controller.h>
 #include <consensus/params.h>
 #include <crypto/hex_base.h>
 #include <dbwrapper.h>
@@ -478,6 +479,60 @@ bool BlockManager::LoadBlockIndex(const std::optional<uint256>& snapshot_blockha
         previous_index = pindex;
         pindex->nChainWork = (pindex->pprev ? pindex->pprev->nChainWork : 0) + GetBlockProof(*pindex);
         pindex->nTimeMax = (pindex->pprev ? std::max(pindex->pprev->nTimeMax, pindex->nTime) : pindex->nTime);
+
+        // Reconstruct Mercatura's memory-only adaptive-emission state in the
+        // same parent-before-child pass used for nChainWork and nTimeMax.
+        //
+        // This intentionally uses only header/index data. Historical
+        // MercaHash is not recomputed during startup.
+        if (pindex->nHeight == 0) {
+            pindex->m_mca_emission_state.reset();
+        } else {
+            if (!pindex->pprev ||
+                pindex->pprev->nHeight != pindex->nHeight - 1) {
+                LogError(
+                    "%s: invalid emission ancestry at height %d for block %s\n",
+                    __func__,
+                    pindex->nHeight,
+                    pindex->GetBlockHash().ToString());
+                return false;
+            }
+
+            const Consensus::McaEmissionState* emission_parent{nullptr};
+
+            // Genesis is a blockchain parent but deliberately not a monetary
+            // controller state. Block 1 initializes s_1=l_1=z_1.
+            if (pindex->nHeight > 1) {
+                if (!pindex->pprev->m_mca_emission_state) {
+                    LogError(
+                        "%s: missing parent emission state at height %d for block %s\n",
+                        __func__,
+                        pindex->nHeight,
+                        pindex->GetBlockHash().ToString());
+                    return false;
+                }
+
+                emission_parent =
+                    &*pindex->pprev->m_mca_emission_state;
+            }
+
+            const auto emission_state{
+                Consensus::DeriveMcaEmissionState(
+                    emission_parent,
+                    pindex->nHeight,
+                    GetBlockProof(*pindex))};
+
+            if (!emission_state) {
+                LogError(
+                    "%s: failed to reconstruct emission state at height %d for block %s\n",
+                    __func__,
+                    pindex->nHeight,
+                    pindex->GetBlockHash().ToString());
+                return false;
+            }
+
+            pindex->m_mca_emission_state = *emission_state;
+        }
 
         // We can link the chain of blocks for which we've received transactions at some point, or
         // blocks that are assumed-valid on the basis of snapshot load (see

@@ -114,6 +114,36 @@ static std::unique_ptr<CBlockIndex> CreateBlockIndex(int nHeight, CBlockIndex* a
     return index;
 }
 
+/**
+ * Some inherited miner tests intentionally fake the active tip height without
+ * actually adding or removing a block in order to exercise locktime/template
+ * behavior.
+ *
+ * Mercatura associates branch-local monetary state with an exact block height,
+ * so the test-only height metadata must stay synchronized. Do not alter s/l,
+ * q/r, or subsidy here. These synthetic mutations occur only in the early
+ * bootstrap fixture and are not real chain transitions.
+ */
+static void ShiftActiveTipHeightForTest(
+    CBlockIndex& tip,
+    int delta)
+    EXCLUSIVE_LOCKS_REQUIRED(cs_main)
+{
+    BOOST_REQUIRE(
+        tip.m_mca_emission_state.has_value());
+
+    BOOST_REQUIRE_EQUAL(
+        tip.m_mca_emission_state->height,
+        tip.nHeight);
+
+    tip.nHeight += delta;
+    tip.m_mca_emission_state->height += delta;
+
+    BOOST_REQUIRE_EQUAL(
+        tip.m_mca_emission_state->height,
+        tip.nHeight);
+}
+
 // Test suite for ancestor feerate transaction selection.
 // Implemented as an additional function, rather than a separate test case,
 // to allow reusing the blockchain created in CreateNewBlock_validity.
@@ -491,33 +521,10 @@ void MinerTestingSetup::TestBasicMining(const CScript& scriptPubKey, const std::
     {
         CTxMemPool& tx_mempool{MakeMempool()};
         LOCK(tx_mempool.cs);
+        // Mercatura has no Bitcoin-style subsidy halving at height 210000.
+        // Adaptive/bootstrap subsidy transitions are covered by dedicated
+        // Mercatura emission and controller tests.
 
-        // subsidy changing
-        int nHeight = m_node.chainman->ActiveChain().Height();
-        // Create an actual 209999-long block chain (without valid blocks).
-        while (m_node.chainman->ActiveChain().Tip()->nHeight < 209999) {
-            CBlockIndex* prev = m_node.chainman->ActiveChain().Tip();
-            CBlockIndex* next = new CBlockIndex();
-            next->phashBlock = new uint256(m_rng.rand256());
-            m_node.chainman->ActiveChainstate().CoinsTip().SetBestBlock(next->GetBlockHash());
-            next->pprev = prev;
-            next->nHeight = prev->nHeight + 1;
-            next->BuildSkip();
-            m_node.chainman->ActiveChain().SetTip(*next);
-        }
-        BOOST_REQUIRE(mining->createNewBlock(options, /*cooldown=*/false));
-        // Extend to a 210000-long block chain.
-        while (m_node.chainman->ActiveChain().Tip()->nHeight < 210000) {
-            CBlockIndex* prev = m_node.chainman->ActiveChain().Tip();
-            CBlockIndex* next = new CBlockIndex();
-            next->phashBlock = new uint256(m_rng.rand256());
-            m_node.chainman->ActiveChainstate().CoinsTip().SetBestBlock(next->GetBlockHash());
-            next->pprev = prev;
-            next->nHeight = prev->nHeight + 1;
-            next->BuildSkip();
-            m_node.chainman->ActiveChain().SetTip(*next);
-        }
-        BOOST_REQUIRE(mining->createNewBlock(options, /*cooldown=*/false));
 
         // invalid p2sh txn in tx_mempool, template creation fails
         tx.vin[0].prevout.hash = txFirst[0]->GetHash();
@@ -534,15 +541,6 @@ void MinerTestingSetup::TestBasicMining(const CScript& scriptPubKey, const std::
         hash = tx.GetHash();
         TryAddToMempool(tx_mempool, entry.Fee(LOWFEE).Time(Now<NodeSeconds>()).SpendsCoinbase(false).FromTx(tx));
         BOOST_CHECK_EXCEPTION(mining->createNewBlock(options, /*cooldown=*/false), std::runtime_error, HasReason("block-script-verify-flag-failed"));
-
-        // Delete the dummy blocks again.
-        while (m_node.chainman->ActiveChain().Tip()->nHeight > nHeight) {
-            CBlockIndex* del = m_node.chainman->ActiveChain().Tip();
-            m_node.chainman->ActiveChain().SetTip(*Assert(del->pprev));
-            m_node.chainman->ActiveChainstate().CoinsTip().SetBestBlock(del->pprev->GetBlockHash());
-            delete del->phashBlock;
-            delete del;
-        }
     }
 
     CTxMemPool& tx_mempool{MakeMempool()};
@@ -653,7 +651,9 @@ void MinerTestingSetup::TestBasicMining(const CScript& scriptPubKey, const std::
         CBlockIndex* ancestor{Assert(m_node.chainman->ActiveChain().Tip()->GetAncestor(m_node.chainman->ActiveChain().Tip()->nHeight - i))};
         ancestor->nTime += SEQUENCE_LOCK_TIME; // Trick the MedianTimePast
     }
-    m_node.chainman->ActiveChain().Tip()->nHeight++;
+    ShiftActiveTipHeightForTest(
+        *Assert(m_node.chainman->ActiveChain().Tip()),
+        +1);
     SetMockTime(m_node.chainman->ActiveChain().Tip()->GetMedianTimePast() + 1);
 
     block_template = mining->createNewBlock(options, /*cooldown=*/false);
@@ -895,12 +895,16 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 
     TestBasicMining(scriptPubKey, txFirst, baseheight);
 
-    m_node.chainman->ActiveChain().Tip()->nHeight--;
+    ShiftActiveTipHeightForTest(
+        *Assert(m_node.chainman->ActiveChain().Tip()),
+        -1);
     SetMockTime(0);
 
     TestPackageSelection(scriptPubKey, txFirst);
 
-    m_node.chainman->ActiveChain().Tip()->nHeight--;
+    ShiftActiveTipHeightForTest(
+        *Assert(m_node.chainman->ActiveChain().Tip()),
+        -1);
     SetMockTime(0);
 
     TestPrioritisedMining(scriptPubKey, txFirst);

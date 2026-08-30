@@ -80,7 +80,6 @@ public:
         m_chain_type = ChainType::MAIN;
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
-        consensus.nSubsidyHalvingInterval = 210000;
         consensus.script_flag_exceptions.emplace( // BIP16 exception
             uint256{"00000000000002dc756eebf4f49723ed8d30cc28a5f108eb94b1ba88ac4f9c22"}, SCRIPT_VERIFY_NONE);
         consensus.script_flag_exceptions.emplace( // Taproot exception
@@ -180,7 +179,6 @@ public:
         m_chain_type = ChainType::TESTNET;
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
-        consensus.nSubsidyHalvingInterval = 210000;
         consensus.script_flag_exceptions.emplace( // BIP16 exception
             uint256{"00000000dd30457c001f4095d208cc1296b0eed002427aa599874af7a432b105"}, SCRIPT_VERIFY_NONE);
         consensus.BIP34Height = 21111;
@@ -274,7 +272,6 @@ public:
         m_chain_type = ChainType::TESTNET4;
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
-        consensus.nSubsidyHalvingInterval = 210000;
         consensus.BIP34Height = 1;
         consensus.BIP34Hash = uint256{};
         consensus.BIP65Height = 1;
@@ -420,7 +417,6 @@ public:
         m_chain_type = ChainType::SIGNET;
         consensus.signet_blocks = true;
         consensus.signet_challenge.assign(bin.begin(), bin.end());
-        consensus.nSubsidyHalvingInterval = 210000;
         consensus.BIP34Height = 1;
         consensus.BIP34Hash = uint256{};
         consensus.BIP65Height = 1;
@@ -508,7 +504,6 @@ public:
         m_chain_type = ChainType::REGTEST;
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
-        consensus.nSubsidyHalvingInterval = 150;
         consensus.BIP34Height = 1; // Always active unless overridden
         consensus.BIP34Hash = uint256();
         consensus.BIP65Height = 1;  // Always active unless overridden
@@ -594,23 +589,23 @@ public:
         m_assumeutxo_data = {
             {   // For use by unit tests
                 .height = 110,
-                .hash_serialized = AssumeutxoHash{uint256{"4dd4c3f3f12d7228c6c24ac646232d7927952a3cdd2532f0f3a6d5c20e3d49db"}},
+                .hash_serialized = AssumeutxoHash{uint256{"4016f03e76f4de1e1b3c4970e4ad7b92c784d983ef6d1c4f0e06d59046da459d"}},
                 .m_chain_tx_count = 111,
-                .blockhash = uint256{"a896a4410cde7ee12b0048f04b69e06ddaa5e73b1a5c7c39343b8b137d7b603c"},
+                .blockhash = uint256{"33717a04e8a830d874b81ce1715e378f6daa6e8d86977c0063f169db64a48820"},
             },
             {
                 // For use by fuzz target src/test/fuzz/utxo_snapshot.cpp
                 .height = 200,
-                .hash_serialized = AssumeutxoHash{uint256{"0113df039ba5ccca62bed5ca381abbcb5cbff8ee3e977fd2d788dabdf913ae36"}},
+                .hash_serialized = AssumeutxoHash{uint256{"64cfad77e81e7202c3d4317d203ac2966a0192e35ebc8616f86ef5db2a1b2de4"}},
                 .m_chain_tx_count = 201,
-                .blockhash = uint256{"2f237d1f2cf0f736afeb173aef8e874c8c33f34797f42519510c936c9888f03a"},
+                .blockhash = uint256{"07b7f44d074122be85a63c905c94bb9486112fc5b19607bae846631927a05041"},
             },
             {
                 // For use by test/functional/feature_assumeutxo.py and test/functional/tool_bitcoin_chainstate.py
                 .height = 299,
-                .hash_serialized = AssumeutxoHash{uint256{"8879f3a01f6d21eddfe3f26b1e05af9b696a6ae46f2bb7ffddf4ea4e9e4e3457"}},
+                .hash_serialized = AssumeutxoHash{uint256{"3107f9526723c6861e03083a1ef98e0c589609482be75645430561f98f281609"}},
                 .m_chain_tx_count = 334,
-                .blockhash = uint256{"5c95d358609c4495d1d3c941d0c2798c771fd54cde1e39e4c11dcdb9cf2e9ac2"},
+                .blockhash = uint256{"ea6fd67e2ea069767cf7062e93a6063fd615c7894e321253b72c55d3a2440719"},
             },
         };
 

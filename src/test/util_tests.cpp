@@ -466,10 +466,11 @@ BOOST_AUTO_TEST_CASE(util_ParseMoney)
     BOOST_CHECK(!ParseMoney(".6789"));
     BOOST_CHECK(!ParseMoney("12345.6789"));
 
-    // MAX_MONEY is a transaction/value safety bound, not a supply cap.
-    BOOST_CHECK_EQUAL(ParseMoney("21000000000000.00").value(), MAX_MONEY);
-    BOOST_CHECK(!ParseMoney("21000000000000.01"));
-    BOOST_CHECK(!ParseMoney("999999999999999.00"));
+    // MAX_MONEY is a monetary safety bound, not an aggregate supply cap.
+    BOOST_CHECK_EQUAL(ParseMoney("9999999999999999.99").value(), MAX_MONEY);
+    BOOST_CHECK(!ParseMoney("10000000000000000.00"));
+    BOOST_CHECK_EQUAL(ParseMoney("999999999999999.00").value(),
+                      CAmount{99'999'999'999'999'900});
 
     // Parsing empty string should fail.
     BOOST_CHECK(!ParseMoney(""));

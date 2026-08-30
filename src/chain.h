@@ -7,6 +7,7 @@
 #define BITCOIN_CHAIN_H
 
 #include <arith_uint256.h>
+#include <consensus/mercatura_controller.h>
 #include <consensus/params.h>
 #include <flatfile.h>
 #include <kernel/cs_main.h>
@@ -19,6 +20,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -116,6 +118,20 @@ public:
 
     //! (memory only) Total amount of work (expected number of hashes) in the chain up to and including this block
     arith_uint256 nChainWork{};
+
+    /**
+     * Mercatura branch-local emission state after accepting this header.
+     *
+     * Memory only. Height 0 (genesis) deliberately has no emission state.
+     * Height 1 initializes the monetary state machine independently of the
+     * genesis coinbase. Every later block derives strictly from its pprev
+     * emission state.
+     *
+     * This field is reconstructed deterministically from height, ancestry,
+     * nBits/GetBlockProof, and protocol rules at startup. It is not serialized
+     * into CDiskBlockIndex.
+     */
+    std::optional<Consensus::McaEmissionState> m_mca_emission_state{};
 
     //! Number of transactions in this block. This will be nonzero if the block
     //! reached the VALID_TRANSACTIONS level, and zero otherwise.
@@ -334,6 +350,9 @@ public:
 
     explicit CDiskBlockIndex(const CBlockIndex* pindex) : CBlockIndex(*pindex)
     {
+        // Mercatura emission state is strictly memory-only and must never be
+        // carried as part of the disk block-index representation.
+        m_mca_emission_state.reset();
         hashPrev = (pprev ? pprev->GetBlockHash() : uint256());
     }
 

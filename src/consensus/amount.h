@@ -17,13 +17,16 @@ static constexpr CAmount COIN = 100;
 /** One indivisible Mercatura Cent: 0.01 MCA. */
 static constexpr CAmount CENT = 1;
 
-/** No monetary value larger than this is valid.
+/** Consensus-critical monetary value safety bound.
  *
- * This is a consensus-critical sanity bound, not a total supply cap.
- * Mercatura preserves Bitcoin Core's existing raw integer safety ceiling
- * while using 100 base units per MCA.
+ * This is NOT Mercatura's total or eventual supply cap. Mercatura has no
+ * fixed maximum aggregate supply. MAX_MONEY exists solely as a finite
+ * sanity bound for monetary values and consensus arithmetic.
+ *
+ * This value matches the inherited fixed-point parser's positive upper
+ * bound and remains safely representable by CAmount and CompressAmount.
  */
-static constexpr CAmount MAX_MONEY = 2'100'000'000'000'000;
+static constexpr CAmount MAX_MONEY = 999'999'999'999'999'999;
 inline bool MoneyRange(const CAmount& nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 
 #endif // BITCOIN_CONSENSUS_AMOUNT_H

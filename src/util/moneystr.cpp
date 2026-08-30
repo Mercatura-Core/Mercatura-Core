@@ -77,14 +77,25 @@ std::optional<CAmount> ParseMoney(const std::string& money_string)
     if (*p) {
         return std::nullopt;
     }
-    // Mercatura permits at most 14 whole MCA digits under MAX_MONEY.
-    // Reject longer inputs before multiplying by COIN.
-    if (strWhole.size() > 14)
-        return std::nullopt;
     if (nUnits < 0 || nUnits > COIN)
         return std::nullopt;
-    int64_t nWhole = LocaleIndependentAtoi<int64_t>(strWhole);
-    CAmount value = nWhole * COIN + nUnits;
+
+    // Parse the whole-MCA portion while bounding it against MAX_MONEY before
+    // multiplication by COIN. This avoids signed overflow and keeps the parser
+    // automatically aligned with Mercatura's monetary safety bound.
+    constexpr CAmount MAX_WHOLE_MCA{MAX_MONEY / COIN};
+    CAmount nWhole{0};
+    for (const char ch : strWhole) {
+        const CAmount digit{ch - '0'};
+        if (nWhole > MAX_WHOLE_MCA / 10 ||
+            (nWhole == MAX_WHOLE_MCA / 10 &&
+             digit > MAX_WHOLE_MCA % 10)) {
+            return std::nullopt;
+        }
+        nWhole = nWhole * 10 + digit;
+    }
+
+    const CAmount value{nWhole * COIN + nUnits};
 
     if (!MoneyRange(value)) {
         return std::nullopt;

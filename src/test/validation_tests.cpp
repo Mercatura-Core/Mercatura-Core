@@ -2,6 +2,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <consensus/mercatura_emission.h>
+#include <consensus/mercatura_controller.h>
+#include <chain.h>
 #include <chainparams.h>
 #include <consensus/amount.h>
 #include <consensus/merkle.h>
@@ -21,50 +24,67 @@
 
 BOOST_FIXTURE_TEST_SUITE(validation_tests, TestingSetup)
 
-static void TestBlockSubsidyHalvings(const Consensus::Params& consensusParams)
+BOOST_AUTO_TEST_CASE(mercatura_subsidy_state_accessors)
 {
-    int maxHalvings = 64;
-    CAmount nInitialSubsidy = 50 * COIN;
+    using namespace Consensus;
 
-    CAmount nPreviousSubsidy = nInitialSubsidy * 2; // for height == 0
-    BOOST_CHECK_EQUAL(nPreviousSubsidy, nInitialSubsidy * 2);
-    for (int nHalvings = 0; nHalvings < maxHalvings; nHalvings++) {
-        int nHeight = nHalvings * consensusParams.nSubsidyHalvingInterval;
-        CAmount nSubsidy = GetBlockSubsidy(nHeight, consensusParams);
-        BOOST_CHECK(nSubsidy <= nInitialSubsidy);
-        BOOST_CHECK_EQUAL(nSubsidy, nPreviousSubsidy / 2);
-        nPreviousSubsidy = nSubsidy;
-    }
-    BOOST_CHECK_EQUAL(GetBlockSubsidy(maxHalvings * consensusParams.nSubsidyHalvingInterval, consensusParams), 0);
-}
+    // Genesis is the block-tree root but deliberately outside Mercatura's
+    // adaptive monetary state machine.
+    CBlockIndex genesis;
+    genesis.nHeight = 0;
 
-static void TestBlockSubsidyHalvings(int nSubsidyHalvingInterval)
-{
-    Consensus::Params consensusParams;
-    consensusParams.nSubsidyHalvingInterval = nSubsidyHalvingInterval;
-    TestBlockSubsidyHalvings(consensusParams);
-}
+    BOOST_CHECK(
+        !GetMcaBlockSubsidy(genesis)
+             .has_value());
 
-BOOST_AUTO_TEST_CASE(block_subsidy_test)
-{
-    const auto chainParams = CreateChainParams(*m_node.args, ChainType::MAIN);
-    TestBlockSubsidyHalvings(chainParams->GetConsensus()); // As in main
-    TestBlockSubsidyHalvings(150); // As in regtest
-    TestBlockSubsidyHalvings(1000); // Just another interval
-}
+    const auto block1_subsidy{
+        GetNextMcaBlockSubsidy(genesis)};
 
-BOOST_AUTO_TEST_CASE(subsidy_limit_test)
-{
-    const auto chainParams = CreateChainParams(*m_node.args, ChainType::MAIN);
-    CAmount nSum = 0;
-    for (int nHeight = 0; nHeight < 14000000; nHeight += 1000) {
-        CAmount nSubsidy = GetBlockSubsidy(nHeight, chainParams->GetConsensus());
-        BOOST_CHECK(nSubsidy <= 50 * COIN);
-        nSum += nSubsidy * 1000;
-        BOOST_CHECK(MoneyRange(nSum));
-    }
-    // Temporary pre-Phase-9 subsidy schedule with Mercatura's 2-decimal base unit.
-    BOOST_CHECK_EQUAL(nSum, CAmount{2098950000});
+    BOOST_REQUIRE(
+        block1_subsidy.has_value());
+
+    BOOST_CHECK_EQUAL(
+        *block1_subsidy,
+        MERCATURA_BOOTSTRAP_EDGE_SUBSIDY);
+
+    // Build a deterministic height-1 monetary state and attach it to a
+    // CBlockIndex exactly as normal header admission does.
+    const auto block1_state{
+        DeriveMcaEmissionState(
+            nullptr,
+            1,
+            arith_uint256{
+                static_cast<uint64_t>(
+                    MERCATURA_BOOTSTRAP_EDGE_SUBSIDY)})};
+
+    BOOST_REQUIRE(
+        block1_state.has_value());
+
+    CBlockIndex block1;
+    block1.nHeight = 1;
+    block1.pprev = &genesis;
+    block1.m_mca_emission_state =
+        *block1_state;
+
+    const auto indexed_subsidy{
+        GetMcaBlockSubsidy(block1)};
+
+    BOOST_REQUIRE(
+        indexed_subsidy.has_value());
+
+    BOOST_CHECK_EQUAL(
+        *indexed_subsidy,
+        MERCATURA_BOOTSTRAP_EDGE_SUBSIDY);
+
+    const auto block2_subsidy{
+        GetNextMcaBlockSubsidy(block1)};
+
+    BOOST_REQUIRE(
+        block2_subsidy.has_value());
+
+    BOOST_CHECK_EQUAL(
+        *block2_subsidy,
+        GetMercaturaBootstrapSubsidy(2));
 }
 
 BOOST_AUTO_TEST_CASE(signet_parse_tests)
@@ -143,36 +163,36 @@ BOOST_AUTO_TEST_CASE(test_assumeutxo)
     }
 
     const auto out110 = *params->AssumeutxoForHeight(110);
-    BOOST_CHECK_EQUAL(out110.hash_serialized.ToString(), "4dd4c3f3f12d7228c6c24ac646232d7927952a3cdd2532f0f3a6d5c20e3d49db");
+    BOOST_CHECK_EQUAL(out110.hash_serialized.ToString(), "4016f03e76f4de1e1b3c4970e4ad7b92c784d983ef6d1c4f0e06d59046da459d");
     BOOST_CHECK_EQUAL(out110.m_chain_tx_count, 111U);
-    BOOST_CHECK_EQUAL(out110.blockhash.ToString(), "a896a4410cde7ee12b0048f04b69e06ddaa5e73b1a5c7c39343b8b137d7b603c");
+    BOOST_CHECK_EQUAL(out110.blockhash.ToString(), "33717a04e8a830d874b81ce1715e378f6daa6e8d86977c0063f169db64a48820");
 
     const auto out110_by_hash = *params->AssumeutxoForBlockhash(
-        uint256{"a896a4410cde7ee12b0048f04b69e06ddaa5e73b1a5c7c39343b8b137d7b603c"});
+        uint256{"33717a04e8a830d874b81ce1715e378f6daa6e8d86977c0063f169db64a48820"});
     BOOST_CHECK_EQUAL(out110_by_hash.height, 110);
-    BOOST_CHECK_EQUAL(out110_by_hash.hash_serialized.ToString(), "4dd4c3f3f12d7228c6c24ac646232d7927952a3cdd2532f0f3a6d5c20e3d49db");
+    BOOST_CHECK_EQUAL(out110_by_hash.hash_serialized.ToString(), "4016f03e76f4de1e1b3c4970e4ad7b92c784d983ef6d1c4f0e06d59046da459d");
     BOOST_CHECK_EQUAL(out110_by_hash.m_chain_tx_count, 111U);
 
     const auto out200 = *params->AssumeutxoForHeight(200);
-    BOOST_CHECK_EQUAL(out200.hash_serialized.ToString(), "0113df039ba5ccca62bed5ca381abbcb5cbff8ee3e977fd2d788dabdf913ae36");
+    BOOST_CHECK_EQUAL(out200.hash_serialized.ToString(), "64cfad77e81e7202c3d4317d203ac2966a0192e35ebc8616f86ef5db2a1b2de4");
     BOOST_CHECK_EQUAL(out200.m_chain_tx_count, 201U);
-    BOOST_CHECK_EQUAL(out200.blockhash.ToString(), "2f237d1f2cf0f736afeb173aef8e874c8c33f34797f42519510c936c9888f03a");
+    BOOST_CHECK_EQUAL(out200.blockhash.ToString(), "07b7f44d074122be85a63c905c94bb9486112fc5b19607bae846631927a05041");
 
     const auto out200_by_hash = *params->AssumeutxoForBlockhash(
-        uint256{"2f237d1f2cf0f736afeb173aef8e874c8c33f34797f42519510c936c9888f03a"});
+        uint256{"07b7f44d074122be85a63c905c94bb9486112fc5b19607bae846631927a05041"});
     BOOST_CHECK_EQUAL(out200_by_hash.height, 200);
-    BOOST_CHECK_EQUAL(out200_by_hash.hash_serialized.ToString(), "0113df039ba5ccca62bed5ca381abbcb5cbff8ee3e977fd2d788dabdf913ae36");
+    BOOST_CHECK_EQUAL(out200_by_hash.hash_serialized.ToString(), "64cfad77e81e7202c3d4317d203ac2966a0192e35ebc8616f86ef5db2a1b2de4");
     BOOST_CHECK_EQUAL(out200_by_hash.m_chain_tx_count, 201U);
 
     const auto out299 = *params->AssumeutxoForHeight(299);
-    BOOST_CHECK_EQUAL(out299.hash_serialized.ToString(), "8879f3a01f6d21eddfe3f26b1e05af9b696a6ae46f2bb7ffddf4ea4e9e4e3457");
+    BOOST_CHECK_EQUAL(out299.hash_serialized.ToString(), "3107f9526723c6861e03083a1ef98e0c589609482be75645430561f98f281609");
     BOOST_CHECK_EQUAL(out299.m_chain_tx_count, 334U);
-    BOOST_CHECK_EQUAL(out299.blockhash.ToString(), "5c95d358609c4495d1d3c941d0c2798c771fd54cde1e39e4c11dcdb9cf2e9ac2");
+    BOOST_CHECK_EQUAL(out299.blockhash.ToString(), "ea6fd67e2ea069767cf7062e93a6063fd615c7894e321253b72c55d3a2440719");
 
     const auto out299_by_hash = *params->AssumeutxoForBlockhash(
-        uint256{"5c95d358609c4495d1d3c941d0c2798c771fd54cde1e39e4c11dcdb9cf2e9ac2"});
+        uint256{"ea6fd67e2ea069767cf7062e93a6063fd615c7894e321253b72c55d3a2440719"});
     BOOST_CHECK_EQUAL(out299_by_hash.height, 299);
-    BOOST_CHECK_EQUAL(out299_by_hash.hash_serialized.ToString(), "8879f3a01f6d21eddfe3f26b1e05af9b696a6ae46f2bb7ffddf4ea4e9e4e3457");
+    BOOST_CHECK_EQUAL(out299_by_hash.hash_serialized.ToString(), "3107f9526723c6861e03083a1ef98e0c589609482be75645430561f98f281609");
     BOOST_CHECK_EQUAL(out299_by_hash.m_chain_tx_count, 334U);
 }
 

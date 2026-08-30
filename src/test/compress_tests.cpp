@@ -43,7 +43,7 @@ BOOST_AUTO_TEST_CASE(compress_amounts)
     BOOST_CHECK(TestPair(                 COIN,        0x3));
     BOOST_CHECK(TestPair(            50 * COIN,       0x2c));
     BOOST_CHECK(TestPair(    21'000'000 * COIN,       0xbd));
-    BOOST_CHECK(TestPair(            MAX_MONEY,  0x1406f40));
+    BOOST_CHECK(TestPair(            MAX_MONEY,  0x7ce66c50e283fff7ULL));
 
     for (uint64_t i = 1; i <= NUM_MULTIPLES_BASE_UNIT; i++)
         BOOST_CHECK(TestEncode(i));

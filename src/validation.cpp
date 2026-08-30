@@ -13,6 +13,7 @@
 #include <clientversion.h>
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
+#include <consensus/mercatura_controller.h>
 #include <consensus/merkle.h>
 #include <consensus/tx_check.h>
 #include <consensus/tx_verify.h>
@@ -1840,19 +1841,6 @@ PackageMempoolAcceptResult ProcessNewPackage(Chainstate& active_chainstate, CTxM
     return result;
 }
 
-CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
-{
-    int halvings = nHeight / consensusParams.nSubsidyHalvingInterval;
-    // Force block reward to zero when right shift is undefined.
-    if (halvings >= 64)
-        return 0;
-
-    CAmount nSubsidy = 50 * COIN;
-    // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
-    nSubsidy >>= halvings;
-    return nSubsidy;
-}
-
 CoinsViews::CoinsViews(DBParams db_params, CoinsViewOptions options)
     : m_dbview{std::move(db_params), std::move(options)},
       m_catcherview(&m_dbview) {}
@@ -2637,7 +2625,26 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
              Ticks<SecondsDouble>(m_chainman.time_connect),
              Ticks<MillisecondsDouble>(m_chainman.time_connect) / m_chainman.num_blocks_total);
 
-    CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, params.GetConsensus());
+    const auto block_subsidy{
+        Consensus::GetMcaBlockSubsidy(*pindex)};
+
+    if (!block_subsidy) {
+        LogError(
+            "%s: missing Mercatura emission state for block %s at height %d\n",
+            __func__,
+            pindex->GetBlockHash().ToString(),
+            pindex->nHeight);
+
+        return state.Error(
+            "missing-mca-emission-state");
+    }
+
+    // Miner underclaiming remains valid. Fees affect only the maximum amount
+    // that may be claimed by the coinbase; neither fees nor actual coinbase
+    // claim feed back into Mercatura's emission controller.
+    const CAmount blockReward{
+        nFees + *block_subsidy};
+
     if (block.vtx[0]->GetValueOut() > blockReward && state.IsValid()) {
         state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-cb-amount",
                       strprintf("coinbase pays too much (actual=%d vs limit=%d)", block.vtx[0]->GetValueOut(), blockReward));
@@ -4323,6 +4330,8 @@ bool ChainstateManager::AcceptBlockHeader(
     // Check for duplicate
     uint256 hash = block.GetHash();
     BlockMap::iterator miSelf{m_blockman.m_block_index.find(hash)};
+    CBlockIndex* pindexPrev{nullptr};
+
     if (hash != GetConsensus().hashGenesisBlock) {
         if (miSelf != m_blockman.m_block_index.end()) {
             // Block header is already known.
@@ -4339,7 +4348,6 @@ bool ChainstateManager::AcceptBlockHeader(
 
         // Reject headers that cannot connect to our block index before spending
         // memory-hard MercaHash work on them.
-        CBlockIndex* pindexPrev = nullptr;
         BlockMap::iterator mi{m_blockman.m_block_index.find(block.hashPrevBlock)};
         if (mi == m_blockman.m_block_index.end()) {
             LogDebug(BCLog::VALIDATION, "header %s has prev block not found: %s\n", hash.ToString(), block.hashPrevBlock.ToString());
@@ -4373,7 +4381,57 @@ bool ChainstateManager::AcceptBlockHeader(
         LogDebug(BCLog::VALIDATION, "%s: not adding new block header %s, missing anti-dos proof-of-work validation\n", __func__, hash.ToString());
         return state.Invalid(BlockValidationResult::BLOCK_HEADER_LOW_WORK, "too-little-chainwork");
     }
-    CBlockIndex* pindex{m_blockman.AddToBlockIndex(block, m_best_header)};
+
+    std::optional<Consensus::McaEmissionState> emission_state;
+
+    if (hash != GetConsensus().hashGenesisBlock) {
+        const int height{pindexPrev->nHeight + 1};
+        const Consensus::McaEmissionState* emission_parent{nullptr};
+
+        // Genesis anchors the block tree but is deliberately outside the
+        // Mercatura monetary state machine.
+        if (height > 1) {
+            if (!pindexPrev->m_mca_emission_state) {
+                LogError(
+                    "%s: missing parent Mercatura emission state for %s\n",
+                    __func__,
+                    hash.ToString());
+                return state.Error("missing-prev-emission-state");
+            }
+
+            emission_parent =
+                &*pindexPrev->m_mca_emission_state;
+        }
+
+        emission_state =
+            Consensus::DeriveMcaEmissionState(
+                emission_parent,
+                height,
+                GetBlockProof(block));
+
+        if (!emission_state) {
+            LogDebug(
+                BCLog::VALIDATION,
+                "%s: invalid Mercatura emission transition for block %s at height %d\n",
+                __func__,
+                hash.ToString(),
+                height);
+
+            return state.Invalid(
+                BlockValidationResult::BLOCK_CONSENSUS,
+                "bad-emission-state");
+        }
+    }
+
+    CBlockIndex* pindex{
+        m_blockman.AddToBlockIndex(
+            block,
+            m_best_header)};
+
+    // This state belongs to the indexed header's own ancestry. Side branches
+    // therefore retain independent controller histories without mutable
+    // global state or reorg undo arithmetic.
+    pindex->m_mca_emission_state = emission_state;
 
     if (ppindex)
         *ppindex = pindex;
@@ -4721,6 +4779,39 @@ BlockValidationState TestBlockValidity(
     index_dummy.pprev = tip;
     index_dummy.nHeight = tip->nHeight + 1;
     index_dummy.phashBlock = &block_hash;
+
+    // TestBlockValidity deliberately bypasses AcceptBlockHeader() and does not
+    // insert index_dummy into the real block index. Derive the exact same
+    // branch-local Mercatura emission state that normal header admission would
+    // have assigned, but attach it only to this temporary index.
+    const Consensus::McaEmissionState* emission_parent{nullptr};
+
+    if (index_dummy.nHeight > 1) {
+        if (!tip->m_mca_emission_state) {
+            state.Error("missing-prev-emission-state");
+            return state;
+        }
+
+        emission_parent =
+            &*tip->m_mca_emission_state;
+    }
+
+    const auto emission_state{
+        Consensus::DeriveMcaEmissionState(
+            emission_parent,
+            index_dummy.nHeight,
+            GetBlockProof(block))};
+
+    if (!emission_state) {
+        state.Invalid(
+            BlockValidationResult::BLOCK_CONSENSUS,
+            "bad-emission-state");
+        return state;
+    }
+
+    index_dummy.m_mca_emission_state =
+        *emission_state;
+
     CCoinsViewCache view_dummy(&chainstate.CoinsTip());
 
     // Set fJustCheck to true in order to update, and not clear, validation caches.

@@ -83,7 +83,6 @@ struct BIP9Deployment {
  */
 struct Params {
     uint256 hashGenesisBlock;
-    int nSubsidyHalvingInterval;
     /**
      * Hashes of blocks that
      * - are known to be consensus valid, and

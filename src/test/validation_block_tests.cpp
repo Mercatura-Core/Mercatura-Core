@@ -6,6 +6,7 @@
 
 #include <chainparams.h>
 #include <consensus/merkle.h>
+#include <consensus/mercatura_controller.h>
 #include <consensus/validation.h>
 #include <node/miner.h>
 #include <pow.h>
@@ -77,20 +78,48 @@ std::shared_ptr<CBlock> MinerTestingSetup::Block(const uint256& prev_hash)
     pblock->hashPrevBlock = prev_hash;
     pblock->nTime = ++time;
 
+    const CBlockIndex* prev_index{
+        WITH_LOCK(
+            ::cs_main,
+            return m_node.chainman->m_blockman.LookupBlockIndex(prev_hash))};
+
+    BOOST_REQUIRE(prev_index);
+
+    // BlockAssembler initially creates a template for the active tip. This
+    // helper can deliberately construct a block on a side branch, so replace
+    // the template subsidy with the command belonging to the explicitly
+    // requested parent.
+    const auto block_subsidy{
+        WITH_LOCK(
+            ::cs_main,
+            return Consensus::GetNextMcaBlockSubsidy(*prev_index))};
+
+    BOOST_REQUIRE(block_subsidy.has_value());
+
     // Make the coinbase transaction with two outputs:
     // One zero-value one that has a unique pubkey to make sure that blocks at the same height can have a different hash
     // Another one that has the coinbase reward in a P2WSH with OP_TRUE as witness program to make it easy to spend
     CMutableTransaction txCoinbase(*pblock->vtx[0]);
     txCoinbase.vout.resize(2);
     txCoinbase.vout[1].scriptPubKey = P2WSH_OP_TRUE;
-    txCoinbase.vout[1].nValue = txCoinbase.vout[0].nValue;
+    txCoinbase.vout[1].nValue = *block_subsidy;
     txCoinbase.vout[0].nValue = 0;
     txCoinbase.vin[0].scriptWitness.SetNull();
+
     // Always pad with OP_0 as dummy extraNonce (also avoids bad-cb-length error for block <=16)
-    const int prev_height{WITH_LOCK(::cs_main, return m_node.chainman->m_blockman.LookupBlockIndex(prev_hash)->nHeight)};
-    txCoinbase.vin[0].scriptSig = CScript{} << prev_height + 1 << OP_0;
-    txCoinbase.nLockTime = static_cast<uint32_t>(prev_height);
-    pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));
+    const int prev_height{
+        WITH_LOCK(
+            ::cs_main,
+            return prev_index->nHeight)};
+
+    txCoinbase.vin[0].scriptSig =
+        CScript{} << prev_height + 1 << OP_0;
+
+    txCoinbase.nLockTime =
+        static_cast<uint32_t>(prev_height);
+
+    pblock->vtx[0] =
+        MakeTransactionRef(std::move(txCoinbase));
 
     return pblock;
 }
@@ -98,6 +127,16 @@ std::shared_ptr<CBlock> MinerTestingSetup::Block(const uint256& prev_hash)
 std::shared_ptr<CBlock> MinerTestingSetup::FinalizeBlock(std::shared_ptr<CBlock> pblock)
 {
     const CBlockIndex* prev_block{WITH_LOCK(::cs_main, return m_node.chainman->m_blockman.LookupBlockIndex(pblock->hashPrevBlock))};
+    BOOST_REQUIRE(prev_block);
+
+    // The template may have originally been created for a different active
+    // tip. Difficulty must therefore also be derived from the explicitly
+    // requested parent before proof of work is mined.
+    pblock->nBits = GetNextWorkRequired(
+        prev_block,
+        pblock.get(),
+        Params().GetConsensus());
+
     m_node.chainman->GenerateCoinbaseCommitment(*pblock, prev_block);
 
     pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
@@ -162,6 +201,270 @@ void MinerTestingSetup::BuildChain(const uint256& root, int height, const unsign
     if (gen_fork) {
         blocks.push_back(GoodBlock(root));
         BuildChain(blocks.back()->GetHash(), height - 1, invalid_rate, branch_rate, max_size, blocks);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(mercatura_emission_state_survives_reorg)
+{
+    bool ignored;
+
+    auto ProcessBlock =
+        [&](std::shared_ptr<const CBlock> block) -> bool {
+            return Assert(m_node.chainman)->ProcessNewBlock(
+                block,
+                /*force_processing=*/true,
+                /*min_pow_checked=*/true,
+                /*new_block=*/&ignored);
+        };
+
+    auto ActiveTipHash = [&]() {
+        return WITH_LOCK(
+            Assert(m_node.chainman)->GetMutex(),
+            return m_node.chainman->ActiveChain().Tip()->GetBlockHash());
+    };
+
+    auto GetEmissionState =
+        [&](const uint256& hash) {
+            LOCK(::cs_main);
+
+            const CBlockIndex* index{
+                Assert(
+                    m_node.chainman->m_blockman.LookupBlockIndex(
+                        hash))};
+
+            BOOST_REQUIRE(
+                index->m_mca_emission_state.has_value());
+
+            BOOST_REQUIRE_EQUAL(
+                index->m_mca_emission_state->height,
+                index->nHeight);
+
+            return *index->m_mca_emission_state;
+        };
+
+    auto CheckStateEqual =
+        [](const Consensus::McaEmissionState& actual,
+           const Consensus::McaEmissionState& expected) {
+            BOOST_CHECK_EQUAL(
+                actual.height,
+                expected.height);
+
+            BOOST_CHECK_EQUAL(
+                actual.s_q48,
+                expected.s_q48);
+
+            BOOST_CHECK_EQUAL(
+                actual.l_q48,
+                expected.l_q48);
+
+            BOOST_CHECK_EQUAL(
+                actual.q_q48,
+                expected.q_q48);
+
+            BOOST_CHECK_EQUAL(
+                actual.r_q48,
+                expected.r_q48);
+
+            BOOST_CHECK_EQUAL(
+                actual.subsidy,
+                expected.subsidy);
+
+            BOOST_CHECK_EQUAL(
+                actual.controller_initialized,
+                expected.controller_initialized);
+        };
+
+    // Establish a normal active chain:
+    //
+    // genesis -- A1 -- A2
+    //
+    BOOST_REQUIRE(
+        ProcessBlock(
+            std::make_shared<CBlock>(
+                Params().GenesisBlock())));
+
+    const auto a1{
+        GoodBlock(
+            Params().GenesisBlock().GetHash())};
+
+    BOOST_REQUIRE(ProcessBlock(a1));
+
+    const auto a2{
+        GoodBlock(a1->GetHash())};
+
+    BOOST_REQUIRE(ProcessBlock(a2));
+
+    BOOST_CHECK_EQUAL(
+        ActiveTipHash(),
+        a2->GetHash());
+
+    const auto a1_state_before{
+        GetEmissionState(a1->GetHash())};
+
+    const auto a2_state_before{
+        GetEmissionState(a2->GetHash())};
+
+    // Build headers for a competing branch before connecting its blocks:
+    //
+    // genesis -- A1 -- A2
+    //               |
+    //                B2 -- B3
+    //
+    // GoodBlock() submits each header during FinalizeBlock(), so these monetary
+    // states exist branch-locally before the blocks trigger an active-chain
+    // change.
+    const auto b2{
+        GoodBlock(a1->GetHash())};
+
+    const auto b3{
+        GoodBlock(b2->GetHash())};
+
+    const auto b2_state_pre_activation{
+        GetEmissionState(b2->GetHash())};
+
+    const auto b3_state_pre_activation{
+        GetEmissionState(b3->GetHash())};
+
+    // Connecting B2 alone does not give the fork more work than A2.
+    BOOST_REQUIRE(ProcessBlock(b2));
+
+    // B3 makes the competing branch longer and forces activation of B.
+    BOOST_REQUIRE(ProcessBlock(b3));
+
+    BOOST_CHECK_EQUAL(
+        ActiveTipHash(),
+        b3->GetHash());
+
+    // Activation must reuse the state derived when the headers entered the
+    // block index. Reorg handling must not recalculate or mutate it.
+    CheckStateEqual(
+        GetEmissionState(b2->GetHash()),
+        b2_state_pre_activation);
+
+    CheckStateEqual(
+        GetEmissionState(b3->GetHash()),
+        b3_state_pre_activation);
+
+    // The disconnected A branch remains in the block tree with its original
+    // branch-local monetary state intact.
+    CheckStateEqual(
+        GetEmissionState(a1->GetHash()),
+        a1_state_before);
+
+    CheckStateEqual(
+        GetEmissionState(a2->GetHash()),
+        a2_state_before);
+
+    // While B is active, extend the old A branch. This exercises block
+    // construction from a non-active parent and proves the side branch gets
+    // its own already-derived monetary states.
+    const auto a3{
+        GoodBlock(a2->GetHash())};
+
+    const auto a4{
+        GoodBlock(a3->GetHash())};
+
+    const auto a3_state_pre_activation{
+        GetEmissionState(a3->GetHash())};
+
+    const auto a4_state_pre_activation{
+        GetEmissionState(a4->GetHash())};
+
+    BOOST_REQUIRE(ProcessBlock(a3));
+    BOOST_REQUIRE(ProcessBlock(a4));
+
+    BOOST_CHECK_EQUAL(
+        ActiveTipHash(),
+        a4->GetHash());
+
+    // Switching back to A again reuses the states that were already attached
+    // to A3/A4 while they were a side branch.
+    CheckStateEqual(
+        GetEmissionState(a3->GetHash()),
+        a3_state_pre_activation);
+
+    CheckStateEqual(
+        GetEmissionState(a4->GetHash()),
+        a4_state_pre_activation);
+
+    // And the now-disconnected B branch still retains exactly the state it had
+    // before either reorg.
+    CheckStateEqual(
+        GetEmissionState(b2->GetHash()),
+        b2_state_pre_activation);
+
+    CheckStateEqual(
+        GetEmissionState(b3->GetHash()),
+        b3_state_pre_activation);
+
+    CheckStateEqual(
+        GetEmissionState(a2->GetHash()),
+        a2_state_before);
+
+    // ---------------------------------------------------------------------
+    // Replay/restart reconstruction
+    // ---------------------------------------------------------------------
+    //
+    // m_mca_emission_state is deliberately memory-only. Simulate losing all
+    // of that runtime state, then invoke the same LoadBlockIndex path used
+    // during startup. Every indexed branch must reconstruct bit-for-bit from
+    // ancestry and block work alone.
+    {
+        LOCK(::cs_main);
+
+        auto& chainman{
+            *Assert(m_node.chainman)};
+
+        for (CBlockIndex* index :
+             chainman.m_blockman.GetAllBlockIndices()) {
+            index->m_mca_emission_state.reset();
+        }
+
+        // Genesis deliberately remains outside the monetary state machine.
+        BOOST_REQUIRE(
+            !chainman.ActiveChain().Genesis()
+                 ->m_mca_emission_state.has_value());
+
+        BOOST_REQUIRE(
+            chainman.LoadBlockIndex());
+    }
+
+    // The active branch must reproduce exactly.
+    CheckStateEqual(
+        GetEmissionState(a1->GetHash()),
+        a1_state_before);
+
+    CheckStateEqual(
+        GetEmissionState(a2->GetHash()),
+        a2_state_before);
+
+    CheckStateEqual(
+        GetEmissionState(a3->GetHash()),
+        a3_state_pre_activation);
+
+    CheckStateEqual(
+        GetEmissionState(a4->GetHash()),
+        a4_state_pre_activation);
+
+    // The disconnected side branch must also reproduce exactly. Startup
+    // reconstruction is therefore block-tree based, not active-chain based.
+    CheckStateEqual(
+        GetEmissionState(b2->GetHash()),
+        b2_state_pre_activation);
+
+    CheckStateEqual(
+        GetEmissionState(b3->GetHash()),
+        b3_state_pre_activation);
+
+    // Genesis still has no Mercatura emission state after replay.
+    {
+        LOCK(::cs_main);
+
+        BOOST_CHECK(
+            !Assert(m_node.chainman)
+                 ->ActiveChain()
+                 .Genesis()
+                 ->m_mca_emission_state.has_value());
     }
 }
 

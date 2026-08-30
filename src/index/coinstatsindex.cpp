@@ -108,7 +108,37 @@ CoinStatsIndex::CoinStatsIndex(std::unique_ptr<interfaces::Chain> chain, size_t 
 
 bool CoinStatsIndex::CustomAppend(const interfaces::BlockInfo& block)
 {
-    const CAmount block_subsidy{GetBlockSubsidy(block.height, Params().GetConsensus())};
+    if (block.height < 0) {
+        LogError("invalid negative block height in CoinStatsIndex");
+        return false;
+    }
+
+    CAmount block_subsidy{0};
+
+    if (block.height == 0) {
+        // Genesis is deliberately outside Mercatura's adaptive emission state,
+        // but its inherited genesis coinbase output is permanently
+        // unspendable and should remain represented in CoinStats accounting.
+        if (!block.data ||
+            block.data->vtx.empty() ||
+            !block.data->vtx.front()->IsCoinBase()) {
+            LogError("missing genesis coinbase data in CoinStatsIndex");
+            return false;
+        }
+
+        block_subsidy =
+            block.data->vtx.front()->GetValueOut();
+    } else {
+        if (!block.subsidy) {
+            LogError(
+                "missing Mercatura protocol subsidy at height %d",
+                block.height);
+            return false;
+        }
+
+        block_subsidy = *block.subsidy;
+    }
+
     m_total_subsidy += block_subsidy;
 
     // Ignore genesis block

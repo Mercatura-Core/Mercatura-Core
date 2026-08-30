@@ -339,6 +339,66 @@ BOOST_AUTO_TEST_CASE(tx_invalid)
     }
 }
 
+BOOST_AUTO_TEST_CASE(mercatura_max_money_transaction_boundaries)
+{
+    auto make_base_transaction = [] {
+        CMutableTransaction tx;
+        tx.vin.emplace_back(
+            COutPoint{Txid::FromUint256(uint256::ONE), 0});
+        return tx;
+    };
+
+    // A single output exactly at MAX_MONEY is valid.
+    {
+        CMutableTransaction tx{make_base_transaction()};
+        tx.vout.emplace_back(MAX_MONEY, CScript{} << OP_TRUE);
+
+        TxValidationState state;
+        BOOST_CHECK(CheckTransaction(CTransaction{tx}, state));
+        BOOST_CHECK(state.IsValid());
+    }
+
+    // A zero-value companion output does not change the valid total.
+    {
+        CMutableTransaction tx{make_base_transaction()};
+        tx.vout.emplace_back(MAX_MONEY, CScript{} << OP_TRUE);
+        tx.vout.emplace_back(0, CScript{} << OP_TRUE);
+
+        TxValidationState state;
+        BOOST_CHECK(CheckTransaction(CTransaction{tx}, state));
+        BOOST_CHECK(state.IsValid());
+    }
+
+    // An individual output one base unit above MAX_MONEY is invalid.
+    {
+        CMutableTransaction tx{make_base_transaction()};
+        tx.vout.emplace_back(MAX_MONEY + 1, CScript{} << OP_TRUE);
+
+        TxValidationState state;
+        BOOST_CHECK(!CheckTransaction(CTransaction{tx}, state));
+        BOOST_CHECK(state.IsInvalid());
+        BOOST_CHECK_EQUAL(
+            state.GetRejectReason(),
+            "bad-txns-vout-toolarge");
+    }
+
+    // Individually valid outputs whose aggregate exceeds MAX_MONEY are
+    // invalid. The chosen MAX_MONEY leaves sufficient signed CAmount
+    // headroom for this addition to occur without overflow.
+    {
+        CMutableTransaction tx{make_base_transaction()};
+        tx.vout.emplace_back(MAX_MONEY, CScript{} << OP_TRUE);
+        tx.vout.emplace_back(1, CScript{} << OP_TRUE);
+
+        TxValidationState state;
+        BOOST_CHECK(!CheckTransaction(CTransaction{tx}, state));
+        BOOST_CHECK(state.IsInvalid());
+        BOOST_CHECK_EQUAL(
+            state.GetRejectReason(),
+            "bad-txns-txouttotal-toolarge");
+    }
+}
+
 BOOST_AUTO_TEST_CASE(tx_no_inputs)
 {
     CMutableTransaction empty;

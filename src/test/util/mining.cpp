@@ -2,6 +2,9 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <optional>
+#include <consensus/mercatura_controller.h>
+#include <chain.h>
 #include <test/util/mining.h>
 
 #include <chainparams.h>
@@ -39,10 +42,26 @@ std::vector<std::shared_ptr<CBlock>> CreateBlockChain(size_t total_height, const
     std::vector<std::shared_ptr<CBlock>> ret{total_height};
     auto time{params.GenesisBlock().nTime};
     PoWHashContext pow_context;
+    std::optional<Consensus::McaEmissionState> emission_state;
 
     // NOTE: here `height` does not correspond to the block height but the block height - 1.
     for (size_t height{0}; height < total_height; ++height) {
         CBlock& block{*(ret.at(height) = std::make_shared<CBlock>())};
+
+        const int block_height{
+            static_cast<int>(height) + 1};
+
+        const Consensus::McaEmissionState* emission_parent{
+            emission_state
+                ? &*emission_state
+                : nullptr};
+
+        const auto emission_command{
+            Consensus::GetMcaEmissionCommand(
+                emission_parent,
+                block_height)};
+
+        assert(emission_command);
 
         CMutableTransaction coinbase_tx;
         coinbase_tx.nLockTime = static_cast<uint32_t>(height);
@@ -51,7 +70,8 @@ std::vector<std::shared_ptr<CBlock>> CreateBlockChain(size_t total_height, const
         coinbase_tx.vin[0].nSequence = CTxIn::MAX_SEQUENCE_NONFINAL; // Make sure timelock is enforced.
         coinbase_tx.vout.resize(1);
         coinbase_tx.vout[0].scriptPubKey = P2WSH_OP_TRUE;
-        coinbase_tx.vout[0].nValue = GetBlockSubsidy(height + 1, params.GetConsensus());
+        coinbase_tx.vout[0].nValue =
+            emission_command->subsidy;
         // Always include OP_0 as a dummy extraNonce.
         coinbase_tx.vin[0].scriptSig = CScript() << (height + 1) << OP_0;
         block.vtx = {MakeTransactionRef(std::move(coinbase_tx))};
@@ -62,6 +82,15 @@ std::vector<std::shared_ptr<CBlock>> CreateBlockChain(size_t total_height, const
         block.nTime = ++time;
         block.nBits = params.GenesisBlock().nBits;
         block.nNonce = 0;
+
+        const auto derived_state{
+            Consensus::DeriveMcaEmissionState(
+                emission_parent,
+                block_height,
+                GetBlockProof(block))};
+
+        assert(derived_state);
+        emission_state = *derived_state;
 
         while (!CheckProofOfWork(
             block,

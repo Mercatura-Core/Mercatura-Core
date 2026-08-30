@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <consensus/mercatura_controller.h>
 #include <kernel/chain.h>
 
 #include <chain.h>
@@ -21,6 +22,12 @@ interfaces::BlockInfo MakeBlockInfo(const CBlockIndex* index, const CBlock* data
     if (index) {
         info.prev_hash = index->pprev ? index->pprev->phashBlock : nullptr;
         info.height = index->nHeight;
+
+        if (index->nHeight > 0) {
+            info.subsidy =
+                Consensus::GetMcaBlockSubsidy(*index);
+        }
+
         info.chain_time_max = index->GetBlockTimeMax();
         LOCK(::cs_main);
         info.file_number = index->nFile;

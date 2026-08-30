@@ -27,3 +27,5 @@ target/
 /guix-build-*
 
 /ci/scratch/
+
+/test/cache/

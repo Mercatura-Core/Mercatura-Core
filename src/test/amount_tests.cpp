@@ -13,11 +13,16 @@ BOOST_AUTO_TEST_SUITE(amount_tests)
 
 BOOST_AUTO_TEST_CASE(MoneyRangeTest)
 {
+    BOOST_CHECK_EQUAL(MAX_MONEY, CAmount{999'999'999'999'999'999});
     BOOST_CHECK_EQUAL(MoneyRange(CAmount(-1)), false);
     BOOST_CHECK_EQUAL(MoneyRange(CAmount(0)), true);
     BOOST_CHECK_EQUAL(MoneyRange(CAmount(1)), true);
     BOOST_CHECK_EQUAL(MoneyRange(MAX_MONEY), true);
     BOOST_CHECK_EQUAL(MoneyRange(MAX_MONEY + CAmount(1)), false);
+
+    // Two individually valid monetary values can be added without signed
+    // CAmount overflow before the resulting sum is range-checked.
+    BOOST_CHECK(MAX_MONEY <= std::numeric_limits<CAmount>::max() / 2);
 }
 
 BOOST_AUTO_TEST_CASE(GetFeeTest)

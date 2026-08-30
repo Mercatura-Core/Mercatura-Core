@@ -5,6 +5,8 @@
 #ifndef BITCOIN_KERNEL_CHAIN_H
 #define BITCOIN_KERNEL_CHAIN_H
 
+#include <optional>
+#include <consensus/amount.h>
 #include <attributes.h>
 
 #include <iostream>
@@ -20,6 +22,16 @@ struct BlockInfo {
     const uint256& hash;
     const uint256* prev_hash = nullptr;
     int height = -1;
+
+    /**
+     * Mercatura protocol subsidy for this indexed block.
+     *
+     * This is the commanded subsidy, not necessarily what the miner claimed.
+     * Genesis is outside the Mercatura emission state machine and leaves this
+     * unset.
+     */
+    std::optional<CAmount> subsidy{};
+
     int file_number = -1;
     unsigned data_pos = 0;
     const CBlock* data = nullptr;

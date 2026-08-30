@@ -16,6 +16,7 @@
 
 #include <univalue.h>
 
+
 const auto NoMalleation = [](AutoFile& file, node::SnapshotMetadata& meta){};
 
 /**

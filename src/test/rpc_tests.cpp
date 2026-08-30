@@ -236,7 +236,7 @@ BOOST_AUTO_TEST_CASE(rpc_format_monetary_values)
     BOOST_CHECK_EQUAL(ValueFromAmount(1234567).write(), "12345.67");
     BOOST_CHECK_EQUAL(ValueFromAmount(-COIN).write(), "-1.00");
 
-    BOOST_CHECK_EQUAL(ValueFromAmount(MAX_MONEY).write(), "21000000000000.00");
+    BOOST_CHECK_EQUAL(ValueFromAmount(MAX_MONEY).write(), "9999999999999999.99");
 
     BOOST_CHECK_EQUAL(ValueFromAmount(std::numeric_limits<CAmount>::max()).write(), "92233720368547758.07");
     BOOST_CHECK_EQUAL(ValueFromAmount(std::numeric_limits<CAmount>::max() - 1).write(), "92233720368547758.06");
@@ -285,8 +285,8 @@ BOOST_AUTO_TEST_CASE(rpc_parse_monetary_values)
     BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.01000000")), CENT);
     BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("1.00000000")), COIN);
 
-    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("21000000000000.00")), MAX_MONEY);
-    BOOST_CHECK_THROW(AmountFromValue(ValueFromString("21000000000000.01")), UniValue);
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("9999999999999999.99")), MAX_MONEY);
+    BOOST_CHECK_THROW(AmountFromValue(ValueFromString("10000000000000000.00")), UniValue);
 
     BOOST_CHECK_EXCEPTION(
         AmountFromValue(".19"),

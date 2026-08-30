@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <consensus/mercatura_controller.h>
 #include <node/miner.h>
 
 #include <chain.h>
@@ -213,8 +214,19 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     // Add an output that spends the full coinbase reward.
     coinbaseTx.vout.resize(1);
     coinbaseTx.vout[0].scriptPubKey = m_options.coinbase_output_script;
-    // Block subsidy + fees
-    const CAmount block_reward{nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus())};
+    // Mercatura subsidy is commanded by the parent's branch-local controller
+    // state. Mining and validation therefore use the same consensus path.
+    const auto block_subsidy{
+        Consensus::GetNextMcaBlockSubsidy(*pindexPrev)};
+
+    const CAmount block_reward{
+        std::min<CAmount>(
+            MAX_MONEY,
+            nFees + *Assert(block_subsidy))};
+
+    // If subsidy itself is at MAX_MONEY, transaction-level monetary limits
+    // can make some fees unclaimable. Such value is simply left unclaimed;
+    // it never changes q/r or the protocol subsidy.
     coinbaseTx.vout[0].nValue = block_reward;
     coinbase_tx.block_reward_remaining = block_reward;
 

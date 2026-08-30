@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <consensus/mercatura_controller.h>
 #include <bench/bench.h>
 #include <chain.h>
 #include <chainparams.h>
@@ -50,7 +51,10 @@ static void DuplicateInputs(benchmark::Bench& bench)
     coinbaseTx.vin[0].prevout.SetNull();
     coinbaseTx.vout.resize(1);
     coinbaseTx.vout[0].scriptPubKey = SCRIPT_PUB;
-    coinbaseTx.vout[0].nValue = GetBlockSubsidy(nHeight, chainparams.GetConsensus());
+    coinbaseTx.vout[0].nValue =
+        *Assert(
+            Consensus::GetNextMcaBlockSubsidy(
+                *pindexPrev));
     coinbaseTx.vin[0].scriptSig = CScript() << nHeight << OP_0;
 
 

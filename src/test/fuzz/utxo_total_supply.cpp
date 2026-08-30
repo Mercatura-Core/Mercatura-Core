@@ -2,6 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <consensus/mercatura_controller.h>
+#include <chain.h>
 #include <chainparams.h>
 #include <consensus/consensus.h>
 #include <consensus/merkle.h>
@@ -43,6 +45,23 @@ FUZZ_TARGET(utxo_total_supply)
         LOCK(chainman.GetMutex());
         return chainman.ActiveHeight();
     };
+
+    const auto ActiveProtocolSubsidy = [&]() {
+        LOCK(chainman.GetMutex());
+
+        const CBlockIndex* tip{
+            chainman.ActiveChain().Tip()};
+
+        assert(tip);
+        assert(tip->nHeight > 0);
+
+        const auto subsidy{
+            Consensus::GetMcaBlockSubsidy(*tip)};
+
+        assert(subsidy);
+        return *subsidy;
+    };
+
     BlockAssembler::Options options;
     options.coinbase_output_script = CScript() << OP_FALSE;
     options.include_dummy_extranonce = true;
@@ -122,7 +141,7 @@ FUZZ_TARGET(utxo_total_supply)
     }
     current_block->hashMerkleRoot = BlockMerkleRoot(*current_block);
     assert(!MineBlock(node, current_block).IsNull());
-    circulation += GetBlockSubsidy(ActiveHeight(), Params().GetConsensus());
+    circulation += ActiveProtocolSubsidy();
 
     assert(ActiveHeight() == 1);
     UpdateUtxoStats(/*wipe_cache=*/fuzzed_data_provider.ConsumeBool());
@@ -161,7 +180,7 @@ FUZZ_TARGET(utxo_total_supply)
                         assert(current_block->vtx.at(0)->vin.at(0).scriptSig == duplicate_coinbase_script);
                     }
 
-                    circulation += GetBlockSubsidy(ActiveHeight(), Params().GetConsensus());
+                    circulation += ActiveProtocolSubsidy();
                 }
 
                 UpdateUtxoStats(/*wipe_cache=*/fuzzed_data_provider.ConsumeBool());
