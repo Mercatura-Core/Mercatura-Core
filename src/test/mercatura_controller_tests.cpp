@@ -32,7 +32,19 @@ BOOST_AUTO_TEST_CASE(controller_consensus_constants)
 
     BOOST_CHECK_EQUAL(
         MERCATURA_CONTROLLER_DIVISOR,
-        4'204'800);
+        840'960);
+
+    // Mercatura has 210,240 target blocks/year. k = 0.25 = 1/4,
+    // so the exact integer controller divisor is:
+    //
+    //     210,240 / 0.25 = 4 * 210,240 = 840,960
+    //
+    // This permanently locks the gain relationship without introducing
+    // floating-point arithmetic into consensus.
+    constexpr int64_t BLOCKS_PER_YEAR{210'240};
+    BOOST_CHECK_EQUAL(
+        MERCATURA_CONTROLLER_DIVISOR,
+        4 * BLOCKS_PER_YEAR);
 
     BOOST_CHECK_EQUAL(
         MERCATURA_PERPETUAL_SUBSIDY_FLOOR,
@@ -204,10 +216,14 @@ BOOST_AUTO_TEST_CASE(upward_rate_limiter_vector)
 
     BOOST_REQUIRE(command.has_value());
 
-    // q receives the complete controller movement.
+    // q receives the complete k=0.25 controller movement:
+    // trunc(1,256,238,426,931,200 / 840,960) = 1,493,814,720.
+    BOOST_CHECK_EQUAL(
+        command->q_q48 - parent.q_q48,
+        1'493'814'720);
     BOOST_CHECK_EQUAL(
         command->q_q48,
-        4'132'578'964'197'990);
+        4'132'580'159'249'766);
 
     // r is independently clipped to exactly d_plus.
     BOOST_CHECK_EQUAL(
@@ -251,9 +267,14 @@ BOOST_AUTO_TEST_CASE(downward_rate_limiter_vector)
 
     BOOST_REQUIRE(command.has_value());
 
+    // Negative controller division remains truncate-toward-zero:
+    // trunc(-2,254,540,184,409,600 / 840,960) = -2,680,912,510.
+    BOOST_CHECK_EQUAL(
+        command->q_q48 - parent.q_q48,
+        -2'680'912'510);
     BOOST_CHECK_EQUAL(
         command->q_q48,
-        4'132'578'129'252'544);
+        4'132'575'984'522'536);
 
     BOOST_CHECK_EQUAL(
         command->r_q48,

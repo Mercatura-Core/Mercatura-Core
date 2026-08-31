@@ -99,8 +99,18 @@ static unsigned int DarkGravityWave(const CBlockIndex* pindexLast, const Consens
         }
     }
 
+    // The 24 averaged difficulty targets are heights H through H-23.
+    // Measure elapsed time from H back to the block immediately before
+    // that target window, H-24, so the timespan contains 24 complete
+    // block intervals rather than only 23.
+    assert(pindex->pprev);
+
+    const CBlockIndex* const pindexTimeStart{
+        pindex->pprev};
+
     int64_t nActualTimespan =
-        pindexLast->GetBlockTime() - pindex->GetBlockTime();
+        pindexLast->GetBlockTime() -
+        pindexTimeStart->GetBlockTime();
 
     if (nActualTimespan < params.nDGWMinTimespan) {
         nActualTimespan = params.nDGWMinTimespan;

@@ -252,8 +252,9 @@ private:
 
     /**
      * Rolling block-index history used to validate Mercatura's exact DGW
-     * difficulty during headers presync and redownload. At most
-     * nDGWPastBlocks entries are retained.
+     * difficulty during headers presync and redownload. Retain
+     * nDGWPastBlocks target samples plus one immediately older timestamp
+     * anchor for the complete elapsed-time window.
      */
     std::deque<CBlockIndex> m_difficulty_history;
 

@@ -83,9 +83,9 @@ BOOST_AUTO_TEST_CASE(dgw_first_activation_nominal_spacing)
 
     constexpr uint32_t START_BITS{0x1c0ffff0U};
 
-    // Heights 1 through 24 form the first complete 24-block DGW window.
-    // Twenty-four blocks contain twenty-three timestamp intervals:
-    // 23 * 150 = 3450 seconds.
+    // Height 24 is the newest of the first complete 24-target DGW
+    // window. Elapsed time is measured from height 24 back to height 0,
+    // giving exactly 24 * 150 = 3600 seconds.
     auto blocks = BuildDGWChain(
         25,
         START_BITS,
@@ -96,11 +96,72 @@ BOOST_AUTO_TEST_CASE(dgw_first_activation_nominal_spacing)
     next_block.nTime =
         blocks.back().GetBlockTime() + consensus.nPowTargetSpacing;
 
-    constexpr uint32_t EXPECTED_BITS{0x1c0f5546U};
-
     BOOST_CHECK_EQUAL(
         GetNextWorkRequired(&blocks.back(), &next_block, consensus),
-        EXPECTED_BITS);
+        START_BITS);
+}
+
+BOOST_AUTO_TEST_CASE(dgw_nominal_spacing_has_no_systematic_drift)
+{
+    const auto main_params =
+        CreateChainParams(*m_node.args, ChainType::MAIN);
+    const auto& consensus = main_params->GetConsensus();
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+
+    // Every possible full DGW window in this synthetic chain contains
+    // exactly 24 intervals of 150 seconds and 24 identical targets.
+    auto blocks = BuildDGWChain(
+        100,
+        START_BITS,
+        1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    for (size_t height = 24; height < blocks.size(); ++height) {
+        CBlockHeader next_block;
+        next_block.nTime =
+            blocks[height].GetBlockTime() +
+            consensus.nPowTargetSpacing;
+
+        BOOST_CHECK_EQUAL(
+            GetNextWorkRequired(
+                &blocks[height],
+                &next_block,
+                consensus),
+            START_BITS);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(dgw_averages_24_targets_excluding_time_anchor)
+{
+    const auto main_params =
+        CreateChainParams(*m_node.args, ChainType::MAIN);
+    const auto& consensus = main_params->GetConsensus();
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+    constexpr uint32_t ANCHOR_BITS{0x1c07fff8U};
+
+    auto blocks = BuildDGWChain(
+        25,
+        START_BITS,
+        1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    // Height 0 supplies only the H-24 timestamp endpoint. Its difficulty
+    // must not participate in the 24-target average of heights 24..1.
+    blocks[0].nBits = ANCHOR_BITS;
+
+    CBlockHeader next_block;
+    next_block.nTime =
+        blocks.back().GetBlockTime() +
+        consensus.nPowTargetSpacing;
+
+    BOOST_CHECK_EQUAL(
+        GetNextWorkRequired(
+            &blocks.back(),
+            &next_block,
+            consensus),
+        START_BITS);
 }
 
 BOOST_AUTO_TEST_CASE(dgw_lower_timespan_clamp)
@@ -176,10 +237,11 @@ BOOST_AUTO_TEST_CASE(dgw_historical_averaging_recurrence)
         blocks[i].nBits = (i % 2 == 0) ? TARGET_A : TARGET_B;
     }
 
-    // Make the timestamp span of the 24-block window exactly equal
-    // to the locked 3600-second DGW target timespan so this vector
-    // isolates the historical DGWv3 averaging recurrence.
-    blocks[1].nTime =
+    // Height 0 is the timestamp anchor immediately before the 24
+    // averaged targets at heights 1..24. Set H - (H-24) to exactly
+    // the locked 3600-second timespan so this vector isolates only
+    // the established DGWv3 averaging recurrence.
+    blocks[0].nTime =
         blocks.back().GetBlockTime() - consensus.nDGWTargetTimespan;
 
     CBlockHeader next_block;
@@ -218,7 +280,7 @@ BOOST_AUTO_TEST_CASE(dgw_pow_limit_ceiling)
     CBlockHeader next_block;
     next_block.nTime = blocks.back().GetBlockTime() + 1000;
 
-    // The 23,000-second historical span exceeds the 10,800-second
+    // The 24,000-second historical span exceeds the 10,800-second
     // maximum. The 3x adjustment would make the target easier than
     // powLimit, so DGW must cap it back to powLimit.
     BOOST_CHECK_EQUAL(
@@ -247,7 +309,7 @@ BOOST_AUTO_TEST_CASE(testnet_min_difficulty_delay)
 
     // Exactly 300 seconds does not trigger the exception because the
     // consensus rule uses a strict greater-than comparison.
-    constexpr uint32_t NORMAL_DGW_BITS{0x1c0f5546U};
+    constexpr uint32_t NORMAL_DGW_BITS{START_BITS};
 
     BOOST_CHECK_EQUAL(
         GetNextWorkRequired(

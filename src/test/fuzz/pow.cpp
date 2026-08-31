@@ -34,10 +34,12 @@ static bool HasRequiredDGWHistory(
 
     const CBlockIndex* current = &block;
 
-    // DGW evaluates nDGWPastBlocks entries including pindexLast itself,
-    // so it needs nDGWPastBlocks - 1 predecessor links.
+    // DGW averages nDGWPastBlocks entries including pindexLast itself,
+    // and additionally needs the block immediately before those samples
+    // as the elapsed-time anchor. Therefore nDGWPastBlocks predecessor
+    // links are required.
     for (int64_t count = 1;
-         count < params.nDGWPastBlocks;
+         count <= params.nDGWPastBlocks;
          ++count) {
         if (current->pprev == nullptr) {
             return false;

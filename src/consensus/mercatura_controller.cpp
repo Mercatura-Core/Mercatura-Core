@@ -148,7 +148,7 @@ std::optional<McaEmissionCommand> GetAdaptiveCommand(
         return std::nullopt;
     }
 
-    // q_(h+1) = q_h + e_h / 4,204,800
+    // q_(h+1) = q_h + e_h / 840,960
     const int64_t q_adjustment{
         DivideQ48TowardZero(
             error_q48,

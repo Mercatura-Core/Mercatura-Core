@@ -230,10 +230,11 @@ BOOST_AUTO_TEST_CASE(dgw_exact_difficulty_presync)
     BOOST_REQUIRE_EQUAL(valid_chain.size(), 25);
 
     // Blocks 1-24 retain launch difficulty. Block 25 is the first real
-    // DGW calculation and therefore must differ at nominal spacing because
-    // the 24-block history contains 23 timestamp intervals.
+    // DGW calculation. With 24 complete 150-second intervals, the
+    // 3600-second window is exactly at equilibrium and difficulty does
+    // not drift.
     BOOST_CHECK_EQUAL(valid_chain[23].nBits, genesis.nBits);
-    BOOST_CHECK_NE(valid_chain[24].nBits, valid_chain[23].nBits);
+    BOOST_CHECK_EQUAL(valid_chain[24].nBits, valid_chain[23].nBits);
 
     HeadersSyncState valid_hss{
         /*id=*/0,

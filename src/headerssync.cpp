@@ -76,7 +76,7 @@ void HeadersSyncState::ResetDifficultyHistory()
     const CBlockIndex* pindex = &m_chain_start;
 
     for (int64_t count = 0;
-         pindex != nullptr && count < m_consensus_params.nDGWPastBlocks;
+         pindex != nullptr && count <= m_consensus_params.nDGWPastBlocks;
          ++count) {
         history.push_back(pindex);
         pindex = pindex->pprev;
@@ -119,11 +119,12 @@ bool HeadersSyncState::ValidateDifficultyAndAddHeader(
             : nullptr;
 
     if (m_difficulty_history.size() >
-        static_cast<size_t>(m_consensus_params.nDGWPastBlocks)) {
+        static_cast<size_t>(m_consensus_params.nDGWPastBlocks + 1)) {
         m_difficulty_history.pop_front();
 
-        // The oldest retained entry is the end of the DGW window.
-        // Do not leave its pprev pointing at the erased deque element.
+        // Retain one block immediately before the 24-target DGW window.
+        // Its timestamp supplies the H-24 endpoint for the 24 elapsed
+        // intervals. Do not leave its pprev pointing at the erased entry.
         m_difficulty_history.front().pprev = nullptr;
     }
 
