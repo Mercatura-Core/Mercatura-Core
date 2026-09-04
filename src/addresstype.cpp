@@ -87,6 +87,12 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
         addressRet = tap;
         return true;
     }
+    case TxoutType::WITNESS_V2_MERCATURA_PQ: {
+        WitnessV2MercaturaPQ pq;
+        std::copy(vSolutions[0].begin(), vSolutions[0].end(), pq.begin());
+        addressRet = pq;
+        return true;
+    }
     case TxoutType::ANCHOR: {
         addressRet = PayToAnchor();
         return true;
@@ -143,8 +149,16 @@ public:
         return CScript() << OP_1 << ToByteVector(tap);
     }
 
+    CScript operator()(const WitnessV2MercaturaPQ& pq) const
+    {
+        return CScript() << OP_2 << ToByteVector(pq);
+    }
+
     CScript operator()(const WitnessUnknown& id) const
     {
+        // Witness version 2 is permanently assigned to Mercatura PQ v1
+        // and must never be represented as WitnessUnknown.
+        if (id.GetWitnessVersion() == 2) return {};
         return CScript() << CScript::EncodeOP_N(id.GetWitnessVersion()) << id.GetWitnessProgram();
     }
 };
@@ -159,7 +173,8 @@ public:
     bool operator()(const WitnessV0KeyHash& dest) const { return true; }
     bool operator()(const WitnessV0ScriptHash& dest) const { return true; }
     bool operator()(const WitnessV1Taproot& dest) const { return true; }
-    bool operator()(const WitnessUnknown& dest) const { return true; }
+    bool operator()(const WitnessV2MercaturaPQ& dest) const { return true; }
+    bool operator()(const WitnessUnknown& dest) const { return dest.GetWitnessVersion() != 2; }
 };
 } // namespace
 

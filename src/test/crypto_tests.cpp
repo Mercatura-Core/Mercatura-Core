@@ -6,9 +6,14 @@
 #include <crypto/chacha20.h>
 #include <crypto/chacha20poly1305.h>
 #include <crypto/hkdf_sha256_32.h>
+#include <crypto/hkdf_sha3_384.h>
+#include <crypto/mercatura_pqderive.h>
+#include <crypto/hmac_sha3_384.h>
 #include <crypto/hmac_sha256.h>
 #include <crypto/hmac_sha512.h>
 #include <crypto/mercahash.h>
+#include <crypto/mercatura_pqhash.h>
+#include <crypto/mercatura_pqkey.h>
 #include <crypto/poly1305.h>
 #include <crypto/ripemd160.h>
 #include <crypto/sha1.h>
@@ -358,6 +363,7 @@ void TestHKDF_SHA256_32(const std::string &ikm_hex, const std::string &salt_hex,
 }
 
 void TestSHA3_256(const std::string& input, const std::string& output);
+void TestSHA3_384(const std::string& input, const std::string& output);
 void TestSHA3_512(const std::string& input, const std::string& output);
 }; // struct CryptoTests
 } // namespace crypto_tests
@@ -1054,6 +1060,168 @@ BOOST_AUTO_TEST_CASE(chacha20poly1305_testvectors)
                            "14b94829deb27f0b1923a2af704ae5d6");
 }
 
+BOOST_AUTO_TEST_CASE(mercatura_hmac_sha3_384_tests)
+{
+    const auto test_hmac = [](
+        const std::vector<unsigned char>& key,
+        const std::vector<unsigned char>& message,
+        const std::string& expected_hex) {
+
+        std::array<unsigned char, CHMAC_SHA3_384::OUTPUT_SIZE> output{};
+
+        CHMAC_SHA3_384(key.data(), key.size())
+            .Write(message)
+            .Finalize(output);
+
+        BOOST_CHECK_EQUAL(HexStr(output), expected_hex);
+    };
+
+    test_hmac(
+        {},
+        {},
+        "adca89f07bbfbeaf58880c1572379ea2416568fd3b66542bd42599c57c4567e6a"
+        "e086299ea216c6f3e7aef90b6191d24");
+
+    test_hmac(
+        {'k', 'e', 'y'},
+        {'T','h','e',' ','q','u','i','c','k',' ','b','r','o','w','n',' ',
+         'f','o','x',' ','j','u','m','p','s',' ','o','v','e','r',' ',
+         't','h','e',' ','l','a','z','y',' ','d','o','g'},
+        "aa739ad9fcdf9be4a04f06680ade7a1bd1e01a0af64accb04366234cf9f6934a"
+        "0f8589772f857681fcde8acc256091a2");
+}
+
+BOOST_AUTO_TEST_CASE(mercatura_pq_child_derivation_tests)
+{
+    std::array<unsigned char, MERCATURA_PQ_MASTER_SEED_SIZE> master_seed{};
+    for (size_t i = 0; i < master_seed.size(); ++i) {
+        master_seed[i] = static_cast<unsigned char>(i);
+    }
+
+    std::array<unsigned char, 32> genesis_bytes{};
+    for (size_t i = 0; i < genesis_bytes.size(); ++i) {
+        genesis_bytes[i] = static_cast<unsigned char>(0x20 + i);
+    }
+
+    const uint256 genesis_hash{
+        std::span<const unsigned char>{genesis_bytes}
+    };
+
+    const auto derive = [&](uint32_t account, uint8_t branch, uint32_t index) {
+        const auto result = DeriveMercaturaPQChildSeed(
+            master_seed,
+            genesis_hash,
+            account,
+            branch,
+            index);
+
+        BOOST_REQUIRE(result.has_value());
+        return *result;
+    };
+
+    // account=0, external/receive, index=0
+    BOOST_CHECK_EQUAL(
+        HexStr(derive(0, 0, 0)),
+        "0be624be1e03a6fd1e078d25352115a74aca5696e332ab7e23e5dd019b784484");
+
+    // Same account/index, internal/change branch.
+    BOOST_CHECK_EQUAL(
+        HexStr(derive(0, 1, 0)),
+        "c64d84ddc9b12450012b4e968ff8f93295f733f75f2abf266709c387fd712dd8");
+
+    // Account separation.
+    BOOST_CHECK_EQUAL(
+        HexStr(derive(1, 0, 0)),
+        "5fcd4c6b875d5292ecae823e08a685105eba06b572f5d56620ee7f79f8a5abba");
+
+    // Index separation.
+    BOOST_CHECK_EQUAL(
+        HexStr(derive(0, 0, 1)),
+        "c22212b81e5776b92b8cc68e89f549ee90331c1bf94feb3e3862ddd10306a23c");
+
+    // Branch byte is strictly 0 or 1.
+    BOOST_CHECK(
+        !DeriveMercaturaPQChildSeed(
+            master_seed,
+            genesis_hash,
+            0,
+            2,
+            0).has_value());
+
+    // Network/genesis separation.
+    std::array<unsigned char, 32> other_genesis_bytes{};
+    for (size_t i = 0; i < other_genesis_bytes.size(); ++i) {
+        other_genesis_bytes[i] = static_cast<unsigned char>(0x40 + i);
+    }
+
+    const uint256 other_genesis_hash{
+        std::span<const unsigned char>{other_genesis_bytes}
+    };
+
+    const auto other_network = DeriveMercaturaPQChildSeed(
+        master_seed,
+        other_genesis_hash,
+        0,
+        0,
+        0);
+
+    BOOST_REQUIRE(other_network.has_value());
+
+    BOOST_CHECK_EQUAL(
+        HexStr(*other_network),
+        "f280f0d1f51c03a40521a37946a33837053fa0022720a7bbae18d0f4eccb674d");
+
+    BOOST_CHECK(*other_network != derive(0, 0, 0));
+}
+
+BOOST_AUTO_TEST_CASE(mercatura_hkdf_sha3_384_l32_tests)
+{
+    std::array<unsigned char, 32> ikm{};
+    for (size_t i = 0; i < ikm.size(); ++i) {
+        ikm[i] = static_cast<unsigned char>(i);
+    }
+
+    const std::string salt_text{"Mercatura/PQWalletMaster/v1"};
+    const std::vector<unsigned char> salt{
+        salt_text.begin(),
+        salt_text.end()
+    };
+
+    std::vector<unsigned char> info;
+
+    const std::string info_tag{"Mercatura/MLDSA65Key/v1"};
+    info.insert(info.end(), info_tag.begin(), info_tag.end());
+
+    info.push_back(0x00);
+
+    for (unsigned int i = 32; i < 64; ++i) {
+        info.push_back(static_cast<unsigned char>(i));
+    }
+
+    // account = 0, little endian
+    info.insert(info.end(), {0x00, 0x00, 0x00, 0x00});
+
+    // branch = external/receive
+    info.push_back(0x00);
+
+    // index = 0, little endian
+    info.insert(info.end(), {0x00, 0x00, 0x00, 0x00});
+
+    CHKDF_HMAC_SHA3_384_L32 hkdf{ikm, salt};
+
+    BOOST_CHECK_EQUAL(
+        HexStr(hkdf.GetPRK()),
+        "0fa61af4e2a7c9a572bcf5b67443566a9c367a2e4148295e515964c105d44b8c"
+        "0354aa88d98c9f2a3a548d6288f5dc01");
+
+    std::array<unsigned char, CHKDF_HMAC_SHA3_384_L32::OUTPUT_SIZE> child{};
+    hkdf.Expand32(info, child);
+
+    BOOST_CHECK_EQUAL(
+        HexStr(child),
+        "0be624be1e03a6fd1e078d25352115a74aca5696e332ab7e23e5dd019b784484");
+}
+
 BOOST_AUTO_TEST_CASE(hkdf_hmac_sha256_l32_tests)
 {
     // Use rfc5869 test vectors but truncated to 32 bytes (our implementation only support length 32)
@@ -1112,6 +1280,28 @@ void CryptoTest::TestSHA3_256(const std::string& input, const std::string& outpu
     BOOST_CHECK(std::equal(std::begin(out_bytes), std::end(out_bytes), out));
 }
 
+
+void CryptoTest::TestSHA3_384(const std::string& input, const std::string& output)
+{
+    const auto in_bytes = ParseHex(input);
+    const auto out_bytes = ParseHex(output);
+
+    SHA3_384 sha;
+    // Hash the whole thing.
+    unsigned char out[SHA3_384::OUTPUT_SIZE];
+    sha.Write(in_bytes).Finalize(out);
+    assert(out_bytes.size() == sizeof(out));
+    BOOST_CHECK(std::equal(std::begin(out_bytes), std::end(out_bytes), out));
+
+    // Reset and split randomly in 3.
+    sha.Reset();
+    int s1 = m_rng.randrange(in_bytes.size() + 1);
+    int s2 = m_rng.randrange(in_bytes.size() + 1 - s1);
+    int s3 = in_bytes.size() - s1 - s2;
+    sha.Write(std::span{in_bytes}.first(s1)).Write(std::span{in_bytes}.subspan(s1, s2));
+    sha.Write(std::span{in_bytes}.last(s3)).Finalize(out);
+    BOOST_CHECK(std::equal(std::begin(out_bytes), std::end(out_bytes), out));
+}
 
 void CryptoTest::TestSHA3_512(const std::string& input, const std::string& output)
 {
@@ -1330,6 +1520,86 @@ BOOST_AUTO_TEST_CASE(mercahash_v1_vectors)
     BOOST_CHECK(
         diagnostics.binding_reference_distance_max <
         mercahash::BIND_BLOCK_COUNT);
+}
+
+BOOST_AUTO_TEST_CASE(mercatura_pqkey_commitment_tests)
+{
+    std::vector<unsigned char> public_key(1952);
+
+    for (size_t i = 0; i < public_key.size(); ++i) {
+        public_key[i] = static_cast<unsigned char>(i & 0xff);
+    }
+
+    MercaturaPQKeyCommitment commitment{};
+
+    BOOST_REQUIRE(
+        ComputeMercaturaPQKeyCommitmentV1(
+            commitment,
+            public_key));
+
+    BOOST_CHECK_EQUAL(
+        HexStr(commitment),
+        "459fdc66a6115ae17d6e535b263b2657a5f90d32931e08a68461bf1709b0dd6f");
+
+    auto changed_key = public_key;
+    changed_key[1000] ^= 0x01;
+
+    MercaturaPQKeyCommitment changed_commitment{};
+
+    BOOST_REQUIRE(
+        ComputeMercaturaPQKeyCommitmentV1(
+            changed_commitment,
+            changed_key));
+
+    BOOST_CHECK(commitment != changed_commitment);
+
+    auto short_key = public_key;
+    short_key.pop_back();
+
+    BOOST_CHECK(
+        !ComputeMercaturaPQKeyCommitmentV1(
+            commitment,
+            short_key));
+
+    auto long_key = public_key;
+    long_key.push_back(0x00);
+
+    BOOST_CHECK(
+        !ComputeMercaturaPQKeyCommitmentV1(
+            commitment,
+            long_key));
+}
+
+BOOST_AUTO_TEST_CASE(mercatura_pqhash_tests)
+{
+    const std::vector<unsigned char> empty{};
+    const auto abc = ParseHex("616263");
+    const auto sequence = ParseHex("00010203040506070809");
+    const std::string long_tag(253, 'A');
+
+    BOOST_CHECK_EQUAL(HexStr(PQH384("Mercatura/PQAuth/v1/Final", empty)), "d2b6410b6f3aea2e8d19a4977df6157276a9315696f66f8ee5ef02c508a20519b7d6e3924327f75ce66e3be92baf4183");
+
+    BOOST_CHECK_EQUAL(HexStr(PQH384("Mercatura/PQAuth/v1/Final", abc)), "cdb60738dab477602d0059fcc32d5b3551652da673bc92a11790cb8a31092f3c6a1f4bc7af0beef8a9f944e426108b62");
+
+    BOOST_CHECK_EQUAL(HexStr(PQH384("Mercatura/PQAuth/v1/Prevouts", sequence)), "5e41196066f64833aa0b3bc9de1bf6db11973d17481db744a7773609f3bc5e37225f48078a13040a0ccecbfeda44d95e");
+
+    BOOST_CHECK_EQUAL(HexStr(PQH384(long_tag, abc)), "7cb2fbb1a2cf1e4fc7616c9e51a52ed97d50dd065d2231a1c148730d721ad30796ddc19b39ba9557f1f60d3810123b07");
+
+}
+
+BOOST_AUTO_TEST_CASE(sha3_384_tests)
+{
+    // SHA3-384 known-answer vectors.
+    TestSHA3_384("", "0c63a75b845e4f7d01107d852e4c2485c51a50aaaa94fc61995e71bbee983a2ac3713831264adb47fb6bd1e058d5f004");
+
+    TestSHA3_384("616263", "ec01498288516fc926459f58e2c6ad8df9b473cb0fc08c2596da7cf0e49be4b298d88cea927ac7f539f1edf228376d25");
+
+    TestSHA3_384(std::string(206, '0'), "11c556552dda63418669716bad02e4125f4973f3ceea99ee50b6ff117e9f7a3fed0360abb5eff4ac8e954205c01981d2");
+
+    TestSHA3_384(std::string(208, '0'), "aaed6beb61b1f9a9b469d38a27a35edde7f676f4603e67f5424c7588043b869ebbfcfc3ecee2ae6f5ecfaf7f706c49e3");
+
+    TestSHA3_384(std::string(210, '0'), "7db7a10350831a0b3c8c94a138a301858dd8c6d589cd1b47f6720f9243162f952161ae945ec8cf7a838d02cfbcc762ee");
+
 }
 
 BOOST_AUTO_TEST_CASE(sha3_512_tests)

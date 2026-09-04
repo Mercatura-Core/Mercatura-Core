@@ -320,7 +320,7 @@ std::vector<CTransactionRef> CreateBigSigOpsCluster(const CTransactionRef& first
     // block sigops > limit: 1000 CHECKMULTISIG + 1
     tx.vin.resize(1);
     // NOTE: OP_NOP is used to force 20 SigOps for the CHECKMULTISIG
-    tx.vin[0].scriptSig = CScript() << OP_0 << OP_0 << OP_CHECKSIG << OP_1;
+    tx.vin[0].scriptSig = CScript() << OP_0 << OP_IF << OP_CHECKSIG << OP_ENDIF << OP_1;
     tx.vin[0].prevout.hash = first_tx->GetHash();
     tx.vin[0].prevout.n = 0;
     tx.vout.resize(50);
@@ -637,29 +637,15 @@ void MinerTestingSetup::TestBasicMining(const CScript& scriptPubKey, const std::
     tx.vin[0].nSequence = CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG | 1;
     BOOST_CHECK(!TestSequenceLocks(CTransaction{tx}, tx_mempool)); // Sequence locks fail
 
-    auto block_template = mining->createNewBlock(options, /*cooldown=*/false);
-    BOOST_REQUIRE(block_template);
+    // Mercatura activates BIP68/CSV from genesis. The relative-locked
+    // transactions above were deliberately inserted into the mempool while
+    // still failing sequence locks. Template self-validation must therefore
+    // reject this inconsistent mempool state.
+    BOOST_CHECK_EXCEPTION(
+        mining->createNewBlock(options, /*cooldown=*/false),
+        std::runtime_error,
+        HasReason("bad-txns-nonfinal"));
 
-    // None of the of the absolute height/time locked tx should have made
-    // it into the template because we still check IsFinalTx in CreateNewBlock,
-    // but relative locked txs will if inconsistently added to mempool.
-    // For now these will still generate a valid template until BIP68 soft fork
-    CBlock block{block_template->getBlock()};
-    BOOST_CHECK_EQUAL(block.vtx.size(), 3U);
-    // However if we advance height by 1 and time by SEQUENCE_LOCK_TIME, all of them should be mined
-    for (int i = 0; i < CBlockIndex::nMedianTimeSpan; ++i) {
-        CBlockIndex* ancestor{Assert(m_node.chainman->ActiveChain().Tip()->GetAncestor(m_node.chainman->ActiveChain().Tip()->nHeight - i))};
-        ancestor->nTime += SEQUENCE_LOCK_TIME; // Trick the MedianTimePast
-    }
-    ShiftActiveTipHeightForTest(
-        *Assert(m_node.chainman->ActiveChain().Tip()),
-        +1);
-    SetMockTime(m_node.chainman->ActiveChain().Tip()->GetMedianTimePast() + 1);
-
-    block_template = mining->createNewBlock(options, /*cooldown=*/false);
-    BOOST_REQUIRE(block_template);
-    block = block_template->getBlock();
-    BOOST_CHECK_EQUAL(block.vtx.size(), 5U);
 }
 
 void MinerTestingSetup::TestPrioritisedMining(const CScript& scriptPubKey, const std::vector<CTransactionRef>& txFirst)
@@ -844,17 +830,24 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 
             txCoinbase.version = 1;
             txCoinbase.vin[0].scriptSig = CScript{} << (current_height + 1) << bi.extranonce;
-            // Preserve the deterministic coinbase shape historically used
-            // by this fixture.
-            txCoinbase.vout.resize(1);
+
+            // Keep the generated witness commitment output intact. Only make
+            // the payout output script deterministic for this fixture.
             txCoinbase.vout[0].scriptPubKey = CScript();
-            block.vtx[0] = MakeTransactionRef(txCoinbase);
+
+            // Rebuild the modified block exactly as the mining submission path
+            // does. This also clears cached merkle/witness/block validation state.
+            node::AddMerkleRootAndCoinbase(
+                block,
+                MakeTransactionRef(txCoinbase),
+                block.nVersion,
+                block.nTime,
+                bi.nonce_start);
+
             if (txFirst.size() == 0)
                 baseheight = current_height;
             if (txFirst.size() < 4)
                 txFirst.push_back(block.vtx[0]);
-            block.hashMerkleRoot = BlockMerkleRoot(block);
-            block.nNonce = bi.nonce_start;
         }
 
         // The inherited nonce is only a deterministic starting point. Search
@@ -895,9 +888,6 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 
     TestBasicMining(scriptPubKey, txFirst, baseheight);
 
-    ShiftActiveTipHeightForTest(
-        *Assert(m_node.chainman->ActiveChain().Tip()),
-        -1);
     SetMockTime(0);
 
     TestPackageSelection(scriptPubKey, txFirst);

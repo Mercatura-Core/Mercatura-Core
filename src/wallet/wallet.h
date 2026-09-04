@@ -29,6 +29,7 @@
 #include <util/string.h>
 #include <util/time.h>
 #include <util/ui_change_type.h>
+#include <wallet/mercatura_pqwallet.h>
 #include <wallet/crypter.h>
 #include <wallet/db.h>
 #include <wallet/scriptpubkeyman.h>
@@ -452,6 +453,34 @@ private:
     //! Update mempool conflicts for TRUC sibling transactions
     void UpdateTrucSiblingConflicts(const CWalletTx& parent_wtx, const Txid& child_txid, bool add_conflict) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
+    /**
+     * Mercatura PQ Authorization v1 wallet state.
+     *
+     * The authoritative secret is one 32-byte master seed. Expanded
+     * ML-DSA secret keys are derived material and are never authoritative
+     * wallet records.
+     */
+    std::optional<MercaturaPQWalletState> m_mercatura_pq_state
+        GUARDED_BY(cs_wallet);
+
+    CKeyingMaterial m_mercatura_pq_master_seed
+        GUARDED_BY(cs_wallet);
+
+    MercaturaPQCryptedSeed m_mercatura_pq_crypted_seed
+        GUARDED_BY(cs_wallet);
+
+
+    /**
+     * Public ownership index for Mercatura PQ outputs.
+     *
+     * Maps the exact 32-byte witness-v2 key commitment to the
+     * deterministic derivation location needed to reconstruct the
+     * ML-DSA key when signing.
+     */
+    std::map<MercaturaPQKeyCommitment, MercaturaPQKeyLocator>
+        m_mercatura_pq_key_locators
+        GUARDED_BY(cs_wallet);
+
 public:
     /**
      * Main wallet lock.
@@ -473,6 +502,8 @@ public:
     MasterKeyMap mapMasterKeys;
     unsigned int nMasterKeyMaxID = 0;
 
+
+
     /** Construct wallet with specified name and database implementation. */
     CWallet(interfaces::Chain* chain, const std::string& name, std::unique_ptr<WalletDatabase> database)
         : m_chain(chain),
@@ -489,6 +520,69 @@ public:
 
     bool IsLocked() const override;
     bool Lock();
+
+
+    bool InitializeMercaturaPQWallet()
+        EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
+    bool LoadMercaturaPQState(
+        const MercaturaPQWalletState& state)
+        EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
+    bool LoadMercaturaPQSeed(
+        const CKeyingMaterial& seed)
+        EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
+    bool LoadMercaturaPQCryptedSeed(
+        const MercaturaPQCryptedSeed& crypted_seed)
+        EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
+
+    bool LoadMercaturaPQKeyLocator(
+        const MercaturaPQKeyCommitment& commitment,
+        const MercaturaPQKeyLocator& locator)
+        EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
+    bool HasMercaturaPQKeyCommitment(
+        const MercaturaPQKeyCommitment& commitment) const
+        EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
+    std::optional<MercaturaPQKeyLocator>
+    GetMercaturaPQKeyLocator(
+        const MercaturaPQKeyCommitment& commitment) const
+        EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
+    size_t GetMercaturaPQKeyLocatorCount() const
+        EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
+    bool ValidateMercaturaPQKeyLocators() const
+        EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
+    bool HasMercaturaPQState() const
+        EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
+    const MercaturaPQWalletState& GetMercaturaPQState() const
+        EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
+    bool HasMercaturaPQPlaintextSeed() const
+        EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
+
+    bool WithMercaturaPQMasterSeed(
+        std::function<bool(const CKeyingMaterial&)> cb) const;
+
+
+    /**
+     * Derive and persist one new Mercatura PQ destination.
+     *
+     * internal = false -> branch 0 / receive
+     * internal = true  -> branch 1 / change
+     *
+     * An encrypted wallet must be unlocked because Mercatura PQ v1
+     * intentionally has no public-child/xpub derivation.
+     */
+    util::Result<CTxDestination>
+    GetNewMercaturaPQDestination(bool internal);
 
     /** Interface to assert chain access */
     bool HaveChain() const { return m_chain ? true : false; }
@@ -656,7 +750,7 @@ public:
 
     OutputType TransactionChangeType(const std::optional<OutputType>& change_type, const std::vector<CRecipient>& vecSend) const;
 
-    /** Fetch the inputs and sign with SIGHASH_ALL. */
+    /** Fetch the inputs and sign using the wallet default signing mode. */
     bool SignTransaction(CMutableTransaction& tx) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     /** Sign the tx given the input coins and sighash. */
     bool SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors) const;

@@ -6,6 +6,7 @@
 #include <coins.h>
 #include <consensus/consensus.h>
 #include <consensus/tx_verify.h>
+#include <crypto/mercatura_pqkey.h>
 #include <key.h>
 #include <pubkey.h>
 #include <script/interpreter.h>
@@ -139,7 +140,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
         // is not accurate.
         assert(GetTransactionSigOpCost(CTransaction(creationTx), coins, flags) == MAX_PUBKEYS_PER_MULTISIG * WITNESS_SCALE_FACTOR);
         // Sanity check: script verification fails because of an invalid signature.
-        assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_CHECKMULTISIGVERIFY);
+        assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_BAD_OPCODE);
     }
 
     // Multisig nested in P2SH
@@ -150,7 +151,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, CScriptWitness());
         assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags) == 2 * WITNESS_SCALE_FACTOR);
-        assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_CHECKMULTISIGVERIFY);
+        assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_BAD_OPCODE);
 
         // P2SH sigops are not counted if we don't set the SCRIPT_VERIFY_P2SH flag
         assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, /*flags=*/0) == 0);
@@ -171,7 +172,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
         assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags & ~SCRIPT_VERIFY_WITNESS) == 0);
         assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_EQUALVERIFY);
 
-        // The sig op cost for witness version != 0 is zero.
+        // This inherited witness-v1 fixture has zero sigop cost.
         assert(scriptPubKey[0] == 0x00);
         scriptPubKey[0] = 0x51;
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, scriptWitness);
@@ -182,6 +183,130 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
         // The witness of a coinbase transaction is not taken into account.
         spendingTx.vin[0].prevout.SetNull();
         assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags) == 0);
+    }
+
+    // Mercatura PQ Authorization v1 native witness-v2 program.
+    {
+        const std::vector<unsigned char> pq_program(
+            MERCATURA_PQ_KEY_COMMITMENT_SIZE,
+            0x42);
+
+        const CScript scriptPubKey{
+            CScript() << OP_2 << pq_program
+        };
+
+        const CScript scriptSig;
+        const CScriptWitness scriptWitness;
+
+        BuildTxs(
+            spendingTx,
+            coins,
+            creationTx,
+            scriptPubKey,
+            scriptSig,
+            scriptWitness);
+
+        // One native Mercatura PQ input consumes four inherited
+        // sigop-cost units, regardless of whether its witness is
+        // actually valid.
+        assert(
+            GetTransactionSigOpCost(
+                CTransaction(spendingTx),
+                coins,
+                flags) ==
+            MERCATURA_PQ_SIGOPS_COST);
+
+        // Witness resource accounting remains gated by
+        // SCRIPT_VERIFY_WITNESS.
+        assert(
+            GetTransactionSigOpCost(
+                CTransaction(spendingTx),
+                coins,
+                flags & ~SCRIPT_VERIFY_WITNESS) == 0);
+
+        // Add a second distinct PQ UTXO and spend both.
+        CMutableTransaction secondCreationTx{
+            creationTx
+        };
+
+        secondCreationTx.vout[0].nValue = 2;
+
+        AddCoins(
+            coins,
+            CTransaction(secondCreationTx),
+            0);
+
+        spendingTx.vin.push_back(
+            spendingTx.vin[0]);
+
+        spendingTx.vin[1].prevout.hash =
+            secondCreationTx.GetHash();
+
+        spendingTx.vin[1].prevout.n = 0;
+
+        assert(
+            GetTransactionSigOpCost(
+                CTransaction(spendingTx),
+                coins,
+                flags) ==
+            2 * MERCATURA_PQ_SIGOPS_COST);
+
+        // Coinbase transactions never consume witness sigop cost.
+        spendingTx.vin.resize(1);
+        spendingTx.vin[0].prevout.SetNull();
+
+        assert(
+            GetTransactionSigOpCost(
+                CTransaction(spendingTx),
+                coins,
+                flags) == 0);
+
+        // Witness-v2 is Mercatura PQ only at exactly 32 bytes.
+        // Other program lengths are consensus-invalid elsewhere
+        // and must not be treated as ML-DSA verification work here.
+        const std::vector<unsigned char> short_program(
+            MERCATURA_PQ_KEY_COMMITMENT_SIZE - 1,
+            0x42);
+
+        const CScript shortScriptPubKey{
+            CScript() << OP_2 << short_program
+        };
+
+        BuildTxs(
+            spendingTx,
+            coins,
+            creationTx,
+            shortScriptPubKey,
+            scriptSig,
+            scriptWitness);
+
+        assert(
+            GetTransactionSigOpCost(
+                CTransaction(spendingTx),
+                coins,
+                flags) == 0);
+
+        const std::vector<unsigned char> long_program(
+            MERCATURA_PQ_KEY_COMMITMENT_SIZE + 1,
+            0x42);
+
+        const CScript longScriptPubKey{
+            CScript() << OP_2 << long_program
+        };
+
+        BuildTxs(
+            spendingTx,
+            coins,
+            creationTx,
+            longScriptPubKey,
+            scriptSig,
+            scriptWitness);
+
+        assert(
+            GetTransactionSigOpCost(
+                CTransaction(spendingTx),
+                coins,
+                flags) == 0);
     }
 
     // P2WPKH nested in P2SH
@@ -211,7 +336,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, scriptWitness);
         assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags) == 2);
         assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags & ~SCRIPT_VERIFY_WITNESS) == 0);
-        assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_CHECKMULTISIGVERIFY);
+        assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_BAD_OPCODE);
     }
 
     // P2WSH nested in P2SH
@@ -227,7 +352,7 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig, scriptWitness);
         assert(GetTransactionSigOpCost(CTransaction(spendingTx), coins, flags) == 2);
-        assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_CHECKMULTISIGVERIFY);
+        assert(VerifyWithFlag(CTransaction(creationTx), spendingTx, flags) == SCRIPT_ERR_BAD_OPCODE);
     }
 }
 

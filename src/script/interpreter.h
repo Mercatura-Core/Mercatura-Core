@@ -7,6 +7,7 @@
 #define BITCOIN_SCRIPT_INTERPRETER_H
 
 #include <consensus/amount.h>
+#include <crypto/mercatura_pqhash.h>
 #include <hash.h>
 #include <primitives/transaction.h>
 #include <script/script_error.h> // IWYU pragma: export
@@ -172,6 +173,15 @@ struct PrecomputedTransactionData
     //! Whether the 5 fields above are initialized.
     bool m_bip341_taproot_ready = false;
 
+    // Mercatura PQ Authorization v1 precomputed data.
+    MercaturaPQHash384 m_pq_prevouts_hash{};
+    MercaturaPQHash384 m_pq_amounts_hash{};
+    MercaturaPQHash384 m_pq_scriptpubkeys_hash{};
+    MercaturaPQHash384 m_pq_sequences_hash{};
+    MercaturaPQHash384 m_pq_outputs_hash{};
+    //! Whether all five PQ Authorization v1 fields above are initialized.
+    bool m_pq_ready = false;
+
     // BIP143 precomputed data (double-SHA256).
     uint256 hashPrevouts, hashSequence, hashOutputs;
     //! Whether the 3 fields above are initialized.
@@ -237,6 +247,7 @@ struct ScriptExecutionData
 static constexpr size_t WITNESS_V0_SCRIPTHASH_SIZE = 32;
 static constexpr size_t WITNESS_V0_KEYHASH_SIZE = 20;
 static constexpr size_t WITNESS_V1_TAPROOT_SIZE = 32;
+static constexpr size_t WITNESS_V2_MERCATURA_PQ_SIZE = 32;
 
 static constexpr uint8_t TAPROOT_LEAF_MASK = 0xfe;
 static constexpr uint8_t TAPROOT_LEAF_TAPSCRIPT = 0xc0;
@@ -284,6 +295,14 @@ public:
         return false;
     }
 
+    virtual bool CheckMercaturaPQSignature(
+        std::span<const unsigned char> sig,
+        std::span<const unsigned char> pubkey,
+        ScriptError* serror = nullptr) const
+    {
+        return false;
+    }
+
     virtual bool CheckLockTime(const CScriptNum& nLockTime) const
     {
          return false;
@@ -309,6 +328,24 @@ enum class MissingDataBehavior
 template<typename T>
 bool SignatureHashSchnorr(uint256& hash_out, ScriptExecutionData& execdata, const T& tx_to, uint32_t in_pos, uint8_t hash_type, SigVersion sigversion, const PrecomputedTransactionData& cache, MissingDataBehavior mdb);
 
+/**
+ * Compute Mercatura PQ Authorization v1's 48-byte transaction authorization
+ * digest for one input.
+ */
+template <typename T>
+bool ComputeMercaturaPQAuthDigestV1(
+    MercaturaPQHash384& hash_out,
+    const T& tx_to,
+    uint32_t in_pos,
+    const uint256& genesis_hash,
+    const PrecomputedTransactionData& cache);
+
+bool CheckMercaturaPQWitnessStructureV1(
+    const CScriptWitness& witness,
+    const std::vector<unsigned char>& program,
+    bool is_p2sh,
+    ScriptError* serror);
+
 template <class T>
 class GenericTransactionSignatureChecker : public BaseSignatureChecker
 {
@@ -318,6 +355,7 @@ private:
     unsigned int nIn;
     const CAmount amount;
     const PrecomputedTransactionData* txdata;
+    std::optional<uint256> m_pq_genesis_hash;
     mutable SigHashCache m_sighash_cache;
 
 protected:
@@ -325,10 +363,38 @@ protected:
     virtual bool VerifySchnorrSignature(std::span<const unsigned char> sig, const XOnlyPubKey& pubkey, const uint256& sighash) const;
 
 public:
-    GenericTransactionSignatureChecker(const T* txToIn, unsigned int nInIn, const CAmount& amountIn, MissingDataBehavior mdb) : txTo(txToIn), m_mdb(mdb), nIn(nInIn), amount(amountIn), txdata(nullptr) {}
-    GenericTransactionSignatureChecker(const T* txToIn, unsigned int nInIn, const CAmount& amountIn, const PrecomputedTransactionData& txdataIn, MissingDataBehavior mdb) : txTo(txToIn), m_mdb(mdb), nIn(nInIn), amount(amountIn), txdata(&txdataIn) {}
+    GenericTransactionSignatureChecker(
+        const T* txToIn,
+        unsigned int nInIn,
+        const CAmount& amountIn,
+        MissingDataBehavior mdb,
+        std::optional<uint256> pq_genesis_hash = std::nullopt)
+        : txTo(txToIn),
+          m_mdb(mdb),
+          nIn(nInIn),
+          amount(amountIn),
+          txdata(nullptr),
+          m_pq_genesis_hash(pq_genesis_hash) {}
+
+    GenericTransactionSignatureChecker(
+        const T* txToIn,
+        unsigned int nInIn,
+        const CAmount& amountIn,
+        const PrecomputedTransactionData& txdataIn,
+        MissingDataBehavior mdb,
+        std::optional<uint256> pq_genesis_hash = std::nullopt)
+        : txTo(txToIn),
+          m_mdb(mdb),
+          nIn(nInIn),
+          amount(amountIn),
+          txdata(&txdataIn),
+          m_pq_genesis_hash(pq_genesis_hash) {}
     bool CheckECDSASignature(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion) const override;
     bool CheckSchnorrSignature(std::span<const unsigned char> sig, std::span<const unsigned char> pubkey, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror = nullptr) const override;
+    bool CheckMercaturaPQSignature(
+        std::span<const unsigned char> sig,
+        std::span<const unsigned char> pubkey,
+        ScriptError* serror = nullptr) const override;
     bool CheckLockTime(const CScriptNum& nLockTime) const override;
     bool CheckSequence(const CScriptNum& nSequence) const override;
 };
@@ -352,6 +418,14 @@ public:
     bool CheckSchnorrSignature(std::span<const unsigned char> sig, std::span<const unsigned char> pubkey, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror = nullptr) const override
     {
         return m_checker.CheckSchnorrSignature(sig, pubkey, sigversion, execdata, serror);
+    }
+
+    bool CheckMercaturaPQSignature(
+        std::span<const unsigned char> sig,
+        std::span<const unsigned char> pubkey,
+        ScriptError* serror = nullptr) const override
+    {
+        return m_checker.CheckMercaturaPQSignature(sig, pubkey, serror);
     }
 
     bool CheckLockTime(const CScriptNum& nLockTime) const override

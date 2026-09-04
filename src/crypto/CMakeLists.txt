@@ -17,6 +17,13 @@ add_library(bitcoin_crypto STATIC EXCLUDE_FROM_ALL
   sha256.cpp
   sha256_sse4.cpp
   mercahash.cpp
+  mercatura_mldsa.c
+  mercatura_pqderive.cpp
+  hmac_sha3_384.cpp
+  hkdf_sha3_384.cpp
+  mercatura_pqhash.cpp
+  mercatura_pqkey.cpp
+  mldsa_native/mldsa/mldsa_native.c
   sha3.cpp
   sha512.cpp
   siphash.cpp
@@ -27,6 +34,12 @@ target_link_libraries(bitcoin_crypto
   PRIVATE
     core_interface
 )
+
+target_include_directories(bitcoin_crypto PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/mldsa_native/mldsa)
+
+set_property(SOURCE mercatura_mldsa.c APPEND PROPERTY COMPILE_DEFINITIONS MLD_CONFIG_PARAMETER_SET=65)
+
+set_property(SOURCE mldsa_native/mldsa/mldsa_native.c APPEND PROPERTY COMPILE_DEFINITIONS MLD_CONFIG_PARAMETER_SET=65 MLD_CONFIG_CORE_API_ONLY)
 
 if(HAVE_SSE41)
   target_compile_definitions(bitcoin_crypto PRIVATE ENABLE_SSE41)

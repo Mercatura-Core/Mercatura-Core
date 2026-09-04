@@ -149,7 +149,8 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
                        const CCoinsViewCache& inputs, script_verify_flags flags, bool cacheSigStore,
                        bool cacheFullScriptStore, PrecomputedTransactionData& txdata,
                        ValidationCache& validation_cache,
-                       std::vector<CScriptCheck>* pvChecks = nullptr)
+                       std::vector<CScriptCheck>* pvChecks = nullptr,
+                       std::optional<uint256> pq_genesis_hash = std::nullopt)
                        EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
 bool CheckFinalTxAtTip(const CBlockIndex& active_chain_tip, const CTransaction& tx)
@@ -403,7 +404,7 @@ void Chainstate::MaybeUpdateMempoolForReorg(
 static bool CheckInputsFromMempoolAndCache(const CTransaction& tx, TxValidationState& state,
                 const CCoinsViewCache& view, const CTxMemPool& pool,
                 script_verify_flags flags, PrecomputedTransactionData& txdata, CCoinsViewCache& coins_tip,
-                ValidationCache& validation_cache)
+                ValidationCache& validation_cache, const uint256& pq_genesis_hash)
                 EXCLUSIVE_LOCKS_REQUIRED(cs_main, pool.cs)
 {
     AssertLockHeld(cs_main);
@@ -435,7 +436,17 @@ static bool CheckInputsFromMempoolAndCache(const CTransaction& tx, TxValidationS
     }
 
     // Call CheckInputScripts() to cache signature and script validity against current tip consensus rules.
-    return CheckInputScripts(tx, state, view, flags, /* cacheSigStore= */ true, /* cacheFullScriptStore= */ true, txdata, validation_cache);
+    return CheckInputScripts(
+        tx,
+        state,
+        view,
+        flags,
+        /* cacheSigStore= */ true,
+        /* cacheFullScriptStore= */ true,
+        txdata,
+        validation_cache,
+        nullptr,
+        pq_genesis_hash);
 }
 
 namespace {
@@ -1148,7 +1159,17 @@ bool MemPoolAccept::PolicyScriptChecks(const ATMPArgs& args, Workspace& ws)
 
     // Check input scripts and signatures.
     // This is done last to help prevent CPU exhaustion denial-of-service attacks.
-    if (!CheckInputScripts(tx, state, m_view, scriptVerifyFlags, true, false, ws.m_precomputed_txdata, GetValidationCache())) {
+    if (!CheckInputScripts(
+            tx,
+            state,
+            m_view,
+            scriptVerifyFlags,
+            true,
+            false,
+            ws.m_precomputed_txdata,
+            GetValidationCache(),
+            nullptr,
+            args.m_chainparams.GetConsensus().hashGenesisBlock)) {
         // Detect a failure due to a missing witness so that p2p code can handle rejection caching appropriately.
         if (!tx.HasWitness() && SpendsNonAnchorWitnessProg(tx, m_view)) {
             state.Invalid(TxValidationResult::TX_WITNESS_STRIPPED,
@@ -1184,8 +1205,16 @@ bool MemPoolAccept::ConsensusScriptChecks(const ATMPArgs& args, Workspace& ws)
     // invalid blocks (using TestBlockValidity), however allowing such
     // transactions into the mempool can be exploited as a DoS attack.
     script_verify_flags currentBlockScriptVerifyFlags{GetBlockScriptFlags(*m_active_chainstate.m_chain.Tip(), m_active_chainstate.m_chainman)};
-    if (!CheckInputsFromMempoolAndCache(tx, state, m_view, m_pool, currentBlockScriptVerifyFlags,
-                                        ws.m_precomputed_txdata, m_active_chainstate.CoinsTip(), GetValidationCache())) {
+    if (!CheckInputsFromMempoolAndCache(
+            tx,
+            state,
+            m_view,
+            m_pool,
+            currentBlockScriptVerifyFlags,
+            ws.m_precomputed_txdata,
+            m_active_chainstate.CoinsTip(),
+            GetValidationCache(),
+            args.m_chainparams.GetConsensus().hashGenesisBlock)) {
         LogError("BUG! PLEASE REPORT THIS! CheckInputScripts failed against latest-block but not STANDARD flags %s, %s", hash.ToString(), state.ToString());
         return Assume(false);
     }
@@ -2007,7 +2036,20 @@ std::optional<std::pair<ScriptError, std::string>> CScriptCheck::operator()() {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
     const CScriptWitness *witness = &ptxTo->vin[nIn].scriptWitness;
     ScriptError error{SCRIPT_ERR_UNKNOWN_ERROR};
-    if (VerifyScript(scriptSig, m_tx_out.scriptPubKey, witness, m_flags, CachingTransactionSignatureChecker(ptxTo, nIn, m_tx_out.nValue, cacheStore, *m_signature_cache, *txdata), &error)) {
+    if (VerifyScript(
+            scriptSig,
+            m_tx_out.scriptPubKey,
+            witness,
+            m_flags,
+            CachingTransactionSignatureChecker(
+                ptxTo,
+                nIn,
+                m_tx_out.nValue,
+                cacheStore,
+                *m_signature_cache,
+                *txdata,
+                m_pq_genesis_hash),
+            &error)) {
         return std::nullopt;
     } else {
         auto debug_str = strprintf("input %i of %s (wtxid %s), spending %s:%i", nIn, ptxTo->GetHash().ToString(), ptxTo->GetWitnessHash().ToString(), ptxTo->vin[nIn].prevout.hash.ToString(), ptxTo->vin[nIn].prevout.n);
@@ -2054,7 +2096,8 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
                        const CCoinsViewCache& inputs, script_verify_flags flags, bool cacheSigStore,
                        bool cacheFullScriptStore, PrecomputedTransactionData& txdata,
                        ValidationCache& validation_cache,
-                       std::vector<CScriptCheck>* pvChecks)
+                       std::vector<CScriptCheck>* pvChecks,
+                       std::optional<uint256> pq_genesis_hash)
 {
     if (tx.IsCoinBase()) return true;
 
@@ -2069,7 +2112,20 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
     // transaction).
     uint256 hashCacheEntry;
     CSHA256 hasher = validation_cache.ScriptExecutionCacheHasher();
-    hasher.Write(UCharCast(tx.GetWitnessHash().begin()), 32).Write((unsigned char*)&flags, sizeof(flags)).Finalize(hashCacheEntry.begin());
+
+    hasher.Write(UCharCast(tx.GetWitnessHash().begin()), 32);
+    hasher.Write(reinterpret_cast<unsigned char*>(&flags), sizeof(flags));
+
+    const unsigned char pq_context_present{
+        static_cast<unsigned char>(pq_genesis_hash.has_value())
+    };
+    hasher.Write(&pq_context_present, 1);
+
+    if (pq_genesis_hash.has_value()) {
+        hasher.Write(pq_genesis_hash->begin(), 32);
+    }
+
+    hasher.Finalize(hashCacheEntry.begin());
     AssertLockHeld(cs_main); //TODO: Remove this requirement by making CuckooCache not require external locks
     if (validation_cache.m_script_execution_cache.contains(hashCacheEntry, !cacheFullScriptStore)) {
         return true;
@@ -2098,7 +2154,15 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
         // spent being checked as a part of CScriptCheck.
 
         // Verify signature
-        CScriptCheck check(txdata.m_spent_outputs[i], tx, validation_cache.m_signature_cache, i, flags, cacheSigStore, &txdata);
+        CScriptCheck check(
+            txdata.m_spent_outputs[i],
+            tx,
+            validation_cache.m_signature_cache,
+            i,
+            flags,
+            cacheSigStore,
+            &txdata,
+            pq_genesis_hash);
         if (pvChecks) {
             pvChecks->emplace_back(std::move(check));
         } else if (auto result = check(); result.has_value()) {
@@ -2243,14 +2307,8 @@ script_verify_flags GetBlockScriptFlags(const CBlockIndex& block_index, const Ch
 {
     const Consensus::Params& consensusparams = chainman.GetConsensus();
 
-    // BIP16 didn't become active until Apr 1 2012 (on mainnet, and
-    // retroactively applied to testnet)
-    // However, only one historical block violated the P2SH rules (on both
-    // mainnet and testnet).
-    // Similarly, only one historical block violated the TAPROOT rules on
-    // mainnet.
-    // For simplicity, always leave P2SH+WITNESS+TAPROOT on except for the two
-    // violating blocks.
+    // Mercatura enables P2SH, witness, and Taproot semantics from chain
+    // start. There are no inherited Bitcoin historical script exceptions.
     script_verify_flags flags{SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_TAPROOT};
     const auto it{consensusparams.script_flag_exceptions.find(*Assert(block_index.phashBlock))};
     if (it != consensusparams.script_flag_exceptions.end()) {
@@ -2598,10 +2656,30 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
             // they need to be added to control which runs them asynchronously. Otherwise, CheckInputScripts runs the checks before returning.
             if (control) {
                 std::vector<CScriptCheck> vChecks;
-                tx_ok = CheckInputScripts(tx, tx_state, view, flags, fCacheResults, fCacheResults, txsdata[i], m_chainman.m_validation_cache, &vChecks);
+                tx_ok = CheckInputScripts(
+                    tx,
+                    tx_state,
+                    view,
+                    flags,
+                    fCacheResults,
+                    fCacheResults,
+                    txsdata[i],
+                    m_chainman.m_validation_cache,
+                    &vChecks,
+                    m_chainman.GetConsensus().hashGenesisBlock);
                 if (tx_ok) control->Add(std::move(vChecks));
             } else {
-                tx_ok = CheckInputScripts(tx, tx_state, view, flags, fCacheResults, fCacheResults, txsdata[i], m_chainman.m_validation_cache);
+                tx_ok = CheckInputScripts(
+                    tx,
+                    tx_state,
+                    view,
+                    flags,
+                    fCacheResults,
+                    fCacheResults,
+                    txsdata[i],
+                    m_chainman.m_validation_cache,
+                    nullptr,
+                    m_chainman.GetConsensus().hashGenesisBlock);
             }
             if (!tx_ok) {
                 // Any transaction validation failure in ConnectBlock is a block consensus failure

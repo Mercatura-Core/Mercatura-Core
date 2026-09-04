@@ -65,10 +65,22 @@ public:
         return bech32::Encode(bech32::Encoding::BECH32M, m_params.Bech32HRP(), data);
     }
 
+    std::string operator()(const WitnessV2MercaturaPQ& pq) const
+    {
+        std::vector<unsigned char> data = {2};
+        data.reserve(53);
+        ConvertBits<8, 5, true>([&](unsigned char c) { data.push_back(c); }, pq.begin(), pq.end());
+        return bech32::Encode(bech32::Encoding::BECH32M, m_params.Bech32HRP(), data);
+    }
+
     std::string operator()(const WitnessUnknown& id) const
     {
         const std::vector<unsigned char>& program = id.GetWitnessProgram();
-        if (id.GetWitnessVersion() < 1 || id.GetWitnessVersion() > 16 || program.size() < 2 || program.size() > 40) {
+        if (id.GetWitnessVersion() < 1 ||
+            id.GetWitnessVersion() > 16 ||
+            id.GetWitnessVersion() == 2 ||
+            program.size() < 2 ||
+            program.size() > 40) {
             return {};
         }
         std::vector<unsigned char> data = {(unsigned char)id.GetWitnessVersion()};
@@ -179,6 +191,22 @@ CTxDestination DecodeDestination(const std::string& str, const CChainParams& par
                 WitnessV1Taproot tap;
                 std::copy(data.begin(), data.end(), tap.begin());
                 return tap;
+            }
+
+            if (version == 2) {
+                static_assert(WITNESS_V2_MERCATURA_PQ_SIZE == 32);
+
+                if (data.size() != WITNESS_V2_MERCATURA_PQ_SIZE) {
+                    error_str = strprintf(
+                        "Invalid Mercatura PQ witness-v2 program size (%d %s)",
+                        data.size(),
+                        byte_str);
+                    return CNoDestination();
+                }
+
+                WitnessV2MercaturaPQ pq;
+                std::copy(data.begin(), data.end(), pq.begin());
+                return pq;
             }
 
             if (CScript::IsPayToAnchor(version, data)) {

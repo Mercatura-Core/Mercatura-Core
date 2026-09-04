@@ -64,6 +64,7 @@ add_executable(fuzz
   merkle.cpp
   merkleblock.cpp
   message.cpp
+  mercatura_pq_witness.cpp
   miniscript.cpp
   minisketch.cpp
   mini_miner.cpp

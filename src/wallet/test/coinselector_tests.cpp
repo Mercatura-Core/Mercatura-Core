@@ -167,6 +167,12 @@ static std::unique_ptr<CWallet> NewWallet(const node::NodeContext& m_node, const
     LOCK(wallet->cs_wallet);
     wallet->SetWalletFlag(WALLET_FLAG_DESCRIPTORS);
     wallet->SetupDescriptorScriptPubKeyMans();
+
+    // Mercatura normal wallet destinations are native PQ witness-v2.
+    // These test helpers manually construct wallets and therefore bypass
+    // the ordinary wallet-creation path that initializes PQ wallet state.
+    BOOST_REQUIRE(wallet->InitializeMercaturaPQWallet());
+
     return wallet;
 }
 
@@ -1031,8 +1037,8 @@ BOOST_AUTO_TEST_CASE(coin_grinder_tests)
         const auto& res = CoinGrinder(target, dummy_params, m_node, max_selection_weight, [&](CWallet& wallet) {
             CoinsResult available_coins;
             for (int j = 0; j < 10; ++j) {
-                add_coin(available_coins, wallet, CAmount(1 * test_unit), CFeeRate(5000), 144, false, 0, true);
-                add_coin(available_coins, wallet, CAmount(2 * test_unit), CFeeRate(5000), 144, false, 0, true);
+                add_coin(available_coins, wallet, CAmount(1 * test_unit), CFeeRate(5000), 144, false, 0, true, 68);
+                add_coin(available_coins, wallet, CAmount(2 * test_unit), CFeeRate(5000), 144, false, 0, true, 68);
             }
             return available_coins;
         });
@@ -1049,10 +1055,10 @@ BOOST_AUTO_TEST_CASE(coin_grinder_tests)
         const auto& res = CoinGrinder(target, dummy_params, m_node, max_selection_weight, [&](CWallet& wallet) {
             CoinsResult available_coins;
             for (int j = 0; j < 60; ++j) { // 60 UTXO --> 19,8 BTC total --> 60 × 272 WU = 16320 WU
-                add_coin(available_coins, wallet, CAmount(0.33 * test_unit), CFeeRate(5000), 144, false, 0, true);
+                add_coin(available_coins, wallet, CAmount(0.33 * test_unit), CFeeRate(5000), 144, false, 0, true, 68);
             }
             for (int i = 0; i < 10; i++) { // 10 UTXO --> 20 BTC total --> 10 × 272 WU = 2720 WU
-                add_coin(available_coins, wallet, CAmount(2 * test_unit), CFeeRate(5000), 144, false, 0, true);
+                add_coin(available_coins, wallet, CAmount(2 * test_unit), CFeeRate(5000), 144, false, 0, true, 68);
             }
             return available_coins;
         });
@@ -1275,14 +1281,14 @@ BOOST_AUTO_TEST_CASE(srd_tests)
         // ###########################
         // 2) Test max weight exceeded
         // ###########################
-        CAmount target = 49.5L * COIN;
+        CAmount target = 29.5L * COIN;
         int max_selection_weight = 3000;
         const auto& res = SelectCoinsSRD(target, dummy_params, m_node, max_selection_weight, [&](CWallet& wallet) {
             CoinsResult available_coins;
             for (int j = 0; j < 10; ++j) {
                 /* 10 × 1 BTC + 10 × 2 BTC = 30 BTC. 20 × 272 WU = 5440 WU */
-                add_coin(available_coins, wallet, CAmount(1 * COIN), CFeeRate(0), 144, false, 0, true);
-                add_coin(available_coins, wallet, CAmount(2 * COIN), CFeeRate(0), 144, false, 0, true);
+                add_coin(available_coins, wallet, CAmount(1 * COIN), CFeeRate(0), 144, false, 0, true, 68);
+                add_coin(available_coins, wallet, CAmount(2 * COIN), CFeeRate(0), 144, false, 0, true, 68);
             }
             return available_coins;
         });
@@ -1299,10 +1305,10 @@ BOOST_AUTO_TEST_CASE(srd_tests)
         const auto& res = SelectCoinsSRD(target, dummy_params, m_node, max_selection_weight, [&](CWallet& wallet) {
             CoinsResult available_coins;
             for (int j = 0; j < 60; ++j) { // 60 UTXO --> 19,8 BTC total --> 60 × 272 WU = 16320 WU
-                add_coin(available_coins, wallet, CAmount(0.33 * COIN), CFeeRate(0), 144, false, 0, true);
+                add_coin(available_coins, wallet, CAmount(0.33 * COIN), CFeeRate(0), 144, false, 0, true, 68);
             }
             for (int i = 0; i < 10; i++) { // 10 UTXO --> 20 BTC total --> 10 × 272 WU = 2720 WU
-                add_coin(available_coins, wallet, CAmount(2 * COIN), CFeeRate(0), 144, false, 0, true);
+                add_coin(available_coins, wallet, CAmount(2 * COIN), CFeeRate(0), 144, false, 0, true, 68);
             }
             return available_coins;
         });
@@ -1368,10 +1374,10 @@ BOOST_AUTO_TEST_CASE(check_max_selection_weight)
             target, cs_params, cc, [&](CWallet& wallet) {
                 CoinsResult available_coins;
                 for (int j = 0; j < 1515; ++j) {
-                    add_coin(available_coins, wallet, CAmount(33 * test_unit / 1000), CFeeRate(0), 144, false, 0, true);
+                    add_coin(available_coins, wallet, CAmount(33 * test_unit / 1000), CFeeRate(0), 144, false, 0, true, 68);
                 }
 
-                add_coin(available_coins, wallet, CAmount(50 * test_unit), CFeeRate(0), 144, false, 0, true);
+                add_coin(available_coins, wallet, CAmount(50 * test_unit), CFeeRate(0), 144, false, 0, true, 68);
                 return available_coins;
             },
             m_node);
@@ -1394,10 +1400,10 @@ BOOST_AUTO_TEST_CASE(check_max_selection_weight)
             target, cs_params, cc, [&](CWallet& wallet) {
                 CoinsResult available_coins;
                 for (int j = 0; j < 400; ++j) {
-                    add_coin(available_coins, wallet, CAmount(test_unit / 16), CFeeRate(0), 144, false, 0, true);
+                    add_coin(available_coins, wallet, CAmount(test_unit / 16), CFeeRate(0), 144, false, 0, true, 68);
                 }
                 for (int j = 0; j < 2000; ++j) {
-                    add_coin(available_coins, wallet, CAmount(test_unit / 40), CFeeRate(0), 144, false, 0, true);
+                    add_coin(available_coins, wallet, CAmount(test_unit / 40), CFeeRate(0), 144, false, 0, true, 68);
                 }
                 return available_coins;
             },
@@ -1419,7 +1425,7 @@ BOOST_AUTO_TEST_CASE(check_max_selection_weight)
             target, cs_params, cc, [&](CWallet& wallet) {
                 CoinsResult available_coins;
                 for (int j = 0; j < 1515; ++j) {
-                    add_coin(available_coins, wallet, CAmount(33 * test_unit / 1000), CFeeRate(0), 144, false, 0, true);
+                    add_coin(available_coins, wallet, CAmount(33 * test_unit / 1000), CFeeRate(0), 144, false, 0, true, 68);
                 }
                 return available_coins;
             },

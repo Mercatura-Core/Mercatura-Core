@@ -6,6 +6,8 @@
 #ifndef BITCOIN_WALLET_WALLETDB_H
 #define BITCOIN_WALLET_WALLETDB_H
 
+#include <wallet/mercatura_pqwallet.h>
+#include <wallet/crypter.h>
 #include <key.h>
 #include <primitives/transaction_identifier.h>
 #include <script/sign.h>
@@ -71,6 +73,10 @@ extern const std::string KEY;
 extern const std::string KEYMETA;
 extern const std::string LOCKED_UTXO;
 extern const std::string MASTER_KEY;
+extern const std::string MERCATURA_PQ_STATE;
+extern const std::string MERCATURA_PQ_SEED;
+extern const std::string MERCATURA_PQ_CRYPTED_SEED;
+extern const std::string MERCATURA_PQ_KEY_LOCATOR;
 extern const std::string MINVERSION;
 extern const std::string NAME;
 extern const std::string OLD_KEY;
@@ -232,6 +238,17 @@ public:
     bool WriteCryptedKey(const CPubKey& vchPubKey, const std::vector<unsigned char>& vchCryptedSecret, const CKeyMetadata &keyMeta);
     bool WriteMasterKey(unsigned int nID, const CMasterKey& kMasterKey);
     bool EraseMasterKey(unsigned int id);
+
+    bool WriteMercaturaPQState(const MercaturaPQWalletState& state);
+    bool WriteMercaturaPQSeed(const CKeyingMaterial& seed);
+    bool EraseMercaturaPQSeed();
+    bool WriteMercaturaPQCryptedSeed(
+        const MercaturaPQCryptedSeed& crypted_seed);
+
+    bool WriteMercaturaPQKeyLocator(
+        const MercaturaPQKeyCommitment& commitment,
+        const MercaturaPQKeyLocator& locator);
+    bool EraseMercaturaPQCryptedSeed();
 
     bool WriteWatchOnly(const CScript &script, const CKeyMetadata &keymeta);
     bool EraseWatchOnly(const CScript &script);

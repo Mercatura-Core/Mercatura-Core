@@ -4,6 +4,15 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <wallet/wallet.h>
+#include <chainparams.h>
+#include <crypto/mercatura_mldsa.h>
+#include <crypto/mercatura_pqderive.h>
+#include <crypto/mercatura_pqkey.h>
+#include <limits>
+#include <algorithm>
+#include <crypto/sha256.h>
+#include <array>
+#include <span>
 
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 #include <addresstype.h>
@@ -429,6 +438,33 @@ std::shared_ptr<CWallet> CreateWallet(WalletContext& context, const std::string&
         return nullptr;
     }
 
+    // A wallet born encrypted was temporarily created with the
+    // blank-wallet flag. If the user did not actually request a
+    // blank wallet, initialize its PQ state before EncryptWallet()
+    // so the authoritative PQ seed is encrypted in the same initial
+    // wallet-encryption operation.
+    if (!create_blank &&
+        !(wallet_creation_flags &
+          WALLET_FLAG_DISABLE_PRIVATE_KEYS)) {
+        LOCK(wallet->cs_wallet);
+
+        if (!wallet->HasMercaturaPQState()) {
+            if (!wallet->InitializeMercaturaPQWallet()) {
+                error = Untranslated(
+                    "Error: Wallet created but Mercatura PQ initialization failed.");
+                status = DatabaseStatus::FAILED_CREATE;
+                return nullptr;
+            }
+        }
+
+        if (!wallet->HasMercaturaPQPlaintextSeed()) {
+            error = Untranslated(
+                "Error: Newly created Mercatura wallet is missing its PQ master seed.");
+            status = DatabaseStatus::FAILED_CREATE;
+            return nullptr;
+        }
+    }
+
     // Encrypt the wallet
     if (!passphrase.empty() && !(wallet_creation_flags & WALLET_FLAG_DISABLE_PRIVATE_KEYS)) {
         if (!wallet->EncryptWallet(passphrase)) {
@@ -601,6 +637,142 @@ static bool EncryptMasterKey(const SecureString& wallet_passphrase, const CKeyin
         return false;
     }
 
+    return true;
+}
+
+
+template <size_t N>
+static std::array<unsigned char, CSHA256::OUTPUT_SIZE>
+MercaturaPQWalletTaggedSHA256(
+    const char (&tag)[N],
+    std::span<const unsigned char> data)
+{
+    static_assert(N > 1);
+
+    std::array<unsigned char, CSHA256::OUTPUT_SIZE> tag_hash{};
+    std::array<unsigned char, CSHA256::OUTPUT_SIZE> result{};
+
+    CSHA256()
+        .Write(
+            reinterpret_cast<const unsigned char*>(tag),
+            N - 1)
+        .Finalize(tag_hash.data());
+
+    CSHA256()
+        .Write(tag_hash.data(), tag_hash.size())
+        .Write(tag_hash.data(), tag_hash.size())
+        .Write(data.data(), data.size())
+        .Finalize(result.data());
+
+    return result;
+}
+
+static std::array<unsigned char, CSHA256::OUTPUT_SIZE>
+ComputeMercaturaPQWalletSeedCheckV1(
+    std::span<const unsigned char> seed)
+{
+    static constexpr char TAG[]{
+        "Mercatura/PQWalletSeedCheck/v1"
+    };
+
+    return MercaturaPQWalletTaggedSHA256(TAG, seed);
+}
+
+static uint256 ComputeMercaturaPQWalletSeedEncryptionIVV1(
+    const std::array<unsigned char, CSHA256::OUTPUT_SIZE>& seed_check)
+{
+    static constexpr char TAG[]{
+        "Mercatura/PQWalletSeedEncryptionIV/v1"
+    };
+
+    const auto iv_hash{
+        MercaturaPQWalletTaggedSHA256(
+            TAG,
+            seed_check)
+    };
+
+    return uint256{
+        std::span<const unsigned char>{iv_hash}
+    };
+}
+
+static bool EncryptMercaturaPQMasterSeedV1(
+    const CKeyingMaterial& wallet_master_key,
+    const CKeyingMaterial& pq_master_seed,
+    MercaturaPQCryptedSeed& crypted_seed)
+{
+    if (pq_master_seed.size() !=
+        MERCATURA_PQ_WALLET_MASTER_SEED_SIZE) {
+        return false;
+    }
+
+    crypted_seed.seed_check =
+        ComputeMercaturaPQWalletSeedCheckV1(
+            pq_master_seed);
+
+    const uint256 iv{
+        ComputeMercaturaPQWalletSeedEncryptionIVV1(
+            crypted_seed.seed_check)
+    };
+
+    crypted_seed.ciphertext.clear();
+
+    return EncryptSecret(
+        wallet_master_key,
+        pq_master_seed,
+        iv,
+        crypted_seed.ciphertext);
+}
+
+static bool DecryptMercaturaPQMasterSeedV1(
+    const CKeyingMaterial& wallet_master_key,
+    const MercaturaPQCryptedSeed& crypted_seed,
+    CKeyingMaterial& pq_master_seed)
+{
+    if (!crypted_seed.IsStructurallyValid()) {
+        return false;
+    }
+
+    const uint256 iv{
+        ComputeMercaturaPQWalletSeedEncryptionIVV1(
+            crypted_seed.seed_check)
+    };
+
+    CKeyingMaterial plaintext;
+
+    if (!DecryptSecret(
+            wallet_master_key,
+            crypted_seed.ciphertext,
+            iv,
+            plaintext)) {
+        return false;
+    }
+
+    if (plaintext.size() !=
+        MERCATURA_PQ_WALLET_MASTER_SEED_SIZE) {
+        if (!plaintext.empty()) {
+            memory_cleanse(
+                plaintext.data(),
+                plaintext.size());
+            plaintext.clear();
+        }
+        return false;
+    }
+
+    const auto check{
+        ComputeMercaturaPQWalletSeedCheckV1(
+            plaintext)
+    };
+
+    if (check != crypted_seed.seed_check) {
+        memory_cleanse(
+            plaintext.data(),
+            plaintext.size());
+        plaintext.clear();
+        return false;
+    }
+
+    pq_master_seed = std::move(plaintext);
     return true;
 }
 
@@ -837,7 +1009,44 @@ bool CWallet::EncryptWallet(const SecureString& strWalletPassphrase)
             encrypted_batch = nullptr;
             return false;
         }
-        encrypted_batch->WriteMasterKey(nMasterKeyMaxID, master_key);
+        encrypted_batch->WriteMasterKey(
+            nMasterKeyMaxID,
+            master_key);
+
+        std::optional<MercaturaPQCryptedSeed>
+            new_pq_crypted_seed;
+
+        if (m_mercatura_pq_state.has_value()) {
+            if (m_mercatura_pq_master_seed.size() !=
+                    MERCATURA_PQ_WALLET_MASTER_SEED_SIZE ||
+                m_mercatura_pq_crypted_seed
+                    .IsStructurallyValid()) {
+                encrypted_batch->TxnAbort();
+                delete encrypted_batch;
+                encrypted_batch = nullptr;
+                return false;
+            }
+
+            MercaturaPQCryptedSeed crypted_seed;
+
+            if (!EncryptMercaturaPQMasterSeedV1(
+                    plain_master_key,
+                    m_mercatura_pq_master_seed,
+                    crypted_seed) ||
+                !encrypted_batch
+                     ->WriteMercaturaPQCryptedSeed(
+                         crypted_seed) ||
+                !encrypted_batch
+                     ->EraseMercaturaPQSeed()) {
+                encrypted_batch->TxnAbort();
+                delete encrypted_batch;
+                encrypted_batch = nullptr;
+                return false;
+            }
+
+            new_pq_crypted_seed =
+                std::move(crypted_seed);
+        }
 
         for (const auto& spk_man_pair : m_spk_managers) {
             auto spk_man = spk_man_pair.second.get();
@@ -861,6 +1070,18 @@ bool CWallet::EncryptWallet(const SecureString& strWalletPassphrase)
 
         delete encrypted_batch;
         encrypted_batch = nullptr;
+
+        if (new_pq_crypted_seed.has_value()) {
+            m_mercatura_pq_crypted_seed =
+                std::move(*new_pq_crypted_seed);
+
+            if (!m_mercatura_pq_master_seed.empty()) {
+                memory_cleanse(
+                    m_mercatura_pq_master_seed.data(),
+                    m_mercatura_pq_master_seed.size());
+                m_mercatura_pq_master_seed.clear();
+            }
+        }
 
         Lock();
         Unlock(strWalletPassphrase);
@@ -1642,6 +1863,28 @@ bool CWallet::IsMine(const CScript& script) const
 {
     AssertLockHeld(cs_wallet);
 
+    // Mercatura PQ ownership is deliberately independent from
+    // Bitcoin's secp256k1 ScriptPubKeyManagers. A locked encrypted
+    // wallet can recognize its PQ outputs using only the persisted
+    // public commitment -> derivation-locator map.
+    CTxDestination pq_destination;
+
+    if (ExtractDestination(script, pq_destination)) {
+        if (const auto* pq{
+                std::get_if<WitnessV2MercaturaPQ>(
+                    &pq_destination)}) {
+            MercaturaPQKeyCommitment commitment{};
+
+            std::copy(
+                pq->begin(),
+                pq->end(),
+                commitment.begin());
+
+            return m_mercatura_pq_key_locators.contains(
+                commitment);
+        }
+    }
+
     // Search the cache so that IsMine is called only on the relevant SPKMs instead of on everything in m_spk_managers
     const auto& it = m_cached_spks.find(script);
     if (it != m_cached_spks.end()) {
@@ -1713,14 +1956,14 @@ bool CWallet::IsHDEnabled() const
 bool CWallet::CanGetAddresses(bool internal) const
 {
     LOCK(cs_wallet);
-    if (m_spk_managers.empty()) return false;
-    for (OutputType t : OUTPUT_TYPES) {
-        auto spk_man = GetScriptPubKeyMan(t, internal);
-        if (spk_man && spk_man->CanGetAddresses(internal)) {
-            return true;
-        }
-    }
-    return false;
+    (void)internal;
+
+    // Mercatura PQ v1 has no xpub/public-child derivation.
+    // New addresses therefore require both initialized PQ state
+    // and access to the plaintext master seed.
+    return m_mercatura_pq_state.has_value() &&
+           m_mercatura_pq_master_seed.size() ==
+               MERCATURA_PQ_WALLET_MASTER_SEED_SIZE;
 }
 
 void CWallet::SetWalletFlag(uint64_t flags)
@@ -2149,6 +2392,186 @@ void MaybeResendWalletTxs(WalletContext& context)
 }
 
 
+
+struct MercaturaPQGeneratedSignature
+{
+    std::array<
+        uint8_t,
+        MERCATURA_MLDSA65_PUBLIC_KEY_SIZE>
+        public_key{};
+
+    std::array<
+        uint8_t,
+        MERCATURA_MLDSA65_SIGNATURE_SIZE>
+        signature{};
+};
+
+static std::optional<MercaturaPQGeneratedSignature>
+SignMercaturaPQInput(
+    std::span<
+        const unsigned char,
+        MERCATURA_PQ_MASTER_SEED_SIZE>
+        master_seed,
+    const MercaturaPQKeyLocator& locator,
+    const MercaturaPQKeyCommitment& expected_commitment,
+    const CMutableTransaction& tx,
+    uint32_t input_index,
+    const uint256& genesis_hash,
+    const PrecomputedTransactionData& txdata,
+    std::string& error)
+{
+    auto child_seed{
+        DeriveMercaturaPQChildSeed(
+            master_seed,
+            genesis_hash,
+            locator.account,
+            locator.branch,
+            locator.index)
+    };
+
+    if (!child_seed.has_value()) {
+        error =
+            "Mercatura PQ child-key derivation failed";
+        return std::nullopt;
+    }
+
+    MercaturaPQGeneratedSignature result;
+
+    std::array<
+        uint8_t,
+        MERCATURA_MLDSA65_SECRET_KEY_SIZE>
+        secret_key{};
+
+    if (mercatura_mldsa65_keypair_from_seed(
+            result.public_key.data(),
+            result.public_key.size(),
+            secret_key.data(),
+            secret_key.size(),
+            child_seed->data(),
+            child_seed->size()) != 1) {
+        memory_cleanse(
+            child_seed->data(),
+            child_seed->size());
+
+        memory_cleanse(
+            secret_key.data(),
+            secret_key.size());
+
+        error =
+            "ML-DSA-65 key generation failed";
+        return std::nullopt;
+    }
+
+    MercaturaPQKeyCommitment derived_commitment{};
+
+    const bool commitment_ok{
+        ComputeMercaturaPQKeyCommitmentV1(
+            derived_commitment,
+            result.public_key)
+    };
+
+    if (!commitment_ok ||
+        derived_commitment != expected_commitment) {
+        memory_cleanse(
+            child_seed->data(),
+            child_seed->size());
+
+        memory_cleanse(
+            secret_key.data(),
+            secret_key.size());
+
+        error =
+            "Mercatura PQ derived key does not match the owned output commitment";
+        return std::nullopt;
+    }
+
+    MercaturaPQHash384 digest{};
+
+    if (!ComputeMercaturaPQAuthDigestV1(
+            digest,
+            tx,
+            input_index,
+            genesis_hash,
+            txdata)) {
+        memory_cleanse(
+            child_seed->data(),
+            child_seed->size());
+
+        memory_cleanse(
+            secret_key.data(),
+            secret_key.size());
+
+        error =
+            "Mercatura PQ authorization digest creation failed";
+        return std::nullopt;
+    }
+
+    std::array<
+        uint8_t,
+        MERCATURA_MLDSA65_RANDOM_SIZE>
+        signing_randomness{};
+
+    GetStrongRandBytes(
+        signing_randomness);
+
+    static constexpr char PQ_CONTEXT[] =
+        "Mercatura/PQAuth/v1";
+
+    const bool signed_ok{
+        mercatura_mldsa65_sign(
+            result.signature.data(),
+            result.signature.size(),
+            digest.data(),
+            digest.size(),
+            reinterpret_cast<const uint8_t*>(
+                PQ_CONTEXT),
+            sizeof(PQ_CONTEXT) - 1,
+            signing_randomness.data(),
+            signing_randomness.size(),
+            secret_key.data(),
+            secret_key.size()) == 1
+    };
+
+    // Child seed, expanded secret key, and per-signature randomness
+    // are temporary secret material.
+    memory_cleanse(
+        child_seed->data(),
+        child_seed->size());
+
+    memory_cleanse(
+        secret_key.data(),
+        secret_key.size());
+
+    memory_cleanse(
+        signing_randomness.data(),
+        signing_randomness.size());
+
+    if (!signed_ok) {
+        error =
+            "ML-DSA-65 signing failed";
+        return std::nullopt;
+    }
+
+    // Fail closed if a freshly generated signature cannot be verified
+    // immediately against its derived public key.
+    if (mercatura_mldsa65_verify(
+            result.signature.data(),
+            result.signature.size(),
+            digest.data(),
+            digest.size(),
+            reinterpret_cast<const uint8_t*>(
+                PQ_CONTEXT),
+            sizeof(PQ_CONTEXT) - 1,
+            result.public_key.data(),
+            result.public_key.size()) != 1) {
+        error =
+            "Generated ML-DSA-65 signature failed self-verification";
+        return std::nullopt;
+    }
+
+    return result;
+}
+
 bool CWallet::SignTransaction(CMutableTransaction& tx) const
 {
     AssertLockHeld(cs_wallet);
@@ -2170,16 +2593,227 @@ bool CWallet::SignTransaction(CMutableTransaction& tx) const
 
 bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors) const
 {
-    // Try to sign with all ScriptPubKeyMans
+    AssertLockHeld(cs_wallet);
+
+    // Detect whether this transaction contains any Mercatura PQ inputs.
+    //
+    // PQ Authorization v1 is intentionally kept separate from Bitcoin's
+    // secp256k1 SigningProvider / ScriptPubKeyMan machinery.
+    bool has_pq_input{false};
+
+    for (const CTxIn& input : tx.vin) {
+        const auto coin_it{
+            coins.find(input.prevout)
+        };
+
+        if (coin_it == coins.end() ||
+            coin_it->second.IsSpent()) {
+            continue;
+        }
+
+        CTxDestination destination;
+
+        if (ExtractDestination(
+                coin_it->second.out.scriptPubKey,
+                destination) &&
+            std::get_if<WitnessV2MercaturaPQ>(
+                &destination) != nullptr) {
+            has_pq_input = true;
+            break;
+        }
+    }
+
+    if (has_pq_input) {
+        // PQ Authorization v1 has exactly one fixed all-input/all-output
+        // signing mode and no Bitcoin sighash byte.
+        if (sighash != SIGHASH_DEFAULT) {
+            input_errors[0] =
+                Untranslated(
+                    "Mercatura PQ Authorization v1 does not support alternate sighash modes");
+            return false;
+        }
+
+        if (m_mercatura_pq_master_seed.size() !=
+            MERCATURA_PQ_WALLET_MASTER_SEED_SIZE) {
+            input_errors[0] =
+                Untranslated(
+                    "Mercatura PQ master seed is unavailable; wallet may be locked");
+            return false;
+        }
+
+        // PQAuthDigestV1 commits to every spent amount and scriptPubKey.
+        // Therefore all previous outputs must be available before signing.
+        std::vector<CTxOut> spent_outputs;
+        spent_outputs.reserve(tx.vin.size());
+
+        std::vector<MercaturaPQKeyCommitment> commitments;
+        commitments.reserve(tx.vin.size());
+
+        std::vector<MercaturaPQKeyLocator> locators;
+        locators.reserve(tx.vin.size());
+
+        for (size_t i = 0; i < tx.vin.size(); ++i) {
+            const CTxIn& input{
+                tx.vin[i]
+            };
+
+            const auto coin_it{
+                coins.find(input.prevout)
+            };
+
+            if (coin_it == coins.end() ||
+                coin_it->second.IsSpent()) {
+                input_errors[i] =
+                    _("Input not found or already spent");
+                return false;
+            }
+
+            const CTxOut& prevout{
+                coin_it->second.out
+            };
+
+            CTxDestination destination;
+
+            if (!ExtractDestination(
+                    prevout.scriptPubKey,
+                    destination)) {
+                input_errors[i] =
+                    Untranslated(
+                        "Unable to extract Mercatura PQ input destination");
+                return false;
+            }
+
+            const auto* pq_destination{
+                std::get_if<WitnessV2MercaturaPQ>(
+                    &destination)
+            };
+
+            if (pq_destination == nullptr) {
+                input_errors[i] =
+                    Untranslated(
+                        "Mercatura PQ transaction contains a non-PQ ownership input");
+                return false;
+            }
+
+            MercaturaPQKeyCommitment commitment{};
+
+            std::copy(
+                pq_destination->begin(),
+                pq_destination->end(),
+                commitment.begin());
+
+            const auto locator_it{
+                m_mercatura_pq_key_locators.find(
+                    commitment)
+            };
+
+            if (locator_it ==
+                m_mercatura_pq_key_locators.end()) {
+                input_errors[i] =
+                    Untranslated(
+                        "Mercatura PQ private key is not available for this input");
+                return false;
+            }
+
+            spent_outputs.push_back(
+                prevout);
+
+            commitments.push_back(
+                commitment);
+
+            locators.push_back(
+                locator_it->second);
+        }
+
+        PrecomputedTransactionData txdata;
+
+        txdata.Init(
+            tx,
+            std::move(spent_outputs),
+            /*force=*/true);
+
+        if (!txdata.m_pq_ready) {
+            input_errors[0] =
+                Untranslated(
+                    "Unable to initialize Mercatura PQ authorization hashes");
+            return false;
+        }
+
+        const uint256 genesis_hash{
+            Params().GetConsensus().hashGenesisBlock
+        };
+
+        const std::span<
+            const unsigned char,
+            MERCATURA_PQ_MASTER_SEED_SIZE>
+            master_seed{
+                m_mercatura_pq_master_seed.data(),
+                MERCATURA_PQ_MASTER_SEED_SIZE
+            };
+
+        // Stage every witness first. Nothing is written into the
+        // transaction until all inputs have signed successfully.
+        std::vector<CScriptWitness> staged_witnesses(
+            tx.vin.size());
+
+        for (size_t i = 0; i < tx.vin.size(); ++i) {
+            std::string signing_error;
+
+            auto generated{
+                SignMercaturaPQInput(
+                    master_seed,
+                    locators[i],
+                    commitments[i],
+                    tx,
+                    static_cast<uint32_t>(i),
+                    genesis_hash,
+                    txdata,
+                    signing_error)
+            };
+
+            if (!generated.has_value()) {
+                input_errors[i] =
+                    Untranslated(
+                        signing_error);
+                return false;
+            }
+
+            staged_witnesses[i].stack = {
+                std::vector<unsigned char>(
+                    generated->signature.begin(),
+                    generated->signature.end()),
+                std::vector<unsigned char>(
+                    generated->public_key.begin(),
+                    generated->public_key.end()),
+            };
+        }
+
+        // Every PQ input has signed successfully. Apply the complete
+        // witnesses atomically from the wallet signer's perspective.
+        for (size_t i = 0; i < tx.vin.size(); ++i) {
+            tx.vin[i].scriptSig.clear();
+            tx.vin[i].scriptWitness =
+                std::move(staged_witnesses[i]);
+
+            input_errors.erase(
+                static_cast<int>(i));
+        }
+
+        return true;
+    }
+
+    // Compatibility path for inherited non-PQ wallet/test machinery.
+    // Normal Mercatura ownership never reaches this path.
     for (ScriptPubKeyMan* spk_man : GetAllScriptPubKeyMans()) {
-        // spk_man->SignTransaction will return true if the transaction is complete,
-        // so we can exit early and return true if that happens
-        if (spk_man->SignTransaction(tx, coins, sighash, input_errors)) {
+        if (spk_man->SignTransaction(
+                tx,
+                coins,
+                sighash,
+                input_errors)) {
             return true;
         }
     }
 
-    // At this point, one input was not fully signed otherwise we would have exited already
     return false;
 }
 
@@ -2212,6 +2846,210 @@ std::optional<PSBTError> CWallet::FillPSBT(PartiallySignedTransaction& psbtx, bo
     }
 
     const PrecomputedTransactionData txdata = PrecomputePSBTData(psbtx);
+
+    // Mercatura PQ Authorization v1 is handled at wallet level rather
+    // than through the inherited secp256k1 ScriptPubKeyMan machinery.
+    //
+    // Work on a copy so PQ signing/finalization changes are committed
+    // atomically if every attempted wallet-owned PQ input succeeds.
+    PartiallySignedTransaction pq_work{psbtx};
+    size_t pq_signed{0};
+
+    for (size_t i = 0;
+         i < pq_work.tx->vin.size();
+         ++i) {
+        PSBTInput& input{
+            pq_work.inputs.at(i)
+        };
+
+        if (PSBTInputSigned(input)) {
+            continue;
+        }
+
+        CTxOut utxo;
+
+        if (!pq_work.GetInputUTXO(
+                utxo,
+                static_cast<int>(i))) {
+            // Without the spent output we cannot even identify the
+            // authorization type. Leave the input incomplete.
+            continue;
+        }
+
+        CTxDestination destination;
+
+        if (!ExtractDestination(
+                utxo.scriptPubKey,
+                destination)) {
+            continue;
+        }
+
+        const auto* pq_destination{
+            std::get_if<WitnessV2MercaturaPQ>(
+                &destination)
+        };
+
+        if (pq_destination == nullptr) {
+            continue;
+        }
+
+        // Native PQ spends may safely carry the specific witness UTXO.
+        // This also allows the normal PSBT pruning logic to discard a
+        // redundant non_witness_utxo when the transaction permits it.
+        input.witness_utxo = utxo;
+
+        // If a PSBT already contains a complete PQ authorization,
+        // validate it and optionally finalize it before considering
+        // whether this wallet should create a new signature.
+        const bool has_public_key{
+            GetMercaturaPQPSBTPublicKey(
+                input) != nullptr
+        };
+
+        const bool has_signature{
+            GetMercaturaPQPSBTSignature(
+                input) != nullptr
+        };
+
+        if (has_public_key &&
+            has_signature) {
+            const PSBTError existing_result{
+                SignPSBTInput(
+                    DUMMY_SIGNING_PROVIDER,
+                    pq_work,
+                    static_cast<int>(i),
+                    &txdata,
+                    sighash_type,
+                    nullptr,
+                    finalize)
+            };
+
+            if (existing_result ==
+                PSBTError::SIGHASH_MISMATCH) {
+                return existing_result;
+            }
+
+            if (existing_result ==
+                PSBTError::OK) {
+                // The authorization was already present. Do not count
+                // it as a signature newly produced by this wallet.
+                continue;
+            }
+        }
+
+        MercaturaPQKeyCommitment commitment{};
+
+        std::copy(
+            pq_destination->begin(),
+            pq_destination->end(),
+            commitment.begin());
+
+        const auto locator{
+            GetMercaturaPQKeyLocator(
+                commitment)
+        };
+
+        if (!locator.has_value()) {
+            // This wallet does not own the PQ input. Leave it available
+            // for another signer rather than failing the whole PSBT.
+            continue;
+        }
+
+        // PQ Authorization v1 has one fixed signing mode only.
+        if ((sighash_type.has_value() &&
+             *sighash_type != SIGHASH_DEFAULT) ||
+            (input.sighash_type.has_value() &&
+             *input.sighash_type != SIGHASH_DEFAULT)) {
+            return PSBTError::SIGHASH_MISMATCH;
+        }
+
+        if (!sign) {
+            // Match inherited FillPSBT n_signed semantics: when signing
+            // is disabled, count inputs this wallet could sign without
+            // deriving or generating any cryptographic material.
+            ++pq_signed;
+            continue;
+        }
+
+        // PQAuthDigestV1 commits to every spent amount/scriptPubKey.
+        // A wallet must therefore have complete transaction-wide spent
+        // output data before producing any PQ signature.
+        if (!txdata.m_pq_ready) {
+            return PSBTError::MISSING_INPUTS;
+        }
+
+        if (m_mercatura_pq_master_seed.size() !=
+            MERCATURA_PQ_WALLET_MASTER_SEED_SIZE) {
+            // Most commonly this means the wallet is locked.
+            return PSBTError::INCOMPLETE;
+        }
+
+        const uint256 genesis_hash{
+            Params().GetConsensus().hashGenesisBlock
+        };
+
+        const std::span<
+            const unsigned char,
+            MERCATURA_PQ_MASTER_SEED_SIZE>
+            master_seed{
+                m_mercatura_pq_master_seed.data(),
+                MERCATURA_PQ_MASTER_SEED_SIZE
+            };
+
+        std::string signing_error;
+
+        auto generated{
+            SignMercaturaPQInput(
+                master_seed,
+                *locator,
+                commitment,
+                *pq_work.tx,
+                static_cast<uint32_t>(i),
+                genesis_hash,
+                txdata,
+                signing_error)
+        };
+
+        if (!generated.has_value()) {
+            return PSBTError::INCOMPLETE;
+        }
+
+        if (!SetMercaturaPQPSBTPublicKey(
+                input,
+                generated->public_key) ||
+            !SetMercaturaPQPSBTSignature(
+                input,
+                generated->signature)) {
+            return PSBTError::INCOMPLETE;
+        }
+
+        if (finalize) {
+            const PSBTError finalize_result{
+                SignPSBTInput(
+                    DUMMY_SIGNING_PROVIDER,
+                    pq_work,
+                    static_cast<int>(i),
+                    &txdata,
+                    sighash_type,
+                    nullptr,
+                    /*finalize=*/true)
+            };
+
+            if (finalize_result !=
+                PSBTError::OK) {
+                return finalize_result;
+            }
+        }
+
+        ++pq_signed;
+    }
+
+    // Commit all wallet-level PQ PSBT changes together.
+    psbtx = std::move(pq_work);
+
+    if (n_signed) {
+        *n_signed += pq_signed;
+    }
 
     // Fill in information from ScriptPubKeyMans
     for (ScriptPubKeyMan* spk_man : GetAllScriptPubKeyMans()) {
@@ -2598,31 +3436,285 @@ bool CWallet::TopUpKeyPool(unsigned int kpSize)
     return res;
 }
 
+util::Result<CTxDestination>
+CWallet::GetNewMercaturaPQDestination(
+    bool internal)
+{
+    LOCK(cs_wallet);
+
+    if (!m_mercatura_pq_state.has_value()) {
+        return util::Error{
+            Untranslated(
+                "Error: Mercatura PQ wallet state is not initialized.")
+        };
+    }
+
+    if (!m_mercatura_pq_state->IsSupported()) {
+        return util::Error{
+            Untranslated(
+                "Error: Unsupported Mercatura PQ wallet version.")
+        };
+    }
+
+    if (m_mercatura_pq_master_seed.size() !=
+        MERCATURA_PQ_WALLET_MASTER_SEED_SIZE) {
+        if (HasEncryptionKeys() && IsLocked()) {
+            return util::Error{
+                Untranslated(
+                    "Error: Wallet must be unlocked to derive a new Mercatura PQ address.")
+            };
+        }
+
+        return util::Error{
+            Untranslated(
+                "Error: Mercatura PQ master seed is unavailable.")
+        };
+    }
+
+    const uint8_t branch{
+        static_cast<uint8_t>(
+            internal ? 1 : 0)
+    };
+
+    const uint32_t index{
+        internal
+            ? m_mercatura_pq_state
+                  ->next_internal_index
+            : m_mercatura_pq_state
+                  ->next_external_index
+    };
+
+    if (index ==
+        std::numeric_limits<uint32_t>::max()) {
+        return util::Error{
+            Untranslated(
+                "Error: Mercatura PQ derivation index exhausted.")
+        };
+    }
+
+    const std::span<
+        const unsigned char,
+        MERCATURA_PQ_MASTER_SEED_SIZE>
+        master_seed{
+            m_mercatura_pq_master_seed.data(),
+            MERCATURA_PQ_MASTER_SEED_SIZE
+        };
+
+    auto child_seed{
+        DeriveMercaturaPQChildSeed(
+            master_seed,
+            Params().GetConsensus().hashGenesisBlock,
+            m_mercatura_pq_state->account,
+            branch,
+            index)
+    };
+
+    if (!child_seed.has_value()) {
+        return util::Error{
+            Untranslated(
+                "Error: Mercatura PQ child-key derivation failed.")
+        };
+    }
+
+    std::array<
+        uint8_t,
+        MERCATURA_MLDSA65_PUBLIC_KEY_SIZE>
+        public_key{};
+
+    std::array<
+        uint8_t,
+        MERCATURA_MLDSA65_SECRET_KEY_SIZE>
+        secret_key{};
+
+    if (mercatura_mldsa65_keypair_from_seed(
+            public_key.data(),
+            public_key.size(),
+            secret_key.data(),
+            secret_key.size(),
+            child_seed->data(),
+            child_seed->size()) != 1) {
+        memory_cleanse(
+            child_seed->data(),
+            child_seed->size());
+
+        memory_cleanse(
+            secret_key.data(),
+            secret_key.size());
+
+        return util::Error{
+            Untranslated(
+                "Error: ML-DSA-65 key generation failed.")
+        };
+    }
+
+    MercaturaPQKeyCommitment commitment{};
+
+    const bool commitment_ok{
+        ComputeMercaturaPQKeyCommitmentV1(
+            commitment,
+            public_key)
+    };
+
+    // Child seed and expanded secret key are temporary derivation
+    // material only. They are never stored in the wallet.
+    memory_cleanse(
+        child_seed->data(),
+        child_seed->size());
+
+    memory_cleanse(
+        secret_key.data(),
+        secret_key.size());
+
+    if (!commitment_ok) {
+        return util::Error{
+            Untranslated(
+                "Error: Mercatura PQ key commitment failed.")
+        };
+    }
+
+    if (m_mercatura_pq_key_locators.contains(
+            commitment)) {
+        return util::Error{
+            Untranslated(
+                "Error: Duplicate Mercatura PQ key commitment.")
+        };
+    }
+
+    const MercaturaPQKeyLocator locator{
+        /*account=*/m_mercatura_pq_state->account,
+        /*branch=*/branch,
+        /*index=*/index,
+    };
+
+    MercaturaPQWalletState updated_state{
+        *m_mercatura_pq_state
+    };
+
+    if (internal) {
+        ++updated_state.next_internal_index;
+    } else {
+        ++updated_state.next_external_index;
+    }
+
+    // Allocate the map entry before committing the database
+    // transaction. This avoids a post-commit map allocation being
+    // the first operation capable of failing.
+    const auto [locator_it, inserted]{
+        m_mercatura_pq_key_locators.emplace(
+            commitment,
+            locator)
+    };
+
+    if (!inserted) {
+        return util::Error{
+            Untranslated(
+                "Error: Duplicate Mercatura PQ key commitment.")
+        };
+    }
+
+    WalletBatch batch{
+        GetDatabase()
+    };
+
+    if (!batch.TxnBegin()) {
+        m_mercatura_pq_key_locators.erase(
+            locator_it);
+
+        return util::Error{
+            Untranslated(
+                "Error: Could not begin Mercatura PQ wallet database transaction.")
+        };
+    }
+
+    if (!batch.WriteMercaturaPQKeyLocator(
+            commitment,
+            locator) ||
+        !batch.WriteMercaturaPQState(
+            updated_state)) {
+        batch.TxnAbort();
+
+        m_mercatura_pq_key_locators.erase(
+            locator_it);
+
+        return util::Error{
+            Untranslated(
+                "Error: Could not persist Mercatura PQ destination.")
+        };
+    }
+
+    if (!batch.TxnCommit()) {
+        m_mercatura_pq_key_locators.erase(
+            locator_it);
+
+        return util::Error{
+            Untranslated(
+                "Error: Could not commit Mercatura PQ destination.")
+        };
+    }
+
+    // Only advance the authoritative in-memory derivation state
+    // after the database transaction has committed successfully.
+    m_mercatura_pq_state =
+        updated_state;
+
+    const uint256 commitment_hash{
+        std::span<const unsigned char>{
+            commitment}
+    };
+
+    return CTxDestination{
+        WitnessV2MercaturaPQ{
+            commitment_hash}
+    };
+}
+
 util::Result<CTxDestination> CWallet::GetNewDestination(const OutputType type, const std::string& label)
 {
     LOCK(cs_wallet);
-    auto spk_man = GetScriptPubKeyMan(type, /*internal=*/false);
-    if (!spk_man) {
-        return util::Error{strprintf(_("Error: No %s addresses available."), FormatOutputType(type))};
+    (void)type;
+
+    // Mercatura PQ Authorization v1 is the sole normal ownership
+    // destination type. Never fall back to inherited classical
+    // descriptor address generation.
+    if (!m_mercatura_pq_state.has_value()) {
+        return util::Error{
+            Untranslated(
+                "Error: Mercatura PQ wallet state is not initialized.")
+        };
     }
 
-    auto op_dest = spk_man->GetNewDestination(type);
-    if (op_dest) {
-        SetAddressBook(*op_dest, label, AddressPurpose::RECEIVE);
+    auto pq_dest{
+        GetNewMercaturaPQDestination(
+            /*internal=*/false)
+    };
+
+    if (pq_dest) {
+        SetAddressBook(
+            *pq_dest,
+            label,
+            AddressPurpose::RECEIVE);
     }
 
-    return op_dest;
+    return pq_dest;
 }
 
 util::Result<CTxDestination> CWallet::GetNewChangeDestination(const OutputType type)
 {
     LOCK(cs_wallet);
+    (void)type;
 
-    ReserveDestination reservedest(this, type);
-    auto op_dest = reservedest.GetReservedDestination(true);
-    if (op_dest) reservedest.KeepDestination();
+    // Mercatura PQ Authorization v1 is the sole normal change
+    // destination type. Never fall back to inherited classical
+    // descriptor keypool generation.
+    if (!m_mercatura_pq_state.has_value()) {
+        return util::Error{
+            Untranslated(
+                "Error: Mercatura PQ wallet state is not initialized.")
+        };
+    }
 
-    return op_dest;
+    return GetNewMercaturaPQDestination(
+        /*internal=*/true);
 }
 
 void CWallet::MarkDestinationsDirty(const std::set<CTxDestination>& destinations) {
@@ -3099,6 +4191,23 @@ std::shared_ptr<CWallet> CWallet::CreateNew(WalletContext& context, const std::s
         // Only descriptor wallets can be created
         assert(walletInstance->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS));
 
+        // Normal private-key Mercatura wallets receive exactly one
+        // authoritative PQ master seed when first created.
+        //
+        // Blank, private-key-disabled, and external-signer wallets do
+        // not silently receive PQ private material.
+        if (!(wallet_creation_flags &
+              (WALLET_FLAG_DISABLE_PRIVATE_KEYS |
+               WALLET_FLAG_BLANK_WALLET |
+               WALLET_FLAG_EXTERNAL_SIGNER))) {
+            if (!walletInstance->InitializeMercaturaPQWallet()) {
+                error = strprintf(
+                    _("Error creating %s: Could not initialize Mercatura PQ wallet state."),
+                    walletFile);
+                return nullptr;
+            }
+        }
+
         if ((wallet_creation_flags & WALLET_FLAG_EXTERNAL_SIGNER) || !(wallet_creation_flags & (WALLET_FLAG_DISABLE_PRIVATE_KEYS | WALLET_FLAG_BLANK_WALLET))) {
             walletInstance->SetupDescriptorScriptPubKeyMans();
         }
@@ -3368,23 +4477,59 @@ bool CWallet::Lock()
             memory_cleanse(vMasterKey.data(), vMasterKey.size() * sizeof(decltype(vMasterKey)::value_type));
             vMasterKey.clear();
         }
+
+
+        if (!m_mercatura_pq_master_seed.empty()) {
+            memory_cleanse(
+                m_mercatura_pq_master_seed.data(),
+                m_mercatura_pq_master_seed.size());
+            m_mercatura_pq_master_seed.clear();
+        }
     }
 
     NotifyStatusChanged(this);
     return true;
 }
 
-bool CWallet::Unlock(const CKeyingMaterial& vMasterKeyIn)
+bool CWallet::Unlock(
+    const CKeyingMaterial& vMasterKeyIn)
 {
     {
         LOCK(cs_wallet);
-        for (const auto& spk_man_pair : m_spk_managers) {
-            if (!spk_man_pair.second->CheckDecryptionKey(vMasterKeyIn)) {
+
+        for (const auto& spk_man_pair :
+             m_spk_managers) {
+            if (!spk_man_pair.second
+                     ->CheckDecryptionKey(
+                         vMasterKeyIn)) {
                 return false;
             }
         }
+
+        CKeyingMaterial pq_master_seed;
+
+        if (m_mercatura_pq_state.has_value()) {
+            if (!m_mercatura_pq_crypted_seed
+                     .IsStructurallyValid()) {
+                return false;
+            }
+
+            if (!DecryptMercaturaPQMasterSeedV1(
+                    vMasterKeyIn,
+                    m_mercatura_pq_crypted_seed,
+                    pq_master_seed)) {
+                return false;
+            }
+        }
+
         vMasterKey = vMasterKeyIn;
+
+        if (!pq_master_seed.empty()) {
+            m_mercatura_pq_master_seed =
+                std::move(pq_master_seed);
+        }
     }
+
     NotifyStatusChanged(this);
     return true;
 }
@@ -3536,6 +4681,234 @@ bool CWallet::WithEncryptionKey(std::function<bool (const CKeyingMaterial&)> cb)
     return cb(vMasterKey);
 }
 
+bool CWallet::InitializeMercaturaPQWallet()
+{
+    AssertLockHeld(cs_wallet);
+
+    // This is a fresh-wallet operation only.
+    if (m_mercatura_pq_state.has_value() ||
+        !m_mercatura_pq_master_seed.empty() ||
+        m_mercatura_pq_crypted_seed.IsStructurallyValid()) {
+        return false;
+    }
+
+    MercaturaPQWalletState state;
+
+    CKeyingMaterial master_seed(
+        MERCATURA_PQ_WALLET_MASTER_SEED_SIZE);
+
+    GetStrongRandBytes(master_seed);
+
+    WalletBatch batch{GetDatabase()};
+
+    if (!batch.TxnBegin()) {
+        memory_cleanse(
+            master_seed.data(),
+            master_seed.size());
+        return false;
+    }
+
+    if (!batch.WriteMercaturaPQState(state) ||
+        !batch.WriteMercaturaPQSeed(master_seed)) {
+        batch.TxnAbort();
+
+        memory_cleanse(
+            master_seed.data(),
+            master_seed.size());
+
+        return false;
+    }
+
+    if (!batch.TxnCommit()) {
+        memory_cleanse(
+            master_seed.data(),
+            master_seed.size());
+
+        return false;
+    }
+
+    m_mercatura_pq_state = state;
+    m_mercatura_pq_master_seed =
+        std::move(master_seed);
+
+    return true;
+}
+
+bool CWallet::LoadMercaturaPQKeyLocator(
+    const MercaturaPQKeyCommitment& commitment,
+    const MercaturaPQKeyLocator& locator)
+{
+    AssertLockHeld(cs_wallet);
+
+    if (!locator.IsStructurallyValid()) {
+        return false;
+    }
+
+    return m_mercatura_pq_key_locators
+        .emplace(commitment, locator)
+        .second;
+}
+
+bool CWallet::HasMercaturaPQKeyCommitment(
+    const MercaturaPQKeyCommitment& commitment) const
+{
+    AssertLockHeld(cs_wallet);
+
+    return m_mercatura_pq_key_locators.contains(
+        commitment);
+}
+
+std::optional<MercaturaPQKeyLocator>
+CWallet::GetMercaturaPQKeyLocator(
+    const MercaturaPQKeyCommitment& commitment) const
+{
+    AssertLockHeld(cs_wallet);
+
+    const auto it{
+        m_mercatura_pq_key_locators.find(
+            commitment)
+    };
+
+    if (it ==
+        m_mercatura_pq_key_locators.end()) {
+        return std::nullopt;
+    }
+
+    return it->second;
+}
+
+size_t CWallet::GetMercaturaPQKeyLocatorCount() const
+{
+    AssertLockHeld(cs_wallet);
+
+    return m_mercatura_pq_key_locators.size();
+}
+
+bool CWallet::ValidateMercaturaPQKeyLocators() const
+{
+    AssertLockHeld(cs_wallet);
+
+    if (!m_mercatura_pq_state.has_value()) {
+        return m_mercatura_pq_key_locators.empty();
+    }
+
+    const auto& state{
+        *m_mercatura_pq_state
+    };
+
+    for (const auto& [commitment, locator] :
+         m_mercatura_pq_key_locators) {
+        (void)commitment;
+
+        if (!locator.IsStructurallyValid()) {
+            return false;
+        }
+
+        if (locator.account != state.account) {
+            return false;
+        }
+
+        if (locator.branch == 0) {
+            if (locator.index >=
+                state.next_external_index) {
+                return false;
+            }
+        } else {
+            if (locator.index >=
+                state.next_internal_index) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool CWallet::LoadMercaturaPQState(
+    const MercaturaPQWalletState& state)
+{
+    AssertLockHeld(cs_wallet);
+
+    if (m_mercatura_pq_state.has_value()) {
+        return false;
+    }
+
+    if (!state.IsSupported()) {
+        return false;
+    }
+
+    m_mercatura_pq_state = state;
+    return true;
+}
+
+bool CWallet::LoadMercaturaPQSeed(
+    const CKeyingMaterial& seed)
+{
+    AssertLockHeld(cs_wallet);
+
+    if (seed.size() != 32) {
+        return false;
+    }
+
+    if (!m_mercatura_pq_master_seed.empty() ||
+        m_mercatura_pq_crypted_seed.IsStructurallyValid()) {
+        return false;
+    }
+
+    m_mercatura_pq_master_seed = seed;
+    return true;
+}
+
+bool CWallet::LoadMercaturaPQCryptedSeed(
+    const MercaturaPQCryptedSeed& crypted_seed)
+{
+    AssertLockHeld(cs_wallet);
+
+    if (!crypted_seed.IsStructurallyValid()) {
+        return false;
+    }
+
+    if (!m_mercatura_pq_master_seed.empty() ||
+        m_mercatura_pq_crypted_seed.IsStructurallyValid()) {
+        return false;
+    }
+
+    m_mercatura_pq_crypted_seed = crypted_seed;
+    return true;
+}
+
+bool CWallet::HasMercaturaPQState() const
+{
+    AssertLockHeld(cs_wallet);
+    return m_mercatura_pq_state.has_value();
+}
+
+const MercaturaPQWalletState& CWallet::GetMercaturaPQState() const
+{
+    AssertLockHeld(cs_wallet);
+    assert(m_mercatura_pq_state.has_value());
+    return *m_mercatura_pq_state;
+}
+
+bool CWallet::HasMercaturaPQPlaintextSeed() const
+{
+    AssertLockHeld(cs_wallet);
+    return m_mercatura_pq_master_seed.size() == 32;
+}
+
+
+bool CWallet::WithMercaturaPQMasterSeed(
+    std::function<bool(const CKeyingMaterial&)> cb) const
+{
+    LOCK(cs_wallet);
+
+    if (m_mercatura_pq_master_seed.size() != 32) {
+        return false;
+    }
+
+    return cb(m_mercatura_pq_master_seed);
+}
+
 bool CWallet::HasEncryptionKeys() const
 {
     return !mapMasterKeys.empty();
@@ -3543,9 +4916,20 @@ bool CWallet::HasEncryptionKeys() const
 
 bool CWallet::HaveCryptedKeys() const
 {
-    for (const auto& spkm : GetAllScriptPubKeyMans()) {
-        if (spkm->HaveCryptedKeys()) return true;
+    LOCK(cs_wallet);
+
+    if (m_mercatura_pq_crypted_seed
+            .IsStructurallyValid()) {
+        return true;
     }
+
+    for (const auto& spkm :
+         GetAllScriptPubKeyMans()) {
+        if (spkm->HaveCryptedKeys()) {
+            return true;
+        }
+    }
+
     return false;
 }
 

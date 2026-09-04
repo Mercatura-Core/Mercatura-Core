@@ -44,6 +44,10 @@ const std::string KEYMETA{"keymeta"};
 const std::string KEY{"key"};
 const std::string LOCKED_UTXO{"lockedutxo"};
 const std::string MASTER_KEY{"mkey"};
+const std::string MERCATURA_PQ_STATE{"mercaturapqstate"};
+const std::string MERCATURA_PQ_SEED{"mercaturapqseed"};
+const std::string MERCATURA_PQ_CRYPTED_SEED{"mercaturapqcryptedseed"};
+const std::string MERCATURA_PQ_KEY_LOCATOR{"mercaturapqkeylocator"};
 const std::string MINVERSION{"minversion"};
 const std::string NAME{"name"};
 const std::string OLD_KEY{"wkey"};
@@ -156,6 +160,63 @@ bool WalletBatch::WriteMasterKey(unsigned int nID, const CMasterKey& kMasterKey)
 bool WalletBatch::EraseMasterKey(unsigned int id)
 {
     return EraseIC(std::make_pair(DBKeys::MASTER_KEY, id));
+}
+
+
+bool WalletBatch::WriteMercaturaPQState(
+    const MercaturaPQWalletState& state)
+{
+    return WriteIC(DBKeys::MERCATURA_PQ_STATE, state, true);
+}
+
+bool WalletBatch::WriteMercaturaPQSeed(
+    const CKeyingMaterial& seed)
+{
+    if (seed.size() != 32) {
+        return false;
+    }
+
+    return WriteIC(DBKeys::MERCATURA_PQ_SEED, seed, true);
+}
+
+bool WalletBatch::EraseMercaturaPQSeed()
+{
+    return EraseIC(DBKeys::MERCATURA_PQ_SEED);
+}
+
+bool WalletBatch::WriteMercaturaPQCryptedSeed(
+    const MercaturaPQCryptedSeed& crypted_seed)
+{
+    if (!crypted_seed.IsStructurallyValid()) {
+        return false;
+    }
+
+    return WriteIC(
+        DBKeys::MERCATURA_PQ_CRYPTED_SEED,
+        crypted_seed,
+        true);
+}
+
+bool WalletBatch::EraseMercaturaPQCryptedSeed()
+{
+    return EraseIC(DBKeys::MERCATURA_PQ_CRYPTED_SEED);
+}
+
+
+bool WalletBatch::WriteMercaturaPQKeyLocator(
+    const MercaturaPQKeyCommitment& commitment,
+    const MercaturaPQKeyLocator& locator)
+{
+    if (!locator.IsStructurallyValid()) {
+        return false;
+    }
+
+    return WriteIC(
+        std::make_pair(
+            DBKeys::MERCATURA_PQ_KEY_LOCATOR,
+            commitment),
+        locator,
+        /*fOverwrite=*/false);
 }
 
 bool WalletBatch::WriteWatchOnly(const CScript &dest, const CKeyMetadata& keyMeta)
@@ -1085,6 +1146,203 @@ static DBErrors LoadActiveSPKMs(CWallet* pwallet, DatabaseBatch& batch) EXCLUSIV
     return result;
 }
 
+static DBErrors LoadMercaturaPQWalletRecords(
+    CWallet* pwallet,
+    DatabaseBatch& batch)
+    EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet)
+{
+    AssertLockHeld(pwallet->cs_wallet);
+
+    DBErrors result{DBErrors::LOAD_OK};
+
+    const LoadResult state_res = LoadRecords(
+        pwallet,
+        batch,
+        DBKeys::MERCATURA_PQ_STATE,
+        [](CWallet* wallet,
+           DataStream& key,
+           DataStream& value,
+           std::string& err) {
+            if (!key.empty()) {
+                err = "Error reading wallet database: invalid Mercatura PQ state key";
+                return DBErrors::CORRUPT;
+            }
+
+            MercaturaPQWalletState state;
+            value >> state;
+
+            if (!state.IsSupported()) {
+                err = "Error reading wallet database: unsupported Mercatura PQ wallet version";
+                return DBErrors::TOO_NEW;
+            }
+
+            if (!wallet->LoadMercaturaPQState(state)) {
+                err = "Error reading wallet database: duplicate Mercatura PQ wallet state";
+                return DBErrors::CORRUPT;
+            }
+
+            return DBErrors::LOAD_OK;
+        });
+
+    result = std::max(result, state_res.m_result);
+
+    const LoadResult seed_res = LoadRecords(
+        pwallet,
+        batch,
+        DBKeys::MERCATURA_PQ_SEED,
+        [](CWallet* wallet,
+           DataStream& key,
+           DataStream& value,
+           std::string& err) {
+            if (!key.empty()) {
+                err = "Error reading wallet database: invalid Mercatura PQ seed key";
+                return DBErrors::CORRUPT;
+            }
+
+            CKeyingMaterial seed;
+            value >> seed;
+
+            if (seed.size() != 32) {
+                err = "Error reading wallet database: invalid Mercatura PQ master seed size";
+                return DBErrors::CORRUPT;
+            }
+
+            if (!wallet->LoadMercaturaPQSeed(seed)) {
+                err = "Error reading wallet database: conflicting Mercatura PQ master seed";
+                return DBErrors::CORRUPT;
+            }
+
+            return DBErrors::LOAD_OK;
+        });
+
+    result = std::max(result, seed_res.m_result);
+
+    const LoadResult crypted_seed_res = LoadRecords(
+        pwallet,
+        batch,
+        DBKeys::MERCATURA_PQ_CRYPTED_SEED,
+        [](CWallet* wallet,
+           DataStream& key,
+           DataStream& value,
+           std::string& err) {
+            if (!key.empty()) {
+                err = "Error reading wallet database: invalid Mercatura PQ encrypted seed key";
+                return DBErrors::CORRUPT;
+            }
+
+            MercaturaPQCryptedSeed crypted_seed;
+            value >> crypted_seed;
+
+            if (!crypted_seed.IsStructurallyValid()) {
+                err = "Error reading wallet database: invalid Mercatura PQ encrypted seed";
+                return DBErrors::CORRUPT;
+            }
+
+            if (!wallet->LoadMercaturaPQCryptedSeed(crypted_seed)) {
+                err = "Error reading wallet database: conflicting Mercatura PQ encrypted seed";
+                return DBErrors::CORRUPT;
+            }
+
+            return DBErrors::LOAD_OK;
+        });
+
+    result = std::max(result, crypted_seed_res.m_result);
+
+    const LoadResult locator_res = LoadRecords(
+        pwallet,
+        batch,
+        DBKeys::MERCATURA_PQ_KEY_LOCATOR,
+        [](CWallet* wallet,
+           DataStream& key,
+           DataStream& value,
+           std::string& err) {
+            MercaturaPQKeyCommitment commitment{};
+
+            key >> commitment;
+
+            if (!key.empty()) {
+                err =
+                    "Error reading wallet database: invalid Mercatura PQ key locator key";
+                return DBErrors::CORRUPT;
+            }
+
+            MercaturaPQKeyLocator locator;
+            value >> locator;
+
+            if (!locator.IsStructurallyValid()) {
+                err =
+                    "Error reading wallet database: invalid Mercatura PQ key locator";
+                return DBErrors::CORRUPT;
+            }
+
+            if (!wallet->LoadMercaturaPQKeyLocator(
+                    commitment,
+                    locator)) {
+                err =
+                    "Error reading wallet database: duplicate Mercatura PQ key commitment";
+                return DBErrors::CORRUPT;
+            }
+
+            return DBErrors::LOAD_OK;
+        });
+
+    result = std::max(
+        result,
+        locator_res.m_result);
+
+    if (result != DBErrors::LOAD_OK) {
+        return result;
+    }
+
+    const bool has_state = pwallet->HasMercaturaPQState();
+    const bool has_plain_seed = pwallet->HasMercaturaPQPlaintextSeed();
+    const bool has_crypted_seed =
+        crypted_seed_res.m_records != 0;
+    const bool has_locators =
+        locator_res.m_records != 0;
+
+    if (!has_state &&
+        !has_plain_seed &&
+        !has_crypted_seed &&
+        !has_locators) {
+        return DBErrors::LOAD_OK;
+    }
+
+    if (!has_state) {
+        pwallet->WalletLogPrintf(
+            "Error: Mercatura PQ records exist without PQ wallet state\n");
+        return DBErrors::CORRUPT;
+    }
+
+    if (has_plain_seed == has_crypted_seed) {
+        pwallet->WalletLogPrintf(
+            "Error: Mercatura PQ wallet must contain exactly one plaintext or encrypted master seed\n");
+        return DBErrors::CORRUPT;
+    }
+
+    if (has_plain_seed &&
+        pwallet->HasEncryptionKeys()) {
+        pwallet->WalletLogPrintf(
+            "Error: encrypted wallet contains plaintext Mercatura PQ master seed\n");
+        return DBErrors::CORRUPT;
+    }
+
+    if (has_crypted_seed &&
+        !pwallet->HasEncryptionKeys()) {
+        pwallet->WalletLogPrintf(
+            "Error: encrypted Mercatura PQ seed exists without wallet encryption key\n");
+        return DBErrors::CORRUPT;
+    }
+
+    if (!pwallet->ValidateMercaturaPQKeyLocators()) {
+        pwallet->WalletLogPrintf(
+            "Error: inconsistent Mercatura PQ key locator metadata\n");
+        return DBErrors::CORRUPT;
+    }
+
+    return DBErrors::LOAD_OK;
+}
+
 static DBErrors LoadDecryptionKeys(CWallet* pwallet, DatabaseBatch& batch) EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet)
 {
     AssertLockHeld(pwallet->cs_wallet);
@@ -1142,6 +1400,11 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
 
         // Load decryption keys
         result = std::max(LoadDecryptionKeys(pwallet, *m_batch), result);
+
+        // Load Mercatura PQ wallet state and master seed material.
+        result = std::max(
+            LoadMercaturaPQWalletRecords(pwallet, *m_batch),
+            result);
 
         // Load tx records
         result = std::max(LoadTxRecords(pwallet, *m_batch, any_unordered), result);

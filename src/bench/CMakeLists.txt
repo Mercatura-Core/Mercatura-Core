@@ -37,6 +37,7 @@ add_executable(bench_bitcoin
   mempool_stress.cpp
   merkle_root.cpp
   mercahash.cpp
+  mercatura_pq.cpp
   obfuscation.cpp
   parse_hex.cpp
   peer_eviction.cpp

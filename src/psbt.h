@@ -95,6 +95,42 @@ struct PSBTProprietary
     }
 };
 
+struct PSBTInput;
+
+// Mercatura proprietary PSBT input fields.
+//
+// Identifier: "Mercatura"
+// Subtype 1: PQ Authorization v1 ML-DSA-65 public key
+// Subtype 2: PQ Authorization v1 ML-DSA-65 signature
+//
+// Both fields use empty proprietary key-data. They are deliberately
+// separate from secp256k1 partial signatures and BIP32 metadata.
+static constexpr uint64_t PSBT_MERCATURA_PQ_PUBLIC_KEY = 1;
+static constexpr uint64_t PSBT_MERCATURA_PQ_SIGNATURE = 2;
+
+PSBTProprietary MakeMercaturaPQPSBTProprietary(
+    uint64_t subtype,
+    std::span<const unsigned char> value);
+
+bool ValidateMercaturaPQPSBTProprietary(
+    const PSBTProprietary& entry,
+    bool has_key_data,
+    std::string& error);
+
+const std::vector<unsigned char>* GetMercaturaPQPSBTPublicKey(
+    const PSBTInput& input);
+
+const std::vector<unsigned char>* GetMercaturaPQPSBTSignature(
+    const PSBTInput& input);
+
+bool SetMercaturaPQPSBTPublicKey(
+    PSBTInput& input,
+    std::span<const unsigned char> public_key);
+
+bool SetMercaturaPQPSBTSignature(
+    PSBTInput& input,
+    std::span<const unsigned char> signature);
+
 // Takes a stream and multiple arguments and serializes them as if first serialized into a vector and then into the stream
 // The resulting output into the stream has the total serialized length of all of the objects followed by all objects concatenated with each other.
 template<typename Stream, typename... X>
@@ -840,12 +876,23 @@ struct PSBTInput
                     PSBTProprietary this_prop;
                     skey >> this_prop.identifier;
                     this_prop.subtype = ReadCompactSize(skey);
+                    const bool has_key_data{!skey.empty()};
                     this_prop.key = key;
 
                     if (m_proprietary.contains(this_prop)) {
                         throw std::ios_base::failure("Duplicate Key, proprietary key already found");
                     }
+
                     s >> this_prop.value;
+
+                    std::string mercatura_error;
+                    if (!ValidateMercaturaPQPSBTProprietary(
+                            this_prop,
+                            has_key_data,
+                            mercatura_error)) {
+                        throw std::ios_base::failure(mercatura_error);
+                    }
+
                     m_proprietary.insert(this_prop);
                     break;
                 }

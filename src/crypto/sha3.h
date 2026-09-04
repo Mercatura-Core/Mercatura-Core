@@ -63,4 +63,28 @@ public:
     SHA3_512& Reset();
 };
 
+class SHA3_384
+{
+private:
+    uint64_t m_state[25] = {0};
+    unsigned char m_buffer[8];
+    unsigned m_bufsize = 0;
+    unsigned m_pos = 0;
+
+    //! Sponge rate in bits.
+    static constexpr unsigned RATE_BITS = 832;
+
+    //! Sponge rate expressed as a multiple of the buffer size.
+    static constexpr unsigned RATE_BUFFERS = RATE_BITS / (8 * sizeof(m_buffer));
+
+    static_assert(RATE_BITS % (8 * sizeof(m_buffer)) == 0, "Rate must be a multiple of 8 bytes");
+
+public:
+    static constexpr size_t OUTPUT_SIZE = 48;
+
+    SHA3_384() = default;
+    SHA3_384& Write(std::span<const unsigned char> data);
+    SHA3_384& Finalize(std::span<unsigned char> output);
+    SHA3_384& Reset();
+};
 #endif // BITCOIN_CRYPTO_SHA3_H

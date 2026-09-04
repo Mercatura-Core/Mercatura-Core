@@ -93,6 +93,7 @@ IsMineResult LegacyWalletIsMineInnerDONOTUSE(const LegacyDataSPKM& keystore, con
     case TxoutType::NONSTANDARD:
     case TxoutType::NULL_DATA:
     case TxoutType::WITNESS_UNKNOWN:
+    case TxoutType::WITNESS_V2_MERCATURA_PQ:
     case TxoutType::WITNESS_V1_TAPROOT:
     case TxoutType::ANCHOR:
         break;
@@ -1330,6 +1331,17 @@ std::optional<PSBTError> DescriptorScriptPubKeyMan::FillPSBT(PartiallySignedTran
             script = input.non_witness_utxo->vout[txin.prevout.n].scriptPubKey;
         } else {
             // There's no UTXO so we can just skip this now
+            continue;
+        }
+
+        // Mercatura PQ Authorization v1 is handled directly by CWallet.
+        // It must never fall through the inherited secp256k1 descriptor
+        // signing path or be counted a second time by this SPKM.
+        std::vector<std::vector<unsigned char>> mercatura_pq_solutions;
+        if (Solver(
+                script,
+                mercatura_pq_solutions) ==
+            TxoutType::WITNESS_V2_MERCATURA_PQ) {
             continue;
         }
 

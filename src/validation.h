@@ -344,10 +344,26 @@ private:
     bool cacheStore;
     PrecomputedTransactionData *txdata;
     SignatureCache* m_signature_cache;
+    std::optional<uint256> m_pq_genesis_hash;
 
 public:
-    CScriptCheck(const CTxOut& outIn, const CTransaction& txToIn, SignatureCache& signature_cache, unsigned int nInIn, script_verify_flags flags, bool cacheIn, PrecomputedTransactionData* txdataIn) :
-        m_tx_out(outIn), ptxTo(&txToIn), nIn(nInIn), m_flags(flags), cacheStore(cacheIn), txdata(txdataIn), m_signature_cache(&signature_cache) { }
+    CScriptCheck(
+        const CTxOut& outIn,
+        const CTransaction& txToIn,
+        SignatureCache& signature_cache,
+        unsigned int nInIn,
+        script_verify_flags flags,
+        bool cacheIn,
+        PrecomputedTransactionData* txdataIn,
+        std::optional<uint256> pq_genesis_hash = std::nullopt) :
+        m_tx_out(outIn),
+        ptxTo(&txToIn),
+        nIn(nInIn),
+        m_flags(flags),
+        cacheStore(cacheIn),
+        txdata(txdataIn),
+        m_signature_cache(&signature_cache),
+        m_pq_genesis_hash(pq_genesis_hash) { }
 
     CScriptCheck(const CScriptCheck&) = delete;
     CScriptCheck& operator=(const CScriptCheck&) = delete;

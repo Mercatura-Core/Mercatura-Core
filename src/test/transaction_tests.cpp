@@ -14,6 +14,7 @@
 #include <consensus/tx_verify.h>
 #include <consensus/validation.h>
 #include <core_io.h>
+#include <crypto/mercatura_mldsa.h>
 #include <key.h>
 #include <policy/policy.h>
 #include <policy/settings.h>
@@ -69,6 +70,76 @@ script_verify_flags ParseScriptFlags(std::string strFlags)
         flags |= mapFlagNames.at(word);
     }
     return flags;
+}
+
+// Mercatura permanently disables inherited classical signature
+// authorization opcodes. Some upstream Bitcoin invalid-transaction
+// vectors therefore remain invalid with SCRIPT_ERR_BAD_OPCODE even
+// after the vector's originally-required verification flag is removed.
+//
+// This helper is used only by the inherited "minimal flags" test logic.
+// It does not change transaction or Script validation behavior.
+bool TransactionFailsWithBadOpcode(
+    const CTransaction& tx,
+    const std::map<COutPoint, CScript>& map_prevout_scriptPubKeys,
+    const std::map<COutPoint, int64_t>& map_prevout_values,
+    script_verify_flags flags,
+    const PrecomputedTransactionData& txdata)
+{
+    for (unsigned int i = 0; i < tx.vin.size(); ++i) {
+        const CTxIn& input{
+            tx.vin[i]
+        };
+
+        const auto script_it{
+            map_prevout_scriptPubKeys.find(
+                input.prevout)
+        };
+
+        if (script_it ==
+            map_prevout_scriptPubKeys.end()) {
+            return false;
+        }
+
+        const CAmount amount{
+            map_prevout_values.contains(
+                input.prevout)
+                ? map_prevout_values.at(
+                      input.prevout)
+                : 0
+        };
+
+        ScriptError error{
+            SCRIPT_ERR_UNKNOWN_ERROR
+        };
+
+        try {
+            const bool valid{
+                VerifyScript(
+                    input.scriptSig,
+                    script_it->second,
+                    &input.scriptWitness,
+                    flags,
+                    TransactionSignatureChecker{
+                        &tx,
+                        i,
+                        amount,
+                        txdata,
+                        MissingDataBehavior::ASSERT_FAIL},
+                    &error)
+            };
+
+            if (!valid &&
+                error ==
+                    SCRIPT_ERR_BAD_OPCODE) {
+                return true;
+            }
+        } catch (...) {
+            return false;
+        }
+    }
+
+    return false;
 }
 
 // Check that all flags in STANDARD_SCRIPT_VERIFY_FLAGS are present in mapFlagNames.
@@ -221,10 +292,44 @@ BOOST_AUTO_TEST_CASE(tx_valid)
                 BOOST_ERROR("Bad test flags: " << strTest);
             }
 
-            BOOST_CHECK_MESSAGE(CheckTxScripts(tx, mapprevOutScriptPubKeys, mapprevOutValues, ~verify_flags, txdata, strTest, /*expect_valid=*/true),
-                                "Tx unexpectedly failed: " << strTest);
+            const script_verify_flags active_flags{
+                ~verify_flags
+            };
 
-            // Backwards compatibility of script verification flags: Removing any flag(s) should not invalidate a valid transaction
+            // Bitcoin's inherited tx_valid corpus contains many
+            // transactions whose validity depends on classical
+            // CHECKSIG/CHECKMULTISIG authorization.
+            //
+            // Mercatura permanently disables those ownership
+            // authorization paths. CheckTransaction above still runs
+            // for every vector, preserving transaction-structure
+            // coverage. If the vector's intended-valid Script
+            // execution now fails specifically with BAD_OPCODE, the
+            // Bitcoin Script-flag compatibility permutations below
+            // are not applicable to Mercatura.
+            if (TransactionFailsWithBadOpcode(
+                    tx,
+                    mapprevOutScriptPubKeys,
+                    mapprevOutValues,
+                    active_flags,
+                    txdata)) {
+                continue;
+            }
+
+            BOOST_CHECK_MESSAGE(
+                CheckTxScripts(
+                    tx,
+                    mapprevOutScriptPubKeys,
+                    mapprevOutValues,
+                    active_flags,
+                    txdata,
+                    strTest,
+                    /*expect_valid=*/true),
+                "Tx unexpectedly failed: " << strTest);
+
+            // Backwards compatibility of script verification flags:
+            // Removing any flag(s) should not invalidate a valid
+            // transaction.
             for (const auto& [name, flag] : mapFlagNames) {
                 // Removing individual flags
                 script_verify_flags flags = TrimFlags(~(verify_flags | flag));
@@ -329,10 +434,36 @@ BOOST_AUTO_TEST_CASE(tx_invalid)
                 }
             }
 
-            // Check that flags are minimal: transaction should succeed if any set flags are unset.
+            // Check that flags are minimal: transaction should succeed
+            // if any set flag is unset.
+            //
+            // Exception: Mercatura permanently disables inherited
+            // classical signature authorization. If removing a Bitcoin
+            // verification flag still leaves the transaction failing
+            // specifically with SCRIPT_ERR_BAD_OPCODE, the vector is
+            // unconditionally invalid under Mercatura and the upstream
+            // minimal-flag assumption no longer applies.
             for (auto flags_excluding_one : ExcludeIndividualFlags(verify_flags)) {
-                if (!CheckTxScripts(tx, mapprevOutScriptPubKeys, mapprevOutValues, flags_excluding_one, txdata, strTest, /*expect_valid=*/true)) {
-                    BOOST_ERROR("Too many flags set: " << strTest);
+                if (TransactionFailsWithBadOpcode(
+                        tx,
+                        mapprevOutScriptPubKeys,
+                        mapprevOutValues,
+                        flags_excluding_one,
+                        txdata)) {
+                    continue;
+                }
+
+                if (!CheckTxScripts(
+                        tx,
+                        mapprevOutScriptPubKeys,
+                        mapprevOutValues,
+                        flags_excluding_one,
+                        txdata,
+                        strTest,
+                        /*expect_valid=*/true)) {
+                    BOOST_ERROR(
+                        "Too many flags set: " <<
+                        strTest);
                 }
             }
         }
@@ -449,6 +580,119 @@ BOOST_AUTO_TEST_CASE(basic_transaction_tests)
     BOOST_CHECK_MESSAGE(!CheckTransaction(CTransaction(tx), state) || !state.IsValid(), "Transaction with duplicate txins should be invalid.");
 }
 
+BOOST_AUTO_TEST_CASE(mercatura_pq_standardness)
+{
+    CCoinsView coins_dummy;
+    CCoinsViewCache coins{&coins_dummy};
+
+    std::vector<unsigned char> program(WITNESS_V2_MERCATURA_PQ_SIZE);
+    for (size_t i = 0; i < program.size(); ++i) {
+        program[i] = static_cast<unsigned char>(i);
+    }
+
+    CMutableTransaction funding;
+    funding.vin.resize(1);
+    funding.vin[0].prevout.SetNull();
+    funding.vin[0].scriptSig = CScript() << OP_0 << OP_0;
+    funding.vout.resize(1);
+    funding.vout[0].nValue = 100;
+    funding.vout[0].scriptPubKey = CScript() << OP_2 << program;
+
+    const COutPoint prevout{funding.GetHash(), 0};
+    coins.AddCoin(
+        prevout,
+        Coin{funding.vout[0], /*nHeight=*/1, /*fCoinBase=*/false},
+        /*possible_overwrite=*/false);
+
+    CMutableTransaction spend;
+    spend.version = 2;
+    spend.vin.resize(1);
+    spend.vin[0].prevout = prevout;
+    spend.vin[0].scriptSig.clear();
+    spend.vout.resize(1);
+    spend.vout[0].nValue = 99;
+    spend.vout[0].scriptPubKey = CScript() << OP_1;
+
+    const auto set_valid_pq_witness = [&] {
+        spend.vin[0].scriptWitness.stack = {
+            std::vector<unsigned char>(MERCATURA_MLDSA65_SIGNATURE_SIZE, 0),
+            std::vector<unsigned char>(MERCATURA_MLDSA65_PUBLIC_KEY_SIZE, 0),
+        };
+    };
+
+    set_valid_pq_witness();
+
+    // Exact native PQ v1 structure is standard policy.
+    BOOST_CHECK(AreInputsStandard(CTransaction{spend}, coins));
+    BOOST_CHECK(IsWitnessStandard(CTransaction{spend}, coins));
+
+    // Native PQ spends require an empty scriptSig.
+    spend.vin[0].scriptSig = CScript() << OP_0;
+    BOOST_CHECK(!AreInputsStandard(CTransaction{spend}, coins));
+    spend.vin[0].scriptSig.clear();
+
+    // Missing and extra witness items are nonstandard.
+    spend.vin[0].scriptWitness.stack.clear();
+    BOOST_CHECK(!IsWitnessStandard(CTransaction{spend}, coins));
+
+    spend.vin[0].scriptWitness.stack = {
+        std::vector<unsigned char>(MERCATURA_MLDSA65_SIGNATURE_SIZE, 0),
+    };
+    BOOST_CHECK(!IsWitnessStandard(CTransaction{spend}, coins));
+
+    set_valid_pq_witness();
+    spend.vin[0].scriptWitness.stack.emplace_back(1, 0);
+    BOOST_CHECK(!IsWitnessStandard(CTransaction{spend}, coins));
+
+    // Signature size must be exactly 3309 bytes.
+    set_valid_pq_witness();
+    spend.vin[0].scriptWitness.stack[0].resize(
+        MERCATURA_MLDSA65_SIGNATURE_SIZE - 1);
+    BOOST_CHECK(!IsWitnessStandard(CTransaction{spend}, coins));
+
+    set_valid_pq_witness();
+    spend.vin[0].scriptWitness.stack[0].resize(
+        MERCATURA_MLDSA65_SIGNATURE_SIZE + 1);
+    BOOST_CHECK(!IsWitnessStandard(CTransaction{spend}, coins));
+
+    // Public key size must be exactly 1952 bytes.
+    set_valid_pq_witness();
+    spend.vin[0].scriptWitness.stack[1].resize(
+        MERCATURA_MLDSA65_PUBLIC_KEY_SIZE - 1);
+    BOOST_CHECK(!IsWitnessStandard(CTransaction{spend}, coins));
+
+    set_valid_pq_witness();
+    spend.vin[0].scriptWitness.stack[1].resize(
+        MERCATURA_MLDSA65_PUBLIC_KEY_SIZE + 1);
+    BOOST_CHECK(!IsWitnessStandard(CTransaction{spend}, coins));
+
+    // P2SH wrapping of PQ witness-v2 is explicitly nonstandard.
+    const CScript pq_redeem{CScript() << OP_2 << program};
+
+    CMutableTransaction wrapped_funding;
+    wrapped_funding.vin.resize(1);
+    wrapped_funding.vin[0].prevout.SetNull();
+    wrapped_funding.vin[0].scriptSig = CScript() << OP_0 << OP_0;
+    wrapped_funding.vout.resize(1);
+    wrapped_funding.vout[0].nValue = 100;
+    wrapped_funding.vout[0].scriptPubKey =
+        GetScriptForDestination(ScriptHash{pq_redeem});
+
+    const COutPoint wrapped_prevout{wrapped_funding.GetHash(), 0};
+    coins.AddCoin(
+        wrapped_prevout,
+        Coin{wrapped_funding.vout[0], /*nHeight=*/1, /*fCoinBase=*/false},
+        /*possible_overwrite=*/false);
+
+    spend.vin[0].prevout = wrapped_prevout;
+    spend.vin[0].scriptSig =
+        CScript() << std::vector<unsigned char>(
+            pq_redeem.begin(), pq_redeem.end());
+    set_valid_pq_witness();
+
+    BOOST_CHECK(!IsWitnessStandard(CTransaction{spend}, coins));
+}
+
 BOOST_AUTO_TEST_CASE(test_Get)
 {
     FillableSigningProvider keystore;
@@ -475,117 +719,71 @@ BOOST_AUTO_TEST_CASE(test_Get)
     BOOST_CHECK(AreInputsStandard(CTransaction(t1), coins));
 }
 
-static void CreateCreditAndSpend(const FillableSigningProvider& keystore, const CScript& outscript, CTransactionRef& output, CMutableTransaction& input, bool success = true)
-{
-    CMutableTransaction outputm;
-    outputm.version = 1;
-    outputm.vin.resize(1);
-    outputm.vin[0].prevout.SetNull();
-    outputm.vin[0].scriptSig = CScript();
-    outputm.vout.resize(1);
-    outputm.vout[0].nValue = 1;
-    outputm.vout[0].scriptPubKey = outscript;
-    DataStream ssout;
-    ssout << TX_WITH_WITNESS(outputm);
-    ssout >> TX_WITH_WITNESS(output);
-    assert(output->vin.size() == 1);
-    assert(output->vin[0] == outputm.vin[0]);
-    assert(output->vout.size() == 1);
-    assert(output->vout[0] == outputm.vout[0]);
-
-    CMutableTransaction inputm;
-    inputm.version = 1;
-    inputm.vin.resize(1);
-    inputm.vin[0].prevout.hash = output->GetHash();
-    inputm.vin[0].prevout.n = 0;
-    inputm.vout.resize(1);
-    inputm.vout[0].nValue = 1;
-    inputm.vout[0].scriptPubKey = CScript();
-    SignatureData empty;
-    bool ret = SignSignature(keystore, *output, inputm, 0, SIGHASH_ALL, empty);
-    assert(ret == success);
-    DataStream ssin;
-    ssin << TX_WITH_WITNESS(inputm);
-    ssin >> TX_WITH_WITNESS(input);
-    assert(input.vin.size() == 1);
-    assert(input.vin[0] == inputm.vin[0]);
-    assert(input.vout.size() == 1);
-    assert(input.vout[0] == inputm.vout[0]);
-    assert(input.vin[0].scriptWitness.stack == inputm.vin[0].scriptWitness.stack);
-}
-
-static void CheckWithFlag(const CTransactionRef& output, const CMutableTransaction& input, script_verify_flags flags, bool success)
-{
-    ScriptError error;
-    CTransaction inputi(input);
-    bool ret = VerifyScript(inputi.vin[0].scriptSig, output->vout[0].scriptPubKey, &inputi.vin[0].scriptWitness, flags, TransactionSignatureChecker(&inputi, 0, output->vout[0].nValue, MissingDataBehavior::ASSERT_FAIL), &error);
-    assert(ret == success);
-}
-
-static CScript PushAll(const std::vector<valtype>& values)
-{
-    CScript result;
-    for (const valtype& v : values) {
-        if (v.size() == 0) {
-            result << OP_0;
-        } else if (v.size() == 1 && v[0] >= 1 && v[0] <= 16) {
-            result << CScript::EncodeOP_N(v[0]);
-        } else if (v.size() == 1 && v[0] == 0x81) {
-            result << OP_1NEGATE;
-        } else {
-            result << v;
-        }
-    }
-    return result;
-}
-
-static void ReplaceRedeemScript(CScript& script, const CScript& redeemScript)
-{
-    std::vector<valtype> stack;
-    EvalScript(stack, script, SCRIPT_VERIFY_STRICTENC, BaseSignatureChecker(), SigVersion::BASE);
-    assert(stack.size() > 0);
-    stack.back() = std::vector<unsigned char>(redeemScript.begin(), redeemScript.end());
-    script = PushAll(stack);
-}
-
 BOOST_AUTO_TEST_CASE(test_big_witness_transaction)
 {
     CMutableTransaction mtx;
     mtx.version = 1;
 
-    CKey key = GenerateRandomKey(); // Need to use compressed keys in segwit or the signing will fail
-    FillableSigningProvider keystore;
-    BOOST_CHECK(keystore.AddKeyPubKey(key, key.GetPubKey()));
-    CKeyID hash = key.GetPubKey().GetID();
-    CScript scriptPubKey = CScript() << OP_0 << std::vector<unsigned char>(hash.begin(), hash.end());
+    // Mercatura disables inherited ECDSA/Schnorr ownership
+    // authorization. Preserve this test's large-witness and concurrent
+    // CScriptCheck purpose with a signature-free native P2WSH spend
+    // rather than generating thousands of expensive ML-DSA signatures.
+    //
+    // Each witness supplies one 65-byte stack item followed by:
+    //
+    //     OP_DROP OP_TRUE
+    //
+    // This gives every input a genuine witness-v0 execution path while
+    // avoiding an obsolete classical ownership assumption.
+    const CScript witness_script{
+        CScript() << OP_DROP << OP_TRUE
+    };
 
-    std::vector<int> sigHashes;
-    sigHashes.push_back(SIGHASH_NONE | SIGHASH_ANYONECANPAY);
-    sigHashes.push_back(SIGHASH_SINGLE | SIGHASH_ANYONECANPAY);
-    sigHashes.push_back(SIGHASH_ALL | SIGHASH_ANYONECANPAY);
-    sigHashes.push_back(SIGHASH_NONE);
-    sigHashes.push_back(SIGHASH_SINGLE);
-    sigHashes.push_back(SIGHASH_ALL);
+    const CScript scriptPubKey{
+        GetScriptForDestination(
+            WitnessV0ScriptHash(
+                witness_script))
+    };
 
-    // create a big transaction of 4500 inputs signed by the same key
-    for(uint32_t ij = 0; ij < 4500; ij++) {
-        uint32_t i = mtx.vin.size();
-        COutPoint outpoint{Txid{"0000000000000000000000000000000000000000000000000000000000000100"}, i};
+    // Create a large transaction with 4500 witness inputs.
+    for (uint32_t ij = 0; ij < 4500; ++ij) {
+        const uint32_t i{
+            static_cast<uint32_t>(
+                mtx.vin.size())
+        };
 
-        mtx.vin.resize(mtx.vin.size() + 1);
-        mtx.vin[i].prevout = outpoint;
-        mtx.vin[i].scriptSig = CScript();
+        const COutPoint outpoint{
+            Txid{
+                "0000000000000000000000000000000000000000000000000000000000000100"
+            },
+            i
+        };
 
-        mtx.vout.resize(mtx.vout.size() + 1);
-        mtx.vout[i].nValue = 1000;
-        mtx.vout[i].scriptPubKey = CScript() << OP_1;
-    }
+        mtx.vin.resize(
+            mtx.vin.size() + 1);
 
-    // sign all inputs
-    for(uint32_t i = 0; i < mtx.vin.size(); i++) {
-        SignatureData empty;
-        bool hashSigned = SignSignature(keystore, scriptPubKey, mtx, i, 1000, sigHashes.at(i % sigHashes.size()), empty);
-        assert(hashSigned);
+        mtx.vin[i].prevout =
+            outpoint;
+
+        mtx.vin[i].scriptSig.clear();
+
+        mtx.vin[i].scriptWitness.stack = {
+            std::vector<unsigned char>(
+                65,
+                0),
+            std::vector<unsigned char>(
+                witness_script.begin(),
+                witness_script.end()),
+        };
+
+        mtx.vout.resize(
+            mtx.vout.size() + 1);
+
+        mtx.vout[i].nValue =
+            1000;
+
+        mtx.vout[i].scriptPubKey =
+            CScript() << OP_1;
     }
 
     DataStream ssout;
@@ -619,191 +817,266 @@ BOOST_AUTO_TEST_CASE(test_big_witness_transaction)
     assert(controlCheck);
 }
 
-SignatureData CombineSignatures(const CMutableTransaction& input1, const CMutableTransaction& input2, const CTransactionRef tx)
-{
-    SignatureData sigdata;
-    sigdata = DataFromTransaction(input1, 0, tx->vout[0]);
-    sigdata.MergeSignatureData(DataFromTransaction(input2, 0, tx->vout[0]));
-    ProduceSignature(DUMMY_SIGNING_PROVIDER, MutableTransactionSignatureCreator(input1, 0, tx->vout[0].nValue, SIGHASH_ALL), tx->vout[0].scriptPubKey, sigdata);
-    return sigdata;
-}
-
 BOOST_AUTO_TEST_CASE(test_witness)
 {
-    FillableSigningProvider keystore, keystore2;
-    CKey key1 = GenerateRandomKey();
-    CKey key2 = GenerateRandomKey();
-    CKey key3 = GenerateRandomKey();
-    CKey key1L = GenerateRandomKey(/*compressed=*/false);
-    CKey key2L = GenerateRandomKey(/*compressed=*/false);
-    CPubKey pubkey1 = key1.GetPubKey();
-    CPubKey pubkey2 = key2.GetPubKey();
-    CPubKey pubkey3 = key3.GetPubKey();
-    CPubKey pubkey1L = key1L.GetPubKey();
-    CPubKey pubkey2L = key2L.GetPubKey();
-    BOOST_CHECK(keystore.AddKeyPubKey(key1, pubkey1));
-    BOOST_CHECK(keystore.AddKeyPubKey(key2, pubkey2));
-    BOOST_CHECK(keystore.AddKeyPubKey(key1L, pubkey1L));
-    BOOST_CHECK(keystore.AddKeyPubKey(key2L, pubkey2L));
-    CScript scriptPubkey1, scriptPubkey2, scriptPubkey1L, scriptPubkey2L, scriptMulti;
-    scriptPubkey1 << ToByteVector(pubkey1) << OP_CHECKSIG;
-    scriptPubkey2 << ToByteVector(pubkey2) << OP_CHECKSIG;
-    scriptPubkey1L << ToByteVector(pubkey1L) << OP_CHECKSIG;
-    scriptPubkey2L << ToByteVector(pubkey2L) << OP_CHECKSIG;
-    std::vector<CPubKey> oneandthree;
-    oneandthree.push_back(pubkey1);
-    oneandthree.push_back(pubkey3);
-    scriptMulti = GetScriptForMultisig(2, oneandthree);
-    BOOST_CHECK(keystore.AddCScript(scriptPubkey1));
-    BOOST_CHECK(keystore.AddCScript(scriptPubkey2));
-    BOOST_CHECK(keystore.AddCScript(scriptPubkey1L));
-    BOOST_CHECK(keystore.AddCScript(scriptPubkey2L));
-    BOOST_CHECK(keystore.AddCScript(scriptMulti));
-    CScript destination_script_1, destination_script_2, destination_script_1L, destination_script_2L, destination_script_multi;
-    destination_script_1 = GetScriptForDestination(WitnessV0KeyHash(pubkey1));
-    destination_script_2 = GetScriptForDestination(WitnessV0KeyHash(pubkey2));
-    destination_script_1L = GetScriptForDestination(WitnessV0KeyHash(pubkey1L));
-    destination_script_2L = GetScriptForDestination(WitnessV0KeyHash(pubkey2L));
-    destination_script_multi = GetScriptForDestination(WitnessV0ScriptHash(scriptMulti));
-    BOOST_CHECK(keystore.AddCScript(destination_script_1));
-    BOOST_CHECK(keystore.AddCScript(destination_script_2));
-    BOOST_CHECK(keystore.AddCScript(destination_script_1L));
-    BOOST_CHECK(keystore.AddCScript(destination_script_2L));
-    BOOST_CHECK(keystore.AddCScript(destination_script_multi));
-    BOOST_CHECK(keystore2.AddCScript(scriptMulti));
-    BOOST_CHECK(keystore2.AddCScript(destination_script_multi));
-    BOOST_CHECK(keystore2.AddKeyPubKey(key3, pubkey3));
+    // Mercatura disables inherited ECDSA/Schnorr ownership
+    // authorization, but witness-v0 script execution itself remains
+    // useful for non-signature Script functionality.
+    //
+    // Exercise native and P2SH-wrapped P2WSH using:
+    //
+    //     <dummy> OP_DROP OP_TRUE
+    //
+    // This preserves witness-program, witness-stack, scriptSig,
+    // serialization, and SCRIPT_VERIFY_WITNESS coverage without
+    // depending on classical signatures.
+    const CScript witness_script{
+        CScript() << OP_DROP << OP_TRUE
+    };
 
-    CTransactionRef output1, output2;
-    CMutableTransaction input1, input2;
+    const CScript witness_program{
+        GetScriptForDestination(
+            WitnessV0ScriptHash{
+                witness_script})
+    };
 
-    // Normal pay-to-compressed-pubkey.
-    CreateCreditAndSpend(keystore, scriptPubkey1, output1, input1);
-    CreateCreditAndSpend(keystore, scriptPubkey2, output2, input2);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_NONE, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_NONE, false);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+    const auto verify{
+        [](
+            const CMutableTransaction& mutable_tx,
+            const CScript& prevout_script,
+            script_verify_flags flags) {
+            const CTransaction tx{
+                mutable_tx
+            };
 
-    // P2SH pay-to-compressed-pubkey.
-    CreateCreditAndSpend(keystore, GetScriptForDestination(ScriptHash(scriptPubkey1)), output1, input1);
-    CreateCreditAndSpend(keystore, GetScriptForDestination(ScriptHash(scriptPubkey2)), output2, input2);
-    ReplaceRedeemScript(input2.vin[0].scriptSig, scriptPubkey1);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_NONE, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_NONE, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+            ScriptError error{
+                SCRIPT_ERR_UNKNOWN_ERROR
+            };
 
-    // Witness pay-to-compressed-pubkey (v0).
-    CreateCreditAndSpend(keystore, destination_script_1, output1, input1);
-    CreateCreditAndSpend(keystore, destination_script_2, output2, input2);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_NONE, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_NONE, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+            return VerifyScript(
+                tx.vin.at(0).scriptSig,
+                prevout_script,
+                &tx.vin.at(0).scriptWitness,
+                flags,
+                BaseSignatureChecker{},
+                &error);
+        }
+    };
 
-    // P2SH witness pay-to-compressed-pubkey (v0).
-    CreateCreditAndSpend(keystore, GetScriptForDestination(ScriptHash(destination_script_1)), output1, input1);
-    CreateCreditAndSpend(keystore, GetScriptForDestination(ScriptHash(destination_script_2)), output2, input2);
-    ReplaceRedeemScript(input2.vin[0].scriptSig, destination_script_1);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_NONE, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_NONE, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+    CMutableTransaction spend;
+    spend.version = 2;
 
-    // Normal pay-to-uncompressed-pubkey.
-    CreateCreditAndSpend(keystore, scriptPubkey1L, output1, input1);
-    CreateCreditAndSpend(keystore, scriptPubkey2L, output2, input2);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_NONE, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_NONE, false);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+    spend.vin.emplace_back(
+        COutPoint{
+            Txid{
+                "0000000000000000000000000000000000000000000000000000000000000200"
+            },
+            0});
 
-    // P2SH pay-to-uncompressed-pubkey.
-    CreateCreditAndSpend(keystore, GetScriptForDestination(ScriptHash(scriptPubkey1L)), output1, input1);
-    CreateCreditAndSpend(keystore, GetScriptForDestination(ScriptHash(scriptPubkey2L)), output2, input2);
-    ReplaceRedeemScript(input2.vin[0].scriptSig, scriptPubkey1L);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_NONE, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_NONE, true);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, SCRIPT_VERIFY_WITNESS | SCRIPT_VERIFY_P2SH, false);
-    CheckWithFlag(output1, input2, STANDARD_SCRIPT_VERIFY_FLAGS, false);
+    spend.vout.emplace_back(
+        1,
+        CScript() << OP_TRUE);
 
-    // Signing disabled for witness pay-to-uncompressed-pubkey (v1).
-    CreateCreditAndSpend(keystore, destination_script_1L, output1, input1, false);
-    CreateCreditAndSpend(keystore, destination_script_2L, output2, input2, false);
+    spend.vin.at(0).scriptSig.clear();
 
-    // Signing disabled for P2SH witness pay-to-uncompressed-pubkey (v1).
-    CreateCreditAndSpend(keystore, GetScriptForDestination(ScriptHash(destination_script_1L)), output1, input1, false);
-    CreateCreditAndSpend(keystore, GetScriptForDestination(ScriptHash(destination_script_2L)), output2, input2, false);
+    spend.vin.at(0).scriptWitness.stack = {
+        std::vector<unsigned char>(
+            65,
+            0x42),
+        std::vector<unsigned char>(
+            witness_script.begin(),
+            witness_script.end()),
+    };
 
-    // Normal 2-of-2 multisig
-    CreateCreditAndSpend(keystore, scriptMulti, output1, input1, false);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_NONE, false);
-    CreateCreditAndSpend(keystore2, scriptMulti, output2, input2, false);
-    CheckWithFlag(output2, input2, SCRIPT_VERIFY_NONE, false);
-    BOOST_CHECK(*output1 == *output2);
-    UpdateInput(input1.vin[0], CombineSignatures(input1, input2, output1));
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+    // Without SCRIPT_VERIFY_WITNESS the witness program is treated
+    // according to legacy Script semantics.
+    BOOST_CHECK(
+        verify(
+            spend,
+            witness_program,
+            SCRIPT_VERIFY_NONE));
 
-    // P2SH 2-of-2 multisig
-    CreateCreditAndSpend(keystore, GetScriptForDestination(ScriptHash(scriptMulti)), output1, input1, false);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_NONE, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, false);
-    CreateCreditAndSpend(keystore2, GetScriptForDestination(ScriptHash(scriptMulti)), output2, input2, false);
-    CheckWithFlag(output2, input2, SCRIPT_VERIFY_NONE, true);
-    CheckWithFlag(output2, input2, SCRIPT_VERIFY_P2SH, false);
-    BOOST_CHECK(*output1 == *output2);
-    UpdateInput(input1.vin[0], CombineSignatures(input1, input2, output1));
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+    BOOST_CHECK(
+        verify(
+            spend,
+            witness_program,
+            SCRIPT_VERIFY_P2SH));
 
-    // Witness 2-of-2 multisig
-    CreateCreditAndSpend(keystore, destination_script_multi, output1, input1, false);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_NONE, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS, false);
-    CreateCreditAndSpend(keystore2, destination_script_multi, output2, input2, false);
-    CheckWithFlag(output2, input2, SCRIPT_VERIFY_NONE, true);
-    CheckWithFlag(output2, input2, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS, false);
-    BOOST_CHECK(*output1 == *output2);
-    UpdateInput(input1.vin[0], CombineSignatures(input1, input2, output1));
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+    // With witness verification enabled, execute the exact P2WSH
+    // witness script and require the resulting stack to be true.
+    BOOST_CHECK(
+        verify(
+            spend,
+            witness_program,
+            SCRIPT_VERIFY_P2SH |
+                SCRIPT_VERIFY_WITNESS));
 
-    // P2SH witness 2-of-2 multisig
-    CreateCreditAndSpend(keystore, GetScriptForDestination(ScriptHash(destination_script_multi)), output1, input1, false);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS, false);
-    CreateCreditAndSpend(keystore2, GetScriptForDestination(ScriptHash(destination_script_multi)), output2, input2, false);
-    CheckWithFlag(output2, input2, SCRIPT_VERIFY_P2SH, true);
-    CheckWithFlag(output2, input2, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS, false);
-    BOOST_CHECK(*output1 == *output2);
-    UpdateInput(input1.vin[0], CombineSignatures(input1, input2, output1));
-    CheckWithFlag(output1, input1, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_WITNESS, true);
-    CheckWithFlag(output1, input1, STANDARD_SCRIPT_VERIFY_FLAGS, true);
+    BOOST_CHECK(
+        verify(
+            spend,
+            witness_program,
+            STANDARD_SCRIPT_VERIFY_FLAGS));
+
+    // Wrong witness script must fail once witness verification is
+    // enabled, while legacy evaluation does not inspect the witness.
+    {
+        CMutableTransaction wrong_script{
+            spend
+        };
+
+        const CScript different_script{
+            CScript() << OP_TRUE
+        };
+
+        wrong_script.vin.at(0)
+            .scriptWitness.stack.back() =
+            std::vector<unsigned char>(
+                different_script.begin(),
+                different_script.end());
+
+        BOOST_CHECK(
+            verify(
+                wrong_script,
+                witness_program,
+                SCRIPT_VERIFY_NONE));
+
+        BOOST_CHECK(
+            !verify(
+                wrong_script,
+                witness_program,
+                SCRIPT_VERIFY_P2SH |
+                    SCRIPT_VERIFY_WITNESS));
+    }
+
+    // The witness script requires one item for OP_DROP.
+    {
+        CMutableTransaction missing_item{
+            spend
+        };
+
+        missing_item.vin.at(0)
+            .scriptWitness.stack.erase(
+                missing_item.vin.at(0)
+                    .scriptWitness.stack.begin());
+
+        BOOST_CHECK(
+            !verify(
+                missing_item,
+                witness_program,
+                SCRIPT_VERIFY_P2SH |
+                    SCRIPT_VERIFY_WITNESS));
+    }
+
+    // Native witness programs require an empty scriptSig.
+    {
+        CMutableTransaction nonempty_scriptsig{
+            spend
+        };
+
+        nonempty_scriptsig.vin.at(0)
+            .scriptSig =
+            CScript() << OP_0;
+
+        BOOST_CHECK(
+            !verify(
+                nonempty_scriptsig,
+                witness_program,
+                SCRIPT_VERIFY_P2SH |
+                    SCRIPT_VERIFY_WITNESS));
+    }
+
+    // Witness data must survive transaction serialization exactly.
+    {
+        DataStream encoded;
+        encoded << TX_WITH_WITNESS(spend);
+
+        CMutableTransaction decoded;
+        encoded >> TX_WITH_WITNESS(decoded);
+
+        BOOST_REQUIRE_EQUAL(
+            decoded.vin.size(),
+            1U);
+
+        BOOST_CHECK(
+            decoded.vin.at(0)
+                .scriptWitness.stack ==
+            spend.vin.at(0)
+                .scriptWitness.stack);
+
+        BOOST_CHECK(
+            verify(
+                decoded,
+                witness_program,
+                SCRIPT_VERIFY_P2SH |
+                    SCRIPT_VERIFY_WITNESS));
+    }
+
+    // P2SH-wrapped witness-v0 remains valid for non-signature Script.
+    // Mercatura's P2SH prohibition applies specifically to PQ witness-v2.
+    const CScript wrapped_program{
+        GetScriptForDestination(
+            ScriptHash{
+                witness_program})
+    };
+
+    CMutableTransaction wrapped{
+        spend
+    };
+
+    wrapped.vin.at(0).scriptSig =
+        CScript() <<
+        std::vector<unsigned char>(
+            witness_program.begin(),
+            witness_program.end());
+
+    BOOST_CHECK(
+        verify(
+            wrapped,
+            wrapped_program,
+            SCRIPT_VERIFY_P2SH));
+
+    BOOST_CHECK(
+        verify(
+            wrapped,
+            wrapped_program,
+            SCRIPT_VERIFY_P2SH |
+                SCRIPT_VERIFY_WITNESS));
+
+    BOOST_CHECK(
+        verify(
+            wrapped,
+            wrapped_program,
+            STANDARD_SCRIPT_VERIFY_FLAGS));
+
+    // A different redeem program must fail the P2SH commitment.
+    {
+        CMutableTransaction wrong_redeem{
+            wrapped
+        };
+
+        const CScript other_witness_script{
+            CScript() << OP_FALSE << OP_TRUE
+        };
+
+        const CScript other_witness_program{
+            GetScriptForDestination(
+                WitnessV0ScriptHash{
+                    other_witness_script})
+        };
+
+        wrong_redeem.vin.at(0)
+            .scriptSig =
+            CScript() <<
+            std::vector<unsigned char>(
+                other_witness_program.begin(),
+                other_witness_program.end());
+
+        BOOST_CHECK(
+            !verify(
+                wrong_redeem,
+                wrapped_program,
+                SCRIPT_VERIFY_P2SH));
+    }
 }
 
 BOOST_AUTO_TEST_CASE(MercaturaUndiscountedFeeSizeTest)
@@ -851,8 +1124,23 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vin[0].scriptSig << std::vector<unsigned char>(65, 0);
     t.vout.resize(1);
     t.vout[0].nValue = 90*CENT;
-    CKey key = GenerateRandomKey();
-    t.vout[0].scriptPubKey = GetScriptForDestination(PKHash(key.GetPubKey()));
+
+    // Mercatura's normal standard ownership output is native
+    // witness-v2 PQ Authorization v1, not inherited P2PKH.
+    const CScript standard_output_script{
+        GetScriptForDestination(
+            WitnessV2MercaturaPQ{})
+    };
+
+    // Retain one classical public key only for explicit legacy
+    // standardness/classification fixtures later in this test.
+    // It is not used as Mercatura's normal ownership destination.
+    const CKey legacy_test_key{
+        GenerateRandomKey()
+    };
+
+    t.vout[0].scriptPubKey =
+        standard_output_script;
 
     constexpr auto CheckIsStandard = [](const auto& t, const unsigned int max_op_return_relay = MAX_OP_RETURN_RELAY) {
         std::string reason;
@@ -901,24 +1189,62 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.version = 2;
     CheckIsStandard(t);
 
-    // Check dust with odd relay fee to verify rounding:
-    // nDustThreshold = 182 * 3702 / 1000
+    // Check the standard PQ output's dust boundary with an odd
+    // relay fee. The exact threshold differs from inherited P2PKH
+    // because Mercatura accounts for the much larger PQ spend size.
     g_dust = CFeeRate(3702);
-    // dust:
-    t.vout[0].nValue = 674 - 1;
-    CheckIsNotStandard(t, "dust");
-    // not dust:
-    t.vout[0].nValue = 674;
+
+    const CAmount odd_fee_pq_dust_threshold{
+        GetDustThreshold(
+            t.vout[0],
+            g_dust)
+    };
+
+    BOOST_CHECK_GT(
+        odd_fee_pq_dust_threshold,
+        0);
+
+    // One base unit below the calculated threshold is dust.
+    t.vout[0].nValue =
+        odd_fee_pq_dust_threshold - 1;
+
+    CheckIsNotStandard(
+        t,
+        "dust");
+
+    // The exact threshold is standard.
+    t.vout[0].nValue =
+        odd_fee_pq_dust_threshold;
+
     CheckIsStandard(t);
 
-    // Mercatura does not apply Bitcoin's witness discount to dust accounting.
-    // P2WPKH output: 31 serialized bytes + 148-byte full input estimate = 179 bytes.
-    t.vout[0].scriptPubKey = CScript() << OP_0 << std::vector<unsigned char>(20, 0);
-    BOOST_CHECK_EQUAL(GetDustThreshold(t.vout[0], g_dust), 663);
+    // Mercatura does not apply Bitcoin's witness discount to dust
+    // accounting. Keep this inherited P2WPKH shape only as an
+    // accounting fixture; it is not a normal Mercatura ownership
+    // destination.
+    //
+    // P2WPKH output: 31 serialized bytes + 148-byte full input
+    // estimate = 179 bytes.
+    t.vout[0].scriptPubKey =
+        CScript() <<
+        OP_0 <<
+        std::vector<unsigned char>(
+            20,
+            0);
 
-    // Restore the P2PKH output and default dust relay rate.
-    t.vout[0].scriptPubKey = GetScriptForDestination(PKHash(key.GetPubKey()));
-    g_dust = CFeeRate{DUST_RELAY_TX_FEE};
+    BOOST_CHECK_EQUAL(
+        GetDustThreshold(
+            t.vout[0],
+            g_dust),
+        663);
+
+    // Restore Mercatura's standard PQ output and default dust relay fee.
+    t.vout[0].scriptPubKey =
+        standard_output_script;
+
+    g_dust =
+        CFeeRate{
+            DUST_RELAY_TX_FEE};
 
     t.vout[0].scriptPubKey = CScript() << OP_1;
     CheckIsNotStandard(t, "scriptpubkey");
@@ -977,7 +1303,8 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     // Check large scriptSig (non-standard if size is >1650 bytes)
     t.vout.resize(1);
     t.vout[0].nValue = MAX_MONEY;
-    t.vout[0].scriptPubKey = GetScriptForDestination(PKHash(key.GetPubKey()));
+    t.vout[0].scriptPubKey =
+        standard_output_script;
     // OP_PUSHDATA2 with len (3 bytes) + data (1647 bytes) = 1650 bytes
     t.vin[0].scriptSig = CScript() << std::vector<unsigned char>(1647, 0); // 1650
     CheckIsStandard(t);
@@ -1037,7 +1364,7 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
 
     // Check bare multisig (standard if policy flag g_bare_multi is set)
     g_bare_multi = true;
-    t.vout[0].scriptPubKey = GetScriptForMultisig(1, {key.GetPubKey()}); // simple 1-of-1
+    t.vout[0].scriptPubKey = GetScriptForMultisig(1, {legacy_test_key.GetPubKey()}); // simple 1-of-1
     t.vin.resize(1);
     t.vin[0].scriptSig = CScript() << std::vector<unsigned char>(65, 0);
     CheckIsStandard(t);
@@ -1099,15 +1426,43 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vout[0].nValue = 1;
     CheckIsNotStandard(t, "dust");
 
-    // Check future Witness Program versions dust threshold (non-32-byte pushes are undefined for version 1)
-    for (int op = OP_1; op <= OP_16; op += 1) {
-        t.vout[0].scriptPubKey = CScript() << (opcodetype)op << std::vector<unsigned char>(2, 0);
+    // Check undefined future witness-program versions against
+    // Mercatura's dust policy.
+    //
+    // Witness version 2 is permanently assigned to PQ Authorization v1
+    // and requires exactly a 32-byte program, so a 2-byte v2 program is
+    // deliberately nonstandard and must not be treated as an undefined
+    // future witness version.
+    for (int op = OP_1; op <= OP_16; ++op) {
+        if (op == OP_2) {
+            continue;
+        }
+
+        t.vout[0].scriptPubKey =
+            CScript() <<
+            static_cast<opcodetype>(op) <<
+            std::vector<unsigned char>(2, 0);
+
         t.vout[0].nValue = 2;
         CheckIsStandard(t);
 
         t.vout[0].nValue = 1;
         CheckIsNotStandard(t, "dust");
     }
+
+    // Witness-v2 is Mercatura PQ Authorization v1 only. Any v2
+    // program length other than exactly 32 bytes is nonstandard
+    // regardless of output value.
+    t.vout[0].scriptPubKey =
+        CScript() <<
+        OP_2 <<
+        std::vector<unsigned char>(2, 0);
+
+    t.vout[0].nValue = 2;
+    CheckIsNotStandard(t, "scriptpubkey");
+
+    t.vout[0].nValue = 1;
+    CheckIsNotStandard(t, "scriptpubkey");
 
     // Check anchor outputs
     t.vout[0].scriptPubKey = CScript() << OP_1 << ANCHOR_BYTES;
@@ -1276,8 +1631,8 @@ BOOST_AUTO_TEST_CASE(spends_witness_prog)
     std::vector<std::vector<uint8_t>> sol_dummy;
 
     // CNoDestination, PubKeyDestination, PKHash, ScriptHash, WitnessV0ScriptHash, WitnessV0KeyHash,
-    // WitnessV1Taproot, PayToAnchor, WitnessUnknown.
-    static_assert(std::variant_size_v<CTxDestination> == 9);
+    // WitnessV1Taproot, WitnessV2MercaturaPQ, PayToAnchor, WitnessUnknown.
+    static_assert(std::variant_size_v<CTxDestination> == 10);
 
     // Go through all defined output types and sanity check SpendsNonAnchorWitnessProg.
 
@@ -1360,6 +1715,13 @@ BOOST_AUTO_TEST_CASE(spends_witness_prog)
     tx_spend.vin[0].scriptSig.clear();
     BOOST_CHECK(!::SpendsNonAnchorWitnessProg(CTransaction{tx_spend}, coins));
 
+    // Mercatura PQ Authorization v1 (native witness v2)
+    tx_create.vout[0].scriptPubKey = GetScriptForDestination(WitnessV2MercaturaPQ{});
+    BOOST_CHECK_EQUAL(Solver(tx_create.vout[0].scriptPubKey, sol_dummy), TxoutType::WITNESS_V2_MERCATURA_PQ);
+    tx_spend.vin[0].prevout.hash = tx_create.GetHash();
+    AddCoins(coins, CTransaction{tx_create}, 0, false);
+    BOOST_CHECK(::SpendsNonAnchorWitnessProg(CTransaction{tx_spend}, coins));
+
     // P2A
     tx_create.vout[0].scriptPubKey = GetScriptForDestination(PayToAnchor{});
     BOOST_CHECK_EQUAL(Solver(tx_create.vout[0].scriptPubKey, sol_dummy), TxoutType::ANCHOR);
@@ -1395,9 +1757,10 @@ BOOST_AUTO_TEST_CASE(spends_witness_prog)
     tx_spend.vin[0].scriptSig.clear();
     BOOST_CHECK(!::SpendsNonAnchorWitnessProg(CTransaction{tx_spend}, coins));
 
-    // Various undefined version >1 32-byte witness programs.
+    // Various undefined witness versions 3-16 with 32-byte programs.
+    // Witness version 2 is permanently assigned to Mercatura PQ Authorization v1.
     const auto program{ToByteVector(XOnlyPubKey{pubkey})};
-    for (int i{2}; i <= 16; ++i) {
+    for (int i{3}; i <= 16; ++i) {
         tx_create.vout[0].scriptPubKey = GetScriptForDestination(WitnessUnknown{i, program});
         BOOST_CHECK_EQUAL(Solver(tx_create.vout[0].scriptPubKey, sol_dummy), TxoutType::WITNESS_UNKNOWN);
         tx_spend.vin[0].prevout.hash = tx_create.GetHash();

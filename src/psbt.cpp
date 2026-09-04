@@ -3,7 +3,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <psbt.h>
+#include <crypto/mercatura_mldsa.h>
 
+#include <chainparams.h>
 #include <common/types.h>
 #include <node/types.h>
 #include <policy/policy.h>
@@ -11,7 +13,254 @@
 #include <util/check.h>
 #include <util/strencodings.h>
 
+
 using common::PSBTError;
+
+namespace {
+
+const std::vector<unsigned char>& MercaturaPSBTIdentifier()
+{
+    static const std::vector<unsigned char> identifier{
+        'M', 'e', 'r', 'c', 'a', 't', 'u', 'r', 'a'
+    };
+    return identifier;
+}
+
+size_t MercaturaPQPSBTExpectedSize(uint64_t subtype)
+{
+    switch (subtype) {
+    case PSBT_MERCATURA_PQ_PUBLIC_KEY:
+        return MERCATURA_MLDSA65_PUBLIC_KEY_SIZE;
+    case PSBT_MERCATURA_PQ_SIGNATURE:
+        return MERCATURA_MLDSA65_SIGNATURE_SIZE;
+    default:
+        return 0;
+    }
+}
+
+const PSBTProprietary* FindMercaturaPQPSBTField(
+    const PSBTInput& input,
+    uint64_t subtype)
+{
+    const PSBTProprietary needle{
+        MakeMercaturaPQPSBTProprietary(
+            subtype,
+            std::span<const unsigned char>{})
+    };
+
+    const auto it{
+        input.m_proprietary.find(
+            needle)
+    };
+
+    if (it == input.m_proprietary.end()) {
+        return nullptr;
+    }
+
+    return &*it;
+}
+
+bool SetMercaturaPQPSBTField(
+    PSBTInput& input,
+    uint64_t subtype,
+    std::span<const unsigned char> value)
+{
+    const size_t expected{
+        MercaturaPQPSBTExpectedSize(
+            subtype)
+    };
+
+    if (expected == 0 ||
+        value.size() != expected) {
+        return false;
+    }
+
+    PSBTProprietary entry{
+        MakeMercaturaPQPSBTProprietary(
+            subtype,
+            value)
+    };
+
+    const auto existing{
+        input.m_proprietary.find(
+            entry)
+    };
+
+    if (existing !=
+        input.m_proprietary.end()) {
+        input.m_proprietary.erase(
+            existing);
+    }
+
+    input.m_proprietary.insert(
+        std::move(entry));
+
+    return true;
+}
+
+bool MercaturaPQPSBTFieldsConflict(
+    const PSBTInput& first,
+    const PSBTInput& second)
+{
+    for (const uint64_t subtype : {
+             PSBT_MERCATURA_PQ_PUBLIC_KEY,
+             PSBT_MERCATURA_PQ_SIGNATURE}) {
+        const PSBTProprietary* first_entry{
+            FindMercaturaPQPSBTField(
+                first,
+                subtype)
+        };
+
+        const PSBTProprietary* second_entry{
+            FindMercaturaPQPSBTField(
+                second,
+                subtype)
+        };
+
+        if (first_entry != nullptr &&
+            second_entry != nullptr &&
+            first_entry->value !=
+                second_entry->value) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+} // namespace
+
+PSBTProprietary MakeMercaturaPQPSBTProprietary(
+    uint64_t subtype,
+    std::span<const unsigned char> value)
+{
+    PSBTProprietary entry;
+    entry.subtype = subtype;
+    entry.identifier =
+        MercaturaPSBTIdentifier();
+    entry.value.assign(
+        value.begin(),
+        value.end());
+
+    VectorWriter key_writer{
+        entry.key,
+        0
+    };
+
+    key_writer <<
+        CompactSizeWriter{
+            PSBT_IN_PROPRIETARY};
+
+    key_writer <<
+        entry.identifier;
+
+    key_writer <<
+        CompactSizeWriter{
+            subtype};
+
+    return entry;
+}
+
+bool ValidateMercaturaPQPSBTProprietary(
+    const PSBTProprietary& entry,
+    bool has_key_data,
+    std::string& error)
+{
+    if (entry.identifier !=
+        MercaturaPSBTIdentifier()) {
+        return true;
+    }
+
+    const size_t expected{
+        MercaturaPQPSBTExpectedSize(
+            entry.subtype)
+    };
+
+    // Unknown Mercatura proprietary subtypes remain forward-compatible.
+    if (expected == 0) {
+        return true;
+    }
+
+    if (has_key_data) {
+        error =
+            "Mercatura PQ PSBT proprietary key data must be empty";
+        return false;
+    }
+
+    if (entry.value.size() !=
+        expected) {
+        if (entry.subtype ==
+            PSBT_MERCATURA_PQ_PUBLIC_KEY) {
+            error =
+                "Mercatura PQ PSBT public key must be exactly 1952 bytes";
+        } else {
+            error =
+                "Mercatura PQ PSBT signature must be exactly 3309 bytes";
+        }
+
+        return false;
+    }
+
+    return true;
+}
+
+const std::vector<unsigned char>*
+GetMercaturaPQPSBTPublicKey(
+    const PSBTInput& input)
+{
+    const PSBTProprietary* entry{
+        FindMercaturaPQPSBTField(
+            input,
+            PSBT_MERCATURA_PQ_PUBLIC_KEY)
+    };
+
+    if (entry == nullptr ||
+        entry->value.size() !=
+            MERCATURA_MLDSA65_PUBLIC_KEY_SIZE) {
+        return nullptr;
+    }
+
+    return &entry->value;
+}
+
+const std::vector<unsigned char>*
+GetMercaturaPQPSBTSignature(
+    const PSBTInput& input)
+{
+    const PSBTProprietary* entry{
+        FindMercaturaPQPSBTField(
+            input,
+            PSBT_MERCATURA_PQ_SIGNATURE)
+    };
+
+    if (entry == nullptr ||
+        entry->value.size() !=
+            MERCATURA_MLDSA65_SIGNATURE_SIZE) {
+        return nullptr;
+    }
+
+    return &entry->value;
+}
+
+bool SetMercaturaPQPSBTPublicKey(
+    PSBTInput& input,
+    std::span<const unsigned char> public_key)
+{
+    return SetMercaturaPQPSBTField(
+        input,
+        PSBT_MERCATURA_PQ_PUBLIC_KEY,
+        public_key);
+}
+
+bool SetMercaturaPQPSBTSignature(
+    PSBTInput& input,
+    std::span<const unsigned char> signature)
+{
+    return SetMercaturaPQPSBTField(
+        input,
+        PSBT_MERCATURA_PQ_SIGNATURE,
+        signature);
+}
 
 PartiallySignedTransaction::PartiallySignedTransaction(const CMutableTransaction& tx) : tx(tx)
 {
@@ -32,6 +281,12 @@ bool PartiallySignedTransaction::Merge(const PartiallySignedTransaction& psbt)
     }
 
     for (unsigned int i = 0; i < inputs.size(); ++i) {
+        if (MercaturaPQPSBTFieldsConflict(
+                inputs[i],
+                psbt.inputs[i])) {
+            return false;
+        }
+
         inputs[i].Merge(psbt.inputs[i]);
     }
     for (unsigned int i = 0; i < outputs.size(); ++i) {
@@ -226,6 +481,7 @@ void PSBTInput::Merge(const PSBTInput& input)
     hash256_preimages.insert(input.hash256_preimages.begin(), input.hash256_preimages.end());
     hd_keypaths.insert(input.hd_keypaths.begin(), input.hd_keypaths.end());
     unknown.insert(input.unknown.begin(), input.unknown.end());
+    m_proprietary.insert(input.m_proprietary.begin(), input.m_proprietary.end());
     m_tap_script_sigs.insert(input.m_tap_script_sigs.begin(), input.m_tap_script_sigs.end());
     m_tap_scripts.insert(input.m_tap_scripts.begin(), input.m_tap_scripts.end());
     m_tap_bip32_paths.insert(input.m_tap_bip32_paths.begin(), input.m_tap_bip32_paths.end());
@@ -344,10 +600,51 @@ bool PSBTInputSignedAndVerified(const PartiallySignedTransaction& psbt, unsigned
         return false;
     }
 
+    // Mercatura PQ Authorization v1 has exactly one fixed signing
+    // mode. Reject contradictory PSBT sighash metadata even when
+    // the input already contains an otherwise valid final witness.
+    int witness_version{-1};
+    std::vector<unsigned char> witness_program;
+
+    if (utxo.scriptPubKey.IsWitnessProgram(
+            witness_version,
+            witness_program) &&
+        witness_version == 2 &&
+        witness_program.size() == 32 &&
+        input.sighash_type.has_value() &&
+        *input.sighash_type != SIGHASH_DEFAULT) {
+        return false;
+    }
+
+    const uint256& genesis_hash{
+        Params().GetConsensus().hashGenesisBlock
+    };
+
     if (txdata) {
-        return VerifyScript(input.final_script_sig, utxo.scriptPubKey, &input.final_script_witness, STANDARD_SCRIPT_VERIFY_FLAGS, MutableTransactionSignatureChecker{&(*psbt.tx), input_index, utxo.nValue, *txdata, MissingDataBehavior::FAIL});
+        return VerifyScript(
+            input.final_script_sig,
+            utxo.scriptPubKey,
+            &input.final_script_witness,
+            STANDARD_SCRIPT_VERIFY_FLAGS,
+            MutableTransactionSignatureChecker{
+                &(*psbt.tx),
+                input_index,
+                utxo.nValue,
+                *txdata,
+                MissingDataBehavior::FAIL,
+                genesis_hash});
     } else {
-        return VerifyScript(input.final_script_sig, utxo.scriptPubKey, &input.final_script_witness, STANDARD_SCRIPT_VERIFY_FLAGS, MutableTransactionSignatureChecker{&(*psbt.tx), input_index, utxo.nValue, MissingDataBehavior::FAIL});
+        return VerifyScript(
+            input.final_script_sig,
+            utxo.scriptPubKey,
+            &input.final_script_witness,
+            STANDARD_SCRIPT_VERIFY_FLAGS,
+            MutableTransactionSignatureChecker{
+                &(*psbt.tx),
+                input_index,
+                utxo.nValue,
+                MissingDataBehavior::FAIL,
+                genesis_hash});
     }
 }
 
@@ -435,6 +732,96 @@ PSBTError SignPSBTInput(const SigningProvider& provider, PartiallySignedTransact
         require_witness_sig = true;
     } else {
         return PSBTError::MISSING_INPUTS;
+    }
+
+    // Mercatura PQ Authorization v1 is a dedicated native witness-v2
+    // authorization path. It does not use Bitcoin partial signatures,
+    // BIP32 key metadata, or an appended sighash byte.
+    int witness_version{-1};
+    std::vector<unsigned char> witness_program;
+
+    const bool is_mercatura_pq{
+        utxo.scriptPubKey.IsWitnessProgram(
+            witness_version,
+            witness_program) &&
+        witness_version == 2 &&
+        witness_program.size() == 32
+    };
+
+    if (is_mercatura_pq) {
+        // PQ Authorization v1 has exactly one signing mode:
+        // SIGHASH_DEFAULT, with no sighash byte appended to the signature.
+        if ((sighash.has_value() &&
+             *sighash != SIGHASH_DEFAULT) ||
+            (input.sighash_type.has_value() &&
+             *input.sighash_type != SIGHASH_DEFAULT)) {
+            return PSBTError::SIGHASH_MISMATCH;
+        }
+
+        const auto* public_key{
+            GetMercaturaPQPSBTPublicKey(
+                input)
+        };
+
+        const auto* signature{
+            GetMercaturaPQPSBTSignature(
+                input)
+        };
+
+        if (public_key == nullptr ||
+            signature == nullptr ||
+            txdata == nullptr) {
+            return PSBTError::INCOMPLETE;
+        }
+
+        // Construct the exact candidate witness required by PQ
+        // Authorization v1:
+        //
+        //   witness[0] = raw 3309-byte ML-DSA-65 signature
+        //   witness[1] = raw 1952-byte ML-DSA-65 public key
+        //
+        // VerifyScript is intentionally used here rather than duplicating
+        // PQ consensus checks in PSBT code. This validates witness
+        // structure, key commitment, transaction authorization digest,
+        // genesis binding, and the ML-DSA signature through the normal
+        // Mercatura consensus verifier.
+        CScriptWitness candidate_witness;
+        candidate_witness.stack = {
+            *signature,
+            *public_key
+        };
+
+        const uint256& genesis_hash{
+            Params().GetConsensus().hashGenesisBlock
+        };
+
+        if (!VerifyScript(
+                CScript{},
+                utxo.scriptPubKey,
+                &candidate_witness,
+                STANDARD_SCRIPT_VERIFY_FLAGS,
+                MutableTransactionSignatureChecker{
+                    &tx,
+                    static_cast<unsigned int>(index),
+                    utxo.nValue,
+                    *txdata,
+                    MissingDataBehavior::FAIL,
+                    genesis_hash})) {
+            return PSBTError::INCOMPLETE;
+        }
+
+        // A native PQ witness UTXO is sufficient once the authorization
+        // has been verified. Preserve it for later PSBT processing and
+        // possible non_witness_utxo pruning.
+        input.witness_utxo = utxo;
+
+        if (finalize) {
+            input.final_script_sig.clear();
+            input.final_script_witness =
+                std::move(candidate_witness);
+        }
+
+        return PSBTError::OK;
     }
 
     // Get the sighash type

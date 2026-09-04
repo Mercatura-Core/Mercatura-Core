@@ -211,11 +211,12 @@ BOOST_AUTO_TEST_CASE(script_standard_Solver_failure)
     s << OP_1 << std::vector<unsigned char>(33, 0x01);
     BOOST_CHECK_EQUAL(Solver(s, solutions), TxoutType::WITNESS_UNKNOWN);
 
-    // TxoutType::ANCHOR but wrong witness version
+    // Witness version 2 is permanently assigned to Mercatura PQ v1.
+    // Any program length other than 32 bytes is invalid/non-standard.
     s.clear();
     s << OP_2 << ANCHOR_BYTES;
     BOOST_CHECK(!s.IsPayToAnchor());
-    BOOST_CHECK_EQUAL(Solver(s, solutions), TxoutType::WITNESS_UNKNOWN);
+    BOOST_CHECK_EQUAL(Solver(s, solutions), TxoutType::NONSTANDARD);
 
     // TxoutType::ANCHOR but wrong 2-byte data push
     s.clear();
@@ -298,11 +299,24 @@ BOOST_AUTO_TEST_CASE(script_standard_ExtractDestination)
     WitnessUnknown unk_v1{1, ToByteVector(pubkey)};
     BOOST_CHECK(std::get<WitnessUnknown>(address) == unk_v1);
     s.clear();
-    // -> segwit versions 2+ are not specified yet
+
+    // Mercatura witness v2 with exactly 32 bytes is PQ Authorization v1.
     s << OP_2 << ToByteVector(xpk);
     BOOST_CHECK(ExtractDestination(s, address));
-    WitnessUnknown unk_v2{2, ToByteVector(xpk)};
-    BOOST_CHECK(std::get<WitnessUnknown>(address) == unk_v2);
+
+    WitnessV2MercaturaPQ pq;
+    std::copy(xpk.begin(), xpk.end(), pq.begin());
+
+    BOOST_CHECK(
+        std::get<WitnessV2MercaturaPQ>(address) == pq);
+
+    // Future witness versions remain represented as WitnessUnknown.
+    s.clear();
+    s << OP_3 << ToByteVector(xpk);
+    BOOST_CHECK(ExtractDestination(s, address));
+
+    WitnessUnknown unk_v3{3, ToByteVector(xpk)};
+    BOOST_CHECK(std::get<WitnessUnknown>(address) == unk_v3);
 }
 
 BOOST_AUTO_TEST_CASE(script_standard_GetScriptFor_)

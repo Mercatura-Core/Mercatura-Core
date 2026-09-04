@@ -97,6 +97,18 @@ std::string ScriptErrorString(const ScriptError serror)
             return "Witness provided for non-witness script";
         case SCRIPT_ERR_WITNESS_PUBKEYTYPE:
             return "Using non-compressed keys in segwit";
+        case SCRIPT_ERR_PQ_P2SH_WRAPPED:
+            return "Mercatura PQ witness program must not be P2SH wrapped";
+        case SCRIPT_ERR_PQ_WITNESS_STRUCTURE:
+            return "Invalid Mercatura PQ witness structure";
+        case SCRIPT_ERR_PQ_SIGNATURE_SIZE:
+            return "Invalid Mercatura PQ signature size";
+        case SCRIPT_ERR_PQ_PUBLIC_KEY_SIZE:
+            return "Invalid Mercatura PQ public key size";
+        case SCRIPT_ERR_PQ_KEY_COMMITMENT:
+            return "Mercatura PQ public key commitment mismatch";
+        case SCRIPT_ERR_PQ_SIGNATURE:
+            return "Invalid Mercatura PQ signature";
         case SCRIPT_ERR_SCHNORR_SIG_SIZE:
             return "Invalid Schnorr signature size";
         case SCRIPT_ERR_SCHNORR_SIG_HASHTYPE:

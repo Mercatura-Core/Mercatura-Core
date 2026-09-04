@@ -5,6 +5,9 @@
 
 #include <script/interpreter.h>
 
+#include <crypto/mercatura_mldsa.h>
+#include <crypto/mercatura_pqkey.h>
+#include <consensus/consensus.h>
 #include <crypto/ripemd160.h>
 #include <crypto/sha1.h>
 #include <crypto/sha256.h>
@@ -318,7 +321,7 @@ public:
 };
 }
 
-static bool EvalChecksigPreTapscript(const valtype& vchSig, const valtype& vchPubKey, CScript::const_iterator pbegincodehash, CScript::const_iterator pend, script_verify_flags flags, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptError* serror, bool& fSuccess)
+[[maybe_unused]] static bool EvalChecksigPreTapscript(const valtype& vchSig, const valtype& vchPubKey, CScript::const_iterator pbegincodehash, CScript::const_iterator pend, script_verify_flags flags, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptError* serror, bool& fSuccess)
 {
     assert(sigversion == SigVersion::BASE || sigversion == SigVersion::WITNESS_V0);
 
@@ -344,7 +347,7 @@ static bool EvalChecksigPreTapscript(const valtype& vchSig, const valtype& vchPu
     return true;
 }
 
-static bool EvalChecksigTapscript(const valtype& sig, const valtype& pubkey, ScriptExecutionData& execdata, script_verify_flags flags, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptError* serror, bool& success)
+[[maybe_unused]] static bool EvalChecksigTapscript(const valtype& sig, const valtype& pubkey, ScriptExecutionData& execdata, script_verify_flags flags, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptError* serror, bool& success)
 {
     assert(sigversion == SigVersion::TAPSCRIPT);
 
@@ -389,20 +392,24 @@ static bool EvalChecksigTapscript(const valtype& sig, const valtype& pubkey, Scr
  * A return value of false means the script fails entirely. When true is returned, the
  * success variable indicates whether the signature check itself succeeded.
  */
-static bool EvalChecksig(const valtype& sig, const valtype& pubkey, CScript::const_iterator pbegincodehash, CScript::const_iterator pend, ScriptExecutionData& execdata, script_verify_flags flags, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptError* serror, bool& success)
+static bool EvalChecksig(
+    const valtype& sig,
+    const valtype& pubkey,
+    CScript::const_iterator pbegincodehash,
+    CScript::const_iterator pend,
+    ScriptExecutionData& execdata,
+    script_verify_flags flags,
+    const BaseSignatureChecker& checker,
+    SigVersion sigversion,
+    ScriptError* serror,
+    bool& success)
 {
-    switch (sigversion) {
-    case SigVersion::BASE:
-    case SigVersion::WITNESS_V0:
-        return EvalChecksigPreTapscript(sig, pubkey, pbegincodehash, pend, flags, checker, sigversion, serror, success);
-    case SigVersion::TAPSCRIPT:
-        return EvalChecksigTapscript(sig, pubkey, execdata, flags, checker, sigversion, serror, success);
-    case SigVersion::TAPROOT:
-        // Key path spending in Taproot has no script, so this is unreachable.
-        break;
-    }
-    assert(false);
+    // Mercatura PQ Authorization v1 is the sole normal cryptographic
+    // ownership mechanism. Inherited ECDSA and Schnorr CHECKSIG-family
+    // authorization is disabled at consensus.
+    return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
 }
+
 
 bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& script, script_verify_flags flags, const BaseSignatureChecker& checker, SigVersion sigversion, ScriptExecutionData& execdata, ScriptError* serror)
 {
@@ -1105,114 +1112,17 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
                 case OP_CHECKMULTISIG:
                 case OP_CHECKMULTISIGVERIFY:
                 {
-                    if (sigversion == SigVersion::TAPSCRIPT) return set_error(serror, SCRIPT_ERR_TAPSCRIPT_CHECKMULTISIG);
-
-                    // ([sig ...] num_of_signatures [pubkey ...] num_of_pubkeys -- bool)
-
-                    int i = 1;
-                    if ((int)stack.size() < i)
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-
-                    int nKeysCount = CScriptNum(stacktop(-i), fRequireMinimal).getint();
-                    if (nKeysCount < 0 || nKeysCount > MAX_PUBKEYS_PER_MULTISIG)
-                        return set_error(serror, SCRIPT_ERR_PUBKEY_COUNT);
-                    nOpCount += nKeysCount;
-                    if (nOpCount > MAX_OPS_PER_SCRIPT)
-                        return set_error(serror, SCRIPT_ERR_OP_COUNT);
-                    int ikey = ++i;
-                    // ikey2 is the position of last non-signature item in the stack. Top stack item = 1.
-                    // With SCRIPT_VERIFY_NULLFAIL, this is used for cleanup if operation fails.
-                    int ikey2 = nKeysCount + 2;
-                    i += nKeysCount;
-                    if ((int)stack.size() < i)
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-
-                    int nSigsCount = CScriptNum(stacktop(-i), fRequireMinimal).getint();
-                    if (nSigsCount < 0 || nSigsCount > nKeysCount)
-                        return set_error(serror, SCRIPT_ERR_SIG_COUNT);
-                    int isig = ++i;
-                    i += nSigsCount;
-                    if ((int)stack.size() < i)
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-
-                    // Subset of script starting at the most recent codeseparator
-                    CScript scriptCode(pbegincodehash, pend);
-
-                    // Drop the signature in pre-segwit scripts but not segwit scripts
-                    for (int k = 0; k < nSigsCount; k++)
-                    {
-                        valtype& vchSig = stacktop(-isig-k);
-                        if (sigversion == SigVersion::BASE) {
-                            int found = FindAndDelete(scriptCode, CScript() << vchSig);
-                            if (found > 0 && (flags & SCRIPT_VERIFY_CONST_SCRIPTCODE))
-                                return set_error(serror, SCRIPT_ERR_SIG_FINDANDDELETE);
-                        }
+                    // CHECKMULTISIG was already invalid in Tapscript.
+                    if (sigversion == SigVersion::TAPSCRIPT) {
+                        return set_error(
+                            serror,
+                            SCRIPT_ERR_TAPSCRIPT_CHECKMULTISIG);
                     }
 
-                    bool fSuccess = true;
-                    while (fSuccess && nSigsCount > 0)
-                    {
-                        valtype& vchSig    = stacktop(-isig);
-                        valtype& vchPubKey = stacktop(-ikey);
-
-                        // Note how this makes the exact order of pubkey/signature evaluation
-                        // distinguishable by CHECKMULTISIG NOT if the STRICTENC flag is set.
-                        // See the script_(in)valid tests for details.
-                        if (!CheckSignatureEncoding(vchSig, flags, serror) || !CheckPubKeyEncoding(vchPubKey, flags, sigversion, serror)) {
-                            // serror is set
-                            return false;
-                        }
-
-                        // Check signature
-                        bool fOk = checker.CheckECDSASignature(vchSig, vchPubKey, scriptCode, sigversion);
-
-                        if (fOk) {
-                            isig++;
-                            nSigsCount--;
-                        }
-                        ikey++;
-                        nKeysCount--;
-
-                        // If there are more signatures left than keys left,
-                        // then too many signatures have failed. Exit early,
-                        // without checking any further signatures.
-                        if (nSigsCount > nKeysCount)
-                            fSuccess = false;
-                    }
-
-                    // Clean up stack of actual arguments
-                    while (i-- > 1) {
-                        // If the operation failed, we require that all signatures must be empty vector
-                        if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) && !ikey2 && stacktop(-1).size())
-                            return set_error(serror, SCRIPT_ERR_SIG_NULLFAIL);
-                        if (ikey2 > 0)
-                            ikey2--;
-                        popstack(stack);
-                    }
-
-                    // A bug causes CHECKMULTISIG to consume one extra argument
-                    // whose contents were not checked in any way.
-                    //
-                    // Unfortunately this is a potential source of mutability,
-                    // so optionally verify it is exactly equal to zero prior
-                    // to removing it from the stack.
-                    if (stack.size() < 1)
-                        return set_error(serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
-                    if ((flags & SCRIPT_VERIFY_NULLDUMMY) && stacktop(-1).size())
-                        return set_error(serror, SCRIPT_ERR_SIG_NULLDUMMY);
-                    popstack(stack);
-
-                    stack.push_back(fSuccess ? vchTrue : vchFalse);
-
-                    if (opcode == OP_CHECKMULTISIGVERIFY)
-                    {
-                        if (fSuccess)
-                            popstack(stack);
-                        else
-                            return set_error(serror, SCRIPT_ERR_CHECKMULTISIGVERIFY);
-                    }
+                    // Legacy and witness-v0 ECDSA multisig authorization
+                    // is disabled in Mercatura.
+                    return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
                 }
-                break;
 
                 default:
                     return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
@@ -1396,6 +1306,59 @@ uint256 GetSpentScriptsSHA256(const std::vector<CTxOut>& outputs_spent)
     return ss.GetSHA256();
 }
 
+/** Compute the Mercatura PQ v1 commitment to all transaction prevouts. */
+template <class T>
+MercaturaPQHash384 GetPrevoutsPQH384(const T& txTo)
+{
+    MercaturaPQHashWriter ss{"Mercatura/PQAuth/v1/Prevouts"};
+    for (const auto& txin : txTo.vin) {
+        ss << txin.prevout;
+    }
+    return ss.GetHash();
+}
+
+/** Compute the Mercatura PQ v1 commitment to all spent amounts. */
+MercaturaPQHash384 GetSpentAmountsPQH384(const std::vector<CTxOut>& outputs_spent)
+{
+    MercaturaPQHashWriter ss{"Mercatura/PQAuth/v1/Amounts"};
+    for (const auto& txout : outputs_spent) {
+        ss << txout.nValue;
+    }
+    return ss.GetHash();
+}
+
+/** Compute the Mercatura PQ v1 commitment to all spent scriptPubKeys. */
+MercaturaPQHash384 GetSpentScriptsPQH384(const std::vector<CTxOut>& outputs_spent)
+{
+    MercaturaPQHashWriter ss{"Mercatura/PQAuth/v1/ScriptPubKeys"};
+    for (const auto& txout : outputs_spent) {
+        ss << txout.scriptPubKey;
+    }
+    return ss.GetHash();
+}
+
+/** Compute the Mercatura PQ v1 commitment to all input sequences. */
+template <class T>
+MercaturaPQHash384 GetSequencesPQH384(const T& txTo)
+{
+    MercaturaPQHashWriter ss{"Mercatura/PQAuth/v1/Sequences"};
+    for (const auto& txin : txTo.vin) {
+        ss << txin.nSequence;
+    }
+    return ss.GetHash();
+}
+
+/** Compute the Mercatura PQ v1 commitment to all transaction outputs. */
+template <class T>
+MercaturaPQHash384 GetOutputsPQH384(const T& txTo)
+{
+    MercaturaPQHashWriter ss{"Mercatura/PQAuth/v1/Outputs"};
+    for (const auto& txout : txTo.vout) {
+        ss << txout;
+    }
+    return ss.GetHash();
+}
+
 
 } // namespace
 
@@ -1413,23 +1376,32 @@ void PrecomputedTransactionData::Init(const T& txTo, std::vector<CTxOut>&& spent
     // Determine which precomputation-impacting features this transaction uses.
     bool uses_bip143_segwit = force;
     bool uses_bip341_taproot = force;
-    for (size_t inpos = 0; inpos < txTo.vin.size() && !(uses_bip143_segwit && uses_bip341_taproot); ++inpos) {
+    bool uses_pq = force;
+
+    for (size_t inpos = 0;
+         inpos < txTo.vin.size() &&
+             !(uses_bip143_segwit && uses_bip341_taproot && uses_pq);
+         ++inpos) {
         if (!txTo.vin[inpos].scriptWitness.IsNull()) {
-            if (m_spent_outputs_ready && m_spent_outputs[inpos].scriptPubKey.size() == 2 + WITNESS_V1_TAPROOT_SIZE &&
+            if (m_spent_outputs_ready &&
+                m_spent_outputs[inpos].scriptPubKey.size() ==
+                    2 + WITNESS_V2_MERCATURA_PQ_SIZE &&
+                m_spent_outputs[inpos].scriptPubKey[0] == OP_2 &&
+                m_spent_outputs[inpos].scriptPubKey[1] ==
+                    WITNESS_V2_MERCATURA_PQ_SIZE) {
+                // Native Mercatura PQ Authorization v1:
+                // OP_2 followed by an exact 32-byte witness program.
+                uses_pq = true;
+            } else if (
+                m_spent_outputs_ready &&
+                m_spent_outputs[inpos].scriptPubKey.size() ==
+                    2 + WITNESS_V1_TAPROOT_SIZE &&
                 m_spent_outputs[inpos].scriptPubKey[0] == OP_1) {
-                // Treat every witness-bearing spend with 34-byte scriptPubKey that starts with OP_1 as a Taproot
-                // spend. This only works if spent_outputs was provided as well, but if it wasn't, actual validation
-                // will fail anyway. Note that this branch may trigger for scriptPubKeys that aren't actually segwit
-                // but in that case validation will fail as SCRIPT_ERR_WITNESS_UNEXPECTED anyway.
                 uses_bip341_taproot = true;
             } else {
-                // Treat every spend that's not known to native witness v1 as a Witness v0 spend. This branch may
-                // also be taken for unknown witness versions, but it is harmless, and being precise would require
-                // P2SH evaluation to find the redeemScript.
                 uses_bip143_segwit = true;
             }
         }
-        if (uses_bip341_taproot && uses_bip143_segwit) break; // No need to scan further if we already need all.
     }
 
     if (uses_bip143_segwit || uses_bip341_taproot) {
@@ -1449,6 +1421,14 @@ void PrecomputedTransactionData::Init(const T& txTo, std::vector<CTxOut>&& spent
         m_spent_scripts_single_hash = GetSpentScriptsSHA256(m_spent_outputs);
         m_bip341_taproot_ready = true;
     }
+    if (uses_pq && m_spent_outputs_ready) {
+        m_pq_prevouts_hash = GetPrevoutsPQH384(txTo);
+        m_pq_amounts_hash = GetSpentAmountsPQH384(m_spent_outputs);
+        m_pq_scriptpubkeys_hash = GetSpentScriptsPQH384(m_spent_outputs);
+        m_pq_sequences_hash = GetSequencesPQH384(txTo);
+        m_pq_outputs_hash = GetOutputsPQH384(txTo);
+        m_pq_ready = true;
+    }
 }
 
 template <class T>
@@ -1462,6 +1442,52 @@ template void PrecomputedTransactionData::Init(const CTransaction& txTo, std::ve
 template void PrecomputedTransactionData::Init(const CMutableTransaction& txTo, std::vector<CTxOut>&& spent_outputs, bool force);
 template PrecomputedTransactionData::PrecomputedTransactionData(const CTransaction& txTo);
 template PrecomputedTransactionData::PrecomputedTransactionData(const CMutableTransaction& txTo);
+
+template <typename T>
+bool ComputeMercaturaPQAuthDigestV1(
+    MercaturaPQHash384& hash_out,
+    const T& tx_to,
+    uint32_t in_pos,
+    const uint256& genesis_hash,
+    const PrecomputedTransactionData& cache)
+{
+    if (!cache.m_pq_ready || in_pos >= tx_to.vin.size()) {
+        return false;
+    }
+
+    MercaturaPQHashWriter ss{"Mercatura/PQAuth/v1/Final"};
+
+    ss << tx_to.version;
+    ss << tx_to.nLockTime;
+    ss << static_cast<uint64_t>(tx_to.vin.size());
+    ss << static_cast<uint64_t>(tx_to.vout.size());
+    ss << genesis_hash;
+
+    ss << cache.m_pq_prevouts_hash;
+    ss << cache.m_pq_amounts_hash;
+    ss << cache.m_pq_scriptpubkeys_hash;
+    ss << cache.m_pq_sequences_hash;
+    ss << cache.m_pq_outputs_hash;
+
+    ss << in_pos;
+
+    hash_out = ss.GetHash();
+    return true;
+}
+
+template bool ComputeMercaturaPQAuthDigestV1<CTransaction>(
+    MercaturaPQHash384&,
+    const CTransaction&,
+    uint32_t,
+    const uint256&,
+    const PrecomputedTransactionData&);
+
+template bool ComputeMercaturaPQAuthDigestV1<CMutableTransaction>(
+    MercaturaPQHash384&,
+    const CMutableTransaction&,
+    uint32_t,
+    const uint256&,
+    const PrecomputedTransactionData&);
 
 const HashWriter HASHER_TAPSIGHASH{TaggedHash("TapSighash")};
 const HashWriter HASHER_TAPLEAF{TaggedHash("TapLeaf")};
@@ -1742,6 +1768,54 @@ bool GenericTransactionSignatureChecker<T>::CheckSchnorrSignature(std::span<cons
 }
 
 template <class T>
+bool GenericTransactionSignatureChecker<T>::CheckMercaturaPQSignature(
+    std::span<const unsigned char> sig,
+    std::span<const unsigned char> pubkey,
+    ScriptError* serror) const
+{
+    if (sig.size() != MERCATURA_MLDSA65_SIGNATURE_SIZE) {
+        return set_error(serror, SCRIPT_ERR_PQ_SIGNATURE_SIZE);
+    }
+
+    if (pubkey.size() != MERCATURA_MLDSA65_PUBLIC_KEY_SIZE) {
+        return set_error(serror, SCRIPT_ERR_PQ_PUBLIC_KEY_SIZE);
+    }
+
+    if (!this->txdata || !m_pq_genesis_hash.has_value()) {
+        if (m_mdb == MissingDataBehavior::ASSERT_FAIL) {
+            assert(!"Missing Mercatura PQ transaction context");
+        }
+        return set_error(serror, SCRIPT_ERR_PQ_SIGNATURE);
+    }
+
+    MercaturaPQHash384 digest{};
+    if (!ComputeMercaturaPQAuthDigestV1(
+            digest,
+            *txTo,
+            static_cast<uint32_t>(nIn),
+            *m_pq_genesis_hash,
+            *this->txdata)) {
+        return set_error(serror, SCRIPT_ERR_PQ_SIGNATURE);
+    }
+
+    static constexpr char CONTEXT[] = "Mercatura/PQAuth/v1";
+
+    if (!mercatura_mldsa65_verify(
+            sig.data(),
+            sig.size(),
+            digest.data(),
+            digest.size(),
+            reinterpret_cast<const uint8_t*>(CONTEXT),
+            sizeof(CONTEXT) - 1,
+            pubkey.data(),
+            pubkey.size())) {
+        return set_error(serror, SCRIPT_ERR_PQ_SIGNATURE);
+    }
+
+    return set_success(serror);
+}
+
+template <class T>
 bool GenericTransactionSignatureChecker<T>::CheckLockTime(const CScriptNum& nLockTime) const
 {
     // There are two kinds of nLockTime: lock-by-blockheight
@@ -1914,6 +1988,46 @@ static bool VerifyTaprootCommitment(const std::vector<unsigned char>& control, c
     return q.CheckTapTweak(p, merkle_root, control[0] & 1);
 }
 
+bool CheckMercaturaPQWitnessStructureV1(
+    const CScriptWitness& witness,
+    const std::vector<unsigned char>& program,
+    bool is_p2sh,
+    ScriptError* serror)
+{
+    if (is_p2sh) {
+        return set_error(serror, SCRIPT_ERR_PQ_P2SH_WRAPPED);
+    }
+
+    if (program.size() != WITNESS_V2_MERCATURA_PQ_SIZE) {
+        return set_error(serror, SCRIPT_ERR_WITNESS_PROGRAM_WRONG_LENGTH);
+    }
+
+    if (witness.stack.size() != 2) {
+        return set_error(serror, SCRIPT_ERR_PQ_WITNESS_STRUCTURE);
+    }
+
+    if (witness.stack[0].size() != MERCATURA_MLDSA65_SIGNATURE_SIZE) {
+        return set_error(serror, SCRIPT_ERR_PQ_SIGNATURE_SIZE);
+    }
+
+    if (witness.stack[1].size() != MERCATURA_MLDSA65_PUBLIC_KEY_SIZE) {
+        return set_error(serror, SCRIPT_ERR_PQ_PUBLIC_KEY_SIZE);
+    }
+
+    MercaturaPQKeyCommitment commitment{};
+    if (!ComputeMercaturaPQKeyCommitmentV1(
+            commitment,
+            std::span<const unsigned char>{witness.stack[1]})) {
+        return set_error(serror, SCRIPT_ERR_PQ_PUBLIC_KEY_SIZE);
+    }
+
+    if (!std::equal(commitment.begin(), commitment.end(), program.begin())) {
+        return set_error(serror, SCRIPT_ERR_PQ_KEY_COMMITMENT);
+    }
+
+    return set_success(serror);
+}
+
 static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, const std::vector<unsigned char>& program, script_verify_flags flags, const BaseSignatureChecker& checker, ScriptError* serror, bool is_p2sh)
 {
     CScript exec_script; //!< Actually executed script (last stack item in P2WSH; implied P2PKH script in P2WPKH; leaf script in P2TR)
@@ -1958,11 +2072,9 @@ static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, 
         }
         execdata.m_annex_init = true;
         if (stack.size() == 1) {
-            // Key path spending (stack size is 1 after removing optional annex)
-            if (!checker.CheckSchnorrSignature(stack.front(), program, SigVersion::TAPROOT, execdata, serror)) {
-                return false; // serror is set
-            }
-            return set_success(serror);
+            // Mercatura disables inherited Taproot Schnorr key-path
+            // ownership authorization.
+            return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
         } else {
             // Script path spending (stack size is >1 after removing optional annex)
             const valtype& control = SpanPopBack(stack);
@@ -1987,6 +2099,26 @@ static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, 
             }
             return set_success(serror);
         }
+    } else if (witversion == 2) {
+        // Mercatura PQ Authorization v1 permanently owns witness version 2.
+        // Every v2 program is handled here and must never fall through to
+        // generic unknown-witness success semantics.
+        if (!CheckMercaturaPQWitnessStructureV1(
+                witness,
+                program,
+                is_p2sh,
+                serror)) {
+            return false;
+        }
+
+        if (!checker.CheckMercaturaPQSignature(
+                witness.stack[0],
+                witness.stack[1],
+                serror)) {
+            return false;
+        }
+
+        return set_success(serror);
     } else if (!is_p2sh && CScript::IsPayToAnchor(witversion, program)) {
         return true;
     } else {
@@ -2130,6 +2262,16 @@ size_t static WitnessSigOps(int witversion, const std::vector<unsigned char>& wi
             CScript subscript(witness.stack.back().begin(), witness.stack.back().end());
             return subscript.GetSigOpCount(true);
         }
+    }
+
+    // Mercatura PQ Authorization v1 permanently owns witness version 2
+    // with an exact 32-byte public-key commitment. Charge the
+    // verification cost from the spent output type, independent of
+    // whether the supplied witness is valid, so malformed signatures
+    // cannot evade resource accounting.
+    if (witversion == 2 &&
+        witprogram.size() == MERCATURA_PQ_KEY_COMMITMENT_SIZE) {
+        return MERCATURA_PQ_SIGOPS_COST;
     }
 
     // Future flags may be implemented here.

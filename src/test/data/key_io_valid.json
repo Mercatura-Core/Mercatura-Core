@@ -163,15 +163,6 @@
         }
     ],
     [
-        "mca1z2rkshmxsz0",
-        "520250ed",
-        {
-            "chain": "main",
-            "isPrivkey": false,
-            "tryCaseFlip": true
-        }
-    ],
-    [
         "tmca1qcrh3yqn4nlleplcez2yndq2ry8h9ncg354t8ha",
         "0014c0ef1202759fff90ff19128936814321ee59e111",
         {
@@ -436,15 +427,6 @@
     [
         "mca1pve739yap4uxjvfk0jrey69078u0gasm2nwvv483ec6zkzulgw9xql89696",
         "5120667d1293a1af0d2626cf90f24d15fe3f1e8ec36a9b98ca9e39c6856173e8714c",
-        {
-            "chain": "main",
-            "isPrivkey": false,
-            "tryCaseFlip": true
-        }
-    ],
-    [
-        "mca1zmjtqdmjjxd",
-        "5202dc96",
         {
             "chain": "main",
             "isPrivkey": false,

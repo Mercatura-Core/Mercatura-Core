@@ -219,6 +219,9 @@ CTxDestination ConsumeTxDestination(FuzzedDataProvider& fuzzed_data_provider) no
             tx_destination = WitnessV1Taproot{XOnlyPubKey{ConsumeUInt256(fuzzed_data_provider)}};
         },
         [&] {
+            tx_destination = WitnessV2MercaturaPQ{ConsumeUInt256(fuzzed_data_provider)};
+        },
+        [&] {
             tx_destination = PayToAnchor{};
         },
         [&] {
@@ -226,7 +229,15 @@ CTxDestination ConsumeTxDestination(FuzzedDataProvider& fuzzed_data_provider) no
             if (program.size() < 2) {
                 program = {0, 0};
             }
-            tx_destination = WitnessUnknown{fuzzed_data_provider.ConsumeIntegralInRange<unsigned int>(2, 16), program};
+
+            // Witness version 2 is reserved for Mercatura PQ v1.
+            // WitnessUnknown may represent undefined v1 programs or versions 3-16.
+            unsigned int version = fuzzed_data_provider.ConsumeIntegralInRange<unsigned int>(1, 15);
+            if (version >= 2) {
+                ++version;
+            }
+
+            tx_destination = WitnessUnknown{version, program};
         })};
     Assert(call_size == std::variant_size_v<CTxDestination>);
     return tx_destination;

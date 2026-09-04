@@ -67,7 +67,23 @@ private:
     SignatureCache& m_signature_cache;
 
 public:
-    CachingTransactionSignatureChecker(const CTransaction* txToIn, unsigned int nInIn, const CAmount& amountIn, bool storeIn, SignatureCache& signature_cache, PrecomputedTransactionData& txdataIn) : TransactionSignatureChecker(txToIn, nInIn, amountIn, txdataIn, MissingDataBehavior::ASSERT_FAIL), store(storeIn), m_signature_cache(signature_cache)  {}
+    CachingTransactionSignatureChecker(
+        const CTransaction* txToIn,
+        unsigned int nInIn,
+        const CAmount& amountIn,
+        bool storeIn,
+        SignatureCache& signature_cache,
+        PrecomputedTransactionData& txdataIn,
+        std::optional<uint256> pq_genesis_hash = std::nullopt)
+        : TransactionSignatureChecker(
+              txToIn,
+              nInIn,
+              amountIn,
+              txdataIn,
+              MissingDataBehavior::ASSERT_FAIL,
+              pq_genesis_hash),
+          store(storeIn),
+          m_signature_cache(signature_cache) {}
 
     bool VerifyECDSASignature(const std::vector<unsigned char>& vchSig, const CPubKey& vchPubKey, const uint256& sighash) const override;
     bool VerifySchnorrSignature(std::span<const unsigned char> sig, const XOnlyPubKey& pubkey, const uint256& sighash) const override;

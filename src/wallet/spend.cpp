@@ -8,6 +8,7 @@
 #include <common/system.h>
 #include <consensus/amount.h>
 #include <consensus/validation.h>
+#include <crypto/mercatura_mldsa.h>
 #include <interfaces/chain.h>
 #include <node/types.h>
 #include <numeric>
@@ -44,6 +45,63 @@ TRACEPOINT_SEMAPHORE(coin_selection, aps_create_tx_internal);
 
 namespace wallet {
 static constexpr size_t OUTPUT_GROUP_MAX_ENTRIES{100};
+
+// Mercatura PQ Authorization v1 has one fixed native witness-v2
+// satisfaction:
+//
+//   witness item count        1 byte
+//   signature CompactSize     3 bytes
+//   signature              3309 bytes
+//   public-key CompactSize    3 bytes
+//   public key              1952 bytes
+//
+// The ordinary serialized input itself is:
+//
+//   prev txid                32 bytes
+//   prev output index         4 bytes
+//   empty scriptSig length    1 byte
+//   sequence                  4 bytes
+//
+// Mercatura charges fees by full serialized bytes with no witness
+// discount, while BIP141-style weight is retained for transaction
+// weight limits.
+static_assert(
+    MERCATURA_MLDSA65_SIGNATURE_SIZE > 252 &&
+    MERCATURA_MLDSA65_SIGNATURE_SIZE <= 65535);
+
+static_assert(
+    MERCATURA_MLDSA65_PUBLIC_KEY_SIZE > 252 &&
+    MERCATURA_MLDSA65_PUBLIC_KEY_SIZE <= 65535);
+
+static constexpr int64_t MERCATURA_PQ_BASE_INPUT_SIZE{
+    32 + 4 + 1 + 4
+};
+
+static constexpr int64_t MERCATURA_PQ_WITNESS_SIZE{
+    1 +
+    3 + MERCATURA_MLDSA65_SIGNATURE_SIZE +
+    3 + MERCATURA_MLDSA65_PUBLIC_KEY_SIZE
+};
+
+static constexpr int64_t MERCATURA_PQ_SIGNED_INPUT_FEE_SIZE{
+    MERCATURA_PQ_BASE_INPUT_SIZE +
+    MERCATURA_PQ_WITNESS_SIZE
+};
+
+static constexpr int64_t MERCATURA_PQ_SIGNED_INPUT_WEIGHT{
+    MERCATURA_PQ_BASE_INPUT_SIZE * WITNESS_SCALE_FACTOR +
+    MERCATURA_PQ_WITNESS_SIZE
+};
+
+static bool IsMercaturaPQOutput(const CTxOut& txout)
+{
+    std::vector<std::vector<uint8_t>> solutions;
+
+    return Solver(
+               txout.scriptPubKey,
+               solutions) ==
+           TxoutType::WITNESS_V2_MERCATURA_PQ;
+}
 
 /** Whether the descriptor represents, directly or not, a witness program. */
 static bool IsSegwit(const Descriptor& desc) {
@@ -130,6 +188,10 @@ static std::optional<int64_t> MaxInputFeeSize(const Descriptor& desc, const std:
 
 int CalculateMaximumSignedInputSize(const CTxOut& txout, const COutPoint outpoint, const SigningProvider* provider, bool can_grind_r, const CCoinControl* coin_control)
 {
+    if (IsMercaturaPQOutput(txout)) {
+        return MERCATURA_PQ_SIGNED_INPUT_FEE_SIZE;
+    }
+
     if (!provider) return -1;
 
     if (const auto desc = InferDescriptor(txout.scriptPubKey, *provider)) {
@@ -149,6 +211,10 @@ int CalculateMaximumSignedInputSize(const CTxOut& txout, const CWallet* wallet, 
 
 int CalculateMaximumSignedInputWeight(const CTxOut& txout, const COutPoint outpoint, const SigningProvider* provider, bool can_grind_r, const CCoinControl* coin_control)
 {
+    if (IsMercaturaPQOutput(txout)) {
+        return MERCATURA_PQ_SIGNED_INPUT_WEIGHT;
+    }
+
     if (!provider) return -1;
 
     if (const auto desc = InferDescriptor(txout.scriptPubKey, *provider)) {
@@ -191,6 +257,10 @@ static std::optional<int64_t> GetSignedTxinWeight(const CWallet* wallet, const C
         return weight.value();
     }
 
+    if (IsMercaturaPQOutput(txo)) {
+        return MERCATURA_PQ_SIGNED_INPUT_WEIGHT;
+    }
+
     // Otherwise, use the maximum satisfaction size provided by the descriptor.
     std::unique_ptr<Descriptor> desc{GetDescriptor(wallet, coin_control, txo.scriptPubKey)};
     if (desc) return MaxInputWeight(*desc, {txin}, coin_control, tx_is_segwit, can_grind_r);
@@ -214,6 +284,10 @@ static std::optional<int64_t> GetSignedTxinFeeSize(const CWallet* wallet, const 
         return weight.value();
     }
 
+    if (IsMercaturaPQOutput(txo)) {
+        return MERCATURA_PQ_SIGNED_INPUT_FEE_SIZE;
+    }
+
     std::unique_ptr<Descriptor> desc{GetDescriptor(wallet, coin_control, txo.scriptPubKey)};
     if (desc) return MaxInputFeeSize(*desc, {txin}, coin_control, tx_is_segwit, can_grind_r);
 
@@ -234,6 +308,10 @@ TxSize CalculateMaximumSignedTxSize(const CTransaction &tx, const CWallet *walle
     // Whether any input spends a witness program. Necessary to run before the next loop over the
     // inputs in order to accurately compute the compactSize length for the witness data per input.
     bool is_segwit = std::any_of(txouts.begin(), txouts.end(), [&](const CTxOut& txo) {
+        if (IsMercaturaPQOutput(txo)) {
+            return true;
+        }
+
         std::unique_ptr<Descriptor> desc{GetDescriptor(wallet, coin_control, txo.scriptPubKey)};
         if (desc) return IsSegwit(*desc);
         return false;
@@ -354,6 +432,7 @@ static OutputType GetOutputType(TxoutType type, bool is_from_p2sh)
 {
     switch (type) {
         case TxoutType::WITNESS_V1_TAPROOT:
+        case TxoutType::WITNESS_V2_MERCATURA_PQ:
             return OutputType::BECH32M;
         case TxoutType::WITNESS_V0_KEYHASH:
         case TxoutType::WITNESS_V0_SCRIPTHASH:
@@ -1201,8 +1280,6 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
     coin_selection_params.tx_noinputs_size = 10 + GetSizeOfCompactSize(vecSend.size()); // bytes for output count
 
     CAmount recipients_sum = 0;
-    const OutputType change_type = wallet.TransactionChangeType(coin_control.m_change_type ? *coin_control.m_change_type : wallet.m_default_change_type, vecSend);
-    ReserveDestination reservedest(&wallet, change_type);
     unsigned int outputs_to_subtract_fee_from = 0; // The number of outputs which we are subtracting the fee from
     for (const auto& recipient : vecSend) {
         if (IsDust(recipient, wallet.chain().relayDustFee())) {
@@ -1237,7 +1314,16 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
         // Reserve a new key pair from key pool. If it fails, provide a dummy
         // destination in case we don't need change.
         CTxDestination dest;
-        auto op_dest = reservedest.GetReservedDestination(true);
+
+        // Mercatura PQ Authorization v1 is the sole normal
+        // ownership path. Transaction change is always derived
+        // directly from PQ branch 1 and never from an inherited
+        // classical descriptor keypool.
+        auto op_dest{
+            wallet.GetNewMercaturaPQDestination(
+                /*internal=*/true)
+        };
+
         if (!op_dest) {
             error = _("Transaction needs a change address, but we can't generate it.") + Untranslated(" ") + util::ErrorString(op_dest);
         } else {
@@ -1535,7 +1621,6 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
 
     // Before we return success, we assume any change key will be used to prevent
     // accidental reuse.
-    reservedest.KeepDestination();
 
     wallet.WalletLogPrintf("Coin Selection: Algorithm:%s, Waste Metric Score:%d\n", GetAlgorithmName(result.GetAlgo()), result.GetWaste());
     wallet.WalletLogPrintf("Fee Calculation: Fee:%d Bytes:%u Tgt:%d (requested %d) Reason:\"%s\" Decay %.5f: Estimation: (%g - %g) %.2f%% %.1f/(%.1f %d mem %.1f out) Fail: (%g - %g) %.2f%% %.1f/(%.1f %d mem %.1f out)\n",

@@ -3,6 +3,7 @@
 // file COPYING or https://www.opensource.org/licenses/mit-license.php.
 
 #include <wallet/test/util.h>
+#include <wallet/walletdb.h>
 #include <wallet/wallet.h>
 #include <test/util/common.h>
 #include <test/util/logging.h>
@@ -87,6 +88,226 @@ BOOST_FIXTURE_TEST_CASE(wallet_load_descriptors, TestingSetup)
         const std::shared_ptr<CWallet> wallet(new CWallet(m_node.chain.get(), "", std::move(database)));
         BOOST_CHECK_EQUAL(wallet->PopulateWalletFromDB(_error, _warnings), DBErrors::CORRUPT);
         BOOST_CHECK(found); // The error must be logged
+    }
+}
+
+
+BOOST_FIXTURE_TEST_CASE(mercatura_pq_wallet_load_failure_matrix, TestingSetup)
+{
+    const auto load_database =
+        [&](std::unique_ptr<WalletDatabase> database) {
+            bilingual_str error;
+            std::vector<bilingual_str> warnings;
+
+            const std::shared_ptr<CWallet> wallet{
+                new CWallet(
+                    m_node.chain.get(),
+                    "",
+                    std::move(database))
+            };
+
+            return wallet->PopulateWalletFromDB(
+                error,
+                warnings);
+        };
+
+    const auto valid_state = [] {
+        MercaturaPQWalletState state;
+        state.account = 7;
+        state.next_external_index = 11;
+        state.next_internal_index = 13;
+        return state;
+    };
+
+    const auto valid_seed = [] {
+        CKeyingMaterial seed(32);
+        for (size_t i = 0; i < seed.size(); ++i) {
+            seed[i] = static_cast<unsigned char>(i);
+        }
+        return seed;
+    };
+
+    // A wallet with no PQ records remains valid.
+    {
+        auto database = CreateMockableWalletDatabase();
+
+        BOOST_CHECK_EQUAL(
+            load_database(std::move(database)),
+            DBErrors::LOAD_OK);
+    }
+
+    // Unsupported PQ scheme version.
+    {
+        auto database = CreateMockableWalletDatabase();
+
+        MercaturaPQWalletState state = valid_state();
+        state.scheme_version =
+            MercaturaPQWalletState::SCHEME_VERSION + 1;
+
+        {
+            auto batch = database->MakeBatch();
+
+            BOOST_REQUIRE(
+                batch->Write(
+                    DBKeys::MERCATURA_PQ_STATE,
+                    state));
+
+            BOOST_REQUIRE(
+                batch->Write(
+                    DBKeys::MERCATURA_PQ_SEED,
+                    valid_seed()));
+        }
+
+        BOOST_CHECK_EQUAL(
+            load_database(std::move(database)),
+            DBErrors::TOO_NEW);
+    }
+
+    // Unsupported PQ derivation version.
+    {
+        auto database = CreateMockableWalletDatabase();
+
+        MercaturaPQWalletState state = valid_state();
+        state.derivation_version =
+            MercaturaPQWalletState::DERIVATION_VERSION + 1;
+
+        {
+            auto batch = database->MakeBatch();
+
+            BOOST_REQUIRE(
+                batch->Write(
+                    DBKeys::MERCATURA_PQ_STATE,
+                    state));
+
+            BOOST_REQUIRE(
+                batch->Write(
+                    DBKeys::MERCATURA_PQ_SEED,
+                    valid_seed()));
+        }
+
+        BOOST_CHECK_EQUAL(
+            load_database(std::move(database)),
+            DBErrors::TOO_NEW);
+    }
+
+    // Plaintext master seed must be exactly 32 bytes.
+    for (const size_t bad_size : {size_t{31}, size_t{33}}) {
+        auto database = CreateMockableWalletDatabase();
+
+        CKeyingMaterial bad_seed(bad_size);
+
+        {
+            auto batch = database->MakeBatch();
+
+            BOOST_REQUIRE(
+                batch->Write(
+                    DBKeys::MERCATURA_PQ_STATE,
+                    valid_state()));
+
+            BOOST_REQUIRE(
+                batch->Write(
+                    DBKeys::MERCATURA_PQ_SEED,
+                    bad_seed));
+        }
+
+        BOOST_CHECK_EQUAL(
+            load_database(std::move(database)),
+            DBErrors::CORRUPT);
+    }
+
+    // Seed without PQ wallet state.
+    {
+        auto database = CreateMockableWalletDatabase();
+
+        {
+            auto batch = database->MakeBatch();
+
+            BOOST_REQUIRE(
+                batch->Write(
+                    DBKeys::MERCATURA_PQ_SEED,
+                    valid_seed()));
+        }
+
+        BOOST_CHECK_EQUAL(
+            load_database(std::move(database)),
+            DBErrors::CORRUPT);
+    }
+
+    // PQ wallet state without any master seed.
+    {
+        auto database = CreateMockableWalletDatabase();
+
+        {
+            auto batch = database->MakeBatch();
+
+            BOOST_REQUIRE(
+                batch->Write(
+                    DBKeys::MERCATURA_PQ_STATE,
+                    valid_state()));
+        }
+
+        BOOST_CHECK_EQUAL(
+            load_database(std::move(database)),
+            DBErrors::CORRUPT);
+    }
+
+    // Plaintext and encrypted PQ seeds may never coexist.
+    {
+        auto database = CreateMockableWalletDatabase();
+
+        MercaturaPQCryptedSeed crypted_seed;
+        crypted_seed.ciphertext = {
+            0x01, 0x02, 0x03, 0x04
+        };
+        crypted_seed.seed_check.fill(0x11);
+
+        {
+            auto batch = database->MakeBatch();
+
+            BOOST_REQUIRE(
+                batch->Write(
+                    DBKeys::MERCATURA_PQ_STATE,
+                    valid_state()));
+
+            BOOST_REQUIRE(
+                batch->Write(
+                    DBKeys::MERCATURA_PQ_SEED,
+                    valid_seed()));
+
+            BOOST_REQUIRE(
+                batch->Write(
+                    DBKeys::MERCATURA_PQ_CRYPTED_SEED,
+                    crypted_seed));
+        }
+
+        BOOST_CHECK_EQUAL(
+            load_database(std::move(database)),
+            DBErrors::CORRUPT);
+    }
+
+    // Empty encrypted seed is invalid.
+    {
+        auto database = CreateMockableWalletDatabase();
+
+        const MercaturaPQCryptedSeed empty_crypted_seed{};
+
+        {
+            auto batch = database->MakeBatch();
+
+            BOOST_REQUIRE(
+                batch->Write(
+                    DBKeys::MERCATURA_PQ_STATE,
+                    valid_state()));
+
+            BOOST_REQUIRE(
+                batch->Write(
+                    DBKeys::MERCATURA_PQ_CRYPTED_SEED,
+                    empty_crypted_seed));
+        }
+
+        BOOST_CHECK_EQUAL(
+            load_database(std::move(database)),
+            DBErrors::CORRUPT);
     }
 }
 

@@ -1,0 +1,7 @@
+Mercatura Phase 10 ML-DSA dependency
+Upstream: pq-code-package/mldsa-native
+Tag: v2.0.0
+Commit: 834a90d5e846ffa1e1611bd24e160bb2e9b86d35
+Parameter set: ML-DSA-65 only
+Initial backend: portable C
+Configuration: MLD_CONFIG_CORE_API_ONLY
