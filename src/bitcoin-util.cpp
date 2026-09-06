@@ -13,11 +13,13 @@
 #include <common/system.h>
 #include <compat/compat.h>
 #include <core_io.h>
+#include <pow.h>
 #include <streams.h>
 #include <util/exception.h>
 #include <util/strencodings.h>
 #include <util/translation.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cstdio>
 #include <functional>
@@ -93,13 +95,17 @@ static void grind_task(uint32_t nBits, CBlockHeader header, uint32_t offset, uin
     if (target == 0 || neg || over) return;
     header.nNonce = offset;
 
+    // MercaHash requires one private mutable 128 MiB scratchpad per
+    // worker. Reuse it for every nonce tested by this worker.
+    PoWHashContext pow_context;
+
     uint32_t finish = std::numeric_limits<uint32_t>::max() - step;
     finish = finish - (finish % step) + offset;
 
     while (!found && header.nNonce < finish) {
         const uint32_t next = (finish - header.nNonce < 5000*step) ? finish : header.nNonce + 5000*step;
         do {
-            if (UintToArith256(header.GetHash()) <= target) {
+            if (UintToArith256(pow_context.GetHash(header)) <= target) {
                 if (!found.exchange(true)) {
                     proposed_nonce = header.nNonce;
                 }
@@ -128,9 +134,17 @@ static int Grind(const std::vector<std::string>& args, std::string& strPrint)
     uint32_t proposed_nonce{};
 
     std::vector<std::thread> threads;
-    int n_tasks = std::max(1u, std::thread::hardware_concurrency());
+    // Keep this developer-only grinder memory-bounded. Production
+    // MercaHash mining should use the dedicated Mercatura miner.
+    const unsigned int n_tasks{
+        std::min(
+            4u,
+            std::max(
+                1u,
+                std::thread::hardware_concurrency()))
+    };
     threads.reserve(n_tasks);
-    for (int i = 0; i < n_tasks; ++i) {
+    for (unsigned int i = 0; i < n_tasks; ++i) {
         threads.emplace_back(grind_task, nBits, header, i, n_tasks, std::ref(found), std::ref(proposed_nonce));
     }
     for (auto& t : threads) {

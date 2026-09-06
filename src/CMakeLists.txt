@@ -394,6 +394,17 @@ if(BUILD_UTIL)
 endif()
 
 
+# Mercatura developer-only genesis mining helper.
+# Excluded from normal production builds and not installed.
+add_executable(mercatura-genesis EXCLUDE_FROM_ALL
+  mercatura-genesis.cpp
+)
+target_link_libraries(mercatura-genesis
+  core_interface
+  bitcoin_common
+  bitcoin_util
+)
+
 if(BUILD_GUI)
   add_subdirectory(qt)
 endif()

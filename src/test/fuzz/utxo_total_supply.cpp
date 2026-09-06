@@ -26,7 +26,6 @@ FUZZ_TARGET(utxo_total_supply)
 {
     SeedRandomStateForTest(SeedRand::ZEROS);
     FuzzedDataProvider fuzzed_data_provider(buffer.data(), buffer.size());
-    SetMockTime(ConsumeTime(fuzzed_data_provider, /*min=*/1296688602)); // regtest genesis block timestamp
     /** The testing setup that creates a chainman only (no chainstate) */
     ChainTestingSetup test_setup{
         ChainType::REGTEST,
@@ -36,6 +35,8 @@ FUZZ_TARGET(utxo_total_supply)
             },
         },
     };
+    const auto genesis_time{test_setup.m_node.chainman->GetParams().GenesisBlock().Time().time_since_epoch().count()};
+    SetMockTime(ConsumeTime(fuzzed_data_provider, /*min=*/genesis_time));
     // Create chainstate
     test_setup.LoadVerifyActivateChainstate();
     auto& node{test_setup.m_node};

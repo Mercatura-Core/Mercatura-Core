@@ -61,14 +61,24 @@ static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesi
  * after the final proof-of-work, difficulty, and emission rules are locked.
  * The genesis coinbase output is intentionally unspendable.
  */
-static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
+static CBlock CreateGenesisBlock(const char* pszTimestamp, const char* pszOutput, uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
 {
-    const char* pszTimestamp = "Mercatura development genesis v0.1";
-    const char* pszOutput = "Mercatura development genesis v0.1";
     const CScript genesisOutputScript = CScript() << OP_RETURN
         << std::vector<unsigned char>((const unsigned char*)pszOutput,
                                       (const unsigned char*)pszOutput + strlen(pszOutput));
     return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nNonce, nBits, nVersion, genesisReward);
+}
+
+static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
+{
+    return CreateGenesisBlock(
+        "Mercatura development genesis v0.1",
+        "Mercatura development genesis v0.1",
+        nTime,
+        nNonce,
+        nBits,
+        nVersion,
+        genesisReward);
 }
 
 /**
@@ -130,10 +140,20 @@ public:
         m_assumed_blockchain_size = 0;
         m_assumed_chain_state_size = 0;
 
-        genesis = CreateGenesisBlock(1231006505, 0, 0x207fffff, 1, 50 * COIN);
+        // Mercatura mainnet genesis phrase is permanent. The current
+        // development nBits remains provisional until launch-hardware
+        // MercaHash benchmarking is complete.
+        genesis = CreateGenesisBlock(
+            "012b30242c31233b612b20336d1360",
+            "012b30242c31233b612b20336d1360",
+            1788680812,
+            1,
+            0x207fffff,
+            1,
+            50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256{"fbe9665a1034ef5461d30b42ced28a6297ea55b99aba450e8d3182199e8b4987"});
-        assert(genesis.hashMerkleRoot == uint256{"578a273795e1fc0877ccc7a91c15854d82ad0eb7b9d3f2c2ff93f8749e9bb127"});
+        assert(consensus.hashGenesisBlock == uint256{"cd797c78731d68a82b664b3e359a2e69508ea873fe5747b686488589cc7d6f15"});
+        assert(genesis.hashMerkleRoot == uint256{"b0c99eda385fbc3314f2e877cb2a563ad9d22d6dd18f80fac9653c2f65a8caa6"});
 
         // Mercatura development starts without DNS or fixed seeds.
         // Early networks use manual addnode/connect configuration.
@@ -222,10 +242,17 @@ public:
         m_assumed_blockchain_size = 0;
         m_assumed_chain_state_size = 0;
 
-        genesis = CreateGenesisBlock(1296688602, 0, 0x207fffff, 1, 50 * COIN);
+        genesis = CreateGenesisBlock(
+            "Mercatura private testnet genesis v0.1",
+            "Mercatura private testnet genesis v0.1",
+            1788566400,
+            2,
+            0x207fffff,
+            1,
+            50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256{"92925b2ff2241e0d04325ef3206e9dd15de8f07685c50baa142a48c8a39d6c81"});
-        assert(genesis.hashMerkleRoot == uint256{"578a273795e1fc0877ccc7a91c15854d82ad0eb7b9d3f2c2ff93f8749e9bb127"});
+        assert(consensus.hashGenesisBlock == uint256{"0cee25abd571760687efbebbe8741873dc187ce46afe082282a47b2455320d73"});
+        assert(genesis.hashMerkleRoot == uint256{"98bd90b0fdc8794f4fdfbadc78a068345abb119e0cbb47a6aa2cfc39ebfee891"});
 
         // Mercatura development starts without DNS or fixed seeds.
         // Early test networks use manual addnode/connect configuration.
@@ -380,7 +407,10 @@ public:
         vSeeds.clear();
 
         if (!options.challenge) {
-            bin = "512103ad5e0edad18cb1f0fc0d28a3d4f1f3e445640337489abb10404f2d1e086be430210359ef5021964fe22d6f8e05b2463c9540ce96883fe3b278760f048f5189f2e6c452ae"_hex_v_u8;
+            // Mercatura private Signet authority: native witness-v2
+            // PQ Authorization v1 using the dedicated ML-DSA-65
+            // authority key commitment.
+            bin = "5220a61fde7ab59366186f3270da2f342cd7d05ea76b11c885d6711d55c2ae21a997"_hex_v_u8;
 
             consensus.nMinimumChainWork = uint256{};
             consensus.defaultAssumeValid = uint256{};
@@ -462,10 +492,17 @@ public:
         nDefaultPort = 27779;
         nPruneAfterHeight = 1000;
 
-        genesis = CreateGenesisBlock(1598918400, 2, 0x207fffff, 1, 50 * COIN);
+        genesis = CreateGenesisBlock(
+            "Mercatura private signet genesis v0.1",
+            "Mercatura private signet genesis v0.1",
+            1788566400,
+            1,
+            0x207fffff,
+            1,
+            50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256{"2f46054337be8acc359637a73a43090723db4c94aa1dc4575b0af04e4fa51fdd"});
-        assert(genesis.hashMerkleRoot == uint256{"578a273795e1fc0877ccc7a91c15854d82ad0eb7b9d3f2c2ff93f8749e9bb127"});
+        assert(consensus.hashGenesisBlock == uint256{"eebe2b23469b0d91056cc9240387ba7ee601ce138160da3c508142e039e1f36b"});
+        assert(genesis.hashMerkleRoot == uint256{"b750c920894b9f96090f1d5de2ccfe46a1a0745ad19d46633956c4192d156cca"});
 
         m_assumeutxo_data = {};
 
@@ -571,10 +608,17 @@ public:
             consensus.vDeployments[deployment_pos].min_activation_height = version_bits_params.min_activation_height;
         }
 
-        genesis = CreateGenesisBlock(1296688602, 3, 0x207fffff, 1, 50 * COIN);
+        genesis = CreateGenesisBlock(
+            "Mercatura regtest genesis v0.1",
+            "Mercatura regtest genesis v0.1",
+            1788566400,
+            1,
+            0x207fffff,
+            1,
+            50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256{"2a49311cc7b928f896faa956ea171cea320dc7831e695ea87584e5db03b58b2e"});
-        assert(genesis.hashMerkleRoot == uint256{"578a273795e1fc0877ccc7a91c15854d82ad0eb7b9d3f2c2ff93f8749e9bb127"});
+        assert(consensus.hashGenesisBlock == uint256{"8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685"});
+        assert(genesis.hashMerkleRoot == uint256{"f72f87b6fde6ba17583954c5c0ffec58909e4f49752ea7f125e4ecaf488ab83c"});
 
         vFixedSeeds.clear(); //!< Regtest mode doesn't have any fixed seeds.
         vSeeds.clear();
@@ -587,21 +631,21 @@ public:
                 .height = 110,
                 .hash_serialized = AssumeutxoHash{uint256{"4016f03e76f4de1e1b3c4970e4ad7b92c784d983ef6d1c4f0e06d59046da459d"}},
                 .m_chain_tx_count = 111,
-                .blockhash = uint256{"33717a04e8a830d874b81ce1715e378f6daa6e8d86977c0063f169db64a48820"},
+                .blockhash = uint256{"a93c6a7c01bc0579fa889ac4ad9edc94f7e72ded62bcdced0a60ba207d662bf2"},
             },
             {
                 // For use by fuzz target src/test/fuzz/utxo_snapshot.cpp
                 .height = 200,
                 .hash_serialized = AssumeutxoHash{uint256{"64cfad77e81e7202c3d4317d203ac2966a0192e35ebc8616f86ef5db2a1b2de4"}},
                 .m_chain_tx_count = 201,
-                .blockhash = uint256{"07b7f44d074122be85a63c905c94bb9486112fc5b19607bae846631927a05041"},
+                .blockhash = uint256{"698eecd82cf1c0f3df8b1c5bddf1c8344cbf4a1afa15f9b738c186af8357eded"},
             },
             {
                 // For use by test/functional/feature_assumeutxo.py and test/functional/tool_bitcoin_chainstate.py
                 .height = 299,
                 .hash_serialized = AssumeutxoHash{uint256{"3107f9526723c6861e03083a1ef98e0c589609482be75645430561f98f281609"}},
                 .m_chain_tx_count = 334,
-                .blockhash = uint256{"ea6fd67e2ea069767cf7062e93a6063fd615c7894e321253b72c55d3a2440719"},
+                .blockhash = uint256{"330cdfb964ded1fc551172d7b1abbe4370e9f9af4d65731459712efe181b0ba4"},
             },
         };
 

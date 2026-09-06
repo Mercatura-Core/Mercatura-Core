@@ -103,8 +103,9 @@ void utxo_snapshot_fuzz(FuzzBufferType buffer)
 {
     SeedRandomStateForTest(SeedRand::ZEROS);
     FuzzedDataProvider fuzzed_data_provider(buffer.data(), buffer.size());
-    SetMockTime(ConsumeTime(fuzzed_data_provider, /*min=*/1296688602)); // regtest genesis block timestamp
     auto& setup{*g_setup};
+    const auto genesis_time{setup.m_node.chainman->GetParams().GenesisBlock().Time().time_since_epoch().count()};
+    SetMockTime(ConsumeTime(fuzzed_data_provider, /*min=*/genesis_time));
     bool dirty_chainman{false}; // Reuse the global chainman, but reset it when it is dirty
     auto& chainman{*setup.m_node.chainman};
 

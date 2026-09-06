@@ -28,7 +28,6 @@ from test_framework.messages import (
     MAX_MONEY,
     msg_headers,
     ser_varint,
-    tx_from_hex,
 )
 from test_framework.p2p import (
     P2PInterface,
@@ -45,7 +44,6 @@ from test_framework.util import (
     try_rpc,
 )
 from test_framework.wallet import (
-    getnewdestination,
     MiniWallet,
 )
 from test_framework.blocktools import (
@@ -172,7 +170,7 @@ class AssumeutxoTest(BitcoinTestFramework):
 
     def test_headers_not_synced(self, valid_snapshot_path):
         for node in self.nodes[1:]:
-            msg = "Unable to load UTXO snapshot: The base block header (ea6fd67e2ea069767cf7062e93a6063fd615c7894e321253b72c55d3a2440719) must appear in the headers chain. Make sure all headers are syncing, and call loadtxoutset again."
+            msg = "Unable to load UTXO snapshot: The base block header (330cdfb964ded1fc551172d7b1abbe4370e9f9af4d65731459712efe181b0ba4) must appear in the headers chain. Make sure all headers are syncing, and call loadtxoutset again."
             assert_raises_rpc_error(-32603, msg, node.loadtxoutset, valid_snapshot_path)
 
     def test_invalid_chainstate_scenarios(self):
@@ -231,7 +229,7 @@ class AssumeutxoTest(BitcoinTestFramework):
             block_hash = node.getblockhash(height)
             node.invalidateblock(block_hash)
             assert_equal(node.getblockcount(), height - 1)
-            msg = "Unable to load UTXO snapshot: The base block header (ea6fd67e2ea069767cf7062e93a6063fd615c7894e321253b72c55d3a2440719) is part of an invalid chain."
+            msg = "Unable to load UTXO snapshot: The base block header (330cdfb964ded1fc551172d7b1abbe4370e9f9af4d65731459712efe181b0ba4) is part of an invalid chain."
             assert_raises_rpc_error(-32603, msg, node.loadtxoutset, dump_output_path)
             node.reconsiderblock(block_hash)
 
@@ -339,11 +337,20 @@ class AssumeutxoTest(BitcoinTestFramework):
         snapshot_node = self.nodes[2]
         ibd_node = self.nodes[3]
 
+        # Mercatura regtest genesis is intentionally recent. Start the fresh
+        # IBD node just beyond the 24-hour tip-age threshold at genesis. The
+        # later deterministic chain tip is newer, so full sync can still exit IBD.
+        genesis_time = miner.getblockheader(miner.getblockhash(0))["time"]
+        ibd_mocktime = genesis_time + 24 * 60 * 60 + 1
+
         # Start test fresh by cleaning up node directories
         for node in (snapshot_node, ibd_node):
             self.stop_node(node.index)
             rmtree(node.chain_path)
-            self.start_node(node.index, extra_args=self.extra_args[node.index])
+            node_args = list(self.extra_args[node.index])
+            if node.index == ibd_node.index:
+                node_args.append(f"-mocktime={ibd_mocktime}")
+            self.start_node(node.index, extra_args=node_args)
 
         # Sync-up headers chain on snapshot_node to load snapshot
         headers_provider_conn = snapshot_node.add_p2p_connection(P2PInterface())
@@ -366,6 +373,7 @@ class AssumeutxoTest(BitcoinTestFramework):
         self.connect_nodes(ibd_node.index, snapshot_node.index)
         snapshot_block_hash = snapshot['base_hash']
         self.wait_until(lambda: next(filter(lambda x: x['hash'] == snapshot_block_hash, ibd_node.getchaintips()), default_value)['status'] == "headers-only")
+        assert_equal(ibd_node.getblockchaininfo()["initialblockdownload"], True)
 
         # Once the headers-chain is synced, the ibd_node must avoid requesting historical blocks from the snapshot_node.
         # If it does request such blocks, the snapshot_node will ignore requests it cannot fulfill, causing the ibd_node
@@ -385,6 +393,7 @@ class AssumeutxoTest(BitcoinTestFramework):
         self.connect_nodes(snapshot_node.index, ibd_node.index)
         assert 'NETWORK' in ibd_node.getpeerinfo()[0]['servicesnames']
         self.sync_blocks(nodes=(ibd_node, snapshot_node))
+        assert_equal(ibd_node.getblockchaininfo()["initialblockdownload"], False)
 
     def test_sync_to_most_work_chain_after_background_validation(self):
         """
@@ -453,10 +462,13 @@ class AssumeutxoTest(BitcoinTestFramework):
         # but that n1 and n2 don't yet see.
         assert n0.getblockcount() == START_HEIGHT
         blocks = {START_HEIGHT: Block(n0.getbestblockhash(), 1, START_HEIGHT + 1)}
+        snapshot_spend_utxo = None
         for i in range(100):
             block_tx = 1
             if i % 3 == 0:
-                self.mini_wallet.send_self_transfer(from_node=n0)
+                mini_tx = self.mini_wallet.send_self_transfer(from_node=n0)
+                if i == 99:
+                    snapshot_spend_utxo = mini_tx["new_utxo"]
                 block_tx += 1
             self.generate(n0, nblocks=1, sync_fun=self.no_op)
             height = n0.getblockcount()
@@ -471,6 +483,8 @@ class AssumeutxoTest(BitcoinTestFramework):
                 n0.reconsiderblock(temp_invalid)
                 stale_block = n0.getblock(stale_hash, 0)
 
+
+        assert snapshot_spend_utxo is not None
 
         self.log.info("-- Testing assumeutxo + some indexes + pruning")
 
@@ -654,26 +668,26 @@ class AssumeutxoTest(BitcoinTestFramework):
         n1.getblock(stale_hash)
 
         self.log.info("Submit a spending transaction for a snapshot chainstate coin to the mempool")
-        # spend the coinbase output of the first block that is not available on node1
-        spend_coin_blockhash = n1.getblockhash(START_HEIGHT + 1)
-        assert_raises_rpc_error(-1, "Block not available (not fully downloaded)", n1.getblock, spend_coin_blockhash)
-        prev_tx = n0.getblock(spend_coin_blockhash, 3)['tx'][0]
-        prevout = {"txid": prev_tx['txid'], "vout": 0, "scriptPubKey": prev_tx['vout'][0]['scriptPubKey']['hex']}
-        privkey = n0.get_deterministic_priv_key().key
-        # Spend the actual Mercatura coinbase value, leaving the minimum
-        # 0.01 MCA transaction fee instead of assuming a Bitcoin-sized input.
-        input_value = prev_tx['vout'][0]['value']
-        raw_tx = n1.createrawtransaction(
-            [prevout],
-            {getnewdestination()[2]: input_value - Decimal("0.01")},
-        )
-        signed_tx = n1.signrawtransactionwithkey(raw_tx, [privkey], [prevout])['hex']
-        signed_txid = tx_from_hex(signed_tx).txid_hex
+        snapshot_blockhash = n1.getblockhash(SNAPSHOT_BASE_HEIGHT)
+        assert_raises_rpc_error(-1, "Block not available (not fully downloaded)", n1.getblock, snapshot_blockhash)
 
-        assert n1.gettxout(prev_tx['txid'], 0) is not None
-        n1.sendrawtransaction(signed_tx)
-        assert signed_txid in n1.getrawmempool()
-        assert not n1.gettxout(prev_tx['txid'], 0)
+        snapshot_txid = snapshot_spend_utxo["txid"]
+        snapshot_vout = snapshot_spend_utxo["vout"]
+
+        # The selected output was created immediately before block 299 and
+        # therefore exists in the snapshot even though node1 lacks the block data.
+        assert snapshot_txid in [tx["txid"] for tx in n0.getblock(snapshot_blockhash, 3)["tx"]]
+        assert n1.gettxout(snapshot_txid, snapshot_vout) is not None
+
+        # Spend the MiniWallet ADDRESS_OP_TRUE output without classical
+        # ECDSA/Schnorr ownership authorization.
+        spend_tx = self.mini_wallet.create_self_transfer(
+            utxo_to_spend=snapshot_spend_utxo,
+            fee=Decimal("0.01"),
+        )
+        n1.sendrawtransaction(spend_tx["hex"])
+        assert spend_tx["txid"] in n1.getrawmempool()
+        assert not n1.gettxout(snapshot_txid, snapshot_vout)
 
         PAUSE_HEIGHT = FINAL_HEIGHT - 40
 

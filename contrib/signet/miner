@@ -20,7 +20,7 @@ sys.path.insert(0, PATH_BASE_TEST_FUNCTIONAL)
 
 from test_framework.blocktools import get_witness_script, script_BIP34_coinbase_height, SIGNET_HEADER # noqa: E402
 from test_framework.messages import CBlock, CBlockHeader, COutPoint, CTransaction, CTxIn, CTxInWitness, CTxOut, from_binary, from_hex, ser_string, ser_uint256, tx_from_hex, MAX_SEQUENCE_NONFINAL # noqa: E402
-from test_framework.psbt import PSBT, PSBTMap, PSBT_GLOBAL_UNSIGNED_TX, PSBT_IN_FINAL_SCRIPTSIG, PSBT_IN_FINAL_SCRIPTWITNESS, PSBT_IN_NON_WITNESS_UTXO, PSBT_IN_SIGHASH_TYPE # noqa: E402
+from test_framework.psbt import PSBT, PSBTMap, PSBT_GLOBAL_UNSIGNED_TX, PSBT_IN_FINAL_SCRIPTSIG, PSBT_IN_FINAL_SCRIPTWITNESS, PSBT_IN_NON_WITNESS_UTXO # noqa: E402
 from test_framework.script import CScript, CScriptOp # noqa: E402
 
 logging.basicConfig(
@@ -136,9 +136,9 @@ def generate_psbt(block, signet_spk):
     psbt.g = PSBTMap( {PSBT_GLOBAL_UNSIGNED_TX: signme.serialize(),
                        PSBT_SIGNET_BLOCK: block.serialize()
                      } )
-    psbt.i = [ PSBTMap( {PSBT_IN_NON_WITNESS_UTXO: spendme.serialize(),
-                         PSBT_IN_SIGHASH_TYPE: bytes([1,0,0,0])})
-             ]
+    psbt.i = [PSBTMap({
+        PSBT_IN_NON_WITNESS_UTXO: spendme.serialize(),
+    })]
     psbt.o = [ PSBTMap() ]
     return psbt.to_base64()
 
@@ -248,7 +248,7 @@ def trivial_challenge(spkhex):
     return False
 
 class Generate:
-    INTERVAL = 600.0*2016/2015 # 10 minutes, adjusted for the off-by-one bug
+    INTERVAL = 150.0  # Mercatura target block spacing
 
 
     def __init__(self, multiminer=None, ultimate_target=None, poisson=False, max_interval=1800,
@@ -274,8 +274,14 @@ class Generate:
         #  5) cap the resulting interval between 1 second and 1 hour to avoid extremes
 
         current_target = nbits_to_target(last_nbits)
-        retarget_factor = self.ultimate_target / current_target
-        retarget_factor = max(0.25, min(retarget_factor, 4.0))
+
+        # Without an explicit --nbits target, follow the chain's current
+        # difficulty rather than applying an artificial target change.
+        if self.ultimate_target is None:
+            retarget_factor = 1.0
+        else:
+            retarget_factor = self.ultimate_target / current_target
+            retarget_factor = max(0.25, min(retarget_factor, 4.0))
 
         avg_interval = self.INTERVAL * retarget_factor
 
@@ -354,7 +360,7 @@ class Generate:
             signet_solution = None
         else:
             psbt = generate_psbt(block, signet_spk)
-            input_stream = os.linesep.join([psbt, "true", "ALL"]).encode('utf8')
+            input_stream = os.linesep.join([psbt, "true", "DEFAULT"]).encode('utf8')
             psbt_signed = json.loads(bcli("-stdin", "walletprocesspsbt", input=input_stream))
             if not psbt_signed.get("complete",False):
                logging.debug("Generated PSBT: %s" % (psbt,))
@@ -416,7 +422,11 @@ def do_generate(args):
 
     poolid = get_poolid(args)
 
-    ultimate_target = nbits_to_target(int(args.nbits,16))
+    ultimate_target = (
+        nbits_to_target(int(args.nbits, 16))
+        if args.nbits is not None
+        else None
+    )
 
     gen = Generate(multiminer=my_blocks, ultimate_target=ultimate_target, poisson=args.poisson, max_interval=args.max_interval,
                    standby_delay=args.standby_delay, backup_delay=args.backup_delay, set_block_time=args.set_block_time, poolid=poolid)

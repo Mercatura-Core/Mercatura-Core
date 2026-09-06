@@ -6,6 +6,7 @@
 #include <chainparams.h>
 #include <crypto/mercahash.h>
 #include <pow.h>
+#include <script/script.h>
 #include <streams.h>
 #include <test/util/random.h>
 #include <test/util/common.h>
@@ -612,6 +613,115 @@ BOOST_AUTO_TEST_CASE(mercahash_genesis_pow)
     check_genesis(
         ChainType::REGTEST,
         "regtest");
+}
+
+BOOST_AUTO_TEST_CASE(mercahash_genesis_vectors)
+{
+    struct GenesisVector {
+        ChainType chain_type;
+        const char* network_name;
+        uint32_t time;
+        uint32_t nonce;
+        uint32_t bits;
+        int32_t version;
+        uint256 block_id;
+        uint256 merkle_root;
+        uint256 pow_hash;
+    };
+
+    const std::array<GenesisVector, 4> vectors{{
+        {
+            ChainType::MAIN,
+            "main",
+            1788680812U,
+            1U,
+            0x207fffffU,
+            1,
+            uint256{"cd797c78731d68a82b664b3e359a2e69508ea873fe5747b686488589cc7d6f15"},
+            uint256{"b0c99eda385fbc3314f2e877cb2a563ad9d22d6dd18f80fac9653c2f65a8caa6"},
+            uint256{"5c448423ce7720ab03860668416887a60b00c827edf31c57c48f9f12fd407afe"},
+        },
+        {
+            ChainType::TESTNET,
+            "testnet",
+            1788566400U,
+            2U,
+            0x207fffffU,
+            1,
+            uint256{"0cee25abd571760687efbebbe8741873dc187ce46afe082282a47b2455320d73"},
+            uint256{"98bd90b0fdc8794f4fdfbadc78a068345abb119e0cbb47a6aa2cfc39ebfee891"},
+            uint256{"06f5e56273c1d90c43e1540c5582e8e94e34e1bb378fd8932e721b1c62df7f8a"},
+        },
+        {
+            ChainType::SIGNET,
+            "signet",
+            1788566400U,
+            1U,
+            0x207fffffU,
+            1,
+            uint256{"eebe2b23469b0d91056cc9240387ba7ee601ce138160da3c508142e039e1f36b"},
+            uint256{"b750c920894b9f96090f1d5de2ccfe46a1a0745ad19d46633956c4192d156cca"},
+            uint256{"48039c73237474db04057290c45c574840f8561aa19e4c4e13418f9a6b9dbcc6"},
+        },
+        {
+            ChainType::REGTEST,
+            "regtest",
+            1788566400U,
+            1U,
+            0x207fffffU,
+            1,
+            uint256{"8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685"},
+            uint256{"f72f87b6fde6ba17583954c5c0ffec58909e4f49752ea7f125e4ecaf488ab83c"},
+            uint256{"5529a31aab49396a10b4a925d923b32241d330728e5cff33d39cbc6301769d11"},
+        },
+    }};
+
+    for (const auto& vector : vectors) {
+        const auto params{
+            CreateChainParams(*m_node.args, vector.chain_type)};
+
+        const CBlock& genesis{
+            params->GenesisBlock()};
+
+        BOOST_TEST_CONTEXT(vector.network_name) {
+            BOOST_CHECK_EQUAL(genesis.nTime, vector.time);
+            BOOST_CHECK_EQUAL(genesis.nNonce, vector.nonce);
+            BOOST_CHECK_EQUAL(genesis.nBits, vector.bits);
+            BOOST_CHECK_EQUAL(genesis.nVersion, vector.version);
+            BOOST_CHECK(genesis.hashPrevBlock.IsNull());
+
+            BOOST_CHECK_EQUAL(genesis.GetHash(), vector.block_id);
+            BOOST_CHECK_EQUAL(genesis.hashMerkleRoot, vector.merkle_root);
+
+            PoWHashContext pow_context;
+            const uint256 pow_hash{
+                pow_context.GetHash(genesis)};
+
+            BOOST_CHECK_EQUAL(pow_hash, vector.pow_hash);
+
+            BOOST_CHECK(
+                CheckProofOfWork(
+                    genesis,
+                    params->GetConsensus(),
+                    pow_context));
+
+            BOOST_REQUIRE_EQUAL(genesis.vtx.size(), 1U);
+
+            const CTransaction& coinbase{
+                *genesis.vtx.front()};
+
+            BOOST_CHECK(coinbase.IsCoinBase());
+            BOOST_REQUIRE_EQUAL(coinbase.vout.size(), 1U);
+
+            const CTxOut& output{
+                coinbase.vout.front()};
+
+            BOOST_CHECK_EQUAL(output.nValue, 50 * COIN);
+            BOOST_CHECK(output.scriptPubKey.IsUnspendable());
+            BOOST_REQUIRE(!output.scriptPubKey.empty());
+            BOOST_CHECK_EQUAL(output.scriptPubKey[0], OP_RETURN);
+        }
+    }
 }
 
 BOOST_AUTO_TEST_CASE(CheckProofOfWork_test_negative_target)
