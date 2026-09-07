@@ -1376,6 +1376,7 @@ void TestCoinsResult(ListCoinsTest& context, OutputType out_type, CAmount amount
 {
     LOCK(context.wallet->cs_wallet);
     util::Result<CTxDestination> dest = Assert(context.wallet->GetNewDestination(out_type, ""));
+    BOOST_REQUIRE(std::get_if<WitnessV2MercaturaPQ>(&*dest) != nullptr);
     CWalletTx& wtx = context.AddTx(CRecipient{*dest, amount, /*fSubtractFeeFromAmount=*/true});
     CoinFilterParams filter;
     filter.skip_locked = false;
@@ -1397,16 +1398,16 @@ BOOST_FIXTURE_TEST_CASE(BasicOutputTypesTest, ListCoinsTest)
     BOOST_CHECK_EQUAL(available_coins.Size(), expected_coins_sizes[OutputType::UNKNOWN]);
     BOOST_CHECK_EQUAL(available_coins.coins[OutputType::UNKNOWN].size(), expected_coins_sizes[OutputType::UNKNOWN]);
 
-    // We will create a self transfer for each of the OutputTypes and
-    // verify it is put in the correct bucket after running GetAvailablecoins
+    // Mercatura normal wallet generation ignores inherited Bitcoin output-type
+    // requests and always returns native witness-v2 PQ destinations. AvailableCoins
+    // classifies those outputs as BECH32M.
     //
-    // For each OutputType, We expect 2 UTXOs in our wallet following the self transfer:
-    //   1. One UTXO as the recipient
-    //   2. One UTXO from the change, due to payment address matching logic
+    // Each self transfer adds 2 BECH32M UTXOs:
+    //   1. One recipient output
+    //   2. One change output
 
     for (const auto& out_type : OUTPUT_TYPES) {
-        if (out_type == OutputType::UNKNOWN) continue;
-        expected_coins_sizes[out_type] = 2U;
+        expected_coins_sizes[OutputType::BECH32M] += 2U;
         TestCoinsResult(*this, out_type, 1 * COIN, expected_coins_sizes);
     }
 }
