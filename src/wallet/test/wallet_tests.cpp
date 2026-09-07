@@ -791,6 +791,12 @@ public:
     {
         CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
         wallet = CreateSyncedWallet(*m_node.chain, WITH_LOCK(Assert(m_node.chainman)->GetMutex(), return m_node.chainman->ActiveChain()), coinbaseKey);
+        {
+            LOCK(wallet->cs_wallet);
+            if (!wallet->HasMercaturaPQState()) {
+                BOOST_REQUIRE(wallet->InitializeMercaturaPQWallet());
+            }
+        }
     }
 
     ~ListCoinsTestingSetup()
@@ -803,17 +809,16 @@ public:
         CTransactionRef tx;
         CCoinControl dummy;
         {
-            auto res = CreateTransaction(*wallet, {recipient}, /*change_pos=*/std::nullopt, dummy);
-            BOOST_CHECK(res);
+            // ListCoins tests wallet grouping, not classical authorization. Build
+            // this inherited fixture transaction unsigned under Mercatura PQ rules.
+            auto res = CreateTransaction(*wallet, {recipient}, /*change_pos=*/std::nullopt, dummy, /*sign=*/false);
+            BOOST_REQUIRE(res);
             tx = res->tx;
         }
         wallet->CommitTransaction(tx, {}, {});
-        CMutableTransaction blocktx;
-        {
-            LOCK(wallet->cs_wallet);
-            blocktx = CMutableTransaction(*wallet->mapWallet.at(tx->GetHash()).tx);
-        }
-        CreateAndProcessBlock({CMutableTransaction(blocktx)}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
+        // Do not submit the intentionally unsigned fixture transaction to consensus.
+        // Advance the chain, then assign the wallet-side confirmed state below.
+        CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
 
         LOCK(wallet->cs_wallet);
         LOCK(Assert(m_node.chainman)->GetMutex());
