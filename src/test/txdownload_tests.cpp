@@ -10,7 +10,9 @@
 #include <script/script.h>
 #include <test/util/common.h>
 #include <test/util/random.h>
+#include <test/util/script.h>
 #include <test/util/setup_common.h>
+#include <util/rbf.h>
 #include <validation.h>
 
 #include <array>
@@ -177,33 +179,79 @@ BOOST_FIXTURE_TEST_CASE(handle_missing_inputs, TestChain100Setup)
     NodeId nodeid{1};
     node::TxDownloadConnectionInfo DEFAULT_CONN{/*m_preferred=*/false, /*m_relay_permissions=*/false, /*m_wtxid_relay=*/true};
 
-    // We need mature coinbases
-    mineBlocks(20);
-
     // Transactions with missing inputs are treated differently depending on how much we know about
-    // their parents.
-    CKey wallet_key = GenerateRandomKey();
-    CScript destination = GetScriptForDestination(PKHash(wallet_key.GetPubKey()));
-    // Amount for spending coinbase in a 1-in-1-out tx, at depth n, each time deducting 1000 from the amount as fees.
+    // their parents. Mercatura disables classical ECDSA/Schnorr ownership, so use the established
+    // signature-free P2WSH OP_TRUE test fixture instead of inherited CKey-signed coinbase spends.
+    const CScript destination{P2WSH_OP_TRUE};
+
     CAmount amount_depth_1{50 * COIN - 1000};
     CAmount amount_depth_2{amount_depth_1 - 1000};
-    // Amount for spending coinbase in a 1-in-2-out tx, deducting 1000 in fees
     CAmount amount_split_half{25 * COIN - 500};
     int test_chain_height{100};
+
+    uint64_t funding_nonce{1};
+
+    auto make_funding_outpoint = [&](const CAmount amount) {
+        const COutPoint outpoint{
+            Txid::FromUint256(uint256(funding_nonce++)),
+            0};
+
+        {
+            LOCK(Assert(m_node.chainman)->GetMutex());
+
+            auto& coins{
+                Assert(m_node.chainman)
+                    ->ActiveChainstate()
+                    .CoinsTip()
+            };
+
+            coins.AddCoin(
+                outpoint,
+                Coin{
+                    CTxOut{amount, P2WSH_OP_TRUE},
+                    test_chain_height,
+                    /*coinbase=*/false},
+                /*possible_overwrite=*/false);
+        }
+
+        return outpoint;
+    };
+
+    auto make_spend = [](
+        const std::vector<COutPoint>& inputs,
+        std::vector<CTxOut> outputs) {
+        CMutableTransaction tx;
+        tx.vin.reserve(inputs.size());
+
+        for (const auto& outpoint : inputs) {
+            tx.vin.emplace_back(
+                outpoint,
+                CScript{},
+                MAX_BIP125_RBF_SEQUENCE);
+
+            tx.vin.back().scriptWitness.stack.push_back(
+                WITNESS_STACK_ELEM_OP_TRUE);
+        }
+
+        tx.vout = std::move(outputs);
+        return tx;
+    };
 
     TxValidationState state_orphan;
     state_orphan.Invalid(TxValidationResult::TX_MISSING_INPUTS, "");
 
-    // Transactions are not all submitted to mempool. Conserve the number of m_coinbase_txns we
-    // consume, and only increment this index number when we would conflict with an existing
-    // mempool transaction.
-    size_t coinbase_idx{0};
-
     for (int decisions = 0; decisions < (1 << 4); ++decisions) {
-        auto mtx_single_parent = CreateValidMempoolTransaction(m_coinbase_txns[coinbase_idx], /*input_vout=*/0, test_chain_height, coinbaseKey, destination, amount_depth_1, /*submit=*/false);
+        const COutPoint funding_outpoint{
+            make_funding_outpoint(50 * COIN)};
+
+        auto mtx_single_parent = make_spend(
+            {funding_outpoint},
+            {{amount_depth_1, destination}});
         auto single_parent = MakeTransactionRef(mtx_single_parent);
 
-        auto mtx_orphan = CreateValidMempoolTransaction(single_parent, /*input_vout=*/0, test_chain_height, wallet_key, destination, amount_depth_2, /*submit=*/false);
+        auto mtx_orphan = make_spend(
+            {COutPoint{single_parent->GetHash(), 0}},
+            {{amount_depth_2, destination}});
         auto orphan = MakeTransactionRef(mtx_orphan);
 
         node::TxDownloadManagerImpl txdownload_impl{DEFAULT_OPTS};
@@ -222,10 +270,13 @@ BOOST_FIXTURE_TEST_CASE(handle_missing_inputs, TestChain100Setup)
         if (parent_recent_rej_recon) txdownload_impl.RecentRejectsReconsiderableFilter().insert(single_parent->GetHash().ToUint256());
         if (parent_recent_conf) txdownload_impl.RecentConfirmedTransactionsFilter().insert(single_parent->GetHash().ToUint256());
         if (parent_in_mempool) {
-            const auto mempool_result = WITH_LOCK(::cs_main, return m_node.chainman->ProcessTransaction(single_parent));
-            BOOST_CHECK(mempool_result.m_result_type == MempoolAcceptResult::ResultType::VALID);
-            coinbase_idx += 1;
-            assert(coinbase_idx < m_coinbase_txns.size());
+            const auto mempool_result = WITH_LOCK(
+                ::cs_main,
+                return m_node.chainman->ProcessTransaction(
+                    single_parent));
+            BOOST_CHECK(
+                mempool_result.m_result_type ==
+                MempoolAcceptResult::ResultType::VALID);
         }
 
         // Whether or not the transaction is added as an orphan depends solely on whether or not
@@ -249,16 +300,22 @@ BOOST_FIXTURE_TEST_CASE(handle_missing_inputs, TestChain100Setup)
         std::vector<COutPoint> outpoints;
         int32_t num_parents{24};
         for (int32_t i = 0; i < num_parents; ++i) {
-            assert(coinbase_idx < m_coinbase_txns.size());
-            auto mtx_parent = CreateValidMempoolTransaction(m_coinbase_txns[coinbase_idx++], /*input_vout=*/0, test_chain_height,
-                                                            coinbaseKey, destination, amount_depth_1 + i, /*submit=*/false);
+            const COutPoint funding_outpoint{
+                make_funding_outpoint(50 * COIN)};
+
+            auto mtx_parent = make_spend(
+                {funding_outpoint},
+                {{amount_depth_1 + i, destination}});
+
             auto ptx_parent = MakeTransactionRef(mtx_parent);
             parents.emplace_back(ptx_parent);
             outpoints.emplace_back(ptx_parent->GetHash(), 0);
         }
 
         // Send all coins to 1 output.
-        auto mtx_orphan = CreateValidMempoolTransaction(parents, outpoints, test_chain_height, {wallet_key}, {{amount_depth_2 * num_parents, destination}}, /*submit=*/false);
+        auto mtx_orphan = make_spend(
+            outpoints,
+            {{amount_depth_2 * num_parents, destination}});
         auto orphan = MakeTransactionRef(mtx_orphan);
 
         // 1 parent in RecentRejectsReconsiderableFilter, the rest are unknown
@@ -317,12 +374,24 @@ BOOST_FIXTURE_TEST_CASE(handle_missing_inputs, TestChain100Setup)
 
     // Orphan with multiple inputs spending from a single parent
     {
-        assert(coinbase_idx < m_coinbase_txns.size());
-        auto parent_2outputs = MakeTransactionRef(CreateValidMempoolTransaction({m_coinbase_txns[coinbase_idx]}, {{m_coinbase_txns[coinbase_idx]->GetHash(), 0}}, test_chain_height, {coinbaseKey},
-                                                             {{amount_split_half, destination}, {amount_split_half, destination}}, /*submit=*/false));
+        const COutPoint funding_outpoint{
+            make_funding_outpoint(50 * COIN)};
 
-        auto orphan = MakeTransactionRef(CreateValidMempoolTransaction({parent_2outputs}, {{parent_2outputs->GetHash(), 0}, {parent_2outputs->GetHash(), 1}},
-                                                                       test_chain_height, {wallet_key}, {{amount_depth_2, destination}}, /*submit=*/false));
+        auto parent_2outputs = MakeTransactionRef(
+            make_spend(
+                {funding_outpoint},
+                {
+                    {amount_split_half, destination},
+                    {amount_split_half, destination},
+                }));
+
+        auto orphan = MakeTransactionRef(
+            make_spend(
+                {
+                    COutPoint{parent_2outputs->GetHash(), 0},
+                    COutPoint{parent_2outputs->GetHash(), 1},
+                },
+                {{amount_depth_2, destination}}));
         // Parent is in RecentRejectsReconsiderableFilter. Inputs will find it twice, but this
         // should only counts as 1 parent in the filter.
         {
