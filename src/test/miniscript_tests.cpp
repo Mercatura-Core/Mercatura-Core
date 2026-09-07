@@ -348,6 +348,11 @@ void TestSatisfy(const KeyConverter& converter, const Node& node)
 {
     auto script = node.ToScript(converter);
     const auto challenges{FindChallenges(node)}; // Find all challenges in the generated miniscript.
+    const bool has_classical_signature_challenge{
+        std::any_of(challenges.begin(), challenges.end(), [](const Challenge& challenge) {
+            return challenge.first == ChallengeType::PK;
+        })
+    };
     std::vector<Challenge> challist(challenges.begin(), challenges.end());
     for (int iter = 0; iter < 3; ++iter) {
         std::shuffle(challist.begin(), challist.end(), m_rng);
@@ -388,11 +393,21 @@ void TestSatisfy(const KeyConverter& converter, const Node& node)
                 // Test non-malleable satisfaction.
                 ScriptError serror;
                 bool res = VerifyScript(CScript(), script_pubkey, &witness_nonmal, STANDARD_SCRIPT_VERIFY_FLAGS, checker, &serror);
+                const bool mercatura_classical_sig_disabled{
+                    !res &&
+                    has_classical_signature_challenge &&
+                    serror == ScriptError::SCRIPT_ERR_BAD_OPCODE
+                };
+                // Mercatura intentionally disables inherited ECDSA/Schnorr
+                // CHECKSIG-family authorization at consensus. Preserve the
+                // miniscript satisfaction tests while accepting only that
+                // specific Mercatura execution result.
                 // Non-malleable satisfactions are guaranteed to be valid if ValidSatisfactions().
-                if (node.ValidSatisfactions()) BOOST_CHECK(res);
+                if (node.ValidSatisfactions()) BOOST_CHECK(res || mercatura_classical_sig_disabled);
                 // More detailed: non-malleable satisfactions must be valid, or could fail with ops count error (if CheckOpsLimit failed),
                 // or with a stack size error (if CheckStackSize check fails).
                 BOOST_CHECK(res ||
+                            mercatura_classical_sig_disabled ||
                             (!node.CheckOpsLimit() && serror == ScriptError::SCRIPT_ERR_OP_COUNT) ||
                             (!node.CheckStackSize() && serror == ScriptError::SCRIPT_ERR_STACK_SIZE));
             }
@@ -401,9 +416,17 @@ void TestSatisfy(const KeyConverter& converter, const Node& node)
                 // Test malleable satisfaction only if it's different from the non-malleable one.
                 ScriptError serror;
                 bool res = VerifyScript(CScript(), script_pubkey, &witness_mal, STANDARD_SCRIPT_VERIFY_FLAGS, checker, &serror);
+                const bool mercatura_classical_sig_disabled{
+                    !res &&
+                    has_classical_signature_challenge &&
+                    serror == ScriptError::SCRIPT_ERR_BAD_OPCODE
+                };
                 // Malleable satisfactions are not guaranteed to be valid under any conditions, but they can only
-                // fail due to stack or ops limits.
-                BOOST_CHECK(res || serror == ScriptError::SCRIPT_ERR_OP_COUNT || serror == ScriptError::SCRIPT_ERR_STACK_SIZE);
+                // fail due to stack or ops limits, or Mercatura's intentional classical-signature shutdown.
+                BOOST_CHECK(res ||
+                            mercatura_classical_sig_disabled ||
+                            serror == ScriptError::SCRIPT_ERR_OP_COUNT ||
+                            serror == ScriptError::SCRIPT_ERR_STACK_SIZE);
             }
 
             if (node.IsSane()) {
