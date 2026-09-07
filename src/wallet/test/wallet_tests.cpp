@@ -1447,10 +1447,14 @@ static size_t CalculateNestedKeyhashInputSize(bool use_max_sig)
     // Fill in dummy signatures for fee calculation.
     SignatureData sig_data;
 
-    if (!ProduceSignature(keystore, use_max_sig ? DUMMY_MAXIMUM_SIGNATURE_CREATOR : DUMMY_SIGNATURE_CREATOR, script_pubkey, sig_data)) {
-        // We're hand-feeding it correct arguments; shouldn't happen
-        assert(false);
-    }
+    // The dummy satisfier still constructs the inherited nested-P2WPKH
+    // scriptSig/witness used for this size calculation, but Mercatura
+    // intentionally rejects classical CHECKSIG authorization at consensus.
+    BOOST_CHECK(!ProduceSignature(
+        keystore,
+        use_max_sig ? DUMMY_MAXIMUM_SIGNATURE_CREATOR : DUMMY_SIGNATURE_CREATOR,
+        script_pubkey,
+        sig_data));
 
     CTxIn tx_in;
     UpdateInput(tx_in, sig_data);
