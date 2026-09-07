@@ -16,6 +16,7 @@
 #include <test/util/script.h>
 #include <test/util/setup_common.h>
 #include <util/strencodings.h>
+#include <util/rbf.h>
 #include <test/util/txmempool.h>
 #include <validation.h>
 
@@ -32,6 +33,108 @@ struct TxPackageTest : TestChain100Setup {
     CAmount CoinbaseValue(size_t index) const
     {
         return m_coinbase_txns.at(index)->vout.at(0).nValue;
+    }
+
+    // Mercatura disables inherited ECDSA/Schnorr ownership. Package-policy
+    // tests need valid transactions, not classical signature behavior, so
+    // adapt confirmed fixture inputs locally to the established signature-free
+    // P2WSH OP_TRUE test output. Do not change the shared Bitcoin test helper.
+    void AdaptConfirmedInputsForMercatura(const std::vector<COutPoint>& inputs)
+    {
+        LOCK(Assert(m_node.chainman)->GetMutex());
+
+        auto& coins{
+            Assert(m_node.chainman)
+                ->ActiveChainstate()
+                .CoinsTip()
+        };
+
+        for (const auto& outpoint : inputs) {
+            const auto coin{coins.GetCoin(outpoint)};
+            if (!coin.has_value()) {
+                // Unconfirmed package parents are not in CoinsTip.
+                continue;
+            }
+
+            if (coin->out.scriptPubKey == P2WSH_OP_TRUE) {
+                continue;
+            }
+
+            Coin adapted_coin{*coin};
+            adapted_coin.out.scriptPubKey = P2WSH_OP_TRUE;
+
+            BOOST_REQUIRE(coins.SpendCoin(outpoint));
+            coins.AddCoin(
+                outpoint,
+                std::move(adapted_coin),
+                /*possible_overwrite=*/false);
+        }
+    }
+
+    CMutableTransaction CreateValidMempoolTransaction(
+        const std::vector<CTransactionRef>&,
+        const std::vector<COutPoint>& inputs,
+        int,
+        const std::vector<CKey>&,
+        const std::vector<CTxOut>& outputs,
+        bool submit = true)
+    {
+        AdaptConfirmedInputsForMercatura(inputs);
+
+        CMutableTransaction tx;
+        tx.vin.reserve(inputs.size());
+        tx.vout = outputs;
+
+        for (const auto& outpoint : inputs) {
+            tx.vin.emplace_back(
+                outpoint,
+                CScript{},
+                MAX_BIP125_RBF_SEQUENCE);
+
+            tx.vin.back().scriptWitness.stack.push_back(
+                WITNESS_STACK_ELEM_OP_TRUE);
+        }
+
+        if (submit) {
+            LOCK(cs_main);
+            const MempoolAcceptResult result{
+                m_node.chainman->ProcessTransaction(
+                    MakeTransactionRef(tx))
+            };
+            BOOST_REQUIRE(
+                result.m_result_type ==
+                MempoolAcceptResult::ResultType::VALID);
+        }
+
+        return tx;
+    }
+
+    CMutableTransaction CreateValidMempoolTransaction(
+        CTransactionRef input_transaction,
+        uint32_t input_vout,
+        int input_height,
+        CKey input_signing_key,
+        CScript output_destination,
+        CAmount output_amount = CAmount(1 * COIN),
+        bool submit = true)
+    {
+        const COutPoint input{
+            input_transaction->GetHash(),
+            input_vout
+        };
+
+        const CTxOut output{
+            output_amount,
+            output_destination
+        };
+
+        return CreateValidMempoolTransaction(
+            /*input_transactions=*/{input_transaction},
+            /*inputs=*/{input},
+            /*input_height=*/input_height,
+            /*input_signing_keys=*/{input_signing_key},
+            /*outputs=*/{output},
+            /*submit=*/submit);
     }
 
 // Create placeholder transactions that have no meaning.
@@ -214,7 +317,7 @@ BOOST_AUTO_TEST_CASE(package_validation_tests)
 
     // Parent and Child Package
     CKey parent_key = GenerateRandomKey();
-    CScript parent_locking_script = GetScriptForDestination(PKHash(parent_key.GetPubKey()));
+    CScript parent_locking_script{P2WSH_OP_TRUE};
     auto mtx_parent = CreateValidMempoolTransaction(/*input_transaction=*/m_coinbase_txns[0], /*input_vout=*/0,
                                                     /*input_height=*/0, /*input_signing_key=*/coinbaseKey,
                                                     /*output_destination=*/parent_locking_script,
@@ -222,7 +325,7 @@ BOOST_AUTO_TEST_CASE(package_validation_tests)
     CTransactionRef tx_parent = MakeTransactionRef(mtx_parent);
 
     CKey child_key = GenerateRandomKey();
-    CScript child_locking_script = GetScriptForDestination(PKHash(child_key.GetPubKey()));
+    CScript child_locking_script{P2WSH_OP_TRUE};
     auto mtx_child = CreateValidMempoolTransaction(/*input_transaction=*/tx_parent, /*input_vout=*/0,
                                                    /*input_height=*/101, /*input_signing_key=*/parent_key,
                                                    /*output_destination=*/child_locking_script,
@@ -266,9 +369,9 @@ BOOST_AUTO_TEST_CASE(noncontextual_package_tests)
 {
     // The signatures won't be verified so we can just use a placeholder
     CKey placeholder_key = GenerateRandomKey();
-    CScript spk = GetScriptForDestination(PKHash(placeholder_key.GetPubKey()));
+    CScript spk{P2WSH_OP_TRUE};
     CKey placeholder_key_2 = GenerateRandomKey();
-    CScript spk2 = GetScriptForDestination(PKHash(placeholder_key_2.GetPubKey()));
+    CScript spk2{P2WSH_EMPTY};
 
     // Parent and Child Package
     {
@@ -368,7 +471,7 @@ BOOST_AUTO_TEST_CASE(package_submission_tests)
     LOCK(cs_main);
     unsigned int expected_pool_size = m_node.mempool->size();
     CKey parent_key = GenerateRandomKey();
-    CScript parent_locking_script = GetScriptForDestination(PKHash(parent_key.GetPubKey()));
+    CScript parent_locking_script{P2WSH_OP_TRUE};
 
     // Unrelated transactions are not allowed in package submission.
     Package package_unrelated;
@@ -399,7 +502,7 @@ BOOST_AUTO_TEST_CASE(package_submission_tests)
     package_3gen.push_back(tx_parent);
 
     CKey child_key = GenerateRandomKey();
-    CScript child_locking_script = GetScriptForDestination(PKHash(child_key.GetPubKey()));
+    CScript child_locking_script{P2WSH_OP_TRUE};
     auto mtx_child = CreateValidMempoolTransaction(/*input_transaction=*/tx_parent, /*input_vout=*/0,
                                                    /*input_height=*/101, /*input_signing_key=*/parent_key,
                                                    /*output_destination=*/child_locking_script,
@@ -431,7 +534,8 @@ BOOST_AUTO_TEST_CASE(package_submission_tests)
     // missing inputs, so the package validation isn't expected to happen.
     {
         CScriptWitness bad_witness;
-        bad_witness.stack.emplace_back(1);
+        bad_witness.stack.emplace_back(MAX_STANDARD_P2WSH_STACK_ITEM_SIZE + 1);
+        bad_witness.stack.push_back(WITNESS_STACK_ELEM_OP_TRUE);
         CMutableTransaction mtx_parent_invalid{mtx_parent};
         mtx_parent_invalid.vin[0].scriptWitness = bad_witness;
         CTransactionRef tx_parent_invalid = MakeTransactionRef(mtx_parent_invalid);
@@ -556,7 +660,7 @@ BOOST_AUTO_TEST_CASE(package_single_tx)
 
     // No unconfirmed parents
     CKey single_key = GenerateRandomKey();
-    CScript single_locking_script = GetScriptForDestination(PKHash(single_key.GetPubKey()));
+    CScript single_locking_script{P2WSH_OP_TRUE};
     auto mtx_single = CreateValidMempoolTransaction(/*input_transaction=*/m_coinbase_txns[0], /*input_vout=*/0,
                                                     /*input_height=*/0, /*input_signing_key=*/coinbaseKey,
                                                     /*output_destination=*/single_locking_script,
@@ -572,7 +676,7 @@ BOOST_AUTO_TEST_CASE(package_single_tx)
 
     // Parent and Child. Both submitted by themselves through the ProcessNewPackage interface.
     CKey parent_key = GenerateRandomKey();
-    CScript parent_locking_script = GetScriptForDestination(WitnessV0KeyHash(parent_key.GetPubKey()));
+    CScript parent_locking_script{P2WSH_OP_TRUE};
     auto mtx_parent = CreateValidMempoolTransaction(/*input_transaction=*/m_coinbase_txns[1], /*input_vout=*/0,
                                                     /*input_height=*/0, /*input_signing_key=*/coinbaseKey,
                                                     /*output_destination=*/parent_locking_script,
@@ -593,7 +697,7 @@ BOOST_AUTO_TEST_CASE(package_single_tx)
     BOOST_CHECK_EQUAL(m_node.mempool->size(), expected_pool_size);
 
     CKey child_key = GenerateRandomKey();
-    CScript child_locking_script = GetScriptForDestination(WitnessV0KeyHash(child_key.GetPubKey()));
+    CScript child_locking_script{P2WSH_OP_TRUE};
     auto mtx_child = CreateValidMempoolTransaction(/*input_transaction=*/tx_parent, /*input_vout=*/0,
                                                    /*input_height=*/101, /*input_signing_key=*/parent_key,
                                                    /*output_destination=*/child_locking_script,
@@ -617,7 +721,7 @@ BOOST_AUTO_TEST_CASE(package_single_tx)
     // but use a different destination so this is a distinct conflicting
     // transaction with zero additional fee for incremental relay.
     CKey replacement_key = GenerateRandomKey();
-    CScript replacement_locking_script = GetScriptForDestination(PKHash(replacement_key.GetPubKey()));
+    CScript replacement_locking_script{P2WSH_EMPTY};
     auto mtx_single_low_fee = CreateValidMempoolTransaction(/*input_transaction=*/m_coinbase_txns[0], /*input_vout=*/0,
                                                     /*input_height=*/0, /*input_signing_key=*/coinbaseKey,
                                                     /*output_destination=*/replacement_locking_script,
@@ -669,7 +773,7 @@ BOOST_AUTO_TEST_CASE(package_witness_swap_tests)
     witness2.stack.emplace_back(witnessScript.begin(), witnessScript.end());
 
     CKey child_key = GenerateRandomKey();
-    CScript child_locking_script = GetScriptForDestination(WitnessV0KeyHash(child_key.GetPubKey()));
+    CScript child_locking_script{P2WSH_OP_TRUE};
     CMutableTransaction mtx_child1;
     mtx_child1.version = 1;
     mtx_child1.vin.resize(1);
@@ -740,7 +844,7 @@ BOOST_AUTO_TEST_CASE(package_witness_swap_tests)
     // where a parent's witness is mutated. The honest package should be accepted despite the fact
     // that we don't allow witness replacement.
     CKey grandchild_key = GenerateRandomKey();
-    CScript grandchild_locking_script = GetScriptForDestination(WitnessV0KeyHash(grandchild_key.GetPubKey()));
+    CScript grandchild_locking_script{P2WSH_OP_TRUE};
     auto mtx_grandchild = CreateValidMempoolTransaction(/*input_transaction=*/ptx_child2, /*input_vout=*/0,
                                                         /*input_height=*/0, /*input_signing_key=*/child_key,
                                                         /*output_destination=*/grandchild_locking_script,
@@ -831,7 +935,7 @@ BOOST_AUTO_TEST_CASE(package_witness_swap_tests)
 
     // child spends parent1, parent2, and parent3
     CKey mixed_grandchild_key = GenerateRandomKey();
-    CScript mixed_child_spk = GetScriptForDestination(WitnessV0KeyHash(mixed_grandchild_key.GetPubKey()));
+    CScript mixed_child_spk{P2WSH_OP_TRUE};
 
     CMutableTransaction mtx_mixed_child;
     mtx_mixed_child.vin.emplace_back(COutPoint(ptx_parent1->GetHash(), 0));
@@ -886,9 +990,9 @@ BOOST_AUTO_TEST_CASE(package_cpfp_tests)
     LOCK(::cs_main);
     size_t expected_pool_size = m_node.mempool->size();
     CKey child_key = GenerateRandomKey();
-    CScript parent_spk = GetScriptForDestination(WitnessV0KeyHash(child_key.GetPubKey()));
+    CScript parent_spk{P2WSH_OP_TRUE};
     CKey grandchild_key = GenerateRandomKey();
-    CScript child_spk = GetScriptForDestination(WitnessV0KeyHash(grandchild_key.GetPubKey()));
+    CScript child_spk{P2WSH_OP_TRUE};
 
     // low-fee parent and high-fee child package
     const CAmount coinbase_value{CoinbaseValue(0)};
@@ -966,10 +1070,10 @@ BOOST_AUTO_TEST_CASE(package_cpfp_tests)
     // Just because we allow low-fee parents doesn't mean we allow low-feerate packages.
     // Under Mercatura's mocked 50-base-unit/kB mempool floor, the parent pays only
     // the 1-base-unit relay minimum and the child can cover itself, but their
-    // combined 11-base-unit fee is still insufficient for the whole package.
+    // combined 9-base-unit fee is still insufficient for the whole package.
     Package package_still_too_low;
     const CAmount parent_fee{1};
-    const CAmount child_fee{10};
+    const CAmount child_fee{8};
     auto mtx_parent_cheap = CreateValidMempoolTransaction(/*input_transaction=*/m_coinbase_txns[1], /*input_vout=*/0,
                                                           /*input_height=*/0, /*input_signing_key=*/coinbaseKey,
                                                           /*output_destination=*/parent_spk,
@@ -985,6 +1089,7 @@ BOOST_AUTO_TEST_CASE(package_cpfp_tests)
                                                          /*output_amount=*/tx_parent_cheap->vout[0].nValue - child_fee, /*submit=*/false);
     CTransactionRef tx_child_cheap = MakeTransactionRef(mtx_child_cheap);
     package_still_too_low.push_back(tx_child_cheap);
+
     BOOST_CHECK(m_node.mempool->GetMinFee().GetFee(GetTransactionFeeSize(*tx_child_cheap)) <= child_fee);
     BOOST_CHECK(m_node.mempool->GetMinFee().GetFee(GetTransactionFeeSize(*tx_parent_cheap) + GetTransactionFeeSize(*tx_child_cheap)) > parent_fee + child_fee);
     BOOST_CHECK_EQUAL(m_node.mempool->size(), expected_pool_size);
@@ -1081,7 +1186,7 @@ BOOST_AUTO_TEST_CASE(package_cpfp_tests)
             BOOST_CHECK(it_parent->second.m_state.GetRejectReason() == "");
             BOOST_CHECK_MESSAGE(it_parent->second.m_base_fees.value() == high_parent_fee,
                     strprintf("rich parent: expected fee %s, got %s", high_parent_fee, it_parent->second.m_base_fees.value()));
-            BOOST_CHECK(it_parent->second.m_effective_feerate == CFeeRate(high_parent_fee, GetVirtualTransactionSize(*tx_parent_rich)));
+            BOOST_CHECK(it_parent->second.m_effective_feerate == CFeeRate(high_parent_fee, GetTransactionFeeSize(*tx_parent_rich)));
             BOOST_CHECK_EQUAL(it_child->second.m_result_type, MempoolAcceptResult::ResultType::INVALID);
             BOOST_CHECK_EQUAL(it_child->second.m_state.GetResult(), TxValidationResult::TX_RECONSIDERABLE);
             BOOST_CHECK_EQUAL(it_child->second.m_state.GetRejectReason(), "mempool min fee not met");
@@ -1097,9 +1202,9 @@ BOOST_AUTO_TEST_CASE(package_rbf_tests)
     LOCK(::cs_main);
     size_t expected_pool_size = m_node.mempool->size();
     CKey child_key{GenerateRandomKey()};
-    CScript parent_spk = GetScriptForDestination(WitnessV0KeyHash(child_key.GetPubKey()));
+    CScript parent_spk{P2WSH_OP_TRUE};
     CKey grandchild_key{GenerateRandomKey()};
-    CScript child_spk = GetScriptForDestination(WitnessV0KeyHash(grandchild_key.GetPubKey()));
+    CScript child_spk{P2WSH_OP_TRUE};
 
     const CAmount coinbase_value{CoinbaseValue(0)};
     // Test that de-duplication works. This is not actually package rbf.
