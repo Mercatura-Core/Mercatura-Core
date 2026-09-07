@@ -455,7 +455,10 @@ void DoCheck(std::string prv, std::string pub, const std::string& norm_pub, int 
                     sigdata.ripemd160_preimages = preimages;
                     sigdata.hash160_preimages = preimages;
                     const auto prod_sig_res = ProduceSignature(FlatSigningProvider{keys_priv}.Merge(FlatSigningProvider{script_provider}), creator, spks[n], sigdata);
-                    BOOST_CHECK_MESSAGE(prod_sig_res == !(flags & SIGNABLE_FAILS), prv);
+                    // Mercatura intentionally disables classical ECDSA/Schnorr ownership.
+                    // Retain the inherited descriptor parsing, expansion, solvability, and
+                    // signing-provider coverage, but classical descriptor signing must fail.
+                    BOOST_CHECK_MESSAGE(!prod_sig_res, prv);
                 }
 
                 /* Infer a descriptor from the generated script, and verify its solvability and that it roundtrips. */
