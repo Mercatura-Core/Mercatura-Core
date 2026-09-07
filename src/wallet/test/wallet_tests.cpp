@@ -5854,19 +5854,141 @@ BOOST_FIXTURE_TEST_CASE(RemoveTxs, TestChain100Setup)
     context.args = &m_args;
     context.chain = m_node.chain.get();
     auto wallet = TestCreateWallet(context);
-    CKey key = GenerateRandomKey();
-    AddKey(*wallet, key);
 
-    std::string error;
-    m_coinbase_txns.push_back(CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey())).vtx[0]);
-    auto block_tx = TestSimpleSpend(*m_coinbase_txns[0], 0, coinbaseKey, GetScriptForRawPubKey(key.GetPubKey()));
-    CreateAndProcessBlock({block_tx}, GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
+    // Persist a native Mercatura PQ receive destination in the wallet
+    // whose RemoveTxs bookkeeping is being tested.
+    auto receive_result = wallet->GetNewDestination(
+        OutputType::BECH32,
+        "remove-txs-receive");
+    BOOST_REQUIRE(receive_result);
+
+    const CTxDestination receive_destination{
+        *receive_result
+    };
+
+    BOOST_REQUIRE(
+        std::get_if<WitnessV2MercaturaPQ>(
+            &receive_destination) != nullptr);
+
+    const CScript receive_script{
+        GetScriptForDestination(
+            receive_destination)
+    };
+
+    // Use an isolated PQ wallet to own and sign the synthetic funding
+    // output. The funding transaction itself is intentionally unrelated
+    // to the wallet under test, matching the inherited fixture semantics.
+    WalletContext signing_context;
+    signing_context.args = &m_args;
+
+    auto signing_wallet{
+        TestCreateWallet(
+            CreateMockableWalletDatabase(),
+            signing_context,
+            WALLET_FLAG_DESCRIPTORS)
+    };
+
+    BOOST_REQUIRE(signing_wallet);
+
+    auto source_result{
+        signing_wallet->GetNewDestination(
+            OutputType::BECH32,
+            "remove-txs-source")
+    };
+
+    BOOST_REQUIRE(source_result);
+
+    const CTxDestination source_destination{
+        *source_result
+    };
+
+    BOOST_REQUIRE(
+        std::get_if<WitnessV2MercaturaPQ>(
+            &source_destination) != nullptr);
+
+    CMutableTransaction funding;
+    funding.version = 2;
+    funding.vout.emplace_back(
+        10 * COIN,
+        GetScriptForDestination(
+            source_destination));
+
+    const CTransactionRef prev_tx{
+        MakeTransactionRef(
+            std::move(funding))
+    };
+
+    {
+        LOCK(signing_wallet->cs_wallet);
+
+        BOOST_REQUIRE(
+            signing_wallet->AddToWallet(
+                prev_tx,
+                TxStateInactive{},
+                [](CWalletTx&,
+                   bool /*new_tx*/) {
+                    return true;
+                }) != nullptr);
+    }
+
+    // Make the synthetic PQ funding output visible to normal block
+    // validation as a spendable non-coinbase UTXO.
+    {
+        LOCK(
+            Assert(m_node.chainman)
+                ->GetMutex());
+
+        auto& coins{
+            Assert(m_node.chainman)
+                ->ActiveChainstate()
+                .CoinsTip()
+        };
+
+        const int height{
+            Assert(m_node.chainman)
+                ->ActiveChain()
+                .Height()
+        };
+
+        coins.AddCoin(
+            COutPoint{
+                prev_tx->GetHash(),
+                0},
+            Coin{
+                prev_tx->vout.at(0),
+                height,
+                /*coinbase=*/false},
+            /*possible_overwrite=*/false);
+    }
+
+    CMutableTransaction block_tx;
+    block_tx.version = 2;
+    block_tx.vin.emplace_back(
+        COutPoint{
+            prev_tx->GetHash(),
+            0});
+
+    block_tx.vout.emplace_back(
+        9 * COIN,
+        receive_script);
+
+    {
+        LOCK(signing_wallet->cs_wallet);
+
+        BOOST_REQUIRE(
+            signing_wallet->SignTransaction(
+                block_tx));
+    }
+
+    CreateAndProcessBlock(
+        {block_tx},
+        GetScriptForRawPubKey(
+            coinbaseKey.GetPubKey()));
 
     m_node.validation_signals->SyncWithValidationInterfaceQueue();
 
     {
         auto block_hash = block_tx.GetHash();
-        auto prev_tx = m_coinbase_txns[0];
 
         LOCK(wallet->cs_wallet);
         BOOST_CHECK(wallet->HasWalletSpend(prev_tx));
@@ -5880,6 +6002,7 @@ BOOST_FIXTURE_TEST_CASE(RemoveTxs, TestChain100Setup)
     }
 
     TestUnloadWallet(std::move(wallet));
+    WaitForDeleteWallet(std::move(signing_wallet));
 }
 
 BOOST_AUTO_TEST_SUITE_END()
