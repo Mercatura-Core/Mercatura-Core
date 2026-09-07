@@ -5,6 +5,7 @@
 #include <index/txospenderindex.h>
 #include <test/util/common.h>
 #include <test/util/setup_common.h>
+#include <test/util/script.h>
 #include <validation.h>
 
 #include <boost/test/unit_test.hpp>
@@ -14,33 +15,55 @@ BOOST_AUTO_TEST_SUITE(txospenderindex_tests)
 BOOST_FIXTURE_TEST_CASE(txospenderindex_initial_sync, TestChain100Setup)
 {
     // Setup phase:
-    // Mine blocks for coinbase maturity, so we can spend some coinbase outputs in the test.
+    // Mercatura permanently disables inherited ECDSA/Schnorr ownership.
+    // Use the established signature-free P2WSH OP_TRUE test fixture so this
+    // test continues exercising tx-spender index behavior rather than
+    // inherited Bitcoin signature authorization.
     const CScript& coinbase_script = m_coinbase_txns[0]->vout[0].scriptPubKey;
     for (int i = 0; i < 10; i++) CreateAndProcessBlock({}, coinbase_script);
 
-    // Spend 10 outputs
+    // Create and spend 10 deterministic synthetic non-coinbase outputs.
     std::vector<COutPoint> spent(10);
     std::vector<CMutableTransaction> spender(spent.size());
-    for (size_t i = 0; i < spent.size(); i++) {
-        // Outpoint
-        auto coinbase_tx = m_coinbase_txns[i];
-        spent[i] = COutPoint(coinbase_tx->GetHash(), 0);
 
-        // Spending tx
+    {
+        LOCK(Assert(m_node.chainman)->GetMutex());
+
+        auto& coins{
+            Assert(m_node.chainman)
+                ->ActiveChainstate()
+                .CoinsTip()
+        };
+
+        const int funding_height{
+            Assert(m_node.chainman)->ActiveHeight()
+        };
+
+        for (size_t i = 0; i < spent.size(); ++i) {
+            spent[i] = COutPoint{
+                Txid::FromUint256(uint256(i + 1)),
+                0};
+
+            coins.AddCoin(
+                spent[i],
+                Coin{
+                    CTxOut{50 * COIN, P2WSH_OP_TRUE},
+                    funding_height,
+                    /*coinbase=*/false},
+                /*possible_overwrite=*/false);
+        }
+    }
+
+    for (size_t i = 0; i < spent.size(); ++i) {
         spender[i].version = 1;
-        spender[i].vin.resize(1);
-        spender[i].vin[0].prevout.hash = spent[i].hash;
-        spender[i].vin[0].prevout.n = spent[i].n;
-        spender[i].vout.resize(1);
-        spender[i].vout[0].nValue = coinbase_tx->GetValueOut();
-        spender[i].vout[0].scriptPubKey = coinbase_script;
+        spender[i].vin.emplace_back(spent[i]);
+        spender[i].vin[0].scriptWitness.stack.push_back(
+            WITNESS_STACK_ELEM_OP_TRUE);
 
-        // Sign
-        std::vector<unsigned char> vchSig;
-        const uint256 hash = SignatureHash(coinbase_script, spender[i], 0, SIGHASH_ALL, 0, SigVersion::BASE);
-        BOOST_REQUIRE(coinbaseKey.Sign(hash, vchSig));
-        vchSig.push_back((unsigned char)SIGHASH_ALL);
-        spender[i].vin[0].scriptSig << vchSig;
+        // Leave the normal Mercatura minimum fee of one base unit.
+        spender[i].vout.emplace_back(
+            50 * COIN - CENT,
+            P2WSH_OP_TRUE);
     }
 
     // Generate and ensure block has been fully processed
