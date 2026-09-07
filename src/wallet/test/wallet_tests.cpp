@@ -1514,9 +1514,91 @@ BOOST_FIXTURE_TEST_CASE(CreateWallet, TestChain100Setup)
     context.args = &m_args;
     context.chain = m_node.chain.get();
     auto wallet = TestCreateWallet(context);
-    CKey key = GenerateRandomKey();
-    AddKey(*wallet, key);
+
+    // Persist a native Mercatura PQ receive destination before unloading.
+    auto receive_result = wallet->GetNewDestination(
+        OutputType::BECH32, "create-wallet-notification");
+    BOOST_REQUIRE(receive_result);
+    const CTxDestination receive_destination{*receive_result};
+    BOOST_REQUIRE(
+        std::get_if<WitnessV2MercaturaPQ>(&receive_destination) != nullptr);
+    const CScript receive_script{
+        GetScriptForDestination(receive_destination)};
     TestUnloadWallet(std::move(wallet));
+
+    // Use an isolated PQ wallet only to construct valid ML-DSA-signed
+    // fixture transactions for this notification/rescan test.
+    WalletContext signing_context;
+    signing_context.args = &m_args;
+    auto signing_wallet = TestCreateWallet(
+        CreateMockableWalletDatabase(),
+        signing_context,
+        WALLET_FLAG_DESCRIPTORS);
+    BOOST_REQUIRE(signing_wallet);
+
+    auto source_result = signing_wallet->GetNewDestination(
+        OutputType::BECH32, "create-wallet-source");
+    BOOST_REQUIRE(source_result);
+    const CTxDestination source_destination{*source_result};
+    BOOST_REQUIRE(
+        std::get_if<WitnessV2MercaturaPQ>(&source_destination) != nullptr);
+
+    // Create four independent synthetic PQ funding outputs. They are
+    // inserted directly into the test chainstate UTXO cache below.
+    CMutableTransaction funding;
+    funding.version = 2;
+    for (int i = 0; i < 4; ++i) {
+        funding.vout.emplace_back(
+            10 * COIN,
+            GetScriptForDestination(source_destination));
+    }
+    const CTransactionRef funding_tx{
+        MakeTransactionRef(std::move(funding))};
+
+    {
+        LOCK(signing_wallet->cs_wallet);
+        BOOST_REQUIRE(
+            signing_wallet->AddToWallet(
+                funding_tx,
+                TxStateInactive{},
+                [](CWalletTx&, bool /*new_tx*/) { return true; }) != nullptr);
+    }
+
+    {
+        LOCK(Assert(m_node.chainman)->GetMutex());
+        auto& coins{
+            Assert(m_node.chainman)->ActiveChainstate().CoinsTip()};
+        const int height{
+            Assert(m_node.chainman)->ActiveChain().Height()};
+
+        for (uint32_t i = 0; i < 4; ++i) {
+            coins.AddCoin(
+                COutPoint{funding_tx->GetHash(), i},
+                Coin{
+                    funding_tx->vout.at(i),
+                    height,
+                    /*coinbase=*/false},
+                /*possible_overwrite=*/false);
+        }
+    }
+
+    auto make_pq_spend = [&](uint32_t index) {
+        CMutableTransaction tx;
+        tx.version = 2;
+        tx.vin.emplace_back(
+            COutPoint{funding_tx->GetHash(), index});
+        tx.vout.emplace_back(
+            9 * COIN,
+            receive_script);
+
+        {
+            LOCK(signing_wallet->cs_wallet);
+            BOOST_REQUIRE(
+                signing_wallet->SignTransaction(tx));
+        }
+
+        return tx;
+    };
 
 
     // Add log hook to detect AddToWallet events from rescans, blockConnected,
@@ -1543,10 +1625,11 @@ BOOST_FIXTURE_TEST_CASE(CreateWallet, TestChain100Setup)
         promise.get_future().wait();
     });
     std::string error;
-    m_coinbase_txns.push_back(CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey())).vtx[0]);
-    auto block_tx = TestSimpleSpend(*m_coinbase_txns[0], 0, coinbaseKey, GetScriptForRawPubKey(key.GetPubKey()));
-    m_coinbase_txns.push_back(CreateAndProcessBlock({block_tx}, GetScriptForRawPubKey(coinbaseKey.GetPubKey())).vtx[0]);
-    auto mempool_tx = TestSimpleSpend(*m_coinbase_txns[1], 0, coinbaseKey, GetScriptForRawPubKey(key.GetPubKey()));
+    auto block_tx = make_pq_spend(0);
+    CreateAndProcessBlock(
+        {block_tx},
+        GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
+    auto mempool_tx = make_pq_spend(1);
     BOOST_CHECK(m_node.chain->broadcastTransaction(MakeTransactionRef(mempool_tx), DEFAULT_TRANSACTION_MAXFEE, node::TxBroadcast::MEMPOOL_NO_BROADCAST, error));
 
 
@@ -1585,10 +1668,11 @@ BOOST_FIXTURE_TEST_CASE(CreateWallet, TestChain100Setup)
     addtx_count = 0;
     auto handler = HandleLoadWallet(context, [&](std::unique_ptr<interfaces::Wallet> wallet) {
             BOOST_CHECK(rescan_completed);
-            m_coinbase_txns.push_back(CreateAndProcessBlock({}, GetScriptForRawPubKey(coinbaseKey.GetPubKey())).vtx[0]);
-            block_tx = TestSimpleSpend(*m_coinbase_txns[2], 0, coinbaseKey, GetScriptForRawPubKey(key.GetPubKey()));
-            m_coinbase_txns.push_back(CreateAndProcessBlock({block_tx}, GetScriptForRawPubKey(coinbaseKey.GetPubKey())).vtx[0]);
-            mempool_tx = TestSimpleSpend(*m_coinbase_txns[3], 0, coinbaseKey, GetScriptForRawPubKey(key.GetPubKey()));
+            block_tx = make_pq_spend(2);
+            CreateAndProcessBlock(
+                {block_tx},
+                GetScriptForRawPubKey(coinbaseKey.GetPubKey()));
+            mempool_tx = make_pq_spend(3);
             BOOST_CHECK(m_node.chain->broadcastTransaction(MakeTransactionRef(mempool_tx), DEFAULT_TRANSACTION_MAXFEE, node::TxBroadcast::MEMPOOL_NO_BROADCAST, error));
             m_node.validation_signals->SyncWithValidationInterfaceQueue();
         });
@@ -1604,6 +1688,7 @@ BOOST_FIXTURE_TEST_CASE(CreateWallet, TestChain100Setup)
 
 
     TestUnloadWallet(std::move(wallet));
+    WaitForDeleteWallet(std::move(signing_wallet));
 }
 
 BOOST_FIXTURE_TEST_CASE(mercatura_pq_wallet_creation_matrix, BasicTestingSetup)
