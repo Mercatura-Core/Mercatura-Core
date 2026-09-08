@@ -881,6 +881,248 @@ BOOST_AUTO_TEST_CASE(upper_safety_ceiling_does_not_reset_controller)
         parent.r_q48);
 }
 
+BOOST_AUTO_TEST_CASE(bootstrap_adaptive_boundary_branch_replay)
+{
+    using namespace Consensus;
+
+    BOOST_REQUIRE_EQUAL(
+        MERCATURA_BOOTSTRAP_LAST_HEIGHT + 1,
+        MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT);
+
+    const uint64_t edge{
+        static_cast<uint64_t>(
+            MERCATURA_BOOTSTRAP_EDGE_SUBSIDY)};
+
+    // Synthetic shared fork parent at height 311039. A steady historical
+    // work/subsidy ratio gives s=l=0 and is a valid bootstrap-state shape.
+    McaEmissionState fork_parent;
+    fork_parent.height =
+        MERCATURA_BOOTSTRAP_LAST_HEIGHT - 1;
+    fork_parent.s_q48 = 0;
+    fork_parent.l_q48 = 0;
+    fork_parent.q_q48 = 0;
+    fork_parent.r_q48 = 0;
+    fork_parent.subsidy =
+        GetMercaturaBootstrapSubsidy(
+            fork_parent.height);
+    fork_parent.controller_initialized = false;
+
+    BOOST_REQUIRE_GT(
+        fork_parent.subsidy,
+        0);
+
+    const McaEmissionState fork_parent_before{
+        fork_parent};
+
+    const arith_uint256 steady_work{edge};
+    const arith_uint256 higher_work{
+        edge * uint64_t{2}};
+
+    // Branch A keeps W/R = 1 through the boundary.
+    const auto a40{
+        DeriveMcaEmissionState(
+            &fork_parent,
+            MERCATURA_BOOTSTRAP_LAST_HEIGHT,
+            steady_work)};
+
+    BOOST_REQUIRE(a40.has_value());
+
+    const auto a41{
+        DeriveMcaEmissionState(
+            &*a40,
+            MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT,
+            steady_work)};
+
+    BOOST_REQUIRE(a41.has_value());
+
+    const auto a42{
+        DeriveMcaEmissionState(
+            &*a41,
+            MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT + 1,
+            steady_work)};
+
+    BOOST_REQUIRE(a42.has_value());
+
+    // Branch B sees W/R = 2 at both 311040 and 311041. This gives the
+    // alternative branch its own warmed EMA history across activation.
+    const auto b40{
+        DeriveMcaEmissionState(
+            &fork_parent,
+            MERCATURA_BOOTSTRAP_LAST_HEIGHT,
+            higher_work)};
+
+    BOOST_REQUIRE(b40.has_value());
+
+    const auto b41{
+        DeriveMcaEmissionState(
+            &*b40,
+            MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT,
+            higher_work)};
+
+    BOOST_REQUIRE(b41.has_value());
+
+    const auto b42{
+        DeriveMcaEmissionState(
+            &*b41,
+            MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT + 1,
+            steady_work)};
+
+    BOOST_REQUIRE(b42.has_value());
+
+    // Height 311040 is still bootstrap. Both branches receive the same
+    // protocol subsidy, but their EMA histories are already branch-local.
+    BOOST_CHECK_EQUAL(
+        a40->height,
+        MERCATURA_BOOTSTRAP_LAST_HEIGHT);
+    BOOST_CHECK_EQUAL(
+        b40->height,
+        MERCATURA_BOOTSTRAP_LAST_HEIGHT);
+
+    BOOST_CHECK_EQUAL(
+        a40->subsidy,
+        MERCATURA_BOOTSTRAP_EDGE_SUBSIDY);
+    BOOST_CHECK_EQUAL(
+        b40->subsidy,
+        MERCATURA_BOOTSTRAP_EDGE_SUBSIDY);
+
+    BOOST_CHECK(!a40->controller_initialized);
+    BOOST_CHECK(!b40->controller_initialized);
+
+    BOOST_CHECK_NE(
+        a40->s_q48,
+        b40->s_q48);
+    BOOST_CHECK_NE(
+        a40->l_q48,
+        b40->l_q48);
+
+    // At 311041 q/r initialize identically from the locked edge subsidy,
+    // while each branch keeps its own warmed s/l history.
+    BOOST_CHECK(a41->controller_initialized);
+    BOOST_CHECK(b41->controller_initialized);
+
+    BOOST_CHECK_EQUAL(
+        a41->q_q48,
+        MERCATURA_LN_EDGE_SUBSIDY_Q48);
+    BOOST_CHECK_EQUAL(
+        b41->q_q48,
+        MERCATURA_LN_EDGE_SUBSIDY_Q48);
+
+    BOOST_CHECK_EQUAL(
+        a41->r_q48,
+        MERCATURA_LN_EDGE_SUBSIDY_Q48);
+    BOOST_CHECK_EQUAL(
+        b41->r_q48,
+        MERCATURA_LN_EDGE_SUBSIDY_Q48);
+
+    BOOST_CHECK_NE(
+        a41->s_q48,
+        b41->s_q48);
+    BOOST_CHECK_NE(
+        a41->l_q48,
+        b41->l_q48);
+
+    // Block 311042 is the first block whose command consumes the warmed
+    // branch-local EMA error. The two controller trajectories must diverge.
+    BOOST_CHECK_EQUAL(
+        a42->height,
+        MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT + 1);
+    BOOST_CHECK_EQUAL(
+        b42->height,
+        MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT + 1);
+
+    BOOST_CHECK_NE(
+        a42->q_q48,
+        b42->q_q48);
+    BOOST_CHECK_NE(
+        a42->r_q48,
+        b42->r_q48);
+
+    // Deriving both branches must never mutate the shared fork-parent state.
+    BOOST_CHECK_EQUAL(
+        fork_parent.height,
+        fork_parent_before.height);
+    BOOST_CHECK_EQUAL(
+        fork_parent.s_q48,
+        fork_parent_before.s_q48);
+    BOOST_CHECK_EQUAL(
+        fork_parent.l_q48,
+        fork_parent_before.l_q48);
+    BOOST_CHECK_EQUAL(
+        fork_parent.q_q48,
+        fork_parent_before.q_q48);
+    BOOST_CHECK_EQUAL(
+        fork_parent.r_q48,
+        fork_parent_before.r_q48);
+    BOOST_CHECK_EQUAL(
+        fork_parent.subsidy,
+        fork_parent_before.subsidy);
+    BOOST_CHECK_EQUAL(
+        fork_parent.controller_initialized,
+        fork_parent_before.controller_initialized);
+
+    const auto CheckStateEqual =
+        [](const McaEmissionState& actual,
+           const McaEmissionState& expected) {
+            BOOST_CHECK_EQUAL(
+                actual.height,
+                expected.height);
+            BOOST_CHECK_EQUAL(
+                actual.s_q48,
+                expected.s_q48);
+            BOOST_CHECK_EQUAL(
+                actual.l_q48,
+                expected.l_q48);
+            BOOST_CHECK_EQUAL(
+                actual.q_q48,
+                expected.q_q48);
+            BOOST_CHECK_EQUAL(
+                actual.r_q48,
+                expected.r_q48);
+            BOOST_CHECK_EQUAL(
+                actual.subsidy,
+                expected.subsidy);
+            BOOST_CHECK_EQUAL(
+                actual.controller_initialized,
+                expected.controller_initialized);
+        };
+
+    // Simulate disconnecting to the exact shared parent and replaying the
+    // alternative winning branch from ancestry/work alone.
+    const auto replay_b40{
+        DeriveMcaEmissionState(
+            &fork_parent,
+            MERCATURA_BOOTSTRAP_LAST_HEIGHT,
+            higher_work)};
+
+    BOOST_REQUIRE(replay_b40.has_value());
+
+    const auto replay_b41{
+        DeriveMcaEmissionState(
+            &*replay_b40,
+            MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT,
+            higher_work)};
+
+    BOOST_REQUIRE(replay_b41.has_value());
+
+    const auto replay_b42{
+        DeriveMcaEmissionState(
+            &*replay_b41,
+            MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT + 1,
+            steady_work)};
+
+    BOOST_REQUIRE(replay_b42.has_value());
+
+    CheckStateEqual(
+        *replay_b40,
+        *b40);
+    CheckStateEqual(
+        *replay_b41,
+        *b41);
+    CheckStateEqual(
+        *replay_b42,
+        *b42);
+}
+
 BOOST_AUTO_TEST_CASE(derived_states_are_branch_local)
 {
     using namespace Consensus;
