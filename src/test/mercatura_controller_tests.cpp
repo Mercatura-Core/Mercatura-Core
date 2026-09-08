@@ -585,6 +585,212 @@ BOOST_AUTO_TEST_CASE(subsidy_floor_does_not_reset_controller)
         LN_1000_Q48);
 }
 
+BOOST_AUTO_TEST_CASE(subsidy_floor_entry_persistence_and_exit)
+{
+    using namespace Consensus;
+
+    const CAmount floor{
+        MERCATURA_PERPETUAL_SUBSIDY_FLOOR};
+
+    const auto start_r{
+        LogAmountQ48(floor + 1)};
+    BOOST_REQUIRE(start_r.has_value());
+
+    // Lock the starting point to an actual unfloored subsidy one base unit
+    // above the permanent floor.
+    const auto start_candidate{
+        ExpQ48ToAmount(*start_r)};
+    BOOST_REQUIRE(start_candidate.has_value());
+    BOOST_CHECK_EQUAL(
+        *start_candidate,
+        floor + 1);
+
+    McaEmissionState state;
+    state.height =
+        MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT;
+
+    // Put desired state far enough below production state that r remains on
+    // the exact d_minus limiter for long enough to cross below the floor.
+    state.q_q48 =
+        *start_r +
+        100 * MERCATURA_D_MINUS_Q48;
+    state.r_q48 =
+        *start_r;
+
+    state.s_q48 = 0;
+    state.l_q48 = 0;
+    state.subsidy = floor + 1;
+    state.controller_initialized = true;
+
+    bool entered_floor{false};
+
+    // Drive production downward until the unconstrained candidate is strictly
+    // below the permanent floor.
+    for (int step = 0; step < 100; ++step) {
+        const int64_t prior_q{state.q_q48};
+        const int64_t prior_r{state.r_q48};
+
+        const auto command{
+            GetMcaEmissionCommand(
+                &state,
+                state.height + 1)};
+        BOOST_REQUIRE(command.has_value());
+
+        const auto candidate{
+            ExpQ48ToAmount(command->r_q48)};
+        BOOST_REQUIRE(candidate.has_value());
+
+        // q remains independent of the actual subsidy floor.
+        BOOST_CHECK_EQUAL(
+            command->q_q48,
+            prior_q);
+
+        if (*candidate < floor) {
+            entered_floor = true;
+
+            BOOST_CHECK_EQUAL(
+                command->subsidy,
+                floor);
+            BOOST_CHECK_LT(
+                command->r_q48,
+                prior_r);
+
+            state.height += 1;
+            state.q_q48 = command->q_q48;
+            state.r_q48 = command->r_q48;
+            state.subsidy = command->subsidy;
+            break;
+        }
+
+        state.height += 1;
+        state.q_q48 = command->q_q48;
+        state.r_q48 = command->r_q48;
+        state.subsidy = command->subsidy;
+    }
+
+    BOOST_REQUIRE(entered_floor);
+
+    // Persistence: while the candidate continues downward below the floor,
+    // the actual subsidy remains exactly at the floor and r keeps evolving.
+    for (int step = 0; step < 3; ++step) {
+        const int64_t prior_q{state.q_q48};
+        const int64_t prior_r{state.r_q48};
+
+        const auto command{
+            GetMcaEmissionCommand(
+                &state,
+                state.height + 1)};
+        BOOST_REQUIRE(command.has_value());
+
+        const auto candidate{
+            ExpQ48ToAmount(command->r_q48)};
+        BOOST_REQUIRE(candidate.has_value());
+
+        BOOST_CHECK_LT(
+            *candidate,
+            floor);
+        BOOST_CHECK_EQUAL(
+            command->subsidy,
+            floor);
+        BOOST_CHECK_EQUAL(
+            command->q_q48,
+            prior_q);
+        BOOST_CHECK_LT(
+            command->r_q48,
+            prior_r);
+
+        state.height += 1;
+        state.q_q48 = command->q_q48;
+        state.r_q48 = command->r_q48;
+        state.subsidy = command->subsidy;
+    }
+
+    // Reverse desired state through the real controller update:
+    //
+    //   84,096,000,000,000,000 / 840,960
+    //     = +100,000,000,000 Q16.48 units exactly.
+    //
+    // This moves q well above r. r must then recover only through d_plus.
+    state.s_q48 =
+        84'096'000'000'000'000;
+    state.l_q48 = 0;
+
+    const int64_t reversal_parent_q{
+        state.q_q48};
+    const int64_t reversal_parent_r{
+        state.r_q48};
+
+    const auto reversal{
+        GetMcaEmissionCommand(
+            &state,
+            state.height + 1)};
+    BOOST_REQUIRE(reversal.has_value());
+
+    BOOST_CHECK_EQUAL(
+        reversal->q_q48 - reversal_parent_q,
+        100'000'000'000);
+    BOOST_CHECK_EQUAL(
+        reversal->r_q48 - reversal_parent_r,
+        MERCATURA_D_PLUS_Q48);
+
+    state.height += 1;
+    state.q_q48 = reversal->q_q48;
+    state.r_q48 = reversal->r_q48;
+    state.subsidy = reversal->subsidy;
+
+    // Hold the EMA error at zero after the reversal so q stays fixed while r
+    // independently catches up through the upper rate limiter.
+    state.s_q48 = 0;
+    state.l_q48 = 0;
+
+    bool exited_floor{false};
+
+    for (int step = 0; step < 300; ++step) {
+        const int64_t prior_q{state.q_q48};
+        const int64_t prior_r{state.r_q48};
+
+        const auto command{
+            GetMcaEmissionCommand(
+                &state,
+                state.height + 1)};
+        BOOST_REQUIRE(command.has_value());
+
+        const auto candidate{
+            ExpQ48ToAmount(command->r_q48)};
+        BOOST_REQUIRE(candidate.has_value());
+
+        BOOST_CHECK_EQUAL(
+            command->q_q48,
+            prior_q);
+        BOOST_CHECK_GT(
+            command->r_q48,
+            prior_r);
+
+        if (*candidate > floor) {
+            exited_floor = true;
+
+            BOOST_CHECK_EQUAL(
+                command->subsidy,
+                *candidate);
+            BOOST_CHECK_GT(
+                command->subsidy,
+                floor);
+            break;
+        }
+
+        BOOST_CHECK_EQUAL(
+            command->subsidy,
+            floor);
+
+        state.height += 1;
+        state.q_q48 = command->q_q48;
+        state.r_q48 = command->r_q48;
+        state.subsidy = command->subsidy;
+    }
+
+    BOOST_CHECK(exited_floor);
+}
+
 BOOST_AUTO_TEST_CASE(transition_rejects_wrong_subsidy_or_work)
 {
     using namespace Consensus;
