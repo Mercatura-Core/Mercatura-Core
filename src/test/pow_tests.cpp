@@ -265,6 +265,54 @@ BOOST_AUTO_TEST_CASE(dgw_upper_timespan_clamp)
         EXPECTED_BITS);
 }
 
+BOOST_AUTO_TEST_CASE(dgw_upper_timespan_boundary)
+{
+    const auto main_params =
+        CreateChainParams(*m_node.args, ChainType::MAIN);
+    const auto& consensus = main_params->GetConsensus();
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+    constexpr uint32_t BELOW_CLAMP_BITS{0x1c2ffeacU};
+    constexpr uint32_t CLAMPED_BITS{0x1c2fffd0U};
+
+    const auto calculate_next_work = [&](int64_t final_time_adjustment) {
+        // 25 blocks at 450-second spacing give an exact H to H-24
+        // timespan of 10800 seconds.
+        auto blocks = BuildDGWChain(
+            25,
+            START_BITS,
+            1'700'000'000,
+            450);
+
+        blocks.back().nTime += final_time_adjustment;
+
+        CBlockHeader next_block;
+        next_block.nTime =
+            blocks.back().GetBlockTime() +
+            consensus.nPowTargetSpacing;
+
+        return GetNextWorkRequired(
+            &blocks.back(),
+            &next_block,
+            consensus);
+    };
+
+    // 10799 seconds is below the upper bound and must not be clamped.
+    BOOST_CHECK_EQUAL(
+        calculate_next_work(-1),
+        BELOW_CLAMP_BITS);
+
+    // Exactly 10800 seconds is the upper-boundary value itself.
+    BOOST_CHECK_EQUAL(
+        calculate_next_work(0),
+        CLAMPED_BITS);
+
+    // 10801 seconds is above the upper bound and must clamp to 10800.
+    BOOST_CHECK_EQUAL(
+        calculate_next_work(1),
+        CLAMPED_BITS);
+}
+
 BOOST_AUTO_TEST_CASE(dgw_historical_averaging_recurrence)
 {
     const auto main_params =
