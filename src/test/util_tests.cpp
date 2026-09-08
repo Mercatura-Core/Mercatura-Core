@@ -406,6 +406,7 @@ BOOST_AUTO_TEST_CASE(util_FormatMoney)
 {
     BOOST_CHECK_EQUAL(FormatMoney(0), "0.00");
     BOOST_CHECK_EQUAL(FormatMoney(CENT), "0.01");
+    BOOST_CHECK_EQUAL(FormatMoney(2 * CENT), "0.02");
     BOOST_CHECK_EQUAL(FormatMoney(10 * CENT), "0.10");
     BOOST_CHECK_EQUAL(FormatMoney(99 * CENT), "0.99");
     BOOST_CHECK_EQUAL(FormatMoney(COIN), "1.00");
@@ -458,6 +459,7 @@ BOOST_AUTO_TEST_CASE(util_ParseMoney)
 
     BOOST_CHECK_EQUAL(ParseMoney("0.1").value(), 10);
     BOOST_CHECK_EQUAL(ParseMoney("0.01").value(), CENT);
+    BOOST_CHECK_EQUAL(ParseMoney("0.02").value(), 2 * CENT);
 
     // Mercatura has no denomination smaller than one Cent.
     BOOST_CHECK(!ParseMoney("0.001"));

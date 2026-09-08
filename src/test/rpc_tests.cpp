@@ -233,6 +233,7 @@ BOOST_AUTO_TEST_CASE(rpc_format_monetary_values)
 {
     BOOST_CHECK_EQUAL(ValueFromAmount(0).write(), "0.00");
     BOOST_CHECK_EQUAL(ValueFromAmount(CENT).write(), "0.01");
+    BOOST_CHECK_EQUAL(ValueFromAmount(2 * CENT).write(), "0.02");
     BOOST_CHECK_EQUAL(ValueFromAmount(10 * CENT).write(), "0.10");
     BOOST_CHECK_EQUAL(ValueFromAmount(99 * CENT).write(), "0.99");
     BOOST_CHECK_EQUAL(ValueFromAmount(COIN).write(), "1.00");
@@ -266,6 +267,7 @@ BOOST_AUTO_TEST_CASE(rpc_parse_monetary_values)
     BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0")), 0LL);
     BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.00")), 0LL);
     BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.01")), CENT);
+    BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.02")), 2 * CENT);
     BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.1")), 10LL);
     BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.10")), 10LL);
     BOOST_CHECK_EQUAL(AmountFromValue(ValueFromString("0.99")), 99LL);
