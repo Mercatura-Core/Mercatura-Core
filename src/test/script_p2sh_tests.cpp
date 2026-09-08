@@ -107,27 +107,16 @@ BOOST_AUTO_TEST_CASE(sign)
         txTo[i].vin[0].prevout.hash = txFrom.GetHash();
         txTo[i].vout[0].nValue = 1;
     }
+    // Mercatura disables inherited classical ECDSA ownership
+    // authorization. Direct and P2SH-wrapped P2PK/P2PKH forms may still
+    // be parsed and classified, but the inherited signer must not produce
+    // a valid ownership authorization for them.
     for (int i = 0; i < 8; i++)
     {
         SignatureData empty;
-        BOOST_CHECK_MESSAGE(SignSignature(keystore, CTransaction(txFrom), txTo[i], 0, SIGHASH_ALL, empty), strprintf("SignSignature %d", i));
-    }
-    // All of the above should be OK, and the txTos have valid signatures
-    // Check to make sure signature verification fails if we use the wrong ScriptSig:
-    SignatureCache signature_cache{DEFAULT_SIGNATURE_CACHE_BYTES};
-    for (int i = 0; i < 8; i++) {
-        PrecomputedTransactionData txdata(txTo[i]);
-        for (int j = 0; j < 8; j++)
-        {
-            CScript sigSave = txTo[i].vin[0].scriptSig;
-            txTo[i].vin[0].scriptSig = txTo[j].vin[0].scriptSig;
-            bool sigOK = !CScriptCheck(txFrom.vout[txTo[i].vin[0].prevout.n], CTransaction(txTo[i]), signature_cache, 0, SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC, false, &txdata)().has_value();
-            if (i == j)
-                BOOST_CHECK_MESSAGE(sigOK, strprintf("VerifySignature %d %d", i, j));
-            else
-                BOOST_CHECK_MESSAGE(!sigOK, strprintf("VerifySignature %d %d", i, j));
-            txTo[i].vin[0].scriptSig = sigSave;
-        }
+        BOOST_CHECK_MESSAGE(
+            !SignSignature(keystore, CTransaction(txFrom), txTo[i], 0, SIGHASH_ALL, empty),
+            strprintf("classical SignSignature unexpectedly succeeded for script %d", i));
     }
 }
 
@@ -208,7 +197,14 @@ BOOST_AUTO_TEST_CASE(set)
     for (int i = 0; i < 4; i++)
     {
         SignatureData empty;
-        BOOST_CHECK_MESSAGE(SignSignature(keystore, CTransaction(txFrom), txTo[i], 0, SIGHASH_ALL, empty), strprintf("SignSignature %d", i));
+        BOOST_CHECK_MESSAGE(
+            !SignSignature(keystore, CTransaction(txFrom), txTo[i], 0, SIGHASH_ALL, empty),
+            strprintf("classical SignSignature unexpectedly succeeded for script %d", i));
+
+        // Do not let any partial signing result affect the output-policy
+        // assertions below; this test is checking script standardness.
+        txTo[i].vin[0].scriptSig.clear();
+
         BOOST_CHECK_MESSAGE(IsStandardTx(CTransaction(txTo[i]), /*permit_bare_multisig=*/true, reason), strprintf("txTo[%d].IsStandard", i));
         bool no_pbms_is_std = IsStandardTx(CTransaction(txTo[i]), /*permit_bare_multisig=*/false, reason);
         BOOST_CHECK_MESSAGE((i == 0 ? no_pbms_is_std : !no_pbms_is_std), strprintf("txTo[%d].IsStandard(permbaremulti=false)", i));
@@ -348,15 +344,28 @@ BOOST_AUTO_TEST_CASE(AreInputsStandard)
         txTo.vin[i].prevout.n = i;
         txTo.vin[i].prevout.hash = txFrom.GetHash();
     }
-    SignatureData empty;
-    BOOST_CHECK(SignSignature(keystore, CTransaction(txFrom), txTo, 0, SIGHASH_ALL, empty));
-    SignatureData empty_b;
-    BOOST_CHECK(SignSignature(keystore, CTransaction(txFrom), txTo, 1, SIGHASH_ALL, empty_b));
-    SignatureData empty_c;
-    BOOST_CHECK(SignSignature(keystore, CTransaction(txFrom), txTo, 2, SIGHASH_ALL, empty_c));
-    // SignSignature doesn't know how to sign these. We're
-    // not testing validating signatures, so just create
-    // dummy signatures that DO include the correct P2SH scripts:
+    // AreInputsStandard() does not validate cryptographic signatures here;
+    // it checks scriptSig structure and P2SH redeem-script sigop limits.
+    // Mercatura cannot generate inherited ECDSA/CHECKMULTISIG signatures,
+    // so construct structurally correct push-only stacks directly.
+    const std::vector<unsigned char> dummy_sig{0x01};
+
+    // vin[0]: P2SH wrapping P2PKH: <sig> <pubkey> <redeemScript>
+    txTo.vin[0].scriptSig
+        << dummy_sig
+        << ToByteVector(key[0].GetPubKey())
+        << std::vector<unsigned char>(pay1.begin(), pay1.end());
+
+    // vin[1]: ordinary P2PKH: <sig> <pubkey>
+    txTo.vin[1].scriptSig
+        << dummy_sig
+        << ToByteVector(key[0].GetPubKey());
+
+    // vin[2]: ordinary 1-of-3 multisig: CHECKMULTISIG dummy + one sig
+    txTo.vin[2].scriptSig << OP_0 << dummy_sig;
+
+    // These remaining inputs are also structural policy fixtures rather
+    // than cryptographic-signature tests. Include the correct P2SH scripts:
     txTo.vin[3].scriptSig << OP_11 << OP_11 << std::vector<unsigned char>(oneAndTwo.begin(), oneAndTwo.end());
     txTo.vin[4].scriptSig << std::vector<unsigned char>(fifteenSigops.begin(), fifteenSigops.end());
 
