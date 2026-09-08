@@ -412,6 +412,104 @@ BOOST_AUTO_TEST_CASE(dgw_historical_averaging_recurrence)
         EXPECTED_BITS);
 }
 
+BOOST_AUTO_TEST_CASE(dgw_mixed_targets_nonuniform_timestamps)
+{
+    const auto main_params =
+        CreateChainParams(*m_node.args, ChainType::MAIN);
+    const auto& consensus = main_params->GetConsensus();
+
+    constexpr uint32_t TARGET_A{0x1c0ffff0U};
+    constexpr uint32_t TARGET_B{0x1c07fff8U};
+    constexpr uint32_t TARGET_C{0x1c03fffcU};
+
+    // Independent reference for the exact established DGW recurrence
+    // over the mixed 24-target history below at a 3600-second window.
+    constexpr uint32_t EXPECTED_AVERAGED_BITS{0x1c09998fU};
+
+    // Applying the independently constructed 4200-second history to the
+    // same exact averaged target gives this canonical compact target.
+    constexpr uint32_t EXPECTED_MIXED_BITS{0x1c0b3327U};
+
+    auto blocks = BuildDGWChain(
+        25,
+        TARGET_A,
+        1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    // Heights 1..24 are the 24 DGW target samples. Use three distinct
+    // target levels in a repeating deterministic pattern.
+    for (int i = 1; i <= 24; ++i) {
+        switch (i % 3) {
+        case 0:
+            blocks[i].nBits = TARGET_A;
+            break;
+        case 1:
+            blocks[i].nBits = TARGET_B;
+            break;
+        default:
+            blocks[i].nBits = TARGET_C;
+            break;
+        }
+    }
+
+    CBlockHeader next_block;
+    next_block.nTime =
+        blocks.back().GetBlockTime() +
+        consensus.nPowTargetSpacing;
+
+    // First isolate and lock the mixed-target averaging result with an
+    // exact nominal 3600-second H..H-24 timestamp span.
+    BOOST_CHECK_EQUAL(
+        blocks.back().GetBlockTime() -
+            blocks.front().GetBlockTime(),
+        3600);
+
+    BOOST_CHECK_EQUAL(
+        GetNextWorkRequired(
+            &blocks.back(),
+            &next_block,
+            consensus),
+        EXPECTED_AVERAGED_BITS);
+
+    // Now use a deliberately nonuniform four-interval pattern:
+    //
+    //     60 + 240 + 120 + 280 = 700 seconds
+    //
+    // repeated six times:
+    //
+    //     6 * 700 = 4200 seconds.
+    //
+    // This remains strictly inside the 1200..10800 clamp range.
+    constexpr std::array<int64_t, 4> INTERVALS{
+        60,
+        240,
+        120,
+        280,
+    };
+
+    for (int i = 1; i <= 24; ++i) {
+        blocks[i].nTime =
+            blocks[i - 1].GetBlockTime() +
+            INTERVALS[(i - 1) % INTERVALS.size()];
+    }
+
+    next_block.nTime =
+        blocks.back().GetBlockTime() +
+        consensus.nPowTargetSpacing;
+
+    BOOST_CHECK_EQUAL(
+        blocks.back().GetBlockTime() -
+            blocks.front().GetBlockTime(),
+        4200);
+
+    BOOST_CHECK_EQUAL(
+        GetNextWorkRequired(
+            &blocks.back(),
+            &next_block,
+            consensus),
+        EXPECTED_MIXED_BITS);
+}
+
 BOOST_AUTO_TEST_CASE(dgw_pow_limit_ceiling)
 {
     const auto main_params =
