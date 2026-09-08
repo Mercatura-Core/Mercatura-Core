@@ -1123,6 +1123,236 @@ BOOST_AUTO_TEST_CASE(bootstrap_adaptive_boundary_branch_replay)
         *b42);
 }
 
+BOOST_AUTO_TEST_CASE(adaptive_divergent_work_branch_replay)
+{
+    using namespace Consensus;
+
+    const uint64_t edge{
+        static_cast<uint64_t>(
+            MERCATURA_BOOTSTRAP_EDGE_SUBSIDY)};
+
+    // Build a valid synthetic activation parent from the last bootstrap state.
+    // W/R = 1 keeps the shared EMA history neutral at activation.
+    McaEmissionState bootstrap_parent;
+    bootstrap_parent.height =
+        MERCATURA_BOOTSTRAP_LAST_HEIGHT;
+    bootstrap_parent.s_q48 = 0;
+    bootstrap_parent.l_q48 = 0;
+    bootstrap_parent.q_q48 = 0;
+    bootstrap_parent.r_q48 = 0;
+    bootstrap_parent.subsidy =
+        MERCATURA_BOOTSTRAP_EDGE_SUBSIDY;
+    bootstrap_parent.controller_initialized = false;
+
+    const arith_uint256 steady_work{edge};
+
+    const auto activation{
+        DeriveMcaEmissionState(
+            &bootstrap_parent,
+            MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT,
+            steady_work)};
+
+    BOOST_REQUIRE(activation.has_value());
+    BOOST_REQUIRE(activation->controller_initialized);
+
+    // Advance several steady adaptive blocks before the fork so this is
+    // unambiguously an adaptive-period branch test rather than another
+    // activation-boundary test.
+    McaEmissionState fork_parent{*activation};
+
+    for (int step = 0; step < 8; ++step) {
+        const auto next{
+            DeriveMcaEmissionState(
+                &fork_parent,
+                fork_parent.height + 1,
+                steady_work)};
+
+        BOOST_REQUIRE(next.has_value());
+        fork_parent = *next;
+    }
+
+    BOOST_REQUIRE_GT(
+        fork_parent.height,
+        MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT);
+
+    const McaEmissionState fork_parent_before{
+        fork_parent};
+
+    // Materially divergent branch-local GetBlockProof work histories.
+    //
+    // A receives roughly +ln(16) work-yield pressure.
+    // B receives roughly -ln(16) work-yield pressure.
+    const arith_uint256 high_work{
+        edge * uint64_t{16}};
+
+    const uint64_t low_work_value{
+        edge / uint64_t{16}};
+
+    BOOST_REQUIRE_GT(
+        low_work_value,
+        0U);
+
+    const arith_uint256 low_work{
+        low_work_value};
+
+    McaEmissionState branch_a{
+        fork_parent};
+
+    McaEmissionState branch_b{
+        fork_parent};
+
+    int divergence_steps{0};
+
+    // Continue both adaptive histories until s/l/q/r and actual subsidy have
+    // all diverged. The bound is deliberately generous but deterministic.
+    for (int step = 1; step <= 256; ++step) {
+        const auto next_a{
+            DeriveMcaEmissionState(
+                &branch_a,
+                branch_a.height + 1,
+                high_work)};
+
+        const auto next_b{
+            DeriveMcaEmissionState(
+                &branch_b,
+                branch_b.height + 1,
+                low_work)};
+
+        BOOST_REQUIRE(next_a.has_value());
+        BOOST_REQUIRE(next_b.has_value());
+
+        branch_a = *next_a;
+        branch_b = *next_b;
+
+        BOOST_CHECK_EQUAL(
+            branch_a.height,
+            branch_b.height);
+
+        if (branch_a.s_q48 != branch_b.s_q48 &&
+            branch_a.l_q48 != branch_b.l_q48 &&
+            branch_a.q_q48 != branch_b.q_q48 &&
+            branch_a.r_q48 != branch_b.r_q48 &&
+            branch_a.subsidy != branch_b.subsidy) {
+            divergence_steps = step;
+            break;
+        }
+    }
+
+    BOOST_REQUIRE_GT(
+        divergence_steps,
+        0);
+
+    // Lock the F17 requirement explicitly: the two adaptive branches have
+    // materially different complete controller states and actual subsidies.
+    BOOST_CHECK_NE(
+        branch_a.s_q48,
+        branch_b.s_q48);
+    BOOST_CHECK_NE(
+        branch_a.l_q48,
+        branch_b.l_q48);
+    BOOST_CHECK_NE(
+        branch_a.q_q48,
+        branch_b.q_q48);
+    BOOST_CHECK_NE(
+        branch_a.r_q48,
+        branch_b.r_q48);
+    BOOST_CHECK_NE(
+        branch_a.subsidy,
+        branch_b.subsidy);
+
+    BOOST_CHECK(branch_a.controller_initialized);
+    BOOST_CHECK(branch_b.controller_initialized);
+
+    // Branch derivation must not mutate the state at the fork point.
+    BOOST_CHECK_EQUAL(
+        fork_parent.height,
+        fork_parent_before.height);
+    BOOST_CHECK_EQUAL(
+        fork_parent.s_q48,
+        fork_parent_before.s_q48);
+    BOOST_CHECK_EQUAL(
+        fork_parent.l_q48,
+        fork_parent_before.l_q48);
+    BOOST_CHECK_EQUAL(
+        fork_parent.q_q48,
+        fork_parent_before.q_q48);
+    BOOST_CHECK_EQUAL(
+        fork_parent.r_q48,
+        fork_parent_before.r_q48);
+    BOOST_CHECK_EQUAL(
+        fork_parent.subsidy,
+        fork_parent_before.subsidy);
+    BOOST_CHECK_EQUAL(
+        fork_parent.controller_initialized,
+        fork_parent_before.controller_initialized);
+
+    const auto CheckStateEqual =
+        [](const McaEmissionState& actual,
+           const McaEmissionState& expected) {
+            BOOST_CHECK_EQUAL(
+                actual.height,
+                expected.height);
+            BOOST_CHECK_EQUAL(
+                actual.s_q48,
+                expected.s_q48);
+            BOOST_CHECK_EQUAL(
+                actual.l_q48,
+                expected.l_q48);
+            BOOST_CHECK_EQUAL(
+                actual.q_q48,
+                expected.q_q48);
+            BOOST_CHECK_EQUAL(
+                actual.r_q48,
+                expected.r_q48);
+            BOOST_CHECK_EQUAL(
+                actual.subsidy,
+                expected.subsidy);
+            BOOST_CHECK_EQUAL(
+                actual.controller_initialized,
+                expected.controller_initialized);
+        };
+
+    // Simulate reorganization to branch B. Start again from the exact fork
+    // parent and recompute the winning ancestry using only its low-work history.
+    McaEmissionState replay_b{
+        fork_parent};
+
+    for (int step = 0;
+         step < divergence_steps;
+         ++step) {
+        const auto next{
+            DeriveMcaEmissionState(
+                &replay_b,
+                replay_b.height + 1,
+                low_work)};
+
+        BOOST_REQUIRE(next.has_value());
+        replay_b = *next;
+    }
+
+    // Winning-branch state must reproduce bit-for-bit from its own ancestry.
+    CheckStateEqual(
+        replay_b,
+        branch_b);
+
+    // It must not reproduce the disconnected branch-A controller state.
+    BOOST_CHECK_NE(
+        replay_b.s_q48,
+        branch_a.s_q48);
+    BOOST_CHECK_NE(
+        replay_b.l_q48,
+        branch_a.l_q48);
+    BOOST_CHECK_NE(
+        replay_b.q_q48,
+        branch_a.q_q48);
+    BOOST_CHECK_NE(
+        replay_b.r_q48,
+        branch_a.r_q48);
+    BOOST_CHECK_NE(
+        replay_b.subsidy,
+        branch_a.subsidy);
+}
+
 BOOST_AUTO_TEST_CASE(derived_states_are_branch_local)
 {
     using namespace Consensus;
