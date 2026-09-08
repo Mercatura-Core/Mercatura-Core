@@ -477,6 +477,195 @@ BOOST_AUTO_TEST_CASE(mercatura_emission_state_survives_reorg)
     }
 }
 
+BOOST_AUTO_TEST_CASE(mercatura_adaptive_emission_state_survives_loadblockindex)
+{
+    using namespace Consensus;
+
+    auto& chainman{
+        *Assert(m_node.chainman)};
+
+    constexpr int CHECKPOINT_HEIGHT{
+        MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT + 32};
+
+    McaEmissionState expected_state;
+    CAmount expected_next_subsidy{0};
+    uint256 checkpoint_hash;
+
+    {
+        LOCK(::cs_main);
+
+        CBlockIndex* prev{
+            chainman.m_blockman.LookupBlockIndex(
+                ::Params().GenesisBlock().GetHash())};
+
+        if (!prev) {
+            prev =
+                chainman.m_blockman.AddToBlockIndex(
+                    ::Params().GenesisBlock(),
+                    chainman.m_best_header);
+        }
+
+        BOOST_REQUIRE(prev);
+        BOOST_REQUIRE_EQUAL(
+            prev->nHeight,
+            0);
+
+        // Genesis is deliberately outside Mercatura's emission state machine.
+        prev->m_mca_emission_state.reset();
+
+        // Construct a lightweight contiguous block-index ancestry through a
+        // known adaptive checkpoint. These are header/index entries only:
+        // no MercaHash mining, transaction data, or block files are required.
+        for (int height = 1;
+             height <= CHECKPOINT_HEIGHT;
+             ++height) {
+            CBlockHeader header;
+
+            header.nVersion =
+                ::Params().GenesisBlock().nVersion;
+            header.hashPrevBlock =
+                prev->GetBlockHash();
+            header.hashMerkleRoot =
+                uint256::ZERO;
+            header.nTime =
+                prev->nTime + 1;
+            header.nBits =
+                ::Params().GenesisBlock().nBits;
+            header.nNonce =
+                static_cast<uint32_t>(height);
+
+            CBlockIndex* index{
+                chainman.m_blockman.AddToBlockIndex(
+                    header,
+                    chainman.m_best_header)};
+
+            BOOST_REQUIRE(index);
+            BOOST_REQUIRE(
+                index->pprev == prev);
+            BOOST_REQUIRE_EQUAL(
+                index->nHeight,
+                height);
+
+            const McaEmissionState* emission_parent{
+                nullptr};
+
+            if (height > 1) {
+                BOOST_REQUIRE(
+                    prev->m_mca_emission_state.has_value());
+
+                emission_parent =
+                    &*prev->m_mca_emission_state;
+            }
+
+            const auto emission_state{
+                DeriveMcaEmissionState(
+                    emission_parent,
+                    height,
+                    GetBlockProof(*index))};
+
+            BOOST_REQUIRE(
+                emission_state.has_value());
+
+            index->m_mca_emission_state =
+                *emission_state;
+
+            prev = index;
+        }
+
+        BOOST_REQUIRE_EQUAL(
+            prev->nHeight,
+            CHECKPOINT_HEIGHT);
+        BOOST_REQUIRE(
+            prev->m_mca_emission_state.has_value());
+        BOOST_REQUIRE(
+            prev->m_mca_emission_state
+                ->controller_initialized);
+
+        expected_state =
+            *prev->m_mca_emission_state;
+
+        checkpoint_hash =
+            prev->GetBlockHash();
+
+        const auto next_subsidy{
+            GetNextMcaBlockSubsidy(
+                *prev)};
+
+        BOOST_REQUIRE(
+            next_subsidy.has_value());
+
+        expected_next_subsidy =
+            *next_subsidy;
+
+        // Simulate process-memory loss during restart/reindex. Mercatura
+        // emission state is intentionally not serialized into CDiskBlockIndex.
+        for (CBlockIndex* index :
+             chainman.m_blockman.GetAllBlockIndices()) {
+            index->m_mca_emission_state.reset();
+        }
+
+        BOOST_CHECK(
+            !prev->m_mca_emission_state.has_value());
+
+        // This invokes the real startup reconstruction path. It walks the
+        // block index parent-before-child and rebuilds every Mercatura state
+        // solely from ancestry, height, and GetBlockProof().
+        BOOST_REQUIRE(
+            chainman.LoadBlockIndex());
+
+        CBlockIndex* reconstructed{
+            chainman.m_blockman.LookupBlockIndex(
+                checkpoint_hash)};
+
+        BOOST_REQUIRE(reconstructed);
+        BOOST_REQUIRE_EQUAL(
+            reconstructed->nHeight,
+            CHECKPOINT_HEIGHT);
+        BOOST_REQUIRE(
+            reconstructed
+                ->m_mca_emission_state
+                .has_value());
+
+        const auto& actual{
+            *reconstructed
+                 ->m_mca_emission_state};
+
+        BOOST_CHECK_EQUAL(
+            actual.height,
+            expected_state.height);
+        BOOST_CHECK_EQUAL(
+            actual.s_q48,
+            expected_state.s_q48);
+        BOOST_CHECK_EQUAL(
+            actual.l_q48,
+            expected_state.l_q48);
+        BOOST_CHECK_EQUAL(
+            actual.q_q48,
+            expected_state.q_q48);
+        BOOST_CHECK_EQUAL(
+            actual.r_q48,
+            expected_state.r_q48);
+        BOOST_CHECK_EQUAL(
+            actual.subsidy,
+            expected_state.subsidy);
+        BOOST_CHECK_EQUAL(
+            actual.controller_initialized,
+            expected_state.controller_initialized);
+
+        // F18 also locks the next commanded subsidy across reconstruction.
+        const auto reconstructed_next_subsidy{
+            GetNextMcaBlockSubsidy(
+                *reconstructed)};
+
+        BOOST_REQUIRE(
+            reconstructed_next_subsidy.has_value());
+
+        BOOST_CHECK_EQUAL(
+            *reconstructed_next_subsidy,
+            expected_next_subsidy);
+    }
+}
+
 BOOST_AUTO_TEST_CASE(missing_prev_rejected_before_mercahash)
 {
     CBlockHeader header{Params().GenesisBlock()};
