@@ -25,7 +25,11 @@ using kernel::ChainstateRole;
 using node::BlockAssembler;
 
 namespace validation_block_tests {
-struct MinerTestingSetup : public RegTestingSetup {
+struct MinerTestingSetup : public TestingSetup {
+    explicit MinerTestingSetup(
+        ChainType chain_type = ChainType::REGTEST)
+        : TestingSetup{chain_type} {}
+
     std::shared_ptr<CBlock> Block(const uint256& prev_hash);
     std::shared_ptr<const CBlock> GoodBlock(const uint256& prev_hash);
     std::shared_ptr<const CBlock> BadBlock(const uint256& prev_hash);
@@ -33,6 +37,11 @@ struct MinerTestingSetup : public RegTestingSetup {
     void BuildChain(const uint256& root, int height, unsigned int invalid_rate, unsigned int branch_rate, unsigned int max_size, std::vector<std::shared_ptr<const CBlock>>& blocks);
 
     PoWHashContext m_pow_hash_context;
+};
+
+struct MainDgwReorgTestingSetup : public MinerTestingSetup {
+    MainDgwReorgTestingSetup()
+        : MinerTestingSetup{ChainType::MAIN} {}
 };
 } // namespace validation_block_tests
 
@@ -708,4 +717,234 @@ BOOST_AUTO_TEST_CASE(witness_commitment_index)
 
     BOOST_CHECK_EQUAL(GetWitnessCommitmentIndex(pblock), 2);
 }
+BOOST_AUTO_TEST_SUITE_END()
+BOOST_FIXTURE_TEST_SUITE(
+    validation_block_main_dgw_tests,
+    validation_block_tests::MainDgwReorgTestingSetup)
+
+BOOST_AUTO_TEST_CASE(mercatura_dgw_reorg_uses_winning_branch_history)
+{
+    bool ignored;
+
+    const auto& consensus = Params().GetConsensus();
+
+    BOOST_REQUIRE(!consensus.fPowNoRetargeting);
+    BOOST_REQUIRE_EQUAL(consensus.nDGWPastBlocks, 24);
+    BOOST_REQUIRE_EQUAL(consensus.nDGWTargetTimespan, 3600);
+
+    auto ProcessBlock =
+        [&](const std::shared_ptr<const CBlock>& block) -> bool {
+            return Assert(m_node.chainman)->ProcessNewBlock(
+                block,
+                /*force_processing=*/true,
+                /*min_pow_checked=*/true,
+                /*new_block=*/&ignored);
+        };
+
+    auto ActiveTipHash = [&]() {
+        return WITH_LOCK(
+            Assert(m_node.chainman)->GetMutex(),
+            return m_node.chainman->ActiveChain().Tip()->GetBlockHash());
+    };
+
+    auto LookupIndex =
+        [&](const uint256& hash) -> const CBlockIndex* {
+            return WITH_LOCK(
+                ::cs_main,
+                return m_node.chainman->m_blockman.LookupBlockIndex(hash));
+        };
+
+    auto MakeTimedBlock =
+        [&](const uint256& prev_hash,
+            uint32_t block_time) -> std::shared_ptr<const CBlock> {
+            auto block = Block(prev_hash);
+            block->nTime = block_time;
+            block->nNonce = 0;
+
+            return FinalizeBlock(std::move(block));
+        };
+
+    // Ensure the genesis block is available to the active chainstate.
+    BOOST_REQUIRE(
+        ProcessBlock(
+            std::make_shared<CBlock>(
+                Params().GenesisBlock())));
+
+    const uint256 genesis_hash{
+        Params().GenesisBlock().GetHash()};
+    const uint32_t genesis_time{
+        Params().GenesisBlock().nTime};
+
+    // -----------------------------------------------------------------
+    // Branch A: 25 slow blocks, each 300 seconds apart.
+    //
+    // This branch becomes active first. Its DGW history wants an easier
+    // target, but the result is capped at mainnet powLimit.
+    //
+    // genesis -- A1 -- ... -- A25
+    // -----------------------------------------------------------------
+    std::vector<std::shared_ptr<const CBlock>> branch_a;
+    branch_a.reserve(25);
+
+    uint256 prev_hash{genesis_hash};
+    uint32_t block_time{genesis_time};
+
+    for (int i = 0; i < 25; ++i) {
+        block_time += 300;
+
+        const auto block{
+            MakeTimedBlock(
+                prev_hash,
+                block_time)};
+
+        BOOST_REQUIRE(ProcessBlock(block));
+
+        branch_a.push_back(block);
+        prev_hash = block->GetHash();
+    }
+
+    BOOST_REQUIRE_EQUAL(
+        ActiveTipHash(),
+        branch_a.back()->GetHash());
+
+    const CBlockIndex* const a_tip{
+        LookupIndex(branch_a.back()->GetHash())};
+    BOOST_REQUIRE(a_tip);
+
+    CBlockHeader a_next;
+    a_next.nTime =
+        branch_a.back()->GetBlockTime() + 300;
+
+    const uint32_t a_next_bits{
+        GetNextWorkRequired(
+            a_tip,
+            &a_next,
+            consensus)};
+
+    const uint32_t pow_limit_bits{
+        UintToArith256(consensus.powLimit).GetCompact()};
+
+    BOOST_CHECK_EQUAL(
+        a_next_bits,
+        pow_limit_bits);
+
+    // -----------------------------------------------------------------
+    // Branch B: independently build 25 fast blocks, each 60 seconds
+    // apart, from genesis.
+    //
+    // FinalizeBlock() submits each valid solved header, so the entire B
+    // ancestry exists branch-locally before its blocks are connected.
+    //
+    // genesis -- B1 -- ... -- B25
+    // -----------------------------------------------------------------
+    std::vector<std::shared_ptr<const CBlock>> branch_b;
+    branch_b.reserve(25);
+
+    prev_hash = genesis_hash;
+    block_time = genesis_time;
+
+    for (int i = 0; i < 25; ++i) {
+        block_time += 60;
+
+        const auto block{
+            MakeTimedBlock(
+                prev_hash,
+                block_time)};
+
+        branch_b.push_back(block);
+        prev_hash = block->GetHash();
+    }
+
+    // B25 is the first block whose nBits is derived from B's complete
+    // 24-interval DGW history:
+    //
+    //     24 * 60 = 1440 seconds
+    //
+    // powLimit * 1440 / 3600 gives canonical compact 0x20333332.
+    constexpr uint32_t EXPECTED_B25_BITS{
+        0x20333332U};
+
+    BOOST_CHECK_EQUAL(
+        branch_b.back()->nBits,
+        EXPECTED_B25_BITS);
+
+    const CBlockIndex* const b_tip_before_activation{
+        LookupIndex(branch_b.back()->GetHash())};
+    BOOST_REQUIRE(b_tip_before_activation);
+
+    // Calculate B26 while B is still only a header/side branch.
+    //
+    // Its 24-target window contains B25's harder target followed by
+    // B24..B2 at powLimit. Applying the established DGW recurrence and
+    // B25-B1 = 1440 second span gives canonical compact 0x2030be0d.
+    CBlockHeader b_next_before;
+    b_next_before.nTime =
+        branch_b.back()->GetBlockTime() + 60;
+
+    const uint32_t b_next_bits_before{
+        GetNextWorkRequired(
+            b_tip_before_activation,
+            &b_next_before,
+            consensus)};
+
+    constexpr uint32_t EXPECTED_B_NEXT_BITS{
+        0x2030be0dU};
+
+    BOOST_CHECK_EQUAL(
+        b_next_bits_before,
+        EXPECTED_B_NEXT_BITS);
+
+    // The competing histories must genuinely imply different next work.
+    BOOST_CHECK(
+        a_next_bits != b_next_bits_before);
+
+    // Connect B1..B24. A25 must remain active because B has not yet
+    // accumulated enough work to replace it.
+    for (int i = 0; i < 24; ++i) {
+        BOOST_REQUIRE(
+            ProcessBlock(branch_b[i]));
+    }
+
+    BOOST_CHECK_EQUAL(
+        ActiveTipHash(),
+        branch_a.back()->GetHash());
+
+    // Connecting B25 adds the harder DGW work and forces the real
+    // active-chain reorganization from A to B.
+    BOOST_REQUIRE(
+        ProcessBlock(branch_b.back()));
+
+    BOOST_CHECK_EQUAL(
+        ActiveTipHash(),
+        branch_b.back()->GetHash());
+
+    const CBlockIndex* const active_b_tip{
+        LookupIndex(branch_b.back()->GetHash())};
+    BOOST_REQUIRE(active_b_tip);
+
+    CBlockHeader b_next_after;
+    b_next_after.nTime =
+        branch_b.back()->GetBlockTime() + 60;
+
+    const uint32_t b_next_bits_after{
+        GetNextWorkRequired(
+            active_b_tip,
+            &b_next_after,
+            consensus)};
+
+    // Reorganization must not leak A's old DGW history into B.
+    // The active B branch must produce exactly the same next target it
+    // produced branch-locally before activation.
+    BOOST_CHECK_EQUAL(
+        b_next_bits_after,
+        b_next_bits_before);
+
+    BOOST_CHECK_EQUAL(
+        b_next_bits_after,
+        EXPECTED_B_NEXT_BITS);
+
+    BOOST_CHECK(
+        b_next_bits_after != a_next_bits);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
