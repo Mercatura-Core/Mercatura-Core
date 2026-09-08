@@ -313,6 +313,61 @@ BOOST_AUTO_TEST_CASE(dgw_upper_timespan_boundary)
         CLAMPED_BITS);
 }
 
+BOOST_AUTO_TEST_CASE(dgw_alternating_fast_slow_timestamps)
+{
+    const auto main_params =
+        CreateChainParams(*m_node.args, ChainType::MAIN);
+    const auto& consensus = main_params->GetConsensus();
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+    constexpr uint32_t EXPECTED_BITS{0x1c133320U};
+
+    auto blocks = BuildDGWChain(
+        25,
+        START_BITS,
+        1'700'000'000,
+        0);
+
+    // Construct exactly 24 historical intervals alternating between
+    // 60-second fast blocks and 300-second slow blocks.
+    //
+    // There are 12 of each:
+    //
+    //     12 * 60 + 12 * 300 = 4320 seconds
+    //
+    // This remains inside the 1200..10800 DGW clamp range, so with
+    // identical historical targets the exact expected target is:
+    //
+    //     START_TARGET * 4320 / 3600
+    //       = START_TARGET * 6 / 5
+    //
+    // whose canonical compact representation is 0x1c133320.
+    for (int i = 1; i <= 24; ++i) {
+        const int64_t interval =
+            (i % 2 == 1) ? 60 : 300;
+
+        blocks[i].nTime =
+            blocks[i - 1].GetBlockTime() + interval;
+    }
+
+    CBlockHeader next_block;
+    next_block.nTime =
+        blocks.back().GetBlockTime() +
+        consensus.nPowTargetSpacing;
+
+    BOOST_CHECK_EQUAL(
+        blocks.back().GetBlockTime() -
+            blocks.front().GetBlockTime(),
+        4320);
+
+    BOOST_CHECK_EQUAL(
+        GetNextWorkRequired(
+            &blocks.back(),
+            &next_block,
+            consensus),
+        EXPECTED_BITS);
+}
+
 BOOST_AUTO_TEST_CASE(dgw_historical_averaging_recurrence)
 {
     const auto main_params =
