@@ -191,6 +191,54 @@ BOOST_AUTO_TEST_CASE(dgw_lower_timespan_clamp)
         EXPECTED_BITS);
 }
 
+BOOST_AUTO_TEST_CASE(dgw_lower_timespan_boundary)
+{
+    const auto main_params =
+        CreateChainParams(*m_node.args, ChainType::MAIN);
+    const auto& consensus = main_params->GetConsensus();
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+    constexpr uint32_t CLAMPED_BITS{0x1c055550U};
+    constexpr uint32_t ABOVE_CLAMP_BITS{0x1c055673U};
+
+    const auto calculate_next_work = [&](int64_t final_time_adjustment) {
+        // 25 blocks at 50-second spacing give an exact H to H-24
+        // timespan of 1200 seconds.
+        auto blocks = BuildDGWChain(
+            25,
+            START_BITS,
+            1'700'000'000,
+            50);
+
+        blocks.back().nTime += final_time_adjustment;
+
+        CBlockHeader next_block;
+        next_block.nTime =
+            blocks.back().GetBlockTime() +
+            consensus.nPowTargetSpacing;
+
+        return GetNextWorkRequired(
+            &blocks.back(),
+            &next_block,
+            consensus);
+    };
+
+    // 1199 seconds is below the lower bound and must clamp to 1200.
+    BOOST_CHECK_EQUAL(
+        calculate_next_work(-1),
+        CLAMPED_BITS);
+
+    // Exactly 1200 seconds is the lower-boundary value itself.
+    BOOST_CHECK_EQUAL(
+        calculate_next_work(0),
+        CLAMPED_BITS);
+
+    // 1201 seconds is above the lower bound and must not be clamped.
+    BOOST_CHECK_EQUAL(
+        calculate_next_work(1),
+        ABOVE_CLAMP_BITS);
+}
+
 BOOST_AUTO_TEST_CASE(dgw_upper_timespan_clamp)
 {
     const auto main_params =
