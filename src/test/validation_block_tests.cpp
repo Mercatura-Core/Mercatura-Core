@@ -5,6 +5,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include <chainparams.h>
+#include <coins.h>
 #include <consensus/merkle.h>
 #include <consensus/mercatura_controller.h>
 #include <consensus/validation.h>
@@ -663,6 +664,267 @@ BOOST_AUTO_TEST_CASE(mercatura_adaptive_emission_state_survives_loadblockindex)
         BOOST_CHECK_EQUAL(
             *reconstructed_next_subsidy,
             expected_next_subsidy);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(mercatura_coinbase_plus_one_overclaim_rejected)
+{
+    using namespace Consensus;
+
+    auto& chainman{
+        *Assert(m_node.chainman)};
+
+    auto& chainstate{
+        chainman.ActiveChainstate()};
+
+    constexpr int BOOTSTRAP_TEST_HEIGHT{100};
+    constexpr int ADAPTIVE_TEST_HEIGHT{
+        MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT + 1};
+
+    CBlockIndex* bootstrap_parent{nullptr};
+    CBlockIndex* adaptive_parent{nullptr};
+
+    {
+        LOCK(::cs_main);
+
+        const CBlock& genesis{
+            ::Params().GenesisBlock()};
+
+        CBlockIndex* prev{
+            chainman.m_blockman.LookupBlockIndex(
+                genesis.GetHash())};
+
+        if (!prev) {
+            prev =
+                chainman.m_blockman.AddToBlockIndex(
+                    genesis,
+                    chainman.m_best_header);
+        }
+
+        BOOST_REQUIRE(prev);
+        BOOST_REQUIRE_EQUAL(
+            prev->nHeight,
+            0);
+
+        prev->m_mca_emission_state.reset();
+
+        // Build lightweight header/index ancestry only. No MercaHash mining,
+        // transaction data, or block files are needed for this consensus test.
+        //
+        // Stop at the parent of the adaptive candidate so candidate height
+        // 311042 is validated locally without inserting that candidate.
+        for (int height = 1;
+             height < ADAPTIVE_TEST_HEIGHT;
+             ++height) {
+            CBlockHeader header;
+
+            header.nVersion =
+                genesis.nVersion;
+            header.hashPrevBlock =
+                prev->GetBlockHash();
+            header.hashMerkleRoot =
+                uint256::ZERO;
+            header.nTime =
+                prev->nTime + 1;
+            header.nBits =
+                genesis.nBits;
+            header.nNonce =
+                static_cast<uint32_t>(height);
+
+            CBlockIndex* index{
+                chainman.m_blockman.AddToBlockIndex(
+                    header,
+                    chainman.m_best_header)};
+
+            BOOST_REQUIRE(index);
+            BOOST_REQUIRE(
+                index->pprev == prev);
+            BOOST_REQUIRE_EQUAL(
+                index->nHeight,
+                height);
+
+            const McaEmissionState* emission_parent{
+                nullptr};
+
+            if (height > 1) {
+                BOOST_REQUIRE(
+                    prev->m_mca_emission_state.has_value());
+
+                emission_parent =
+                    &*prev->m_mca_emission_state;
+            }
+
+            const auto emission_state{
+                DeriveMcaEmissionState(
+                    emission_parent,
+                    height,
+                    GetBlockProof(*index))};
+
+            BOOST_REQUIRE(
+                emission_state.has_value());
+
+            index->m_mca_emission_state =
+                *emission_state;
+
+            if (height ==
+                BOOTSTRAP_TEST_HEIGHT - 1) {
+                bootstrap_parent = index;
+            }
+
+            if (height ==
+                ADAPTIVE_TEST_HEIGHT - 1) {
+                adaptive_parent = index;
+            }
+
+            prev = index;
+        }
+
+        BOOST_REQUIRE(bootstrap_parent);
+        BOOST_REQUIRE(adaptive_parent);
+
+        BOOST_REQUIRE_EQUAL(
+            bootstrap_parent->nHeight,
+            BOOTSTRAP_TEST_HEIGHT - 1);
+
+        BOOST_REQUIRE_EQUAL(
+            adaptive_parent->nHeight,
+            ADAPTIVE_TEST_HEIGHT - 1);
+
+        BOOST_REQUIRE(
+            adaptive_parent
+                ->m_mca_emission_state
+                .has_value());
+
+        BOOST_REQUIRE(
+            adaptive_parent
+                ->m_mca_emission_state
+                ->controller_initialized);
+
+        auto CheckPlusOneOverclaim =
+            [&](CBlockIndex& parent,
+                int candidate_height) {
+                BOOST_REQUIRE(
+                    parent.m_mca_emission_state
+                        .has_value());
+
+                const auto subsidy{
+                    GetNextMcaBlockSubsidy(
+                        parent)};
+
+                BOOST_REQUIRE(
+                    subsidy.has_value());
+
+                CMutableTransaction coinbase;
+
+                coinbase.version = 2;
+                coinbase.vin.resize(1);
+                coinbase.vin[0].prevout.SetNull();
+
+                // Valid coinbase-height encoding plus padding keeps scriptSig
+                // inside the consensus 2..100 byte coinbase range.
+                coinbase.vin[0].scriptSig =
+                    CScript{}
+                    << candidate_height
+                    << OP_0;
+
+                coinbase.vout.emplace_back(
+                    *subsidy + CAmount{1},
+                    CScript{} << OP_TRUE);
+
+                CBlock block;
+
+                block.nVersion =
+                    ::Params().GenesisBlock().nVersion;
+                block.hashPrevBlock =
+                    parent.GetBlockHash();
+                block.nTime =
+                    parent.nTime + 1;
+                block.nBits =
+                    parent.nBits;
+                block.nNonce =
+                    static_cast<uint32_t>(
+                        candidate_height);
+                block.vtx.push_back(
+                    MakeTransactionRef(
+                        std::move(coinbase)));
+
+                block.hashMerkleRoot =
+                    BlockMerkleRoot(block);
+
+                CBlockIndex index{
+                    block};
+
+                uint256 block_hash{
+                    block.GetHash()};
+
+                index.pprev =
+                    &parent;
+                index.nHeight =
+                    candidate_height;
+                index.phashBlock =
+                    &block_hash;
+
+                const auto emission_state{
+                    DeriveMcaEmissionState(
+                        &*parent
+                              .m_mca_emission_state,
+                        candidate_height,
+                        GetBlockProof(block))};
+
+                BOOST_REQUIRE(
+                    emission_state.has_value());
+
+                index.m_mca_emission_state =
+                    *emission_state;
+
+                BOOST_CHECK_EQUAL(
+                    GetMcaBlockSubsidy(index)
+                        .value(),
+                    *subsidy);
+
+                // ConnectBlock requires the supplied UTXO view to identify the
+                // exact synthetic parent as its current best block. The block
+                // is coinbase-only, so no historical UTXOs are required.
+                CCoinsViewCache view{
+                    &chainstate.CoinsTip()};
+
+                view.SetBestBlock(
+                    parent.GetBlockHash());
+
+                BlockValidationState state;
+
+                const bool accepted{
+                    chainstate.ConnectBlock(
+                        block,
+                        state,
+                        &index,
+                        view,
+                        /*fJustCheck=*/true)};
+
+                BOOST_CHECK(!accepted);
+
+                BOOST_CHECK(
+                    state.IsInvalid());
+
+                BOOST_CHECK(
+                    state.GetResult() ==
+                    BlockValidationResult::
+                        BLOCK_CONSENSUS);
+
+                BOOST_CHECK_EQUAL(
+                    state.GetRejectReason(),
+                    "bad-cb-amount");
+            };
+
+        // Representative bootstrap block: exactly one base unit too much.
+        CheckPlusOneOverclaim(
+            *bootstrap_parent,
+            BOOTSTRAP_TEST_HEIGHT);
+
+        // First SP-LT-driven adaptive block: exactly one base unit too much.
+        CheckPlusOneOverclaim(
+            *adaptive_parent,
+            ADAPTIVE_TEST_HEIGHT);
     }
 }
 
