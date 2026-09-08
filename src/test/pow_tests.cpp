@@ -767,6 +767,35 @@ BOOST_AUTO_TEST_CASE(CheckProofOfWork_test_biger_hash_than_target)
     BOOST_CHECK(!CheckProofOfWork(hash, nBits, consensus));
 }
 
+BOOST_AUTO_TEST_CASE(CheckProofOfWork_test_target_boundary)
+{
+    const auto consensus =
+        CreateChainParams(*m_node.args, ChainType::REGTEST)->GetConsensus();
+
+    const unsigned int nBits =
+        UintToArith256(consensus.powLimit).GetCompact();
+
+    arith_uint256 target;
+    target.SetCompact(nBits);
+
+    // Exact target is valid.
+    BOOST_CHECK(
+        CheckProofOfWork(
+            ArithToUint256(target),
+            nBits,
+            consensus));
+
+    // One above the exact target is invalid.
+    arith_uint256 above_target = target;
+    above_target += 1;
+
+    BOOST_CHECK(
+        !CheckProofOfWork(
+            ArithToUint256(above_target),
+            nBits,
+            consensus));
+}
+
 BOOST_AUTO_TEST_CASE(CheckProofOfWork_test_zero_target)
 {
     const auto consensus = CreateChainParams(*m_node.args, ChainType::MAIN)->GetConsensus();
