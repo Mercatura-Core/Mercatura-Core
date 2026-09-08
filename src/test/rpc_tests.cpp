@@ -208,7 +208,10 @@ BOOST_AUTO_TEST_CASE(rpc_rawsign)
     r = CallRPC(std::string("signrawtransactionwithkey ")+notsigned+" [] "+prevout);
     BOOST_CHECK(r.get_obj().find_value("complete").get_bool() == false);
     r = CallRPC(std::string("signrawtransactionwithkey ")+notsigned+" ["+privkey1+","+privkey2+"] "+prevout);
-    BOOST_CHECK(r.get_obj().find_value("complete").get_bool() == true);
+    // Mercatura disables inherited classical ECDSA/multisig ownership
+    // authorization, so supplying the legacy private keys must not complete
+    // this classical P2SH multisig spend.
+    BOOST_CHECK(r.get_obj().find_value("complete").get_bool() == false);
 }
 
 BOOST_AUTO_TEST_CASE(rpc_createraw_op_return)
