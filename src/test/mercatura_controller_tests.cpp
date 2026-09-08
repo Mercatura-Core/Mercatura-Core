@@ -116,6 +116,55 @@ BOOST_AUTO_TEST_CASE(bootstrap_signal_initialization_and_ema)
     BOOST_CHECK(!second->controller_initialized);
 }
 
+BOOST_AUTO_TEST_CASE(upward_work_yield_step_ema_vector)
+{
+    using namespace Consensus;
+
+    const uint64_t edge{
+        static_cast<uint64_t>(
+            MERCATURA_BOOTSTRAP_EDGE_SUBSIDY)};
+
+    // Start at z_1 = ln(W_1 / R_1) = 0.
+    arith_uint256 initial_work{edge};
+
+    const auto first{
+        AdvanceMcaEmissionState(
+            nullptr,
+            1,
+            initial_work,
+            MERCATURA_BOOTSTRAP_EDGE_SUBSIDY)};
+
+    BOOST_REQUIRE(first.has_value());
+    BOOST_CHECK_EQUAL(first->s_q48, 0);
+    BOOST_CHECK_EQUAL(first->l_q48, 0);
+
+    // Step upward to W_2 = 2 * R_2, so z_2 = ln(2).
+    arith_uint256 stepped_work{
+        edge * uint64_t{2}};
+
+    const auto second{
+        AdvanceMcaEmissionState(
+            &*first,
+            2,
+            stepped_work,
+            MERCATURA_BOOTSTRAP_EDGE_SUBSIDY)};
+
+    BOOST_REQUIRE(second.has_value());
+
+    // Exact truncate-toward-zero vectors using:
+    // alpha_s = 2 / 4,033  (4,032-block span)
+    // alpha_l = 2 / 103,681 (103,680-block span)
+    BOOST_CHECK_EQUAL(
+        second->s_q48,
+        96'753'576'248);
+    BOOST_CHECK_EQUAL(
+        second->l_q48,
+        3'763'535'971);
+    BOOST_CHECK_EQUAL(
+        second->s_q48 - second->l_q48,
+        92'990'040'277);
+}
+
 BOOST_AUTO_TEST_CASE(steady_signal_has_zero_ema_error)
 {
     using namespace Consensus;
