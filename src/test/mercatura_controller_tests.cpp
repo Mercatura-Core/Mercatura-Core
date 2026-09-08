@@ -464,6 +464,83 @@ BOOST_AUTO_TEST_CASE(downward_rate_limiter_vector)
         2'378'229);
 }
 
+BOOST_AUTO_TEST_CASE(downward_rate_limiter_boundary_vectors)
+{
+    using namespace Consensus;
+
+    BOOST_CHECK_EQUAL(
+        MERCATURA_D_MINUS_Q48,
+        -536'170'157);
+
+    const auto command_for_gap = [](int64_t gap_q48) {
+        McaEmissionState parent;
+
+        parent.height =
+            MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT;
+
+        // With q_h == r_h, choose e_h so that:
+        //
+        // q_(h+1) - r_h
+        //   = trunc(e_h / 840,960)
+        //   = gap_q48 exactly.
+        parent.s_q48 =
+            gap_q48 * MERCATURA_CONTROLLER_DIVISOR;
+        parent.l_q48 = 0;
+
+        parent.q_q48 =
+            MERCATURA_LN_EDGE_SUBSIDY_Q48;
+        parent.r_q48 =
+            MERCATURA_LN_EDGE_SUBSIDY_Q48;
+
+        parent.subsidy =
+            MERCATURA_BOOTSTRAP_EDGE_SUBSIDY;
+        parent.controller_initialized = true;
+
+        return std::pair{
+            parent,
+            GetMcaEmissionCommand(
+                &parent,
+                MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT + 1)};
+    };
+
+    // Just inside the lower limiter: no clipping.
+    const auto [inside_parent, inside]{
+        command_for_gap(MERCATURA_D_MINUS_Q48 + 1)};
+
+    BOOST_REQUIRE(inside.has_value());
+    BOOST_CHECK_EQUAL(
+        inside->q_q48 - inside_parent.r_q48,
+        MERCATURA_D_MINUS_Q48 + 1);
+    BOOST_CHECK_EQUAL(
+        inside->r_q48 - inside_parent.r_q48,
+        MERCATURA_D_MINUS_Q48 + 1);
+
+    // Exactly at d_minus: accepted without changing the value.
+    const auto [boundary_parent, boundary]{
+        command_for_gap(MERCATURA_D_MINUS_Q48)};
+
+    BOOST_REQUIRE(boundary.has_value());
+    BOOST_CHECK_EQUAL(
+        boundary->q_q48 - boundary_parent.r_q48,
+        MERCATURA_D_MINUS_Q48);
+    BOOST_CHECK_EQUAL(
+        boundary->r_q48 - boundary_parent.r_q48,
+        MERCATURA_D_MINUS_Q48);
+
+    // One Q16.48 unit outside: q keeps the desired value, while r clips
+    // to exactly d_minus.
+    const auto [outside_parent, outside]{
+        command_for_gap(MERCATURA_D_MINUS_Q48 - 1)};
+
+    BOOST_REQUIRE(outside.has_value());
+    BOOST_CHECK_EQUAL(
+        outside->q_q48 - outside_parent.r_q48,
+        MERCATURA_D_MINUS_Q48 - 1);
+    BOOST_CHECK_EQUAL(
+        outside->r_q48 - outside_parent.r_q48,
+        MERCATURA_D_MINUS_Q48);
+}
+
 BOOST_AUTO_TEST_CASE(subsidy_floor_does_not_reset_controller)
 {
     using namespace Consensus;
