@@ -466,8 +466,9 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         tx.vout.resize(1);
         tx.vout[0].nValue = i*CENT;
         tx.vout[0].scriptPubKey = GetScriptForDestination(PKHash(key.GetPubKey()));
-        SignatureData empty;
-        BOOST_CHECK(SignSignature(keystore, *txPrev, tx, 0, SIGHASH_ALL, empty));
+        // Mercatura disables inherited classical signature authorization.
+        // Orphanage bookkeeping does not require the orphan's script
+        // authorization to be valid, so no classical signature is created.
 
         auto ptx = MakeTransactionRef(tx);
         orphanage->AddTx(ptx, i);
@@ -489,8 +490,9 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
             tx.vin[j].prevout.n = j;
             tx.vin[j].prevout.hash = txPrev->GetHash();
         }
-        SignatureData empty;
-        BOOST_CHECK(SignSignature(keystore, *txPrev, tx, 0, SIGHASH_ALL, empty));
+        // Mercatura disables inherited classical signature authorization.
+        // Orphanage bookkeeping does not require the orphan's script
+        // authorization to be valid, so no classical signature is created.
         // Reuse same signature for other inputs
         // (they don't have to be valid for this test)
         for (unsigned int j = 1; j < tx.vin.size(); j++)
