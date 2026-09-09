@@ -280,6 +280,85 @@ class MercaturaPQWalletTest(BitcoinTestFramework):
 
         assert len(decoded_unsigned["inputs"]) > 0
 
+        assert_equal(
+            len(decoded_unsigned["inputs"]),
+            len(decoded_unsigned["tx"]["vin"]),
+        )
+
+        # Every selected PQ input must carry the complete spent-output
+        # context required by PQAuth: prevout txid/vout in the unsigned
+        # transaction plus witness_utxo amount and scriptPubKey.
+        total_input_value = Decimal("0")
+
+        for tx_input, psbt_input in zip(
+            decoded_unsigned["tx"]["vin"],
+            decoded_unsigned["inputs"],
+        ):
+            assert "txid" in tx_input
+            assert "vout" in tx_input
+
+            assert "witness_utxo" in psbt_input
+
+            witness_utxo = psbt_input["witness_utxo"]
+
+            assert witness_utxo["amount"] > 0
+
+            assert_equal(
+                witness_utxo["scriptPubKey"]["type"],
+                PQ_SCRIPT_TYPE,
+            )
+
+            assert (
+                witness_utxo["scriptPubKey"]["hex"]
+                .startswith("5220")
+            )
+
+            assert_equal(
+                len(witness_utxo["scriptPubKey"]["hex"]),
+                68,
+            )
+
+            total_input_value += witness_utxo["amount"]
+
+        # The funded transaction itself must preserve the requested
+        # Mercatura amount exactly and use only native PQ outputs,
+        # including wallet-generated change.
+        recipient_outputs = [
+            output
+            for output in decoded_unsigned["tx"]["vout"]
+            if output["scriptPubKey"].get("address")
+            == psbt_receive
+        ]
+
+        assert_equal(
+            len(recipient_outputs),
+            1,
+        )
+
+        assert_equal(
+            recipient_outputs[0]["value"],
+            Decimal("0.40"),
+        )
+
+        for output in decoded_unsigned["tx"]["vout"]:
+            assert_equal(
+                output["scriptPubKey"]["type"],
+                PQ_SCRIPT_TYPE,
+            )
+
+        total_output_value = sum(
+            (
+                output["value"]
+                for output in decoded_unsigned["tx"]["vout"]
+            ),
+            Decimal("0"),
+        )
+
+        assert_equal(
+            total_input_value,
+            total_output_value + funded_psbt["fee"],
+        )
+
         # Sign using the real Mercatura wallet path, but deliberately
         # leave the PSBT unfinalized so the proprietary PQ fields
         # remain directly inspectable through decodepsbt.
