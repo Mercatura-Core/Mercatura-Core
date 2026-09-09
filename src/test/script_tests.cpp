@@ -2338,6 +2338,75 @@ BOOST_AUTO_TEST_CASE(mercatura_pq_precomputed_hashes)
             secret_key.data(),
             secret_key.size()));
 
+    // Phase 12 H11: witness/signature bytes are deliberately excluded
+    // from PQAuthDigestV1 so authorization does not commit circularly
+    // to the signature that authenticates it.
+    CMutableTransaction witnessed_tx{tx};
+    witnessed_tx.vin[1].scriptWitness.stack = {
+        std::vector<unsigned char>(
+            signature.begin(),
+            signature.end()),
+        std::vector<unsigned char>(
+            public_key.begin(),
+            public_key.end()),
+    };
+
+    auto MakeH11SpentOutputs = [&]() {
+        std::vector<CTxOut> outputs;
+        outputs.emplace_back(11111, spent_script1);
+        outputs.emplace_back(22222, spent_script2);
+        return outputs;
+    };
+
+    PrecomputedTransactionData witnessed_txdata;
+    witnessed_txdata.Init(
+        witnessed_tx,
+        MakeH11SpentOutputs(),
+        true);
+
+    BOOST_REQUIRE(witnessed_txdata.m_pq_ready);
+
+    MercaturaPQHash384 witnessed_digest{};
+
+    BOOST_REQUIRE(
+        ComputeMercaturaPQAuthDigestV1(
+            witnessed_digest,
+            witnessed_tx,
+            1,
+            genesis_hash,
+            witnessed_txdata));
+
+    BOOST_CHECK_EQUAL(
+        HexStr(witnessed_digest),
+        HexStr(digest));
+
+    // Changing actual signature bytes must also leave the authorization
+    // digest unchanged. Signature validity changes, but what was signed
+    // does not.
+    witnessed_tx.vin[1].scriptWitness.stack[0][0] ^= 0x01;
+
+    PrecomputedTransactionData changed_witness_txdata;
+    changed_witness_txdata.Init(
+        witnessed_tx,
+        MakeH11SpentOutputs(),
+        true);
+
+    BOOST_REQUIRE(changed_witness_txdata.m_pq_ready);
+
+    MercaturaPQHash384 changed_witness_digest{};
+
+    BOOST_REQUIRE(
+        ComputeMercaturaPQAuthDigestV1(
+            changed_witness_digest,
+            witnessed_tx,
+            1,
+            genesis_hash,
+            changed_witness_txdata));
+
+    BOOST_CHECK_EQUAL(
+        HexStr(changed_witness_digest),
+        HexStr(digest));
+
     MutableTransactionSignatureChecker pq_checker{
         &tx,
         1,
