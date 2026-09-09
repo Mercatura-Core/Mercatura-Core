@@ -2509,6 +2509,38 @@ BOOST_AUTO_TEST_CASE(mercatura_pq_precomputed_hashes)
             &pq_error));
     BOOST_CHECK_EQUAL(pq_error, SCRIPT_ERR_OK);
 
+    // Phase 12 H14: PQ Authorization v1 has one fixed signing mode.
+    // There is no appended sighash byte and no legacy Bitcoin
+    // SIGHASH_ALL/NONE/SINGLE/ANYONECANPAY variant.
+    const std::array<unsigned char, 7> legacy_sighash_bytes{{
+        SIGHASH_DEFAULT,
+        SIGHASH_ALL,
+        SIGHASH_NONE,
+        SIGHASH_SINGLE,
+        SIGHASH_ALL | SIGHASH_ANYONECANPAY,
+        SIGHASH_NONE | SIGHASH_ANYONECANPAY,
+        SIGHASH_SINGLE | SIGHASH_ANYONECANPAY,
+    }};
+
+    for (const unsigned char sighash_byte : legacy_sighash_bytes) {
+        std::vector<unsigned char> suffixed_signature{
+            signature.begin(),
+            signature.end()};
+        suffixed_signature.push_back(sighash_byte);
+
+        pq_error = SCRIPT_ERR_UNKNOWN_ERROR;
+
+        BOOST_CHECK(
+            !pq_checker.CheckMercaturaPQSignature(
+                suffixed_signature,
+                public_key,
+                &pq_error));
+
+        BOOST_CHECK_EQUAL(
+            pq_error,
+            SCRIPT_ERR_PQ_SIGNATURE_SIZE);
+    }
+
     // Phase 12 H10: every field committed by PQ Authorization v1 must
     // invalidate the original ML-DSA signature when changed.
     auto MakeSpentOutputs = [&]() {
