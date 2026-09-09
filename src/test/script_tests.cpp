@@ -2356,6 +2356,195 @@ BOOST_AUTO_TEST_CASE(mercatura_pq_precomputed_hashes)
             &pq_error));
     BOOST_CHECK_EQUAL(pq_error, SCRIPT_ERR_OK);
 
+    // Phase 12 H10: every field committed by PQ Authorization v1 must
+    // invalidate the original ML-DSA signature when changed.
+    auto MakeSpentOutputs = [&]() {
+        std::vector<CTxOut> outputs;
+        outputs.emplace_back(11111, spent_script1);
+        outputs.emplace_back(22222, spent_script2);
+        return outputs;
+    };
+
+    auto ExpectOriginalSignatureRejected =
+        [&](const char* mutation_name,
+            CMutableTransaction mutated_tx,
+            std::vector<CTxOut> mutated_spent_outputs,
+            uint32_t input_index,
+            CAmount input_amount) {
+            BOOST_REQUIRE_EQUAL(
+                mutated_spent_outputs.size(),
+                mutated_tx.vin.size());
+
+            PrecomputedTransactionData mutated_txdata;
+            mutated_txdata.Init(
+                mutated_tx,
+                std::move(mutated_spent_outputs),
+                true);
+
+            BOOST_REQUIRE(mutated_txdata.m_pq_ready);
+
+            MutableTransactionSignatureChecker mutated_checker{
+                &mutated_tx,
+                input_index,
+                input_amount,
+                mutated_txdata,
+                MissingDataBehavior::FAIL,
+                std::optional<uint256>{genesis_hash}
+            };
+
+            ScriptError mutation_error =
+                SCRIPT_ERR_UNKNOWN_ERROR;
+
+            BOOST_CHECK_MESSAGE(
+                !mutated_checker.CheckMercaturaPQSignature(
+                    signature,
+                    public_key,
+                    &mutation_error),
+                mutation_name);
+
+            BOOST_CHECK_MESSAGE(
+                mutation_error == SCRIPT_ERR_PQ_SIGNATURE,
+                mutation_name);
+        };
+
+    // 1. Prevout commitment.
+    {
+        CMutableTransaction mutated_tx{tx};
+        mutated_tx.vin[0].prevout.n += 1;
+
+        ExpectOriginalSignatureRejected(
+            "mutated prevout",
+            std::move(mutated_tx),
+            MakeSpentOutputs(),
+            1,
+            22222);
+    }
+
+    // 2. Spent amount commitment.
+    {
+        auto mutated_spent_outputs{
+            MakeSpentOutputs()};
+        mutated_spent_outputs[0].nValue += 1;
+
+        ExpectOriginalSignatureRejected(
+            "mutated spent amount",
+            CMutableTransaction{tx},
+            std::move(mutated_spent_outputs),
+            1,
+            22222);
+    }
+
+    // 3. Spent scriptPubKey commitment.
+    {
+        auto mutated_spent_outputs{
+            MakeSpentOutputs()};
+        mutated_spent_outputs[0].scriptPubKey << OP_0;
+
+        ExpectOriginalSignatureRejected(
+            "mutated spent scriptPubKey",
+            CMutableTransaction{tx},
+            std::move(mutated_spent_outputs),
+            1,
+            22222);
+    }
+
+    // 4. Input sequence commitment.
+    {
+        CMutableTransaction mutated_tx{tx};
+        mutated_tx.vin[0].nSequence ^= 1;
+
+        ExpectOriginalSignatureRejected(
+            "mutated sequence",
+            std::move(mutated_tx),
+            MakeSpentOutputs(),
+            1,
+            22222);
+    }
+
+    // 5. Transaction output commitment.
+    {
+        CMutableTransaction mutated_tx{tx};
+        mutated_tx.vout[0].nValue += 1;
+
+        ExpectOriginalSignatureRejected(
+            "mutated output",
+            std::move(mutated_tx),
+            MakeSpentOutputs(),
+            1,
+            22222);
+    }
+
+    // 6. Transaction version.
+    {
+        CMutableTransaction mutated_tx{tx};
+        mutated_tx.version += 1;
+
+        ExpectOriginalSignatureRejected(
+            "mutated transaction version",
+            std::move(mutated_tx),
+            MakeSpentOutputs(),
+            1,
+            22222);
+    }
+
+    // 7. Transaction locktime.
+    {
+        CMutableTransaction mutated_tx{tx};
+        mutated_tx.nLockTime += 1;
+
+        ExpectOriginalSignatureRejected(
+            "mutated locktime",
+            std::move(mutated_tx),
+            MakeSpentOutputs(),
+            1,
+            22222);
+    }
+
+    // 8. Input count. Adding an input also necessarily changes the
+    // corresponding component hashes, but independently proves that a
+    // transaction with a different input count cannot reuse this signature.
+    {
+        CMutableTransaction mutated_tx{tx};
+        mutated_tx.vin.push_back(mutated_tx.vin[0]);
+        mutated_tx.vin.back().prevout.n += 100;
+
+        auto mutated_spent_outputs{
+            MakeSpentOutputs()};
+        mutated_spent_outputs.emplace_back(
+            33333,
+            spent_script1);
+
+        ExpectOriginalSignatureRejected(
+            "mutated input count",
+            std::move(mutated_tx),
+            std::move(mutated_spent_outputs),
+            1,
+            22222);
+    }
+
+    // 9. Output count.
+    {
+        CMutableTransaction mutated_tx{tx};
+        mutated_tx.vout.push_back(mutated_tx.vout[0]);
+
+        ExpectOriginalSignatureRejected(
+            "mutated output count",
+            std::move(mutated_tx),
+            MakeSpentOutputs(),
+            1,
+            22222);
+    }
+
+    // 10. Current input index.
+    {
+        ExpectOriginalSignatureRejected(
+            "mutated current input index",
+            CMutableTransaction{tx},
+            MakeSpentOutputs(),
+            0,
+            11111);
+    }
+
     auto corrupted_signature = signature;
     corrupted_signature[0] ^= 0x01;
 
