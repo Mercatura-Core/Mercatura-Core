@@ -6,6 +6,7 @@
 #include <test/data/bip341_wallet_vectors.json.h>
 
 #include <common/system.h>
+#include <chainparams.h>
 #include <core_io.h>
 #include <key.h>
 #include <rpc/util.h>
@@ -2646,6 +2647,145 @@ BOOST_AUTO_TEST_CASE(mercatura_pq_precomputed_hashes)
             public_key,
             &pq_error));
     BOOST_CHECK_EQUAL(pq_error, SCRIPT_ERR_PQ_SIGNATURE);
+
+    // Phase 12 H12: PQ Authorization v1 is explicitly bound to the
+    // active Mercatura network genesis hash. Lock permanent digest
+    // vectors for every active network and prove a mainnet signature
+    // cannot be replayed on another Mercatura network.
+    struct H12NetworkVector {
+        ChainType chain;
+        const char* name;
+        const char* genesis_hex;
+        const char* digest_hex;
+    };
+
+    const std::array<H12NetworkVector, 4> h12_vectors{{
+        {
+            ChainType::MAIN,
+            "mainnet",
+            "cd797c78731d68a82b664b3e359a2e69508ea873fe5747b686488589cc7d6f15",
+            "96890765a6418de83ac0453bc262a8e9b13476725d9bc0e3c6e475d462ee8f63b730cf7287bf53e532a2ce427a6c2a2c",
+        },
+        {
+            ChainType::TESTNET,
+            "testnet",
+            "0cee25abd571760687efbebbe8741873dc187ce46afe082282a47b2455320d73",
+            "127e27c689ce096820338e74ff23e86c4034e7b15fe87b92740276dfbb93ece79ffc7b24f6b6e03cd99d4d1c5544b1fe",
+        },
+        {
+            ChainType::SIGNET,
+            "signet",
+            "eebe2b23469b0d91056cc9240387ba7ee601ce138160da3c508142e039e1f36b",
+            "d99a8702ff54bfd8577e7f87ac47cc586c0b3ec515b3dd6de7cd7a30a393348f5af4d321b44ef070702241cdc91c8476",
+        },
+        {
+            ChainType::REGTEST,
+            "regtest",
+            "8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685",
+            "8386d0b41b046ed52d76001226aa20a634fc72f6fad964499f45412429c9cd4ed7f5443b583c54ce0a231858d0f7ae87",
+        },
+    }};
+
+    std::array<MercaturaPQHash384, 4> h12_digests{};
+    std::array<uint256, 4> h12_genesis_hashes{};
+
+    for (size_t i = 0; i < h12_vectors.size(); ++i) {
+        const auto params{
+            CreateChainParams(
+                ArgsManager{},
+                h12_vectors[i].chain)};
+
+        const uint256 network_genesis{
+            params->GetConsensus().hashGenesisBlock};
+
+        BOOST_CHECK_MESSAGE(
+            network_genesis == params->GenesisBlock().GetHash(),
+            h12_vectors[i].name);
+
+        BOOST_CHECK_MESSAGE(
+            network_genesis.GetHex() ==
+                h12_vectors[i].genesis_hex,
+            h12_vectors[i].name);
+
+        h12_genesis_hashes[i] = network_genesis;
+
+        BOOST_REQUIRE_MESSAGE(
+            ComputeMercaturaPQAuthDigestV1(
+                h12_digests[i],
+                tx,
+                1,
+                network_genesis,
+                txdata),
+            h12_vectors[i].name);
+
+        BOOST_CHECK_MESSAGE(
+            HexStr(h12_digests[i]) ==
+                h12_vectors[i].digest_hex,
+            h12_vectors[i].name);
+    }
+
+    // Every active network must produce a distinct authorization digest.
+    for (size_t i = 0; i < h12_digests.size(); ++i) {
+        for (size_t j = i + 1; j < h12_digests.size(); ++j) {
+            BOOST_CHECK(
+                h12_digests[i] != h12_digests[j]);
+        }
+    }
+
+    // Sign exactly the mainnet-bound digest.
+    std::array<unsigned char, MERCATURA_MLDSA65_SIGNATURE_SIZE>
+        mainnet_signature{};
+
+    BOOST_REQUIRE(
+        mercatura_mldsa65_sign(
+            mainnet_signature.data(),
+            mainnet_signature.size(),
+            h12_digests[0].data(),
+            h12_digests[0].size(),
+            reinterpret_cast<const uint8_t*>(PQ_CONTEXT),
+            sizeof(PQ_CONTEXT) - 1,
+            randomness.data(),
+            randomness.size(),
+            secret_key.data(),
+            secret_key.size()));
+
+    // It must verify only with the mainnet genesis binding.
+    for (size_t i = 0; i < h12_vectors.size(); ++i) {
+        MutableTransactionSignatureChecker network_checker{
+            &tx,
+            1,
+            22222,
+            txdata,
+            MissingDataBehavior::FAIL,
+            std::optional<uint256>{
+                h12_genesis_hashes[i]}
+        };
+
+        ScriptError network_error{
+            SCRIPT_ERR_UNKNOWN_ERROR};
+
+        const bool verified{
+            network_checker.CheckMercaturaPQSignature(
+                mainnet_signature,
+                public_key,
+                &network_error)};
+
+        if (i == 0) {
+            BOOST_CHECK_MESSAGE(
+                verified,
+                h12_vectors[i].name);
+            BOOST_CHECK_EQUAL(
+                network_error,
+                SCRIPT_ERR_OK);
+        } else {
+            BOOST_CHECK_MESSAGE(
+                !verified,
+                h12_vectors[i].name);
+            BOOST_CHECK_EQUAL(
+                network_error,
+                SCRIPT_ERR_PQ_SIGNATURE);
+        }
+    }
 
     MutableTransactionSignatureChecker missing_context_checker{
         &tx,
