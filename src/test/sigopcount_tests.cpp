@@ -8,6 +8,7 @@
 #include <consensus/tx_verify.h>
 #include <crypto/mercatura_pqkey.h>
 #include <key.h>
+#include <policy/policy.h>
 #include <pubkey.h>
 #include <script/interpreter.h>
 #include <script/script.h>
@@ -250,6 +251,87 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
                 coins,
                 flags) ==
             2 * MERCATURA_PQ_SIGOPS_COST);
+
+        // Phase 12 H20: exercise genuine many-input PQ accounting.
+        // Extend the transaction to sixteen distinct native PQ inputs.
+        for (int i = 2; i < 16; ++i) {
+            CMutableTransaction extraCreationTx{
+                creationTx
+            };
+
+            extraCreationTx.vout[0].nValue = i + 1;
+
+            AddCoins(
+                coins,
+                CTransaction(extraCreationTx),
+                0);
+
+            spendingTx.vin.push_back(
+                spendingTx.vin[0]);
+
+            spendingTx.vin.back().prevout.hash =
+                extraCreationTx.GetHash();
+
+            spendingTx.vin.back().prevout.n = 0;
+        }
+
+        assert(spendingTx.vin.size() == 16);
+
+        assert(
+            GetTransactionSigOpCost(
+                CTransaction(spendingTx),
+                coins,
+                flags) ==
+            16 * MERCATURA_PQ_SIGOPS_COST);
+
+        // Lock the exact Mercatura PQ sigop accounting boundaries used
+        // by consensus block validation and standard transaction policy.
+        static_assert(MERCATURA_PQ_SIGOPS_COST == 4);
+        static_assert(MAX_BLOCK_SIGOPS_COST == 80'000);
+        static_assert(MAX_STANDARD_TX_SIGOPS_COST == 16'000);
+
+        static_assert(
+            MAX_BLOCK_SIGOPS_COST %
+                MERCATURA_PQ_SIGOPS_COST ==
+            0);
+
+        static_assert(
+            MAX_STANDARD_TX_SIGOPS_COST %
+                MERCATURA_PQ_SIGOPS_COST ==
+            0);
+
+        constexpr int64_t max_block_pq_inputs{
+            MAX_BLOCK_SIGOPS_COST /
+            MERCATURA_PQ_SIGOPS_COST
+        };
+
+        constexpr int64_t max_standard_pq_inputs{
+            MAX_STANDARD_TX_SIGOPS_COST /
+            MERCATURA_PQ_SIGOPS_COST
+        };
+
+        static_assert(max_block_pq_inputs == 20'000);
+        static_assert(max_standard_pq_inputs == 4'000);
+
+        static_assert(
+            max_block_pq_inputs *
+                MERCATURA_PQ_SIGOPS_COST ==
+            MAX_BLOCK_SIGOPS_COST);
+
+        static_assert(
+            (max_block_pq_inputs + 1) *
+                MERCATURA_PQ_SIGOPS_COST ==
+            80'004);
+
+        static_assert(
+            max_standard_pq_inputs *
+                MERCATURA_PQ_SIGOPS_COST ==
+            MAX_STANDARD_TX_SIGOPS_COST);
+
+        static_assert(
+            (max_standard_pq_inputs + 1) *
+                MERCATURA_PQ_SIGOPS_COST ==
+            16'004);
 
         // Coinbase transactions never consume witness sigop cost.
         spendingTx.vin.resize(1);
