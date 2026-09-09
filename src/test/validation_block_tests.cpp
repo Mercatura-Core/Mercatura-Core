@@ -928,6 +928,353 @@ BOOST_AUTO_TEST_CASE(mercatura_coinbase_plus_one_overclaim_rejected)
     }
 }
 
+BOOST_AUTO_TEST_CASE(mercatura_adaptive_fee_underclaim_preserves_controller)
+{
+    using namespace Consensus;
+
+    auto& chainman{
+        *Assert(m_node.chainman)};
+
+    auto& chainstate{
+        chainman.ActiveChainstate()};
+
+    constexpr int ADAPTIVE_TEST_HEIGHT{
+        MERCATURA_ADAPTIVE_ACTIVATION_HEIGHT + 1};
+
+    constexpr CAmount INPUT_VALUE{1000};
+    constexpr CAmount TX_FEE{10};
+    constexpr CAmount UNDERCLAIM{3};
+
+    CBlockIndex* adaptive_parent{nullptr};
+
+    {
+        LOCK(::cs_main);
+
+        const CBlock& genesis{
+            ::Params().GenesisBlock()};
+
+        CBlockIndex* prev{
+            chainman.m_blockman.LookupBlockIndex(
+                genesis.GetHash())};
+
+        if (!prev) {
+            prev =
+                chainman.m_blockman.AddToBlockIndex(
+                    genesis,
+                    chainman.m_best_header);
+        }
+
+        BOOST_REQUIRE(prev);
+        BOOST_REQUIRE_EQUAL(
+            prev->nHeight,
+            0);
+
+        prev->m_mca_emission_state.reset();
+
+        // Construct only lightweight header/index ancestry through the parent
+        // of the first SP-LT-driven adaptive block.
+        for (int height = 1;
+             height < ADAPTIVE_TEST_HEIGHT;
+             ++height) {
+            CBlockHeader header;
+
+            header.nVersion =
+                genesis.nVersion;
+            header.hashPrevBlock =
+                prev->GetBlockHash();
+            header.hashMerkleRoot =
+                uint256::ZERO;
+            header.nTime =
+                prev->nTime + 1;
+            header.nBits =
+                genesis.nBits;
+            header.nNonce =
+                static_cast<uint32_t>(height);
+
+            CBlockIndex* index{
+                chainman.m_blockman.AddToBlockIndex(
+                    header,
+                    chainman.m_best_header)};
+
+            BOOST_REQUIRE(index);
+            BOOST_REQUIRE(
+                index->pprev == prev);
+            BOOST_REQUIRE_EQUAL(
+                index->nHeight,
+                height);
+
+            const McaEmissionState* emission_parent{
+                nullptr};
+
+            if (height > 1) {
+                BOOST_REQUIRE(
+                    prev->m_mca_emission_state.has_value());
+
+                emission_parent =
+                    &*prev->m_mca_emission_state;
+            }
+
+            const auto emission_state{
+                DeriveMcaEmissionState(
+                    emission_parent,
+                    height,
+                    GetBlockProof(*index))};
+
+            BOOST_REQUIRE(
+                emission_state.has_value());
+
+            index->m_mca_emission_state =
+                *emission_state;
+
+            prev = index;
+        }
+
+        adaptive_parent = prev;
+
+        BOOST_REQUIRE(adaptive_parent);
+        BOOST_REQUIRE_EQUAL(
+            adaptive_parent->nHeight,
+            ADAPTIVE_TEST_HEIGHT - 1);
+
+        BOOST_REQUIRE(
+            adaptive_parent
+                ->m_mca_emission_state
+                .has_value());
+
+        BOOST_REQUIRE(
+            adaptive_parent
+                ->m_mca_emission_state
+                ->controller_initialized);
+
+        const McaEmissionState parent_before{
+            *adaptive_parent
+                 ->m_mca_emission_state};
+
+        const auto subsidy{
+            GetNextMcaBlockSubsidy(
+                *adaptive_parent)};
+
+        BOOST_REQUIRE(
+            subsidy.has_value());
+
+        BOOST_REQUIRE_GT(
+            *subsidy,
+            UNDERCLAIM);
+
+        const COutPoint funding_outpoint{
+            Txid::FromUint256(uint256::ONE),
+            0};
+
+        McaEmissionState full_claim_state;
+        McaEmissionState underclaim_state;
+
+        auto CheckCandidate =
+            [&](CAmount coinbase_claim,
+                uint32_t nonce,
+                McaEmissionState& observed_state) {
+                CMutableTransaction spend;
+
+                spend.version = 2;
+                spend.vin.emplace_back(
+                    funding_outpoint);
+
+                spend.vout.emplace_back(
+                    INPUT_VALUE - TX_FEE,
+                    CScript{} << OP_TRUE);
+
+                BOOST_CHECK_EQUAL(
+                    INPUT_VALUE -
+                        spend.vout[0].nValue,
+                    TX_FEE);
+
+                CMutableTransaction coinbase;
+
+                coinbase.version = 2;
+                coinbase.vin.resize(1);
+                coinbase.vin[0].prevout.SetNull();
+                coinbase.vin[0].scriptSig =
+                    CScript{}
+                    << ADAPTIVE_TEST_HEIGHT
+                    << OP_0;
+
+                coinbase.vout.emplace_back(
+                    coinbase_claim,
+                    CScript{} << OP_TRUE);
+
+                CBlock block;
+
+                block.nVersion =
+                    genesis.nVersion;
+                block.hashPrevBlock =
+                    adaptive_parent
+                        ->GetBlockHash();
+                block.nTime =
+                    adaptive_parent->nTime + 1;
+                block.nBits =
+                    adaptive_parent->nBits;
+                block.nNonce =
+                    nonce;
+
+                block.vtx.push_back(
+                    MakeTransactionRef(
+                        std::move(coinbase)));
+
+                block.vtx.push_back(
+                    MakeTransactionRef(
+                        std::move(spend)));
+
+                block.hashMerkleRoot =
+                    BlockMerkleRoot(block);
+
+                CBlockIndex index{
+                    block};
+
+                uint256 block_hash{
+                    block.GetHash()};
+
+                index.pprev =
+                    adaptive_parent;
+                index.nHeight =
+                    ADAPTIVE_TEST_HEIGHT;
+                index.phashBlock =
+                    &block_hash;
+
+                const auto emission_state{
+                    DeriveMcaEmissionState(
+                        &*adaptive_parent
+                              ->m_mca_emission_state,
+                        ADAPTIVE_TEST_HEIGHT,
+                        GetBlockProof(block))};
+
+                BOOST_REQUIRE(
+                    emission_state.has_value());
+
+                index.m_mca_emission_state =
+                    *emission_state;
+
+                BOOST_REQUIRE(
+                    GetMcaBlockSubsidy(index)
+                        .has_value());
+
+                BOOST_CHECK_EQUAL(
+                    *GetMcaBlockSubsidy(index),
+                    *subsidy);
+
+                observed_state =
+                    *emission_state;
+
+                // Give this candidate an isolated UTXO view whose best block
+                // is the exact synthetic adaptive parent.
+                CCoinsViewCache view{
+                    &chainstate.CoinsTip()};
+
+                view.SetBestBlock(
+                    adaptive_parent
+                        ->GetBlockHash());
+
+                view.AddCoin(
+                    funding_outpoint,
+                    Coin{
+                        CTxOut{
+                            INPUT_VALUE,
+                            CScript{} << OP_TRUE},
+                        adaptive_parent->nHeight,
+                        false},
+                    /*possible_overwrite=*/false);
+
+                BlockValidationState state;
+
+                const bool accepted{
+                    chainstate.ConnectBlock(
+                        block,
+                        state,
+                        &index,
+                        view,
+                        /*fJustCheck=*/true)};
+
+                BOOST_CHECK_MESSAGE(
+                    accepted,
+                    state.ToString());
+
+                BOOST_CHECK(
+                    state.IsValid());
+            };
+
+        // Fees raise the maximum allowed coinbase claim.
+        CheckCandidate(
+            *subsidy + TX_FEE,
+            /*nonce=*/1,
+            full_claim_state);
+
+        // A miner may voluntarily leave part of that available reward
+        // unclaimed. Here 3 base units are deliberately not claimed.
+        CheckCandidate(
+            *subsidy + TX_FEE - UNDERCLAIM,
+            /*nonce=*/2,
+            underclaim_state);
+
+        BOOST_CHECK_EQUAL(
+            full_claim_state.height,
+            underclaim_state.height);
+        BOOST_CHECK_EQUAL(
+            full_claim_state.s_q48,
+            underclaim_state.s_q48);
+        BOOST_CHECK_EQUAL(
+            full_claim_state.l_q48,
+            underclaim_state.l_q48);
+        BOOST_CHECK_EQUAL(
+            full_claim_state.q_q48,
+            underclaim_state.q_q48);
+        BOOST_CHECK_EQUAL(
+            full_claim_state.r_q48,
+            underclaim_state.r_q48);
+        BOOST_CHECK_EQUAL(
+            full_claim_state.subsidy,
+            underclaim_state.subsidy);
+        BOOST_CHECK_EQUAL(
+            full_claim_state.controller_initialized,
+            underclaim_state.controller_initialized);
+
+        // Neither fee collection nor miner underclaiming may feed back into or
+        // mutate the parent controller state.
+        BOOST_CHECK_EQUAL(
+            adaptive_parent
+                ->m_mca_emission_state
+                ->height,
+            parent_before.height);
+        BOOST_CHECK_EQUAL(
+            adaptive_parent
+                ->m_mca_emission_state
+                ->s_q48,
+            parent_before.s_q48);
+        BOOST_CHECK_EQUAL(
+            adaptive_parent
+                ->m_mca_emission_state
+                ->l_q48,
+            parent_before.l_q48);
+        BOOST_CHECK_EQUAL(
+            adaptive_parent
+                ->m_mca_emission_state
+                ->q_q48,
+            parent_before.q_q48);
+        BOOST_CHECK_EQUAL(
+            adaptive_parent
+                ->m_mca_emission_state
+                ->r_q48,
+            parent_before.r_q48);
+        BOOST_CHECK_EQUAL(
+            adaptive_parent
+                ->m_mca_emission_state
+                ->subsidy,
+            parent_before.subsidy);
+        BOOST_CHECK_EQUAL(
+            adaptive_parent
+                ->m_mca_emission_state
+                ->controller_initialized,
+            parent_before.controller_initialized);
+    }
+}
+
 BOOST_AUTO_TEST_CASE(missing_prev_rejected_before_mercahash)
 {
     CBlockHeader header{Params().GenesisBlock()};
