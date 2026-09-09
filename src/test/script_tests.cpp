@@ -1906,6 +1906,186 @@ BOOST_AUTO_TEST_CASE(mercatura_classical_ownership_disabled)
         checkmultisigverify,
         SigVersion::WITNESS_V0);
 
+    // Phase 12 H17: prove ordinary Bitcoin ownership forms cannot spend
+    // even when supplied with otherwise-valid ECDSA signatures.
+    const CKey ecdsa_key{
+        GenerateRandomKey(/*compressed=*/true)
+    };
+    const CPubKey ecdsa_pubkey{
+        ecdsa_key.GetPubKey()
+    };
+    const CAmount classical_amount{1000};
+
+    auto expect_base_ownership_disabled =
+        [&](const CScript& script_pub_key,
+            bool include_pubkey) {
+            const CTransaction tx_credit{
+                BuildCreditingTransaction(
+                    script_pub_key,
+                    classical_amount)
+            };
+
+            CMutableTransaction tx{
+                BuildSpendingTransaction(
+                    CScript{},
+                    CScriptWitness{},
+                    tx_credit)
+            };
+
+            std::vector<unsigned char> signature;
+
+            const uint256 sighash{
+                SignatureHash(
+                    script_pub_key,
+                    tx,
+                    0,
+                    SIGHASH_ALL,
+                    classical_amount,
+                    SigVersion::BASE,
+                    nullptr)
+            };
+
+            BOOST_REQUIRE(
+                ecdsa_key.Sign(
+                    sighash,
+                    signature));
+
+            BOOST_REQUIRE(
+                ecdsa_pubkey.Verify(
+                    sighash,
+                    signature));
+
+            signature.push_back(SIGHASH_ALL);
+
+            CScript script_sig;
+            script_sig << signature;
+
+            if (include_pubkey) {
+                script_sig << ToByteVector(ecdsa_pubkey);
+            }
+
+            tx.vin[0].scriptSig = script_sig;
+
+            ScriptError error{
+                SCRIPT_ERR_UNKNOWN_ERROR
+            };
+
+            BOOST_CHECK(
+                !VerifyScript(
+                    script_sig,
+                    script_pub_key,
+                    &tx.vin[0].scriptWitness,
+                    SCRIPT_VERIFY_NONE,
+                    MutableTransactionSignatureChecker(
+                        &tx,
+                        0,
+                        classical_amount,
+                        MissingDataBehavior::ASSERT_FAIL),
+                    &error));
+
+            BOOST_CHECK_EQUAL(
+                error,
+                SCRIPT_ERR_BAD_OPCODE);
+        };
+
+    // Valid Bitcoin-style P2PK spend.
+    const CScript p2pk_script{
+        CScript{}
+            << ToByteVector(ecdsa_pubkey)
+            << OP_CHECKSIG
+    };
+
+    expect_base_ownership_disabled(
+        p2pk_script,
+        /*include_pubkey=*/false);
+
+    // Valid Bitcoin-style P2PKH spend.
+    const CScript p2pkh_script{
+        GetScriptForDestination(
+            PKHash{ecdsa_pubkey})
+    };
+
+    expect_base_ownership_disabled(
+        p2pkh_script,
+        /*include_pubkey=*/true);
+
+    // Valid Bitcoin-style P2WPKH spend.
+    const CScript p2wpkh_script{
+        GetScriptForDestination(
+            WitnessV0KeyHash{
+                PKHash{ecdsa_pubkey}})
+    };
+
+    const CTransaction p2wpkh_credit{
+        BuildCreditingTransaction(
+            p2wpkh_script,
+            classical_amount)
+    };
+
+    CMutableTransaction p2wpkh_tx{
+        BuildSpendingTransaction(
+            CScript{},
+            CScriptWitness{},
+            p2wpkh_credit)
+    };
+
+    const CScript p2wpkh_script_code{
+        GetScriptForDestination(
+            PKHash{ecdsa_pubkey})
+    };
+
+    std::vector<unsigned char> p2wpkh_signature;
+
+    const uint256 p2wpkh_sighash{
+        SignatureHash(
+            p2wpkh_script_code,
+            p2wpkh_tx,
+            0,
+            SIGHASH_ALL,
+            classical_amount,
+            SigVersion::WITNESS_V0,
+            nullptr)
+    };
+
+    BOOST_REQUIRE(
+        ecdsa_key.Sign(
+            p2wpkh_sighash,
+            p2wpkh_signature));
+
+    BOOST_REQUIRE(
+        ecdsa_pubkey.Verify(
+            p2wpkh_sighash,
+            p2wpkh_signature));
+
+    p2wpkh_signature.push_back(SIGHASH_ALL);
+
+    p2wpkh_tx.vin[0].scriptWitness.stack = {
+        p2wpkh_signature,
+        ToByteVector(ecdsa_pubkey),
+    };
+
+    ScriptError p2wpkh_error{
+        SCRIPT_ERR_UNKNOWN_ERROR
+    };
+
+    BOOST_CHECK(
+        !VerifyScript(
+            CScript{},
+            p2wpkh_script,
+            &p2wpkh_tx.vin[0].scriptWitness,
+            SCRIPT_VERIFY_P2SH |
+                SCRIPT_VERIFY_WITNESS,
+            MutableTransactionSignatureChecker(
+                &p2wpkh_tx,
+                0,
+                classical_amount,
+                MissingDataBehavior::ASSERT_FAIL),
+            &p2wpkh_error));
+
+    BOOST_CHECK_EQUAL(
+        p2wpkh_error,
+        SCRIPT_ERR_BAD_OPCODE);
+
     // Taproot Schnorr key-path authorization is also disabled.
     CScript taproot_script;
     taproot_script
