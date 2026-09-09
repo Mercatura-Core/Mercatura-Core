@@ -2139,6 +2139,99 @@ BOOST_AUTO_TEST_CASE(mercatura_classical_ownership_disabled)
     BOOST_CHECK_EQUAL(script_error, SCRIPT_ERR_OK);
 }
 
+BOOST_AUTO_TEST_CASE(mercatura_non_signature_script_retained)
+{
+    BaseSignatureChecker checker;
+
+    // Phase 12 H19: retained hashlock semantics must remain usable
+    // independently of Mercatura's classical-signature shutdown.
+    const std::vector<unsigned char> preimage{
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef
+    };
+
+    uint256 preimage_hash;
+    CSHA256()
+        .Write(preimage.data(), preimage.size())
+        .Finalize(preimage_hash.begin());
+
+    const CScript hashlock_script{
+        CScript{}
+            << OP_SHA256
+            << ToByteVector(preimage_hash)
+            << OP_EQUALVERIFY
+            << OP_1
+    };
+
+    std::vector<std::vector<unsigned char>> stack{
+        preimage
+    };
+
+    ScriptExecutionData execdata;
+    ScriptError error{
+        SCRIPT_ERR_UNKNOWN_ERROR
+    };
+
+    BOOST_CHECK(
+        EvalScript(
+            stack,
+            hashlock_script,
+            script_verify_flags{},
+            checker,
+            SigVersion::BASE,
+            execdata,
+            &error));
+
+    BOOST_CHECK_EQUAL(
+        error,
+        SCRIPT_ERR_OK);
+
+    // A wrong preimage must fail the hashlock itself.
+    auto wrong_preimage{
+        preimage
+    };
+    wrong_preimage[0] ^= 0x01;
+
+    stack = {
+        wrong_preimage
+    };
+
+    execdata = {};
+    error = SCRIPT_ERR_UNKNOWN_ERROR;
+
+    BOOST_CHECK(
+        !EvalScript(
+            stack,
+            hashlock_script,
+            script_verify_flags{},
+            checker,
+            SigVersion::BASE,
+            execdata,
+            &error));
+
+    BOOST_CHECK_EQUAL(
+        error,
+        SCRIPT_ERR_EQUALVERIFY);
+
+    // OP_RETURN also retains its normal non-signature semantics.
+    stack.clear();
+    execdata = {};
+    error = SCRIPT_ERR_UNKNOWN_ERROR;
+
+    BOOST_CHECK(
+        !EvalScript(
+            stack,
+            CScript{} << OP_RETURN,
+            script_verify_flags{},
+            checker,
+            SigVersion::BASE,
+            execdata,
+            &error));
+
+    BOOST_CHECK_EQUAL(
+        error,
+        SCRIPT_ERR_OP_RETURN);
+}
+
 BOOST_AUTO_TEST_CASE(mercatura_pq_witness_v2_end_to_end)
 {
     // Deterministic 2-input / 2-output transaction fixture.
