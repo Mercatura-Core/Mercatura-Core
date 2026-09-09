@@ -1669,6 +1669,210 @@ BOOST_AUTO_TEST_CASE(mercatura_launch_capacity_exact_limit_accepted)
         MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES);
 }
 
+BOOST_AUTO_TEST_CASE(mercatura_launch_capacity_one_byte_over_rejected)
+{
+    using namespace Consensus;
+
+    auto& chainman{
+        *Assert(m_node.chainman)};
+
+    auto& chainstate{
+        chainman.ActiveChainstate()};
+
+    LOCK(::cs_main);
+
+    const CBlock& genesis{
+        ::Params().GenesisBlock()};
+
+    CBlockIndex* parent{
+        chainman.m_blockman.LookupBlockIndex(
+            genesis.GetHash())};
+
+    if (!parent) {
+        parent =
+            chainman.m_blockman.AddToBlockIndex(
+                genesis,
+                chainman.m_best_header);
+    }
+
+    BOOST_REQUIRE(parent);
+    BOOST_REQUIRE_EQUAL(parent->nHeight, 0);
+
+    constexpr int TEST_HEIGHT{1};
+    constexpr CAmount INPUT_VALUE{1000};
+    constexpr size_t LARGE_SCRIPT_BYTES{900'000};
+    constexpr size_t ADJUSTABLE_SCRIPT_BYTES{100'000};
+    constexpr uint64_t TARGET_CAPACITY{
+        MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES + 1};
+
+    CBlock block;
+    block.nVersion = genesis.nVersion;
+    block.hashPrevBlock = parent->GetBlockHash();
+    block.nTime = parent->nTime + 1;
+    block.nBits = genesis.nBits;
+    block.nNonce = 1;
+
+    const auto emission_state{
+        DeriveMcaEmissionState(
+            /*parent=*/nullptr,
+            TEST_HEIGHT,
+            GetBlockProof(block))};
+
+    BOOST_REQUIRE(emission_state.has_value());
+
+    CMutableTransaction coinbase;
+    coinbase.version = 2;
+    coinbase.vin.resize(1);
+    coinbase.vin[0].prevout.SetNull();
+    coinbase.vin[0].scriptSig =
+        CScript{} << TEST_HEIGHT << OP_0;
+    coinbase.vout.emplace_back(
+        emission_state->subsidy,
+        CScript{} << OP_TRUE);
+
+    block.vtx.push_back(
+        MakeTransactionRef(std::move(coinbase)));
+
+    const Txid funding_txid{
+        Txid::FromUint256(uint256::ONE)};
+
+    auto MakePaddingSpend =
+        [&](uint32_t output_index,
+            size_t script_bytes) {
+            CMutableTransaction tx;
+            tx.version = 2;
+            tx.vin.emplace_back(
+                COutPoint{funding_txid, output_index});
+
+            const std::vector<unsigned char> output_bytes(
+                script_bytes,
+                static_cast<unsigned char>(OP_TRUE));
+
+            CScript output_script(
+                output_bytes.begin(),
+                output_bytes.end());
+
+            tx.vout.emplace_back(
+                INPUT_VALUE,
+                std::move(output_script));
+
+            return tx;
+        };
+
+    CMutableTransaction large_tx{
+        MakePaddingSpend(
+            /*output_index=*/0,
+            LARGE_SCRIPT_BYTES)};
+
+    CMutableTransaction adjustable_tx{
+        MakePaddingSpend(
+            /*output_index=*/1,
+            ADJUSTABLE_SCRIPT_BYTES)};
+
+    block.vtx.push_back(
+        MakeTransactionRef(std::move(large_tx)));
+
+    block.vtx.push_back(
+        MakeTransactionRef(std::move(adjustable_tx)));
+
+    const uint64_t initial_capacity{
+        GetBlockCapacityBytes(block)};
+
+    BOOST_REQUIRE_LT(
+        initial_capacity,
+        TARGET_CAPACITY);
+
+    const uint64_t additional_bytes{
+        TARGET_CAPACITY - initial_capacity};
+
+    adjustable_tx =
+        MakePaddingSpend(
+            /*output_index=*/1,
+            ADJUSTABLE_SCRIPT_BYTES +
+                additional_bytes);
+
+    block.vtx.back() =
+        MakeTransactionRef(
+            std::move(adjustable_tx));
+
+    BOOST_REQUIRE_EQUAL(
+        GetBlockCapacityBytes(block),
+        TARGET_CAPACITY);
+
+    BOOST_CHECK(
+        !block.vtx[1]->HasWitness());
+    BOOST_CHECK(
+        !block.vtx[2]->HasWitness());
+
+    block.hashMerkleRoot =
+        BlockMerkleRoot(block);
+
+    CBlockIndex index{block};
+
+    uint256 block_hash{
+        block.GetHash()};
+
+    index.pprev = parent;
+    index.nHeight = TEST_HEIGHT;
+    index.phashBlock = &block_hash;
+    index.m_mca_emission_state =
+        *emission_state;
+
+    CCoinsViewCache view{
+        &chainstate.CoinsTip()};
+
+    view.SetBestBlock(
+        parent->GetBlockHash());
+
+    view.AddCoin(
+        COutPoint{funding_txid, 0},
+        Coin{
+            CTxOut{
+                INPUT_VALUE,
+                CScript{} << OP_TRUE},
+            parent->nHeight,
+            false},
+        /*possible_overwrite=*/false);
+
+    view.AddCoin(
+        COutPoint{funding_txid, 1},
+        Coin{
+            CTxOut{
+                INPUT_VALUE,
+                CScript{} << OP_TRUE},
+            parent->nHeight,
+            false},
+        /*possible_overwrite=*/false);
+
+    BlockValidationState state;
+
+    const bool accepted{
+        chainstate.ConnectBlock(
+            block,
+            state,
+            &index,
+            view,
+            /*fJustCheck=*/true)};
+
+    BOOST_CHECK(
+        !accepted);
+
+    BOOST_CHECK(
+        state.IsInvalid());
+
+    BOOST_CHECK_EQUAL(
+        state.GetResult(),
+        BlockValidationResult::BLOCK_CONSENSUS);
+
+    BOOST_CHECK_EQUAL(
+        state.GetRejectReason(),
+        "bad-blk-capacity");
+
+    BOOST_CHECK_EQUAL(
+        GetBlockCapacityBytes(block),
+        MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES + 1);
+}
+
 BOOST_AUTO_TEST_CASE(missing_prev_rejected_before_mercahash)
 {
     CBlockHeader header{Params().GenesisBlock()};
