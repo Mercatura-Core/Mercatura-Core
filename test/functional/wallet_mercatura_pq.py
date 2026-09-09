@@ -280,6 +280,20 @@ class MercaturaPQWalletTest(BitcoinTestFramework):
 
         assert len(decoded_unsigned["inputs"]) > 0
 
+        # An unsigned native PQ PSBT must not finalize as complete and
+        # must not expose broadcastable transaction hex.
+        incomplete_finalized = node0.finalizepsbt(
+            unsigned_psbt
+        )
+
+        assert_equal(
+            incomplete_finalized["complete"],
+            False,
+        )
+
+        assert "psbt" in incomplete_finalized
+        assert "hex" not in incomplete_finalized
+
         assert_equal(
             len(decoded_unsigned["inputs"]),
             len(decoded_unsigned["tx"]["vin"]),
