@@ -116,6 +116,7 @@ BASE_SCRIPTS = [
     'feature_assumeutxo.py',
     'wallet_mercatura_pq.py',
     'wallet_mercatura_pq_backup.py',
+    'wallet_mercatura_pq_encryption.py',
     'mempool_updatefromblock.py',
     'mempool_persist.py',
     # vv Tests less than 60s vv
