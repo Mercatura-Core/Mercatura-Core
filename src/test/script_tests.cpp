@@ -1741,6 +1741,13 @@ BOOST_AUTO_TEST_CASE(mercatura_pq_witness_structure)
             valid, wrong_program, false, &error));
     BOOST_CHECK_EQUAL(error, SCRIPT_ERR_WITNESS_PROGRAM_WRONG_LENGTH);
 
+    CScriptWitness empty_witness;
+    error = SCRIPT_ERR_UNKNOWN_ERROR;
+    BOOST_CHECK(
+        !CheckMercaturaPQWitnessStructureV1(
+            empty_witness, program, false, &error));
+    BOOST_CHECK_EQUAL(error, SCRIPT_ERR_PQ_WITNESS_STRUCTURE);
+
     CScriptWitness wrong_count = valid;
     wrong_count.stack.pop_back();
 
@@ -1757,6 +1764,16 @@ BOOST_AUTO_TEST_CASE(mercatura_pq_witness_structure)
     BOOST_CHECK(
         !CheckMercaturaPQWitnessStructureV1(
             extra_item, program, false, &error));
+    BOOST_CHECK_EQUAL(error, SCRIPT_ERR_PQ_WITNESS_STRUCTURE);
+
+    CScriptWitness four_items = valid;
+    four_items.stack.emplace_back(1, 0x00);
+    four_items.stack.emplace_back(1, 0x01);
+
+    error = SCRIPT_ERR_UNKNOWN_ERROR;
+    BOOST_CHECK(
+        !CheckMercaturaPQWitnessStructureV1(
+            four_items, program, false, &error));
     BOOST_CHECK_EQUAL(error, SCRIPT_ERR_PQ_WITNESS_STRUCTURE);
 
     CScriptWitness short_signature = valid;
