@@ -6,6 +6,7 @@
 #include <consensus/validation.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
+#include <policy/policy.h>
 
 #include <boost/test/unit_test.hpp>
 
@@ -109,6 +110,81 @@ BOOST_AUTO_TEST_CASE(transaction_capacity_uses_full_serialized_bytes)
     BOOST_CHECK_LT(
         GetTransactionWeight(witness_tx),
         witness_full_size * WITNESS_SCALE_FACTOR);
+}
+
+BOOST_AUTO_TEST_CASE(equal_witness_and_nonwitness_growth_costs_the_same)
+{
+    constexpr size_t GROWTH_BYTES{32};
+
+    CMutableTransaction base;
+    base.vin.resize(1);
+    base.vout.resize(1);
+
+    // Keep witness serialization active in all three variants so marker/flag
+    // overhead is identical and only the location of the added bytes differs.
+    base.vin[0].scriptWitness.stack.push_back(
+        std::vector<unsigned char>(1, 0x01));
+
+    CMutableTransaction nonwitness_growth{base};
+    const std::vector<unsigned char> nonwitness_bytes(
+        GROWTH_BYTES,
+        0x02);
+    nonwitness_growth.vin[0].scriptSig =
+        CScript(
+            nonwitness_bytes.begin(),
+            nonwitness_bytes.end());
+
+    CMutableTransaction witness_growth{base};
+    witness_growth.vin[0].scriptWitness.stack[0].resize(
+        1 + GROWTH_BYTES,
+        0x03);
+
+    const CTransaction base_tx{base};
+    const CTransaction nonwitness_tx{nonwitness_growth};
+    const CTransaction witness_tx{witness_growth};
+
+    const uint64_t base_size{
+        ::GetSerializeSize(TX_WITH_WITNESS(base_tx))};
+
+    const uint64_t nonwitness_size{
+        ::GetSerializeSize(TX_WITH_WITNESS(nonwitness_tx))};
+
+    const uint64_t witness_size{
+        ::GetSerializeSize(TX_WITH_WITNESS(witness_tx))};
+
+    BOOST_REQUIRE_EQUAL(
+        nonwitness_size - base_size,
+        GROWTH_BYTES);
+
+    BOOST_REQUIRE_EQUAL(
+        witness_size - base_size,
+        GROWTH_BYTES);
+
+    BOOST_CHECK_EQUAL(
+        GetTransactionCapacityBytes(nonwitness_tx) -
+            GetTransactionCapacityBytes(base_tx),
+        GROWTH_BYTES);
+
+    BOOST_CHECK_EQUAL(
+        GetTransactionCapacityBytes(witness_tx) -
+            GetTransactionCapacityBytes(base_tx),
+        GROWTH_BYTES);
+
+    BOOST_CHECK_EQUAL(
+        GetTransactionFeeSize(nonwitness_tx) -
+            GetTransactionFeeSize(base_tx),
+        GROWTH_BYTES);
+
+    BOOST_CHECK_EQUAL(
+        GetTransactionFeeSize(witness_tx) -
+            GetTransactionFeeSize(base_tx),
+        GROWTH_BYTES);
+
+    // BIP141 virtual size still distinguishes the two locations, proving
+    // this vector really does compare non-witness bytes against witness bytes.
+    BOOST_CHECK_GT(
+        GetVirtualTransactionSize(nonwitness_tx),
+        GetVirtualTransactionSize(witness_tx));
 }
 
 BOOST_AUTO_TEST_CASE(block_capacity_uses_full_serialized_bytes)
