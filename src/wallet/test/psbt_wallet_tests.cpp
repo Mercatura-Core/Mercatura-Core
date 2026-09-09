@@ -1728,6 +1728,22 @@ BOOST_AUTO_TEST_CASE(mercatura_pq_psbt_wallet_signing)
                 .final_script_witness.stack.size(),
             2U);
 
+        // Each input must use the child key mapped to its own
+        // PQ commitment/locator.
+        BOOST_CHECK(
+            psbt.inputs.at(0)
+                .final_script_witness.stack.at(1) ==
+            std::vector<unsigned char>(
+                key_a.public_key.begin(),
+                key_a.public_key.end()));
+
+        BOOST_CHECK(
+            psbt.inputs.at(1)
+                .final_script_witness.stack.at(1) ==
+            std::vector<unsigned char>(
+                key_b.public_key.begin(),
+                key_b.public_key.end()));
+
         // Signing must not alter batching/multi-output semantics.
         BOOST_REQUIRE_EQUAL(
             psbt.tx->vout.size(),
