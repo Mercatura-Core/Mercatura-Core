@@ -1112,6 +1112,30 @@ BOOST_AUTO_TEST_CASE(mercatura_pq_psbt_multi_input_binding)
     }
 
     // --------------------------------------------------------
+    // Input 0's authorization also commits to input 1's spent
+    // scriptPubKey. Replacing it after signing with another
+    // structurally valid native PQ script must fail.
+    // --------------------------------------------------------
+
+    {
+        PartiallySignedTransaction bad{
+            base_psbt
+        };
+
+        bad.inputs.at(1)
+            .witness_utxo.scriptPubKey =
+            pq_script_a;
+
+        BOOST_CHECK(
+            !FinalizePSBT(
+                bad));
+
+        BOOST_CHECK(
+            bad.inputs.at(0)
+                .final_script_witness.IsNull());
+    }
+
+    // --------------------------------------------------------
     // PQ Authorization v1 also commits to all transaction
     // outputs. Changing an output after signing must fail.
     // --------------------------------------------------------
