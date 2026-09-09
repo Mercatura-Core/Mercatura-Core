@@ -115,6 +115,7 @@ BASE_SCRIPTS = [
     'feature_maxuploadtarget.py',
     'feature_assumeutxo.py',
     'wallet_mercatura_pq.py',
+    'wallet_mercatura_pq_backup.py',
     'mempool_updatefromblock.py',
     'mempool_persist.py',
     # vv Tests less than 60s vv
