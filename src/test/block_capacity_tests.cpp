@@ -2,6 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <chain.h>
+#include <node/blockstorage.h>
 #include <consensus/consensus.h>
 #include <consensus/validation.h>
 #include <primitives/block.h>
@@ -274,5 +276,120 @@ BOOST_AUTO_TEST_CASE(block_capacity_predicate_changes_at_boundary)
     BOOST_CHECK(IsBlockWithinCapacity(block, 1'051'200));
     BOOST_CHECK(IsBlockWithinCapacity(block, 1'051'201));
 }
+
+
+BOOST_AUTO_TEST_CASE(capacity_reorg_uses_winning_branch_height)
+{
+    using namespace Consensus;
+
+    constexpr int BOUNDARY_HEIGHT{
+        static_cast<int>(
+            MERCATURA_BLOCK_CAPACITY_DOUBLING_INTERVAL)};
+
+    // Use a block whose serialized size lies strictly between the launch
+    // 1 MiB ceiling and the first doubled 2 MiB ceiling.
+    CMutableTransaction tx;
+    tx.vin.resize(1);
+    tx.vout.resize(1);
+    tx.vin[0].scriptWitness.stack.push_back(
+        std::vector<unsigned char>(
+            1'100'000,
+            0x05));
+
+    CBlock block;
+    block.vtx.push_back(
+        MakeTransactionRef(tx));
+
+    const uint64_t capacity{
+        GetBlockCapacityBytes(block)};
+
+    BOOST_REQUIRE_GT(
+        capacity,
+        MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES);
+
+    BOOST_REQUIRE_LE(
+        capacity,
+        MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES * 2);
+
+    // Construct a fork immediately below the first capacity doubling.
+    //
+    //            A1 (1,051,199) -> A2 (1,051,200)
+    //          /
+    // fork (1,051,198)
+    //          \
+    //            B1 (1,051,199, greater accumulated work)
+    //
+    // A2 initially represents the active tip. B1 then wins by accumulated
+    // work even though it is one block shorter, causing the active-chain
+    // height to move back below the capacity boundary.
+    CBlockIndex fork;
+    fork.nHeight = BOUNDARY_HEIGHT - 2;
+    fork.nChainWork = arith_uint256{1};
+
+    CBlockIndex branch_a_1;
+    branch_a_1.pprev = &fork;
+    branch_a_1.nHeight = BOUNDARY_HEIGHT - 1;
+    branch_a_1.nChainWork = arith_uint256{2};
+
+    CBlockIndex branch_a_2;
+    branch_a_2.pprev = &branch_a_1;
+    branch_a_2.nHeight = BOUNDARY_HEIGHT;
+    branch_a_2.nChainWork = arith_uint256{3};
+
+    CBlockIndex branch_b_1;
+    branch_b_1.pprev = &fork;
+    branch_b_1.nHeight = BOUNDARY_HEIGHT - 1;
+    branch_b_1.nChainWork = arith_uint256{4};
+
+    // Bitcoin Core's work comparator must rank B1 above the taller A2 branch.
+    BOOST_REQUIRE(
+        node::CBlockIndexWorkComparator{}(
+            &branch_a_2,
+            &branch_b_1));
+
+    CChain active_chain;
+
+    // Before the reorg the active branch has reached the doubled-cap height,
+    // so this >1 MiB block fits beneath the 2 MiB ceiling.
+    active_chain.SetTip(branch_a_2);
+
+    BOOST_REQUIRE_EQUAL(
+        active_chain.Height(),
+        BOUNDARY_HEIGHT);
+
+    BOOST_CHECK(
+        IsBlockWithinCapacity(
+            block,
+            active_chain.Height()));
+
+    BOOST_CHECK_EQUAL(
+        GetMaxBlockCapacityBytes(
+            active_chain.Height()),
+        MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES * 2);
+
+    // Simulate the chain-selection result after the higher-work B branch wins.
+    // Capacity must immediately follow the winning branch's actual height;
+    // no stale 2 MiB state may survive the reorg.
+    active_chain.SetTip(branch_b_1);
+
+    BOOST_REQUIRE_EQUAL(
+        active_chain.Height(),
+        BOUNDARY_HEIGHT - 1);
+
+    BOOST_CHECK(
+        active_chain[BOUNDARY_HEIGHT - 1] ==
+        &branch_b_1);
+
+    BOOST_CHECK_EQUAL(
+        GetMaxBlockCapacityBytes(
+            active_chain.Height()),
+        MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES);
+
+    BOOST_CHECK(
+        !IsBlockWithinCapacity(
+            block,
+            active_chain.Height()));
+}
+
 
 BOOST_AUTO_TEST_SUITE_END()
