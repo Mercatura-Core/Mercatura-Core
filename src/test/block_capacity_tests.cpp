@@ -52,6 +52,36 @@ BOOST_AUTO_TEST_CASE(later_doubling_boundaries)
     BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(9'460'800), 536'870'912ULL);
 }
 
+BOOST_AUTO_TEST_CASE(first_several_doubling_boundaries_exact)
+{
+    for (uint64_t doubling = 1; doubling <= 4; ++doubling) {
+        const int64_t boundary{
+            static_cast<int64_t>(
+                MERCATURA_BLOCK_CAPACITY_DOUBLING_INTERVAL *
+                doubling)};
+
+        const uint64_t before{
+            MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES <<
+            (doubling - 1)};
+
+        const uint64_t after{
+            MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES <<
+            doubling};
+
+        BOOST_CHECK_EQUAL(
+            GetMaxBlockCapacityBytes(boundary - 1),
+            before);
+
+        BOOST_CHECK_EQUAL(
+            GetMaxBlockCapacityBytes(boundary),
+            after);
+
+        BOOST_CHECK_EQUAL(
+            GetMaxBlockCapacityBytes(boundary + 1),
+            after);
+    }
+}
+
 BOOST_AUTO_TEST_CASE(maximum_capacity_boundary)
 {
     BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(10'511'999), 536'870'912ULL);
