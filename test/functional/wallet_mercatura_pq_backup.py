@@ -307,8 +307,276 @@ class MercaturaPQWalletBackupTest(BitcoinTestFramework):
             received_before + Decimal("0.10"),
         )
 
+        # ----------------------------------------------------------
+        # Older-backup recovery model.
+        #
+        # Mercatura PQ currently has no look-ahead keypool or gap
+        # scanning. An older backup therefore cannot recognize PQ
+        # commitments derived only after that backup until those
+        # deterministic destinations are regenerated and the chain
+        # is explicitly rescanned.
+        # ----------------------------------------------------------
+
         self.log.info(
-            "Mercatura PQ backup/restore workflow passed"
+            "Testing older PQ backup recovery"
+        )
+
+        # Give the independent recipient wallet enough confirmed
+        # funds to pay later-derived source addresses after the old
+        # source backup has been taken.
+        recovery_funder = recipient.getnewaddress(
+            "old-backup-funder"
+        )
+
+        self.assert_pq_address(
+            recipient,
+            recovery_funder,
+        )
+
+        funder_txid = source.sendtoaddress(
+            recovery_funder,
+            Decimal("2.00"),
+        )
+
+        self.sync_mempools()
+
+        self.assert_transaction_outputs_are_pq(
+            source,
+            funder_txid,
+        )
+
+        funding_confirmation = recipient.getnewaddress(
+            "old-backup-funding-confirmation"
+        )
+
+        self.assert_pq_address(
+            recipient,
+            funding_confirmation,
+        )
+
+        self.mine_to_address(
+            node0,
+            funding_confirmation,
+            1,
+        )
+
+        self.sync_blocks()
+
+        assert (
+            recipient.gettransaction(
+                funder_txid
+            )["confirmations"] > 0
+        )
+
+        old_backup_file = (
+            node0.datadir_path /
+            "mercatura_pq_wallet_old_backup.dat"
+        )
+
+        self.log.info(
+            "Creating older PQ wallet backup"
+        )
+
+        source.backupwallet(old_backup_file)
+
+        # These destinations do not exist in the old backup.
+        later_receive = source.getnewaddress(
+            "later-after-old-backup"
+        )
+        later_change = source.getrawchangeaddress()
+
+        self.assert_pq_address(
+            source,
+            later_receive,
+        )
+
+        self.assert_pq_address(
+            source,
+            later_change,
+        )
+
+        assert later_receive != later_change
+
+        # Fund both post-backup destinations from the independent
+        # recipient wallet.
+        recovery_txid = recipient.sendmany(
+            "",
+            {
+                later_receive: Decimal("0.50"),
+                later_change: Decimal("0.50"),
+            },
+        )
+
+        self.sync_mempools()
+
+        self.assert_transaction_outputs_are_pq(
+            recipient,
+            recovery_txid,
+        )
+
+        recovery_confirmation = recipient.getnewaddress(
+            "old-backup-recovery-confirmation"
+        )
+
+        self.assert_pq_address(
+            recipient,
+            recovery_confirmation,
+        )
+
+        self.mine_to_address(
+            node0,
+            recovery_confirmation,
+            1,
+        )
+
+        self.sync_blocks()
+
+        assert (
+            recipient.gettransaction(
+                recovery_txid
+            )["confirmations"] > 0
+        )
+
+        # Remove the first restored copy so the old backup is tested
+        # independently on node 1.
+        node1.unloadwallet(
+            "pq_backup_restored"
+        )
+
+        self.log.info(
+            "Restoring older PQ backup"
+        )
+
+        old_restore_result = node1.restorewallet(
+            "pq_old_backup_restored",
+            old_backup_file,
+        )
+
+        assert_equal(
+            old_restore_result["name"],
+            "pq_old_backup_restored",
+        )
+
+        old_restored = node1.get_wallet_rpc(
+            "pq_old_backup_restored"
+        )
+
+        old_restored.syncwithvalidationinterfacequeue()
+
+        # The later commitments did not exist when this backup was
+        # made, so the initial restore/rescan must not silently claim
+        # ownership of them.
+        assert_equal(
+            old_restored.getaddressinfo(
+                later_receive
+            )["ismine"],
+            False,
+        )
+
+        assert_equal(
+            old_restored.getaddressinfo(
+                later_change
+            )["ismine"],
+            False,
+        )
+
+        assert_equal(
+            old_restored.listunspent(
+                0,
+                9999999,
+                [
+                    later_receive,
+                    later_change,
+                ],
+            ),
+            [],
+        )
+
+        # Deterministic regeneration from the backed-up counters must
+        # reproduce the exact later external/internal destinations.
+        recovered_receive = old_restored.getnewaddress(
+            "recovered-later-receive"
+        )
+        recovered_change = old_restored.getrawchangeaddress()
+
+        assert_equal(
+            recovered_receive,
+            later_receive,
+        )
+
+        assert_equal(
+            recovered_change,
+            later_change,
+        )
+
+        self.assert_pq_address(
+            old_restored,
+            recovered_receive,
+        )
+
+        self.assert_pq_address(
+            old_restored,
+            recovered_change,
+        )
+
+        # Merely regenerating ownership metadata does not retroactively
+        # scan historical blocks.
+        assert_equal(
+            old_restored.listunspent(
+                0,
+                9999999,
+                [
+                    later_receive,
+                    later_change,
+                ],
+            ),
+            [],
+        )
+
+        self.log.info(
+            "Rescanning after deterministic PQ regeneration"
+        )
+
+        old_restored.rescanblockchain()
+        old_restored.syncwithvalidationinterfacequeue()
+
+        assert_equal(
+            old_restored.getreceivedbyaddress(
+                later_receive
+            ),
+            Decimal("0.50"),
+        )
+
+        assert_equal(
+            old_restored.getreceivedbyaddress(
+                later_change
+            ),
+            Decimal("0.50"),
+        )
+
+        recovered_utxos = old_restored.listunspent(
+            1,
+            9999999,
+            [
+                later_receive,
+                later_change,
+            ],
+        )
+
+        assert_equal(
+            sum(
+                (
+                    utxo["amount"]
+                    for utxo in recovered_utxos
+                ),
+                Decimal("0"),
+            ),
+            Decimal("1.00"),
+        )
+
+        self.log.info(
+            "Mercatura PQ backup/restore and "
+            "older-backup recovery workflows passed"
         )
 
 
