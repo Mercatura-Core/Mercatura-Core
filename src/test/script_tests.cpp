@@ -1821,6 +1821,15 @@ BOOST_AUTO_TEST_CASE(mercatura_pq_witness_structure)
         !CheckMercaturaPQWitnessStructureV1(
             wrong_public_key, program, false, &error));
     BOOST_CHECK_EQUAL(error, SCRIPT_ERR_PQ_PUBLIC_KEY_SIZE);
+
+    CScriptWitness long_public_key = valid;
+    long_public_key.stack[1].resize(1953);
+
+    error = SCRIPT_ERR_UNKNOWN_ERROR;
+    BOOST_CHECK(
+        !CheckMercaturaPQWitnessStructureV1(
+            long_public_key, program, false, &error));
+    BOOST_CHECK_EQUAL(error, SCRIPT_ERR_PQ_PUBLIC_KEY_SIZE);
 }
 
 BOOST_AUTO_TEST_CASE(mercatura_classical_ownership_disabled)
