@@ -2621,6 +2621,323 @@ BOOST_FIXTURE_TEST_CASE(mercatura_pq_live_destination_derivation, BasicTestingSe
     }
 }
 
+
+BOOST_FIXTURE_TEST_CASE(mercatura_pq_seed_restore_sequence_and_spendability, BasicTestingSetup)
+{
+    CKeyingMaterial master_seed(
+        MERCATURA_PQ_WALLET_MASTER_SEED_SIZE);
+
+    for (size_t i = 0; i < master_seed.size(); ++i) {
+        master_seed[i] =
+            static_cast<unsigned char>(0x30 + i);
+    }
+
+    MercaturaPQWalletState initial_state;
+    initial_state.account = 0;
+    initial_state.next_external_index = 0;
+    initial_state.next_internal_index = 0;
+
+    // ------------------------------------------------------------
+    // Original wallet.
+    //
+    // Load one authoritative seed and derive the first two external
+    // destinations from branch 0.
+    // ------------------------------------------------------------
+
+    CWallet original{
+        m_node.chain.get(),
+        "",
+        CreateMockableWalletDatabase()
+    };
+
+    {
+        LOCK(original.cs_wallet);
+
+        BOOST_REQUIRE(
+            original.LoadMercaturaPQState(
+                initial_state));
+
+        BOOST_REQUIRE(
+            original.LoadMercaturaPQSeed(
+                master_seed));
+    }
+
+    auto original_receive_0_result{
+        original.GetNewMercaturaPQDestination(
+            /*internal=*/false)
+    };
+
+    auto original_receive_1_result{
+        original.GetNewMercaturaPQDestination(
+            /*internal=*/false)
+    };
+
+    BOOST_REQUIRE(original_receive_0_result);
+    BOOST_REQUIRE(original_receive_1_result);
+
+    const CTxDestination original_receive_0{
+        *original_receive_0_result
+    };
+
+    const CTxDestination original_receive_1{
+        *original_receive_1_result
+    };
+
+    BOOST_CHECK(
+        original_receive_0 !=
+        original_receive_1);
+
+    {
+        LOCK(original.cs_wallet);
+
+        BOOST_CHECK_EQUAL(
+            original.GetMercaturaPQState()
+                .next_external_index,
+            2U);
+
+        BOOST_CHECK_EQUAL(
+            original.GetMercaturaPQState()
+                .next_internal_index,
+            0U);
+
+        BOOST_CHECK_EQUAL(
+            original.GetMercaturaPQKeyLocatorCount(),
+            2U);
+
+        BOOST_CHECK(
+            original.ValidateMercaturaPQKeyLocators());
+    }
+
+    // ------------------------------------------------------------
+    // Recovered wallet.
+    //
+    // Start from the same authoritative master seed and the same
+    // initial derivation state. It must reproduce the identical
+    // external address sequence.
+    // ------------------------------------------------------------
+
+    CWallet recovered{
+        m_node.chain.get(),
+        "",
+        CreateMockableWalletDatabase()
+    };
+
+    {
+        LOCK(recovered.cs_wallet);
+
+        BOOST_REQUIRE(
+            recovered.LoadMercaturaPQState(
+                initial_state));
+
+        BOOST_REQUIRE(
+            recovered.LoadMercaturaPQSeed(
+                master_seed));
+    }
+
+    auto recovered_receive_0_result{
+        recovered.GetNewMercaturaPQDestination(
+            /*internal=*/false)
+    };
+
+    auto recovered_receive_1_result{
+        recovered.GetNewMercaturaPQDestination(
+            /*internal=*/false)
+    };
+
+    BOOST_REQUIRE(recovered_receive_0_result);
+    BOOST_REQUIRE(recovered_receive_1_result);
+
+    const CTxDestination recovered_receive_0{
+        *recovered_receive_0_result
+    };
+
+    const CTxDestination recovered_receive_1{
+        *recovered_receive_1_result
+    };
+
+    BOOST_CHECK(
+        recovered_receive_0 ==
+        original_receive_0);
+
+    BOOST_CHECK(
+        recovered_receive_1 ==
+        original_receive_1);
+
+    {
+        LOCK(recovered.cs_wallet);
+
+        BOOST_CHECK_EQUAL(
+            recovered.GetMercaturaPQState()
+                .next_external_index,
+            2U);
+
+        BOOST_CHECK_EQUAL(
+            recovered.GetMercaturaPQState()
+                .next_internal_index,
+            0U);
+
+        BOOST_CHECK_EQUAL(
+            recovered.GetMercaturaPQKeyLocatorCount(),
+            2U);
+
+        BOOST_CHECK(
+            recovered.ValidateMercaturaPQKeyLocators());
+
+        BOOST_CHECK(
+            recovered.IsMine(
+                original_receive_0));
+
+        BOOST_CHECK(
+            recovered.IsMine(
+                original_receive_1));
+    }
+
+    // ------------------------------------------------------------
+    // Fund an address created by the original wallet.
+    // ------------------------------------------------------------
+
+    CMutableTransaction funding;
+    funding.version = 2;
+
+    funding.vout.emplace_back(
+        10 * COIN,
+        GetScriptForDestination(
+            original_receive_0));
+
+    const CTransactionRef funding_tx{
+        MakeTransactionRef(
+            std::move(funding))
+    };
+
+    const COutPoint prevout{
+        funding_tx->GetHash(),
+        0
+    };
+
+    std::map<COutPoint, Coin> coins;
+
+    coins.emplace(
+        prevout,
+        Coin{
+            funding_tx->vout.at(0),
+            /*nHeight=*/0,
+            /*fCoinBase=*/false
+        });
+
+    // ------------------------------------------------------------
+    // The recovered wallet must be able to sign the old output
+    // using only the restored seed-derived ownership information.
+    // ------------------------------------------------------------
+
+    MercaturaPQKeyCommitment recipient_commitment{};
+    recipient_commitment.fill(0xb7);
+
+    const uint256 recipient_hash{
+        std::span<const unsigned char>{
+            recipient_commitment}
+    };
+
+    const CTxDestination recipient{
+        WitnessV2MercaturaPQ{
+            recipient_hash}
+    };
+
+    CMutableTransaction spend;
+    spend.version = 2;
+
+    spend.vin.emplace_back(prevout);
+
+    spend.vout.emplace_back(
+        9 * COIN,
+        GetScriptForDestination(
+            recipient));
+
+    std::map<int, bilingual_str> input_errors;
+
+    {
+        LOCK(recovered.cs_wallet);
+
+        BOOST_REQUIRE(
+            recovered.SignTransaction(
+                spend,
+                coins,
+                SIGHASH_DEFAULT,
+                input_errors));
+    }
+
+    BOOST_CHECK(
+        input_errors.empty());
+
+    BOOST_CHECK(
+        spend.vin.at(0)
+            .scriptSig.empty());
+
+    BOOST_REQUIRE_EQUAL(
+        spend.vin.at(0)
+            .scriptWitness.stack.size(),
+        2U);
+
+    BOOST_CHECK_EQUAL(
+        spend.vin.at(0)
+            .scriptWitness.stack.at(0).size(),
+        MERCATURA_MLDSA65_SIGNATURE_SIZE);
+
+    BOOST_CHECK_EQUAL(
+        spend.vin.at(0)
+            .scriptWitness.stack.at(1).size(),
+        MERCATURA_MLDSA65_PUBLIC_KEY_SIZE);
+
+    // Verify the restored wallet's signature through the actual
+    // Mercatura witness-v2 consensus verifier.
+    std::vector<CTxOut> spent_outputs{
+        funding_tx->vout.at(0)
+    };
+
+    PrecomputedTransactionData txdata;
+
+    txdata.Init(
+        spend,
+        std::move(spent_outputs),
+        /*force=*/true);
+
+    BOOST_REQUIRE(
+        txdata.m_pq_ready);
+
+    MutableTransactionSignatureChecker checker{
+        &spend,
+        /*nIn=*/0,
+        funding_tx->vout.at(0).nValue,
+        txdata,
+        MissingDataBehavior::FAIL,
+        std::optional<uint256>{
+            Params().GetConsensus().hashGenesisBlock}
+    };
+
+    ScriptError error{
+        SCRIPT_ERR_UNKNOWN_ERROR
+    };
+
+    BOOST_CHECK(
+        VerifyScript(
+            spend.vin.at(0).scriptSig,
+            funding_tx->vout.at(0).scriptPubKey,
+            &spend.vin.at(0).scriptWitness,
+            STANDARD_SCRIPT_VERIFY_FLAGS,
+            checker,
+            &error));
+
+    BOOST_CHECK_EQUAL(
+        error,
+        SCRIPT_ERR_OK);
+
+    memory_cleanse(
+        master_seed.data(),
+        master_seed.size());
+
+    master_seed.clear();
+}
+
+
 BOOST_FIXTURE_TEST_CASE(mercatura_pq_locked_derivation_behavior, BasicTestingSetup)
 {
     WalletContext context;
