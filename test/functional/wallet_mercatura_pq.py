@@ -515,16 +515,122 @@ class MercaturaPQWalletTest(BitcoinTestFramework):
 
         old_receiver_address = receiver_address
 
+        # Prove the receiver can spend before unload and that the
+        # resulting wallet-owned change is native Mercatura PQ.
+        pre_reload_destination = sender.getnewaddress(
+            "pre-reload-receive"
+        )
+
+        self.assert_pq_address(
+            sender,
+            pre_reload_destination,
+        )
+
+        pre_reload_txid = receiver.sendtoaddress(
+            pre_reload_destination,
+            Decimal("0.10"),
+        )
+
+        self.sync_mempools()
+
+        self.assert_transaction_outputs_are_pq(
+            receiver,
+            pre_reload_txid,
+        )
+
+        pre_reload_verbose = receiver.gettransaction(
+            pre_reload_txid,
+            True,
+            True,
+        )
+
+        pre_reload_change_addresses = []
+
+        for output in pre_reload_verbose["decoded"]["vout"]:
+            output_address = output["scriptPubKey"].get(
+                "address"
+            )
+
+            if (
+                output_address is None
+                or output_address == pre_reload_destination
+            ):
+                continue
+
+            if receiver.getaddressinfo(
+                output_address
+            )["ismine"]:
+                pre_reload_change_addresses.append(
+                    output_address
+                )
+
+        assert_equal(
+            len(pre_reload_change_addresses),
+            1,
+        )
+
+        pre_reload_change = (
+            pre_reload_change_addresses[0]
+        )
+
+        self.assert_pq_address(
+            receiver,
+            pre_reload_change,
+        )
+
+        self.mine_to_wallet(
+            node0,
+            sender,
+            1,
+        )
+
+        self.sync_blocks()
+
+        assert (
+            receiver.gettransaction(
+                pre_reload_txid
+            )["confirmations"] > 0
+        )
+
+        balance_before_reload = receiver.getbalance()
+
         node1.unloadwallet("receiver")
         node1.loadwallet("receiver")
 
         receiver = node1.get_wallet_rpc("receiver")
+
+        receiver.syncwithvalidationinterfacequeue()
+
+        # Confirm wallet balance and previously generated PQ change
+        # survive unload/reload.
+        assert_equal(
+            receiver.getbalance(),
+            balance_before_reload,
+        )
 
         self.assert_pq_address(
             receiver,
             old_receiver_address,
         )
 
+        self.assert_pq_address(
+            receiver,
+            pre_reload_change,
+        )
+
+        # Internal/change derivation must also continue forward after
+        # reload rather than reusing the previously persisted change
+        # destination.
+        after_reload_change = receiver.getrawchangeaddress()
+
+        self.assert_pq_address(
+            receiver,
+            after_reload_change,
+        )
+
+        assert after_reload_change != pre_reload_change
+
+        # External derivation must continue forward after reload.
         after_reload = receiver.getnewaddress(
             "after-wallet-reload"
         )
@@ -534,7 +640,47 @@ class MercaturaPQWalletTest(BitcoinTestFramework):
             after_reload,
         )
 
-        assert after_reload != old_receiver_address
+        assert after_reload not in {
+            old_receiver_address,
+            pre_reload_change,
+        }
+
+        # The reloaded wallet must still sign and broadcast a fresh
+        # internal/change output material.
+        post_reload_destination = sender.getnewaddress(
+            "post-reload-receive"
+        )
+
+        self.assert_pq_address(
+            sender,
+            post_reload_destination,
+        )
+
+        post_reload_txid = receiver.sendtoaddress(
+            post_reload_destination,
+            Decimal("0.10"),
+        )
+
+        self.sync_mempools()
+
+        self.assert_transaction_outputs_are_pq(
+            receiver,
+            post_reload_txid,
+        )
+
+        self.mine_to_wallet(
+            node0,
+            sender,
+            1,
+        )
+
+        self.sync_blocks()
+
+        assert (
+            receiver.gettransaction(
+                post_reload_txid
+            )["confirmations"] > 0
+        )
 
         # ----------------------------------------------------------
         # Full node restart must preserve PQ state and derivation
