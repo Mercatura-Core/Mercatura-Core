@@ -1438,6 +1438,206 @@ BOOST_AUTO_TEST_CASE(check_max_selection_weight)
     }
 }
 
+BOOST_AUTO_TEST_CASE(mercatura_pq_coin_selection_prefers_fewer_large_inputs)
+{
+    // J10 regression: normal wallet coin selection must account for the
+    // full native PQ input cost rather than inherited Bitcoin-sized inputs.
+    constexpr int64_t PQ_INPUT_FEE_SIZE{5309};
+    constexpr int64_t PQ_INPUT_WEIGHT{5432};
+    constexpr int64_t INHERITED_SMALL_INPUT_SIZE{68};
+    constexpr int64_t PQ_OUTPUT_SIZE{43};
+
+    const CAmount target{990 * COIN};
+    const CAmount small_value{20 * COIN};
+    const CAmount large_value{1000 * COIN};
+    constexpr int SMALL_COUNT{75};
+
+    // Use a meaningful fee differential so spending many PQ inputs carries
+    // a real waste penalty. The original zero-fee fixture caused all input
+    // costs to tie and Bitcoin Core intentionally breaks waste ties by
+    // spending more inputs.
+    const CFeeRate effective_feerate{100};
+    const CFeeRate long_term_feerate{10};
+
+    BOOST_CHECK_GT(
+        effective_feerate.GetFee(
+            PQ_INPUT_FEE_SIZE),
+        effective_feerate.GetFee(
+            INHERITED_SMALL_INPUT_SIZE));
+
+    CCoinControl cc;
+
+    FastRandomContext rand;
+
+    CoinSelectionParams cs_params{
+        rand,
+        /*change_output_size=*/PQ_OUTPUT_SIZE,
+        /*change_spend_size=*/PQ_INPUT_FEE_SIZE,
+        /*min_change_target=*/CENT,
+        /*effective_feerate=*/effective_feerate,
+        /*long_term_feerate=*/long_term_feerate,
+        /*discard_feerate=*/long_term_feerate,
+        /*tx_noinputs_size=*/10 + PQ_OUTPUT_SIZE,
+        /*avoid_partial=*/false,
+    };
+
+    const CAmount small_input_fee{
+        effective_feerate.GetFee(
+            PQ_INPUT_FEE_SIZE)
+    };
+
+    BOOST_REQUIRE_GT(
+        small_value,
+        small_input_fee);
+
+    const CAmount small_effective_value{
+        small_value -
+        small_input_fee
+    };
+
+    const int small_inputs_needed{
+        static_cast<int>(
+            (target +
+             small_effective_value -
+             1) /
+            small_effective_value)
+    };
+
+    // The small-PQ-UTXO path must be a genuine alternative:
+    // enough small inputs exist, their effective value funds the target,
+    // and the required subset still fits the standard weight ceiling.
+    BOOST_CHECK_GT(
+        small_inputs_needed,
+        1);
+
+    BOOST_CHECK_LE(
+        small_inputs_needed,
+        SMALL_COUNT);
+
+    BOOST_CHECK_LT(
+        static_cast<CAmount>(
+            small_inputs_needed - 1) *
+            small_effective_value,
+        target);
+
+    BOOST_CHECK_GE(
+        static_cast<CAmount>(
+            small_inputs_needed) *
+            small_effective_value,
+        target);
+
+    const int64_t max_selection_weight{
+        MAX_STANDARD_TX_WEIGHT -
+        cs_params.tx_noinputs_size *
+            WITNESS_SCALE_FACTOR -
+        cs_params.change_output_size *
+            WITNESS_SCALE_FACTOR
+    };
+
+    BOOST_CHECK_LE(
+        static_cast<int64_t>(
+            small_inputs_needed) *
+            PQ_INPUT_WEIGHT,
+        max_selection_weight);
+
+    const auto result = select_coins(
+        target,
+        cs_params,
+        cc,
+        [&](CWallet& wallet) {
+            CoinsResult available_coins;
+
+            for (int i = 0;
+                 i < SMALL_COUNT;
+                 ++i) {
+                add_coin(
+                    available_coins,
+                    wallet,
+                    small_value,
+                    effective_feerate,
+                    144,
+                    false,
+                    0,
+                    true);
+            }
+
+            add_coin(
+                available_coins,
+                wallet,
+                large_value,
+                effective_feerate,
+                144,
+                false,
+                0,
+                true);
+
+            BOOST_REQUIRE_EQUAL(
+                available_coins.All().size(),
+                static_cast<size_t>(
+                    SMALL_COUNT + 1));
+
+            CAmount small_effective_total{0};
+            int small_seen{0};
+
+            for (const COutput& coin :
+                 available_coins.All()) {
+                BOOST_CHECK_EQUAL(
+                    coin.input_bytes,
+                    PQ_INPUT_FEE_SIZE);
+
+                BOOST_CHECK_EQUAL(
+                    coin.input_weight,
+                    PQ_INPUT_WEIGHT);
+
+                if (coin.txout.nValue ==
+                    small_value) {
+                    ++small_seen;
+                    small_effective_total +=
+                        coin.GetEffectiveValue();
+                }
+            }
+
+            BOOST_CHECK_EQUAL(
+                small_seen,
+                SMALL_COUNT);
+
+            BOOST_CHECK_GE(
+                small_effective_total,
+                target);
+
+            return available_coins;
+        },
+        m_node);
+
+    BOOST_REQUIRE(result);
+
+    const OutputSet selected{
+        result->GetInputSet()
+    };
+
+    // With the real PQ input cost, the single large UTXO has materially
+    // lower waste than spending dozens of otherwise viable small inputs.
+    BOOST_REQUIRE_EQUAL(
+        selected.size(),
+        1U);
+
+    const auto& selected_coin{
+        *selected.begin()
+    };
+
+    BOOST_CHECK_EQUAL(
+        selected_coin->txout.nValue,
+        large_value);
+
+    BOOST_CHECK_EQUAL(
+        selected_coin->input_bytes,
+        PQ_INPUT_FEE_SIZE);
+
+    BOOST_CHECK_EQUAL(
+        selected_coin->input_weight,
+        PQ_INPUT_WEIGHT);
+}
+
 BOOST_AUTO_TEST_CASE(SelectCoins_effective_value_test)
 {
     // Test that the effective value is used to check whether preset inputs provide sufficient funds when subtract_fee_outputs is not used.
