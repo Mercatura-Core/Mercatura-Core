@@ -434,8 +434,14 @@ void TxToUniv(const CTransaction& tx, const uint256& block_hash, UniValue& entry
     entry.pushKV("txid", tx.GetHash().GetHex());
     entry.pushKV("hash", tx.GetWitnessHash().GetHex());
     entry.pushKV("version", tx.version);
-    entry.pushKV("size", tx.ComputeTotalSize());
-    entry.pushKV("vsize", (GetTransactionWeight(tx) + WITNESS_SCALE_FACTOR - 1) / WITNESS_SCALE_FACTOR);
+
+    // Mercatura does not discount witness bytes for effective transaction-size
+    // accounting. In this context there is no contextual sigop adjustment, so
+    // RPC vsize is the full serialized transaction size. Keep transaction
+    // weight separately for compatibility and diagnostics.
+    const auto serialized_size{tx.ComputeTotalSize()};
+    entry.pushKV("size", serialized_size);
+    entry.pushKV("vsize", serialized_size);
     entry.pushKV("weight", GetTransactionWeight(tx));
     entry.pushKV("locktime", tx.nLockTime);
 
