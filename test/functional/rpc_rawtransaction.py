@@ -349,7 +349,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.log.info("Test sendrawtransaction with missing input")
         inputs = [{'txid': TXID, 'vout': 1}]  # won't exist
         address = getnewdestination()[2]
-        outputs = {address: 4.998}
+        outputs = {address: 4.99}
         rawtx = self.nodes[2].createrawtransaction(inputs, outputs)
         assert_raises_rpc_error(-25, "bad-txns-inputs-missingorspent", self.nodes[2].sendrawtransaction, rawtx)
 
@@ -364,67 +364,67 @@ class RawTransactionsTest(BitcoinTestFramework):
 
         # Test that datacarrier transaction with default maxburnamount (0) does not get sent
         tx = self.wallet.create_self_transfer()['tx']
-        tx_val = 0.001
+        tx_val = Decimal("0.01")
         tx.vout = [CTxOut(int(Decimal(tx_val) * COIN), CScript([OP_RETURN] + [OP_FALSE] * 30))]
         tx_hex = tx.serialize().hex()
         assert_raises_rpc_error(-25, max_burn_exceeded, self.nodes[2].sendrawtransaction, tx_hex)
 
         # Test that oversized script gets rejected by sendrawtransaction
         tx = self.wallet.create_self_transfer()['tx']
-        tx_val = 0.001
+        tx_val = Decimal("0.01")
         tx.vout = [CTxOut(int(Decimal(tx_val) * COIN), CScript([OP_FALSE] * 10001))]
         tx_hex = tx.serialize().hex()
         assert_raises_rpc_error(-25, max_burn_exceeded, self.nodes[2].sendrawtransaction, tx_hex)
 
         # Test that script containing invalid opcode gets rejected by sendrawtransaction
         tx = self.wallet.create_self_transfer()['tx']
-        tx_val = 0.01
+        tx_val = Decimal("0.01")
         tx.vout = [CTxOut(int(Decimal(tx_val) * COIN), CScript([OP_INVALIDOPCODE]))]
         tx_hex = tx.serialize().hex()
         assert_raises_rpc_error(-25, max_burn_exceeded, self.nodes[2].sendrawtransaction, tx_hex)
 
         # Test a transaction where our burn exceeds maxburnamount
         tx = self.wallet.create_self_transfer()['tx']
-        tx_val = 0.001
+        tx_val = Decimal("0.02")
         tx.vout = [CTxOut(int(Decimal(tx_val) * COIN), CScript([OP_RETURN] + [OP_FALSE] * 30))]
         tx_hex = tx.serialize().hex()
-        assert_raises_rpc_error(-25, max_burn_exceeded, self.nodes[2].sendrawtransaction, tx_hex, 0, 0.0009)
+        assert_raises_rpc_error(-25, max_burn_exceeded, self.nodes[2].sendrawtransaction, tx_hex, 0, "0.01")
 
         # Test a transaction where our burn falls short of maxburnamount
         tx = self.wallet.create_self_transfer()['tx']
-        tx_val = 0.001
+        tx_val = Decimal("0.02")
         tx.vout = [CTxOut(int(Decimal(tx_val) * COIN), CScript([OP_RETURN] + [OP_FALSE] * 30))]
         tx_hex = tx.serialize().hex()
-        self.nodes[2].sendrawtransaction(hexstring=tx_hex, maxfeerate='0', maxburnamount='0.0011')
+        self.nodes[2].sendrawtransaction(hexstring=tx_hex, maxfeerate='0', maxburnamount='0.03')
 
         # Test a transaction where our burn equals maxburnamount
         tx = self.wallet.create_self_transfer()['tx']
-        tx_val = 0.001
+        tx_val = Decimal("0.02")
         tx.vout = [CTxOut(int(Decimal(tx_val) * COIN), CScript([OP_RETURN] + [OP_FALSE] * 30))]
         tx_hex = tx.serialize().hex()
-        self.nodes[2].sendrawtransaction(hexstring=tx_hex, maxfeerate='0', maxburnamount='0.001')
+        self.nodes[2].sendrawtransaction(hexstring=tx_hex, maxfeerate='0', maxburnamount='0.02')
 
     def sendrawtransaction_testmempoolaccept_tests(self):
         self.log.info("Test sendrawtransaction/testmempoolaccept with maxfeerate")
         fee_exceeds_max = "Fee exceeds maximum configured by user (e.g. -maxtxfee, maxfeerate)"
 
         # Test a transaction with a small fee.
-        # Fee rate is 0.00100000 BTC/kvB
-        tx = self.wallet.create_self_transfer(fee_rate=Decimal('0.00100000'))
-        # Thus, testmempoolaccept should reject
-        testres = self.nodes[2].testmempoolaccept([tx['hex']], 0.00001000)[0]
+        # Fee rate is 0.10 MCA/kvB.
+        tx = self.wallet.create_self_transfer(fee_rate=Decimal("0.10"))
+        # Thus, testmempoolaccept should reject with a lower explicit maximum.
+        testres = self.nodes[2].testmempoolaccept([tx['hex']], "0.01")[0]
         assert_equal(testres['allowed'], False)
         assert_equal(testres['reject-reason'], 'max-fee-exceeded')
         # and sendrawtransaction should throw
-        assert_raises_rpc_error(-25, fee_exceeds_max, self.nodes[2].sendrawtransaction, tx['hex'], 0.00001000)
+        assert_raises_rpc_error(-25, fee_exceeds_max, self.nodes[2].sendrawtransaction, tx['hex'], "0.01")
         # and the following calls should both succeed
         testres = self.nodes[2].testmempoolaccept(rawtxs=[tx['hex']])[0]
         assert_equal(testres['allowed'], True)
         self.nodes[2].sendrawtransaction(hexstring=tx['hex'])
 
         # Test a transaction with a large fee.
-        # Fee rate is 0.20000000 BTC/kvB
-        tx = self.wallet.create_self_transfer(fee_rate=Decimal("0.20000000"))
+        # Fee rate is 0.20 MCA/kvB.
+        tx = self.wallet.create_self_transfer(fee_rate=Decimal("0.20"))
         # Thus, testmempoolaccept should reject
         testres = self.nodes[2].testmempoolaccept([tx['hex']])[0]
         assert_equal(testres['allowed'], False)
@@ -432,9 +432,9 @@ class RawTransactionsTest(BitcoinTestFramework):
         # and sendrawtransaction should throw
         assert_raises_rpc_error(-25, fee_exceeds_max, self.nodes[2].sendrawtransaction, tx['hex'])
         # and the following calls should both succeed
-        testres = self.nodes[2].testmempoolaccept(rawtxs=[tx['hex']], maxfeerate='0.20000000')[0]
+        testres = self.nodes[2].testmempoolaccept(rawtxs=[tx['hex']], maxfeerate='0.20')[0]
         assert_equal(testres['allowed'], True)
-        self.nodes[2].sendrawtransaction(hexstring=tx['hex'], maxfeerate='0.20000000')
+        self.nodes[2].sendrawtransaction(hexstring=tx['hex'], maxfeerate='0.20')
 
         self.log.info("Test sendrawtransaction/testmempoolaccept with tx outputs already in the utxo set")
         self.generate(self.nodes[2], 1)
@@ -449,7 +449,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         # witness transaction
         encrawtx = "010000000001010000000000000072c1a6a246ae63f74f931e8365e15a089c68d61900000000000000000000ffffffff0100e1f50500000000000102616100000000"
         decrawtx = self.nodes[0].decoderawtransaction(encrawtx, True)  # decode as witness transaction
-        assert_equal(decrawtx['vout'][0]['value'], Decimal('1.00000000'))
+        assert_equal(decrawtx['vout'][0]['value'], Decimal('1000000.00'))
 
         # Mercatura does not discount witness bytes for effective transaction
         # size reporting. The decoded RPC vsize must therefore equal the full
@@ -460,7 +460,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         # non-witness transaction
         encrawtx = "01000000010000000000000072c1a6a246ae63f74f931e8365e15a089c68d61900000000000000000000ffffffff0100e1f505000000000000000000"
         decrawtx = self.nodes[0].decoderawtransaction(encrawtx, False)  # decode as non-witness transaction
-        assert_equal(decrawtx['vout'][0]['value'], Decimal('1.00000000'))
+        assert_equal(decrawtx['vout'][0]['value'], Decimal('1000000.00'))
         # known ambiguous transaction in the chain (see https://github.com/bitcoin/bitcoin/issues/20579)
         coinbase = "03c68708046ff8415c622f4254432e434f4d2ffabe6d6de1965d02c68f928e5b244ab1965115a36f56eb997633c7f690124bbf43644e23080000000ca3d3af6d005a65ff0200fd00000000"
         encrawtx = f"020000000001010000000000000000000000000000000000000000000000000000000000000000ffffffff4b{coinbase}" \
