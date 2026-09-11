@@ -16,6 +16,7 @@ disconnected.
 from decimal import Decimal
 import shutil
 
+from test_framework.blocktools import COINBASE_MATURITY
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
         assert_equal,
@@ -27,6 +28,9 @@ from test_framework.util import (
 class ReorgsRestoreTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 3
+        # Avoid inherited cached-chain wallet funding assumptions. Mercatura
+        # normal ownership is native PQ witness-v2 only.
+        self.setup_clean_chain = True
 
     def skip_test_if_missing_module(self):
         self.skip_if_no_wallet()
@@ -143,6 +147,14 @@ class ReorgsRestoreTest(BitcoinTestFramework):
         assert_greater_than(wallet.getbalances()["mine"]["immature"], 0)
 
     def run_test(self):
+        # Fund the default wallet with mature native Mercatura PQ coinbase
+        # outputs before exercising the inherited wallet reorg scenarios.
+        self.generatetoaddress(
+            self.nodes[0],
+            COINBASE_MATURITY + 1,
+            self.nodes[0].getnewaddress(),
+        )
+
         # Send a tx from which to conflict outputs later
         txid_conflict_from = self.nodes[0].sendtoaddress(self.nodes[0].getnewaddress(), Decimal("10"))
         self.generate(self.nodes[0], 1)
@@ -169,8 +181,8 @@ class ReorgsRestoreTest(BitcoinTestFramework):
         outputs_2 = {}
 
         # Create a conflicted tx broadcast on node0 chain and conflicting tx broadcast on node1 chain. Both spend from txid_conflict_from
-        outputs_1[self.nodes[0].getnewaddress()] = Decimal("9.99998")
-        outputs_2[self.nodes[0].getnewaddress()] = Decimal("9.99998")
+        outputs_1[self.nodes[0].getnewaddress()] = Decimal("9.90")
+        outputs_2[self.nodes[0].getnewaddress()] = Decimal("9.90")
         conflicted = self.nodes[0].signrawtransactionwithwallet(self.nodes[0].createrawtransaction(inputs, outputs_1))
         conflicting = self.nodes[0].signrawtransactionwithwallet(self.nodes[0].createrawtransaction(inputs, outputs_2))
 
@@ -200,7 +212,15 @@ class ReorgsRestoreTest(BitcoinTestFramework):
         # Node0 wallet file is loaded on longest sync'ed node1
         self.stop_node(1)
         self.nodes[0].backupwallet(self.nodes[0].datadir_path / 'wallet.bak')
-        shutil.copyfile(self.nodes[0].datadir_path / 'wallet.bak', self.nodes[1].chain_path / self.default_wallet_name / self.wallet_data_filename)
+        # The inherited cached-chain setup pre-created the destination wallet
+        # directory. With Mercatura's clean-chain PQ fixture, create it
+        # explicitly before installing the backed-up wallet on node1.
+        destination_wallet_dir = self.nodes[1].chain_path / "wallets" / self.default_wallet_name
+        destination_wallet_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(
+            self.nodes[0].datadir_path / 'wallet.bak',
+            destination_wallet_dir / self.wallet_data_filename,
+        )
         self.start_node(1)
         tx_after_reorg = self.nodes[1].gettransaction(txid)
         # Check that normal confirmed tx is confirmed again but with different blockhash
