@@ -22,9 +22,6 @@ from test_framework.p2p import (
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_raises_rpc_error
 from test_framework.wallet import MiniWallet
-from test_framework.blocktools import (
-    create_empty_fork,
-)
 
 # Number of blocks to create in temporary blockchain branch for reorg testing
 # needs to be long enough to allow MTP to move arbitrarily forward
@@ -40,11 +37,70 @@ class MempoolCoinbaseTest(BitcoinTestFramework):
             []
         ]
 
-    def trigger_reorg(self, fork_blocks, node):
-        """Trigger reorg of the fork blocks."""
-        for block in fork_blocks:
-            node.submitblock(block.serialize().hex())
-        assert_equal(self.nodes[0].getbestblockhash(), fork_blocks[-1].hash_hex)
+    def trigger_reorg(self, fork_base):
+        """Trigger a reorg using a real Mercatura MercaHash/DGW fork."""
+        fork_node = self.nodes[1]
+
+        # Keep node0's active branch and mempool state intact. Rewind node1
+        # alone to the previously recorded fork point.
+        self.disconnect_nodes(0, 1)
+        fork_height = fork_node.getblockheader(fork_base)["height"]
+        first_active_block = fork_node.getblockhash(fork_height + 1)
+        fork_node.invalidateblock(first_active_block)
+        assert_equal(fork_node.getbestblockhash(), fork_base)
+
+        # Keep the competing branch in the earlier time window. Mine blocks
+        # through mercaturad so both MercaHash PoW and DGWv3 nBits are valid.
+        fork_node.setmocktime(fork_node.getblock(fork_base)["time"] + 1)
+
+        for _ in range(FORK_LENGTH):
+            self.generateblock(
+                fork_node,
+                output="raw(51)",
+                transactions=[],
+                submit=True,
+                sync_fun=self.no_op,
+            )
+
+        # DGW means block count alone does not guarantee greater accumulated
+        # work. Extend the fork if necessary until it strictly wins by work.
+        for _ in range(FORK_LENGTH):
+            active_work = int(
+                self.nodes[0].getblockchaininfo()["chainwork"], 16
+            )
+            fork_work = int(
+                fork_node.getblockchaininfo()["chainwork"], 16
+            )
+
+            if fork_work > active_work:
+                break
+
+            self.generateblock(
+                fork_node,
+                output="raw(51)",
+                transactions=[],
+                submit=True,
+                sync_fun=self.no_op,
+            )
+        else:
+            raise AssertionError(
+                "Mercatura competing fork did not exceed active-chain work"
+            )
+
+        fork_tip = fork_node.getbestblockhash()
+
+        # invalidateblock() above was only used to construct the competing
+        # branch. Restore the old branch to valid status before reconnecting
+        # so later inherited reorg tests can move between both branches
+        # symmetrically. The new fork remains active because it has more work.
+        fork_node.reconsiderblock(first_active_block)
+        assert_equal(fork_node.getbestblockhash(), fork_tip)
+
+        # Reconnect normally and let most-work chain selection perform the
+        # actual reorg under test.
+        self.connect_nodes(0, 1)
+        self.sync_blocks()
+        assert_equal(self.nodes[0].getbestblockhash(), fork_tip)
 
     def test_reorg_relay(self):
         self.log.info("Test that transactions from disconnected blocks are available for relay immediately")
@@ -179,8 +235,10 @@ class MempoolCoinbaseTest(BitcoinTestFramework):
         spend_3_1_id = self.nodes[0].sendrawtransaction(spend_3_1['hex'])
         self.log.info("Generate a block")
 
-        # Prep for fork, only go FORK_LENGTH  seconds into the MTP future max
-        fork_blocks = create_empty_fork(self.nodes[0], fork_length=FORK_LENGTH)
+        # Record the fork point. Node1 stays synchronized with node0 until
+        # trigger_reorg(), preserving the inherited pre-reorg relay behavior.
+        fork_base = self.nodes[0].getbestblockhash()
+        assert_equal(self.nodes[1].getbestblockhash(), fork_base)
 
         # Jump node and MTP 300 seconds and generate a slightly weaker chain than reorg one
         self.nodes[0].setmocktime(future)
@@ -200,7 +258,7 @@ class MempoolCoinbaseTest(BitcoinTestFramework):
         assert_equal(set(self.nodes[0].getrawmempool()), {spend_1_id, spend_2_1_id, timelock_tx_id})
         self.sync_all()
 
-        self.trigger_reorg(fork_blocks, self.nodes[0])
+        self.trigger_reorg(fork_base)
         self.sync_blocks()
 
         # We went backwards in time to boot timelock_tx_id
@@ -240,6 +298,11 @@ class MempoolCoinbaseTest(BitcoinTestFramework):
         self.log.info("Check that the mempool is empty")
         assert_equal(set(self.nodes[0].getrawmempool()), set())
         self.sync_all()
+
+        # test_reorg_relay() establishes a fresh connection itself.
+        # Ensure the preceding Mercatura reorg scenario leaves the nodes
+        # disconnected so connect_nodes() does not wait on an existing peer.
+        self.disconnect_nodes(0, 1)
 
         self.test_reorg_relay()
 
