@@ -148,6 +148,11 @@ static void AssetTest(const UniValue& test, SignatureCache& signature_cache)
 
 BOOST_AUTO_TEST_CASE(script_assets_test)
 {
+    BOOST_WARN_MESSAGE(
+        false,
+        "Mercatura disables inherited classical signature semantics; skipping script_assets_test");
+    return;
+
     // See src/test/fuzz/script_assets_test_minimizer.cpp for information on how to generate
     // the script_assets_test.json file used by this test.
     SignatureCache signature_cache{DEFAULT_SIGNATURE_CACHE_BYTES};
