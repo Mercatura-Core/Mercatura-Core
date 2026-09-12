@@ -14,6 +14,7 @@
 #include <uint256.h>
 #include <util/strencodings.h>
 
+#include <charconv>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -77,13 +78,20 @@ struct Options {
 
 uint64_t ParseUnsigned(const std::string& text, const char* option_name)
 {
-    std::size_t consumed{0};
+    std::string_view digits{text};
+    int base{10};
 
-    const unsigned long long value{
-        std::stoull(text, &consumed, 0)
-    };
+    if (digits.starts_with("0x") || digits.starts_with("0X")) {
+        base = 16;
+        digits.remove_prefix(2);
+    }
 
-    if (consumed != text.size()) {
+    uint64_t value{0};
+    const char* const begin{digits.data()};
+    const char* const end{begin + digits.size()};
+    const auto [ptr, ec]{std::from_chars(begin, end, value, base)};
+
+    if (digits.empty() || ec != std::errc{} || ptr != end) {
         throw std::runtime_error(
             std::string{"Invalid value for "} +
             option_name +
@@ -91,7 +99,7 @@ uint64_t ParseUnsigned(const std::string& text, const char* option_name)
             text);
     }
 
-    return static_cast<uint64_t>(value);
+    return value;
 }
 
 uint32_t ParseUint32(const std::string& text, const char* option_name)
