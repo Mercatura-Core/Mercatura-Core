@@ -11,8 +11,9 @@
 static void CheckBlockIndex(benchmark::Bench& bench)
 {
     auto testing_setup{MakeNoLogFileContext<TestChain100Setup>()};
-    // Mine some more blocks
-    testing_setup->mineBlocks(1000);
+    // Keep enough additional chain history to exercise CheckBlockIndex()
+    // without making MercaHash block generation dominate benchmark setup.
+    testing_setup->mineBlocks(100);
     bench.run([&] {
         testing_setup->m_node.chainman->CheckBlockIndex();
     });
