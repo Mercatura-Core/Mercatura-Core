@@ -2,9 +2,11 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <addresstype.h>
 #include <bench/bench.h>
 #include <interfaces/chain.h>
 #include <kernel/chainparams.h>
+#include <key_io.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
 #include <sync.h>
@@ -28,7 +30,11 @@ static void WalletBalance(benchmark::Bench& bench, const bool set_dirty, const b
 {
     const auto test_setup = MakeNoLogFileContext<const TestingSetup>();
 
-    const auto& ADDRESS_WATCHONLY = ADDRESS_BCRT1_UNSPENDABLE;
+    // Use a deterministic valid Mercatura PQ destination that is not owned
+    // by this wallet instead of Bitcoin's inherited bcrt1 watch-only address.
+    const std::string address_watchonly{
+        EncodeDestination(WitnessV2MercaturaPQ{})
+    };
 
     // Set clock to genesis block, so the descriptors/keys creation time don't interfere with the blocks scanning process.
     // The reason is 'generatetoaddress', which creates a chain with deterministic timestamps in the past.
@@ -39,13 +45,14 @@ static void WalletBalance(benchmark::Bench& bench, const bool set_dirty, const b
         wallet.SetWalletFlag(WALLET_FLAG_DESCRIPTORS);
         wallet.SetupDescriptorScriptPubKeyMans();
     }
+    assert(wallet.InitializeMercaturaPQWallet());
     auto handler = test_setup->m_node.chain->handleNotifications({&wallet, [](CWallet*) {}});
 
     const std::optional<std::string> address_mine{add_mine ? std::optional<std::string>{getnewaddress(wallet)} : std::nullopt};
 
     for (int i = 0; i < 100; ++i) {
-        generatetoaddress(test_setup->m_node, address_mine.value_or(ADDRESS_WATCHONLY));
-        generatetoaddress(test_setup->m_node, ADDRESS_WATCHONLY);
+        generatetoaddress(test_setup->m_node, address_mine.value_or(address_watchonly));
+        generatetoaddress(test_setup->m_node, address_watchonly);
     }
     // Calls SyncWithValidationInterfaceQueue
     wallet.chain().waitForNotificationsIfTipChanged(uint256::ZERO);
