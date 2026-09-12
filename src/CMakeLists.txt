@@ -61,6 +61,7 @@ endif()
 add_library(bitcoin_consensus STATIC EXCLUDE_FROM_ALL
   arith_uint256.cpp
   consensus/mercatura_controller.cpp
+  consensus/mercatura_controller_blockindex.cpp
   consensus/mercatura_emission.cpp
   consensus/mercatura_fixedpoint.cpp
   consensus/merkle.cpp

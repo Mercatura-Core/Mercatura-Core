@@ -24,6 +24,7 @@ add_library(bitcoinkernel
   ../compressor.cpp
   ../consensus/merkle.cpp
   ../consensus/mercatura_controller.cpp
+  ../consensus/mercatura_controller_blockindex.cpp
   ../consensus/mercatura_emission.cpp
   ../consensus/mercatura_fixedpoint.cpp
   ../consensus/tx_check.cpp
