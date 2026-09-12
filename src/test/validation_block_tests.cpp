@@ -2115,7 +2115,7 @@ BOOST_AUTO_TEST_CASE(witness_commitment_index)
 }
 BOOST_AUTO_TEST_SUITE_END()
 BOOST_FIXTURE_TEST_SUITE(
-    validation_block_main_dgw_tests,
+    validation_block_tests_main_dgw,
     validation_block_tests::MainDgwReorgTestingSetup)
 
 BOOST_AUTO_TEST_CASE(mercatura_dgw_reorg_uses_winning_branch_history)
