@@ -51,23 +51,6 @@ static_assert(WALLET_INCREMENTAL_RELAY_FEE >= DEFAULT_INCREMENTAL_RELAY_FEE, "wa
 
 BOOST_FIXTURE_TEST_SUITE(wallet_tests, WalletTestingSetup)
 
-static constexpr CAmount TEST_SIMPLE_SPEND_FEE{1}; // 0.01 MCA.
-
-
-static CMutableTransaction TestSimpleSpend(const CTransaction& from, uint32_t index, const CKey& key, const CScript& pubkey)
-{
-    CMutableTransaction mtx;
-    mtx.vout.emplace_back(from.vout[index].nValue - TEST_SIMPLE_SPEND_FEE, pubkey);
-    mtx.vin.push_back({CTxIn{from.GetHash(), index}});
-    FillableSigningProvider keystore;
-    keystore.AddKey(key);
-    std::map<COutPoint, Coin> coins;
-    coins[mtx.vin[0].prevout].out = from.vout[index];
-    std::map<int, bilingual_str> input_errors;
-    BOOST_CHECK(SignTransaction(mtx, &keystore, coins, SIGHASH_ALL, input_errors));
-    return mtx;
-}
-
 static void AddKey(CWallet& wallet, const CKey& key)
 {
     LOCK(wallet.cs_wallet);
