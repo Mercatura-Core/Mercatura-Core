@@ -34,7 +34,6 @@ from test_framework.messages import (
     MAX_SEQUENCE_NONFINAL,
     MINIMUM_BLOCK_RESERVED_SIZE,
     ser_uint256,
-    WITNESS_SCALE_FACTOR,
 )
 from test_framework.p2p import P2PDataStore
 from test_framework.test_framework import BitcoinTestFramework
