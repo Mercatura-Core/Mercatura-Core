@@ -60,7 +60,9 @@ static void BlockAssemblerAddPackageTxns(benchmark::Bench& bench)
 {
     FastRandomContext det_rand{true};
     auto testing_setup{MakeNoLogFileContext<TestChain100Setup>()};
-    testing_setup->PopulateMempool(det_rand, /*num_transactions=*/1000, /*submit=*/true);
+    // Preserve a substantial package-selection workload without letting
+    // Mercatura's heavier test-chain setup dominate benchmark sanity checks.
+    testing_setup->PopulateMempool(det_rand, /*num_transactions=*/250, /*submit=*/true);
     BlockAssembler::Options assembler_options;
     assembler_options.test_block_validity = false;
     assembler_options.coinbase_output_script = P2WSH_OP_TRUE;
