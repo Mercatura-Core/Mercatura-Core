@@ -59,14 +59,23 @@ pub fn commit_range() -> String {
     })
 }
 
-/// Return all subtree paths
+/// Return paths that are genuine Git subtrees in the Mercatura repository.
+///
+/// Mercatura's imported Bitcoin Core source history does not retain the
+/// git-subtree metadata for the inherited third-party directories.
 pub fn get_subtrees() -> Vec<&'static str> {
-    // Keep in sync with [test/lint/README.md#git-subtree-checksh]
+    vec![]
+}
+
+/// Return externally sourced directories that should be excluded from
+/// Mercatura-owned source-style and documentation lint checks.
+pub fn get_external_sources() -> Vec<&'static str> {
     vec![
         "src/crc32c",
         "src/crypto/ctaes",
+        "src/crypto/mldsa_native",
         "src/ipc/libmultiprocess",
-        //"src/leveldb", No longer a subtree in this release branch, due to direct cherry-picks
+        "src/leveldb",
         "src/minisketch",
         "src/secp256k1",
     ]
@@ -74,7 +83,7 @@ pub fn get_subtrees() -> Vec<&'static str> {
 
 /// Return the pathspecs to exclude by default
 pub fn get_pathspecs_default_excludes() -> Vec<String> {
-    get_subtrees()
+    get_external_sources()
         .iter()
         .chain(&[
             "doc/release-notes/release-notes-*", // archived notes

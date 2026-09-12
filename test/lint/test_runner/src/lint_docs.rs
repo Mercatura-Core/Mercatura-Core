@@ -5,7 +5,7 @@
 use std::io::ErrorKind;
 use std::process::{Command, Stdio};
 
-use crate::util::{check_output, get_subtrees, git, LintResult};
+use crate::util::{check_output, get_external_sources, git, LintResult};
 
 pub fn lint_doc_release_note_snippets() -> LintResult {
     let non_release_notes = check_output(git().args([
@@ -43,7 +43,7 @@ pub fn lint_doc_args() -> LintResult {
 
 pub fn lint_markdown() -> LintResult {
     let bin_name = "mlc";
-    let mut md_ignore_paths = get_subtrees();
+    let mut md_ignore_paths = get_external_sources();
     md_ignore_paths.push("./doc/README_doxygen.md");
     let md_ignore_path_str = md_ignore_paths.join(",");
 
