@@ -458,6 +458,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - name: 'Linux native x86_64, headless'
+            warp-runner: 'warp-ubuntu-latest-x64-8x'
+            fallback-runner: 'ubuntu-latest'
+            timeout-minutes: 120
+            file-env: './ci/test/00_setup_env_native_linux.sh'
+
           - name: 'iwyu'
             warp-runner: 'warp-ubuntu-latest-x64-8x'
             fallback-runner: 'ubuntu-latest'
