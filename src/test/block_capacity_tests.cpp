@@ -316,8 +316,7 @@ BOOST_AUTO_TEST_CASE(capacity_reorg_uses_winning_branch_height)
     //            A1 (1,051,199) -> A2 (1,051,200)
     //          /
     // fork (1,051,198)
-    //          \
-    //            B1 (1,051,199, greater accumulated work)
+    //          \ B1 (1,051,199, greater accumulated work)
     //
     // A2 initially represents the active tip. B1 then wins by accumulated
     // work even though it is one block shorter, causing the active-chain
