@@ -1,5 +1,5 @@
-#ifndef MERCATURA_MLDSA_H
-#define MERCATURA_MLDSA_H
+#ifndef BITCOIN_CRYPTO_MERCATURA_MLDSA_H
+#define BITCOIN_CRYPTO_MERCATURA_MLDSA_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -48,4 +48,4 @@ int mercatura_mldsa65_verify(
 } // extern "C"
 #endif
 
-#endif
+#endif // BITCOIN_CRYPTO_MERCATURA_MLDSA_H

@@ -8,11 +8,7 @@
 #include <crypto/mercatura_mldsa.h>
 #include <crypto/mercatura_pqderive.h>
 #include <crypto/mercatura_pqkey.h>
-#include <limits>
-#include <algorithm>
 #include <crypto/sha256.h>
-#include <array>
-#include <span>
 
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 #include <addresstype.h>
@@ -81,10 +77,13 @@
 #include <wallet/walletutil.h>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <condition_variable>
 #include <exception>
+#include <limits>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <thread>
 #include <tuple>
