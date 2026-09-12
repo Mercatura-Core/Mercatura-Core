@@ -124,6 +124,7 @@ static void WalletCreateTx(benchmark::Bench& bench, const OutputType output_type
         wallet.SetWalletFlag(WALLET_FLAG_DESCRIPTORS);
         wallet.SetupDescriptorScriptPubKeyMans();
     }
+    assert(wallet.InitializeMercaturaPQWallet());
 
     // Generate destinations
     const auto dest{getNewDestination(wallet, output_type)};
@@ -179,6 +180,7 @@ static void AvailableCoins(benchmark::Bench& bench, const std::vector<OutputType
         wallet.SetWalletFlag(WALLET_FLAG_DESCRIPTORS);
         wallet.SetupDescriptorScriptPubKeyMans();
     }
+    assert(wallet.InitializeMercaturaPQWallet());
 
     // Generate destinations
     std::vector<CScript> dest_wallet;
@@ -207,10 +209,10 @@ static void AvailableCoins(benchmark::Bench& bench, const std::vector<OutputType
     });
 }
 
-static void WalletCreateTxUseOnlyPresetInputs(benchmark::Bench& bench) { WalletCreateTx(bench, OutputType::BECH32, /*allow_other_inputs=*/false,
+static void WalletCreateTxUseOnlyPresetInputs(benchmark::Bench& bench) { WalletCreateTx(bench, OutputType::BECH32M, /*allow_other_inputs=*/false,
                                                                                         {{/*num_of_internal_inputs=*/4}}); }
 
-static void WalletCreateTxUsePresetInputsAndCoinSelection(benchmark::Bench& bench) { WalletCreateTx(bench, OutputType::BECH32, /*allow_other_inputs=*/true,
+static void WalletCreateTxUsePresetInputsAndCoinSelection(benchmark::Bench& bench) { WalletCreateTx(bench, OutputType::BECH32M, /*allow_other_inputs=*/true,
                                                                                                     {{/*num_of_internal_inputs=*/4}}); }
 
 static void WalletAvailableCoins(benchmark::Bench& bench) { AvailableCoins(bench, {OutputType::BECH32M}); }
