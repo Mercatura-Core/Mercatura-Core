@@ -58,6 +58,18 @@ static void addCoin(const CAmount& nValue, const CWallet& wallet, std::vector<st
 // (https://github.com/bitcoin/bitcoin/issues/7883#issuecomment-224807484)
 static void CoinSelection(benchmark::Bench& bench)
 {
+    // Preserve the inherited synthetic P2WPKH-sized fixture used by this
+    // benchmark. Mercatura's real native PQ inputs are substantially larger,
+    // but changing this synthetic input size changes the benchmark scenario
+    // rather than measuring the same coin-selection workload.
+    constexpr int INHERITED_SMALL_INPUT_SIZE{68};
+    constexpr int INHERITED_SMALL_INPUT_WEIGHT{272};
+
+    // Bitcoin's original benchmark assumes COIN is much larger than the fixed
+    // fee rates below. Mercatura uses COIN = 100, so use a larger test-only
+    // unit to preserve the benchmark's original amount and fee relationships.
+    const CAmount test_unit{1'000'000 * COIN};
+
     NodeContext node;
     auto chain = interfaces::MakeChain(node);
     CWallet wallet(chain.get(), "", CreateMockableWalletDatabase());
@@ -66,15 +78,15 @@ static void CoinSelection(benchmark::Bench& bench)
 
     // Add coins.
     for (int i = 0; i < 1000; ++i) {
-        addCoin(1000 * COIN, wallet, wtxs);
+        addCoin(1000 * test_unit, wallet, wtxs);
     }
-    addCoin(3 * COIN, wallet, wtxs);
+    addCoin(3 * test_unit, wallet, wtxs);
 
     // Create coins
     wallet::CoinsResult available_coins;
     for (const auto& wtx : wtxs) {
         const auto txout = wtx->tx->vout.at(0);
-        available_coins.coins[OutputType::BECH32].emplace_back(COutPoint(wtx->GetHash(), 0), txout, /*depth=*/6 * 24, CalculateMaximumSignedInputSize(txout, &wallet, /*coin_control=*/nullptr), /*solvable=*/true, /*safe=*/true, wtx->GetTxTime(), /*from_me=*/true, /*fees=*/ 0);
+        available_coins.coins[OutputType::BECH32].emplace_back(COutPoint(wtx->GetHash(), 0), txout, /*depth=*/6 * 24, INHERITED_SMALL_INPUT_SIZE, /*solvable=*/true, /*safe=*/true, wtx->GetTxTime(), /*from_me=*/true, /*fees=*/0, INHERITED_SMALL_INPUT_WEIGHT);
     }
 
     const CoinEligibilityFilter filter_standard(1, 6, 0);
@@ -92,9 +104,9 @@ static void CoinSelection(benchmark::Bench& bench)
     };
     auto group = wallet::GroupOutputs(wallet, available_coins, coin_selection_params, {{filter_standard}})[filter_standard];
     bench.run([&] {
-        auto result = AttemptSelection(wallet.chain(), 1002.99 * COIN, group, coin_selection_params, /*allow_mixed_output_types=*/true);
+        auto result = AttemptSelection(wallet.chain(), 100299 * test_unit / 100, group, coin_selection_params, /*allow_mixed_output_types=*/true);
         assert(result);
-        assert(result->GetSelectedValue() == 1003 * COIN);
+        assert(result->GetSelectedValue() == 1003 * test_unit);
         assert(result->GetInputSet().size() == 2);
     });
 }
