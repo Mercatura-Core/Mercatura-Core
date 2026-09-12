@@ -2161,10 +2161,18 @@ static RPCHelpMan getblockstats()
     ret_all.pushKV("minfeerate", (minfeerate == MAX_MONEY) ? 0 : minfeerate);
     ret_all.pushKV("mintxsize", mintxsize == MAX_BLOCK_SERIALIZED_SIZE ? 0 : mintxsize);
     ret_all.pushKV("outs", outputs);
-    const CAmount reported_subsidy{
-        pindex.nHeight == 0
-            ? block.vtx.front()->GetValueOut()
-            : *Assert(Consensus::GetMcaBlockSubsidy(pindex))};
+    CAmount reported_subsidy;
+    if (pindex.nHeight == 0) {
+        reported_subsidy = block.vtx.front()->GetValueOut();
+    } else {
+        const auto subsidy{Consensus::GetMcaBlockSubsidy(pindex)};
+        if (!subsidy) {
+            throw JSONRPCError(
+                RPC_INTERNAL_ERROR,
+                "Unable to determine Mercatura block subsidy");
+        }
+        reported_subsidy = *subsidy;
+    }
 
     ret_all.pushKV("subsidy", reported_subsidy);
     ret_all.pushKV("swtotal_size", swtotal_size);
