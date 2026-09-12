@@ -16,10 +16,9 @@ export DEP_OPTS="NO_QT=1 NO_ZMQ=1 NO_USDT=1 NO_IPC=1"
 
 export GOAL="install"
 
-# First Phase 13 Linux CI checkpoint is build-only. Tests are enabled in the
-# build so the test binaries compile, but execution is added separately after
-# the cross-platform build path itself is known-good.
-export RUN_UNIT_TESTS=false
+# Phase 13 Linux CI runs the unit-test suite after the build.
+# Functional-test execution remains deferred to the next checkpoint.
+export RUN_UNIT_TESTS=true
 export RUN_FUNCTIONAL_TESTS=false
 
 export BITCOIN_CONFIG="\
