@@ -93,7 +93,7 @@ from test_framework.script_util import (
     script_to_p2sh_script,
     script_to_p2wsh_script,
 )
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import BitcoinTestFramework, SkipTest
 from test_framework.util import (
     assert_not_equal,
     assert_raises_rpc_error,
@@ -1410,7 +1410,9 @@ class TaprootTest(BitcoinTestFramework):
                             help="Dump generated test cases to directory set by TEST_DUMP_DIR environment variable")
 
     def skip_test_if_missing_module(self):
-        self.skip_if_no_wallet()
+        raise SkipTest(
+            "Mercatura disables inherited classical Schnorr/Taproot authorization semantics"
+        )
 
     def set_test_params(self):
         self.num_nodes = 1
