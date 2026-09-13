@@ -651,6 +651,12 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         sync_fun() if sync_fun else self.sync_all()
         return blocks
 
+    def solve_mercatura_block(self, node, block):
+        """Solve only MercaHash PoW for an arbitrary regtest block."""
+        result = node.solvemercaturablock(block.serialize().hex())
+        block.nNonce = result["nonce"]
+        return block
+
     def generatetoaddress(self, generator, *args, sync_fun=None, **kwargs):
         blocks = generator.generatetoaddress(*args, called_by_framework=True, **kwargs)
         sync_fun() if sync_fun else self.sync_all()
