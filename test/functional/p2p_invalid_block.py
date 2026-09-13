@@ -51,7 +51,7 @@ class InvalidBlockRequestTest(BitcoinTestFramework):
         self.log.info("Create a new block with an anyone-can-spend coinbase")
 
         block = create_block(tip, create_coinbase(height), block_time)
-        block.solve()
+        self.solve_mercatura_block(node, block)
         # Save the coinbase for later
         block1 = block
         peer.send_blocks_and_test([block1], node, success=True)
@@ -76,7 +76,7 @@ class InvalidBlockRequestTest(BitcoinTestFramework):
         tx2 = create_tx_with_script(tx1, 0, script_sig=bytes([OP_TRUE]), amount=50 * COIN)
         block2 = create_block(tip, create_coinbase(height), block_time, txlist=[tx1, tx2])
         block_time += 1
-        block2.solve()
+        self.solve_mercatura_block(node, block2)
         orig_hash = block2.hash_int
         block2_orig = copy.deepcopy(block2)
 
@@ -94,14 +94,23 @@ class InvalidBlockRequestTest(BitcoinTestFramework):
         block2_dup = copy.deepcopy(block2_orig)
         block2_dup.vtx[2].vin.append(block2_dup.vtx[2].vin[0])
         block2_dup.hashMerkleRoot = block2_dup.calc_merkle_root()
-        block2_dup.solve()
+        self.solve_mercatura_block(node, block2_dup)
         peer.send_blocks_and_test([block2_dup], node, success=False, reject_reason='bad-txns-inputs-duplicate')
 
         self.log.info("Test very broken block.")
 
-        block3 = create_block(tip, create_coinbase(height, nValue=100), block_time)
+        # Bitcoin's inherited 100-coin overpayment fixture is valid under
+        # Mercatura's much larger bootstrap subsidy. Derive an amount that is
+        # guaranteed to exceed the current Mercatura block-template value.
+        template_coinbase_value = node.getblocktemplate({"rules": ["segwit"]})["coinbasevalue"]
+        invalid_coinbase_value = template_coinbase_value // COIN + 1
+        block3 = create_block(
+            tip,
+            create_coinbase(height, nValue=invalid_coinbase_value),
+            block_time,
+        )
         block_time += 1
-        block3.solve()
+        self.solve_mercatura_block(node, block3)
 
         peer.send_blocks_and_test([block3], node, success=False, reject_reason='bad-cb-amount')
 
@@ -122,7 +131,7 @@ class InvalidBlockRequestTest(BitcoinTestFramework):
         tx3 = create_tx_with_script(tx2, 0, script_sig=bytes([OP_TRUE]), amount=50 * COIN)
         tx3.vin.append(tx3.vin[0])  # Duplicates input
         block4 = create_block(tip, create_coinbase(height), block_time, txlist=[tx3])
-        block4.solve()
+        self.solve_mercatura_block(node, block4)
         self.log.info("Test inflation by duplicating input")
         peer.send_blocks_and_test([block4], node, success=False,  reject_reason='bad-txns-inputs-duplicate')
 
@@ -131,7 +140,7 @@ class InvalidBlockRequestTest(BitcoinTestFramework):
         node.setmocktime(t)
         # Set block time +1 second past max future validity
         block = create_block(tip, create_coinbase(height), t + MAX_FUTURE_BLOCK_TIME + 1)
-        block.solve()
+        self.solve_mercatura_block(node, block)
         # Need force_send because the block will get rejected without a getdata otherwise
         peer.send_blocks_and_test([block], node, force_send=True, success=False, reject_reason='time-too-new')
         node.setmocktime(t + 1)
