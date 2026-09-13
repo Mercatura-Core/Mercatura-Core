@@ -135,6 +135,32 @@ static RPCHelpMan getnetworkhashps()
     };
 }
 
+static bool SolveBlockPoW(
+    ChainstateManager& chainman,
+    CBlock& block,
+    uint64_t& max_tries,
+    PoWHashContext& pow_context)
+{
+    while (max_tries > 0 &&
+           block.nNonce < std::numeric_limits<uint32_t>::max() &&
+           !CheckProofOfWork(
+               block,
+               chainman.GetConsensus(),
+               pow_context) &&
+           !chainman.m_interrupt) {
+        ++block.nNonce;
+        --max_tries;
+    }
+
+    if (max_tries == 0 ||
+        chainman.m_interrupt ||
+        block.nNonce == std::numeric_limits<uint32_t>::max()) {
+        return false;
+    }
+
+    return true;
+}
+
 static bool GenerateBlock(
     ChainstateManager& chainman,
     CBlock&& block,
@@ -146,21 +172,8 @@ static bool GenerateBlock(
     block_out.reset();
     block.hashMerkleRoot = BlockMerkleRoot(block);
 
-    while (max_tries > 0 &&
-           block.nNonce < std::numeric_limits<uint32_t>::max() &&
-           !CheckProofOfWork(
-               block,
-               chainman.GetConsensus(),
-               pow_context) &&
-           !chainman.m_interrupt) {
-        ++block.nNonce;
-        --max_tries;
-    }
-    if (max_tries == 0 || chainman.m_interrupt) {
+    if (!SolveBlockPoW(chainman, block, max_tries, pow_context)) {
         return false;
-    }
-    if (block.nNonce == std::numeric_limits<uint32_t>::max()) {
-        return true;
     }
 
     block_out = std::make_shared<const CBlock>(std::move(block));
@@ -437,6 +450,54 @@ static RPCHelpMan generateblock()
         obj.pushKV("hex", HexStr(block_ser));
     }
     return obj;
+},
+    };
+}
+
+static RPCHelpMan solvemercaturablock()
+{
+    return RPCHelpMan{
+        "solvemercaturablock",
+        "Solve MercaHash proof of work for an arbitrary serialized block "
+        "without validating or submitting it (-regtest only).\\n"
+        "Only nNonce is modified.\\n",
+        {
+            {"hexdata", RPCArg::Type::STR_HEX, RPCArg::Optional::NO,
+             "The hex-encoded block"},
+        },
+        RPCResult{
+            RPCResult::Type::OBJ, "", "",
+            {
+                {RPCResult::Type::NUM, "nonce", "The solved block nonce"},
+            },
+        },
+        RPCExamples{""},
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    if (!Params().IsMockableChain()) {
+        throw JSONRPCError(
+            RPC_MISC_ERROR,
+            "solvemercaturablock is for regression testing (-regtest mode) only");
+    }
+
+    CBlock block;
+    if (!DecodeHexBlk(block, request.params[0].get_str())) {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Block decode failed");
+    }
+
+    ChainstateManager& chainman = EnsureAnyChainman(request.context);
+    uint64_t max_tries{DEFAULT_MAX_TRIES};
+    PoWHashContext pow_context;
+
+    if (!SolveBlockPoW(chainman, block, max_tries, pow_context)) {
+        throw JSONRPCError(
+            RPC_MISC_ERROR,
+            "Failed to solve Mercatura block proof of work");
+    }
+
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("nonce", block.nNonce);
+    return result;
 },
     };
 }
@@ -1204,6 +1265,7 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"hidden", &generatetodescriptor},
         {"hidden", &generateblock},
         {"hidden", &generate},
+        {"hidden", &solvemercaturablock},
     };
     for (const auto& c : commands) {
         t.appendCommand(c.name, &c);

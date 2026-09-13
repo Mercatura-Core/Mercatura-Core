@@ -39,7 +39,7 @@ class P2PEncrypted(BitcoinTestFramework):
         for _ in range(number):
             # Create some blocks
             block = create_block(tip, create_coinbase(tipheight + 1), last_block_time + 1)
-            block.solve()
+            self.solve_mercatura_block(node, block)
             test_blocks.append(block)
             tip = block.hash_int
             tipheight += 1
@@ -48,7 +48,7 @@ class P2PEncrypted(BitcoinTestFramework):
 
     def create_test_block(self, txs):
         block = create_block(self.tip, create_coinbase(self.tipheight + 1), self.last_block_time + 600, txlist=txs)
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
         return block
 
     def run_test(self):
