@@ -152,7 +152,7 @@ class CompactBlocksTest(BitcoinTestFramework):
 
     def build_block_on_tip(self, node):
         block = create_block(tmpl=node.getblocktemplate(NORMAL_GBT_REQUEST_PARAMS))
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
         return block
 
     # Create 10 more anyone-can-spend utxo's for testing.
@@ -172,7 +172,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         block2 = self.build_block_on_tip(self.nodes[0])
         block2.vtx.append(tx)
         block2.hashMerkleRoot = block2.calc_merkle_root()
-        block2.solve()
+        self.solve_mercatura_block(self.nodes[0], block2)
         self.segwit_node.send_and_ping(msg_no_witness_block(block2))
         assert_equal(self.nodes[0].getbestblockhash(), block2.hash_hex)
         self.utxos.extend([[tx.txid_int, i, out_value] for i in range(10)])
@@ -426,7 +426,7 @@ class CompactBlocksTest(BitcoinTestFramework):
             block.vtx.append(tx)
 
         block.hashMerkleRoot = block.calc_merkle_root()
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
         return block
 
     # Test that we only receive getblocktxn requests for transactions that the
@@ -655,7 +655,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         hashPrevBlock = int(node.getblockhash(node.getblockcount() - 150), 16)
         block = self.build_block_on_tip(node)
         block.hashPrevBlock = hashPrevBlock
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
 
         comp_block = HeaderAndShortIDs()
         comp_block.initialize_from_block(block)
@@ -700,7 +700,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         hashPrevBlock = int(node.getblockhash(cur_height - 5), 16)
         block = self.build_block_on_tip(node)
         block.hashPrevBlock = hashPrevBlock
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
 
         comp_block = HeaderAndShortIDs()
         comp_block.initialize_from_block(block)
@@ -755,7 +755,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         # Drop the coinbase witness but include the witness commitment.
         add_witness_commitment(block)
         block.vtx[0].wit.vtxinwit = []
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
 
         # Now send the compact block with all transactions prefilled, and
         # verify that we don't get disconnected.
@@ -773,7 +773,7 @@ class CompactBlocksTest(BitcoinTestFramework):
         block.vtx[4].vin[0].scriptSig = CScript([OP_RETURN])
         block.hashMerkleRoot = block.calc_merkle_root()
         add_witness_commitment(block)
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
 
         # This will lead to a consensus failure for which we also won't be disconnected but which
         # will be cached.
@@ -794,7 +794,7 @@ class CompactBlocksTest(BitcoinTestFramework):
 
         # Now, announcing a second block building on top of the invalid one will get us disconnected.
         block.hashPrevBlock = block.hash_int
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
         comp_block.initialize_from_block(block, prefill_list=list(range(len(block.vtx))), use_witness=True)
         msg = msg_cmpctblock(comp_block.to_p2p())
         test_node.send_await_disconnect(msg)
