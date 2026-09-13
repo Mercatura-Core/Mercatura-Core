@@ -99,6 +99,7 @@ class BIP68_112_113Test(BitcoinTestFramework):
         self.noban_tx_relay = True
         self.extra_args = [[
             f'-testactivationheight=csv@{CSV_ACTIVATION_HEIGHT}',
+            '-acceptnonstdtxn=1',
         ]]
 
     def create_self_transfer_from_utxo(self, input_tx):
@@ -171,7 +172,7 @@ class BIP68_112_113Test(BitcoinTestFramework):
 
     def create_test_block(self, txs):
         block = create_block(self.tip, create_coinbase(self.tipheight + 1), self.last_block_time + 600, txlist=txs)
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
         return block
 
     def send_blocks(self, blocks, success=True, reject_reason=None):
@@ -182,7 +183,10 @@ class BIP68_112_113Test(BitcoinTestFramework):
 
     def run_test(self):
         self.helper_peer = self.nodes[0].add_p2p_connection(P2PDataStore())
-        self.miniwallet = MiniWallet(self.nodes[0], mode=MiniWalletMode.RAW_P2PK)
+        # Mercatura disables inherited ECDSA ownership authorization.
+        # Use a non-signature anyone-can-spend fixture so this test remains
+        # focused on BIP68/BIP112/BIP113 semantics.
+        self.miniwallet = MiniWallet(self.nodes[0], mode=MiniWalletMode.RAW_OP_TRUE)
 
         self.log.info("Generate blocks in the past for coinbase outputs.")
         long_past_time = int(time.time()) - 600 * 1000  # enough to build up to 1000 blocks 10 minutes apart without worrying about getting into the future
