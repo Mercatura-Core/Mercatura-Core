@@ -46,7 +46,7 @@ class VersionBitsWarningTest(BitcoinTestFramework):
 
         for _ in range(numblocks):
             block = create_block(tip, create_coinbase(height + 1), block_time, version=version)
-            block.solve()
+            self.solve_mercatura_block(self.nodes[0], block)
             peer.send_without_ping(msg_block(block))
             block_time += 1
             height += 1

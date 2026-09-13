@@ -51,7 +51,7 @@ class ChainTiebreaksTest(BitcoinTestFramework):
             hashprev=int(node.getbestblockhash(), 16),
             tmpl={"height": start_height + 1}
         ))
-        blocks[-1].solve()
+        self.solve_mercatura_block(self.nodes[0], blocks[-1])
 
         # Construct B1-B10.
         for i in range(1, 11):
@@ -63,7 +63,7 @@ class ChainTiebreaksTest(BitcoinTestFramework):
                     "curtime": blocks[-1].nTime + 1,
                 }
             ))
-            blocks[-1].solve()
+            self.solve_mercatura_block(self.nodes[0], blocks[-1])
 
         self.log.info('Make sure B0 is accepted normally')
         peer.send_blocks_and_test([blocks[0]], node, success=True)
@@ -134,7 +134,7 @@ class ChainTiebreaksTest(BitcoinTestFramework):
                 "curtime": prev_time + i + 1,
                 }
             ))
-            blocks[-1].solve()
+            self.solve_mercatura_block(self.nodes[0], blocks[-1])
 
         # Send blocks and test that only the first one connects
         self.log.info('Send A1, A2, and A3. Make sure that only the former connects')
@@ -152,7 +152,7 @@ class ChainTiebreaksTest(BitcoinTestFramework):
             "curtime": prev_time + 10,
             }
         )
-        next_block.solve()
+        self.solve_mercatura_block(self.nodes[0], next_block)
         peer.send_blocks_and_test([next_block], node, success=True)
 
     def run_test(self):
