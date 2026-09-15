@@ -325,7 +325,7 @@ class BIP68Test(BitcoinTestFramework):
         # tx3 to be removed.
         for i in range(2):
             block = create_block(tmpl=tmpl, ntime=cur_time)
-            block.solve()
+            self.solve_mercatura_block(self.nodes[0], block)
             tip = block.hash_int
             assert_equal(None if i == 1 else 'inconclusive', self.nodes[0].submitblock(block.serialize().hex()))
             tmpl = self.nodes[0].getblocktemplate(NORMAL_GBT_REQUEST_PARAMS)
@@ -379,7 +379,7 @@ class BIP68Test(BitcoinTestFramework):
         # make a block that violates bip68; ensure that the tip updates
         block = create_block(tmpl=self.nodes[0].getblocktemplate(NORMAL_GBT_REQUEST_PARAMS), txlist=[tx1, tx2, tx3])
         add_witness_commitment(block)
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
 
         assert_equal(None, self.nodes[0].submitblock(block.serialize().hex()))
         assert_equal(self.nodes[0].getbestblockhash(), block.hash_hex)
