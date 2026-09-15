@@ -419,7 +419,37 @@ class TestNode():
 
     def generate(self, nblocks, maxtries=1000000, **kwargs):
         self.log.debug("TestNode.generate() dispatches `generate` call to `generatetoaddress`")
-        return self.generatetoaddress(nblocks=nblocks, address=self.get_deterministic_priv_key().address, maxtries=maxtries, **kwargs)
+
+        address = getattr(
+            self,
+            "_mercatura_generate_address",
+            None,
+        )
+
+        if address is None:
+            wallet_name = getattr(
+                self,
+                "_mercatura_generate_wallet_name",
+                False,
+            )
+
+            if wallet_name is not False:
+                wallet = self.get_wallet_rpc(wallet_name)
+                address = wallet.getnewaddress("coinbase")
+                self._mercatura_generate_address = address
+            else:
+                # Tests without an automatically managed wallet still need a
+                # deterministic Mercatura-compatible mining sink. Keep
+                # explicit classical-key fixtures opt-in via generatetoaddress.
+                from test_framework.address import create_deterministic_address_bcrt1_p2tr_op_true
+                address = create_deterministic_address_bcrt1_p2tr_op_true()[0]
+
+        return self.generatetoaddress(
+            nblocks=nblocks,
+            address=address,
+            maxtries=maxtries,
+            **kwargs,
+        )
 
     def generateblock(self, *args, called_by_framework, **kwargs):
         assert called_by_framework, "Direct call of this mining RPC is discouraged. Please use one of the self.generate* methods on the test framework, which sync the nodes to avoid intermittent test issues. You may use sync_fun=self.no_op to disable the sync explicitly."

@@ -39,7 +39,6 @@ from .util import (
     initialize_datadir,
     p2p_port,
     wait_until_helper_internal,
-    wallet_importprivkey,
 )
 
 
@@ -400,16 +399,72 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
                 assert_equal(chain_info["initialblockdownload"], False)
 
     def import_deterministic_coinbase_privkeys(self):
+        """Initialize normal functional-test wallets with Mercatura PQ ownership."""
         for i in range(self.num_nodes):
             self.init_wallet(node=i)
 
+    @staticmethod
+    def _mercatura_cache_wallet_backup_name(node):
+        return f"mercatura_pq_cache_wallet_{node}.dat"
+
     def init_wallet(self, *, node):
         wallet_name = self.default_wallet_name if self.wallet_names is None else self.wallet_names[node] if node < len(self.wallet_names) else False
-        if wallet_name is not False:
-            n = self.nodes[node]
-            if wallet_name is not None:
-                n.createwallet(wallet_name=wallet_name, load_on_startup=True)
-            wallet_importprivkey(n.get_wallet_rpc(wallet_name), n.get_deterministic_priv_key().key, 0, label="coinbase")
+        if wallet_name is False:
+            return
+
+        n = self.nodes[node]
+
+        # Preserve the inherited None convention for tests that manage an
+        # already-loaded wallet themselves.
+        if wallet_name is None:
+            n._mercatura_generate_wallet_name = None
+            n._mercatura_generate_address = None
+            return
+
+        if wallet_name not in n.listwallets():
+            wallet_dir_names = {
+                entry["name"]
+                for entry in n.listwalletdir()["wallets"]
+            }
+
+            if wallet_name in wallet_dir_names:
+                n.loadwallet(wallet_name)
+            else:
+                backup_file = (
+                    n.datadir_path /
+                    self._mercatura_cache_wallet_backup_name(node)
+                )
+
+                if backup_file.is_file():
+                    n.restorewallet(wallet_name, backup_file)
+                else:
+                    # Clean-chain tests and nodes beyond the three funded
+                    # cache slots start with a fresh native PQ wallet.
+                    n.createwallet(
+                        wallet_name=wallet_name,
+                        load_on_startup=True,
+                    )
+
+        wallet = n.get_wallet_rpc(wallet_name)
+
+        # TestNode.generate() uses this wallet when it needs a wallet-owned
+        # mining destination. Cached wallets already contain one labelled
+        # "coinbase"; fresh wallets derive one lazily on first generation.
+        n._mercatura_generate_wallet_name = wallet_name
+        n._mercatura_generate_address = None
+
+        if "coinbase" in wallet.listlabels():
+            addresses = wallet.getaddressesbylabel("coinbase")
+            assert_equal(len(addresses), 1)
+
+            address = next(iter(addresses))
+            address_info = wallet.getaddressinfo(address)
+
+            assert_equal(address_info["ismine"], True)
+            assert_equal(address_info["iswitness"], True)
+            assert_equal(address_info["witness_version"], 2)
+
+            n._mercatura_generate_address = address
 
     def run_test(self):
         """Tests must override this method to define test logic"""
@@ -901,6 +956,32 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         cache_node_dir = get_datadir_path(self.options.cachedir, CACHE_NODE_ID)
         assert self.num_nodes <= MAX_NODES
 
+        cache_wallet_marker = os.path.join(
+            cache_node_dir,
+            "mercatura_pq_cache_v1",
+        )
+        cache_wallet_backups = [
+            os.path.join(
+                cache_node_dir,
+                self._mercatura_cache_wallet_backup_name(i),
+            )
+            for i in range(3)
+        ]
+
+        # Automatically discard an inherited cache whose spendable coinbases
+        # were created with classical deterministic keys.
+        if self.is_wallet_compiled() and os.path.isdir(cache_node_dir):
+            pq_cache_complete = (
+                os.path.isfile(cache_wallet_marker)
+                and all(os.path.isfile(path) for path in cache_wallet_backups)
+            )
+
+            if not pq_cache_complete:
+                self.log.debug(
+                    "Removing legacy functional cache without Mercatura PQ wallets"
+                )
+                shutil.rmtree(cache_node_dir)
+
         if not os.path.isdir(cache_node_dir):
             self.log.debug("Creating cache directory {}".format(cache_node_dir))
 
@@ -929,14 +1010,49 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
             # Set a time in the past, so that blocks don't end up in the future
             cache_node.setmocktime(cache_node.getblockheader(cache_node.getbestblockhash())['time'])
 
-            # Create a 199-block-long chain; each of the 3 first nodes
-            # gets 25 mature blocks and 25 immature.
-            # The 4th address gets 25 mature and only 24 immature blocks so that the very last
-            # block in the cache does not age too much (have an old tip age).
-            # This is needed so that we are out of IBD when the test starts,
-            # see the tip age check in IsInitialBlockDownload().
-            gen_addresses = [k.address for k in TestNode.PRIV_KEYS][:3] + [create_deterministic_address_bcrt1_p2tr_op_true()[0]]
+            # Create a 199-block-long chain; each of the first 3 nodes
+            # gets 25 mature blocks and 25 immature blocks. Mercatura normal
+            # wallet ownership is native PQ, so the three funded destinations
+            # must be backed by PQ wallets rather than inherited P2PKH keys.
+            sink_address = create_deterministic_address_bcrt1_p2tr_op_true()[0]
+
+            if self.is_wallet_compiled():
+                funded_addresses = []
+
+                for i in range(3):
+                    cache_wallet_name = f"mercatura_pq_cache_wallet_{i}"
+
+                    cache_node.createwallet(
+                        wallet_name=cache_wallet_name,
+                        load_on_startup=True,
+                    )
+
+                    cache_wallet = cache_node.get_wallet_rpc(
+                        cache_wallet_name
+                    )
+
+                    address = cache_wallet.getnewaddress("coinbase")
+                    address_info = cache_wallet.getaddressinfo(address)
+
+                    assert_equal(address_info["ismine"], True)
+                    assert_equal(address_info["iswitness"], True)
+                    assert_equal(address_info["witness_version"], 2)
+
+                    backup_file = os.path.join(
+                        cache_node_dir,
+                        self._mercatura_cache_wallet_backup_name(i),
+                    )
+
+                    cache_wallet.backupwallet(backup_file)
+                    funded_addresses.append(address)
+
+                gen_addresses = funded_addresses + [sink_address]
+            else:
+                # Wallet-disabled builds have no spendable-wallet requirement.
+                gen_addresses = [sink_address] * 4
+
             assert_equal(len(gen_addresses), 4)
+
             for i in range(8):
                 self.generatetoaddress(
                     cache_node,
@@ -946,6 +1062,10 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
 
             assert_equal(cache_node.getblockchaininfo()["blocks"], 199)
 
+            if self.is_wallet_compiled():
+                with open(cache_wallet_marker, "w", encoding="utf8") as marker:
+                    marker.write("Mercatura PQ functional cache v1\n")
+
             # Shut it down, and clean up cache directories:
             self.stop_nodes()
             self.nodes = []
@@ -953,7 +1073,10 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
             def cache_path(*paths):
                 return os.path.join(cache_node_dir, self.chain, *paths)
 
-            os.rmdir(cache_path('wallets'))  # Remove empty wallets dir
+            wallets_path = cache_path("wallets")
+            if os.path.isdir(wallets_path):
+                shutil.rmtree(wallets_path)
+
             for entry in os.listdir(cache_path()):
                 if entry not in ['chainstate', 'blocks', 'indexes']:  # Only indexes, chainstate and blocks folders
                     os.remove(cache_path(entry))
