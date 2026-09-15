@@ -5,7 +5,7 @@
 """Test the invalidateblock RPC."""
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.address import ADDRESS_BCRT1_UNSPENDABLE_DESCRIPTOR
+from test_framework.address import ADDRESS_MCRT1_UNSPENDABLE_DESCRIPTOR
 from test_framework.blocktools import (
     create_block,
     create_coinbase,
@@ -45,7 +45,7 @@ class InvalidateTest(BitcoinTestFramework):
         tip = self.nodes[0].getbestblockhash()
         block_time = self.nodes[0].getblock(self.nodes[0].getbestblockhash())['time'] + 1
         block = create_block(int(tip, 16), create_coinbase(self.nodes[0].getblockcount()), block_time, version=4)
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
         self.nodes[0].submitheader(block.serialize().hex())
         assert_equal(self.nodes[0].getblockchaininfo()["headers"], self.nodes[0].getblockchaininfo()["blocks"] + 1)
 
@@ -111,7 +111,7 @@ class InvalidateTest(BitcoinTestFramework):
         assert_equal(self.nodes[0].getblockchaininfo()['headers'], 7)
 
         self.log.info("Verify that we reconsider all ancestors as well")
-        blocks = self.generatetodescriptor(self.nodes[1], 10, ADDRESS_BCRT1_UNSPENDABLE_DESCRIPTOR, sync_fun=self.no_op)
+        blocks = self.generatetodescriptor(self.nodes[1], 10, ADDRESS_MCRT1_UNSPENDABLE_DESCRIPTOR, sync_fun=self.no_op)
         assert_equal(self.nodes[1].getbestblockhash(), blocks[-1])
         # Invalidate the two blocks at the tip
         self.nodes[1].invalidateblock(blocks[-1])
@@ -123,7 +123,7 @@ class InvalidateTest(BitcoinTestFramework):
         assert_equal(self.nodes[1].getbestblockhash(), blocks[-1])
 
         self.log.info("Verify that we reconsider all descendants")
-        blocks = self.generatetodescriptor(self.nodes[1], 10, ADDRESS_BCRT1_UNSPENDABLE_DESCRIPTOR, sync_fun=self.no_op)
+        blocks = self.generatetodescriptor(self.nodes[1], 10, ADDRESS_MCRT1_UNSPENDABLE_DESCRIPTOR, sync_fun=self.no_op)
         assert_equal(self.nodes[1].getbestblockhash(), blocks[-1])
         # Invalidate the two blocks at the tip
         self.nodes[1].invalidateblock(blocks[-2])
