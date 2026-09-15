@@ -428,7 +428,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
             }
 
             if wallet_name in wallet_dir_names:
-                n.loadwallet(wallet_name)
+                n.loadwallet(wallet_name, load_on_startup=True)
             else:
                 backup_file = (
                     n.datadir_path /
@@ -436,7 +436,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
                 )
 
                 if backup_file.is_file():
-                    n.restorewallet(wallet_name, backup_file)
+                    n.restorewallet(wallet_name, backup_file, load_on_startup=True)
                 else:
                     # Clean-chain tests and nodes beyond the three funded
                     # cache slots start with a fresh native PQ wallet.
