@@ -1276,8 +1276,10 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
     }
     // Set the long term feerate estimate to the wallet's consolidate feerate
     coin_selection_params.m_long_term_feerate = wallet.m_consolidate_feerate;
-    // Static vsize overhead + outputs vsize. 4 nVersion, 4 nLocktime, 1 input count, 1 witness overhead (dummy, flag, stack size)
-    coin_selection_params.tx_noinputs_size = 10 + GetSizeOfCompactSize(vecSend.size()); // bytes for output count
+    // Static full-byte fee overhead + serialized outputs:
+    // 4 nVersion, 4 nLockTime, 1 input count, and 2 SegWit marker/flag bytes.
+    // Per-input witness-stack counts are already included in input_bytes.
+    coin_selection_params.tx_noinputs_size = 11 + GetSizeOfCompactSize(vecSend.size()); // bytes for output count
 
     CAmount recipients_sum = 0;
     unsigned int outputs_to_subtract_fee_from = 0; // The number of outputs which we are subtracting the fee from
