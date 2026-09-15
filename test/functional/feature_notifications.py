@@ -6,12 +6,11 @@
 import os
 import platform
 
-from test_framework.address import ADDRESS_BCRT1_UNSPENDABLE
+from test_framework.address import ADDRESS_MCRT1_UNSPENDABLE
 from test_framework.blocktools import (
     create_block,
     create_coinbase,
 )
-from test_framework.descriptors import descsum_create
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
@@ -65,29 +64,65 @@ class NotificationsTest(BitcoinTestFramework):
 
     def run_test(self):
         if self.is_wallet_compiled():
-            # Setup the descriptors to be imported to the wallet
-            xpriv = "tprv8ZgxMBicQKsPfHCsTwkiM1KT56RXbGGTqvc2hgqzycpwbHqqpcajQeMRZoBD35kW4RtyCemu6j34Ku5DEspmgjKdt2qe4SvRch5Kk8B8A2v"
-            desc_imports = [{
-                "desc": descsum_create(f"wpkh({xpriv}/0/*)"),
-                "timestamp": 0,
-                "active": True,
-                "keypool": True,
-            },{
-                "desc": descsum_create(f"wpkh({xpriv}/1/*)"),
-                "timestamp": 0,
-                "active": True,
-                "keypool": True,
-                "internal": True,
-            }]
-            # Make the wallets and import the descriptors
-            # Ensures that node 0 and node 1 share the same wallet for the conflicting transaction tests below.
-            for i, name in enumerate(self.wallet_names):
-                self.nodes[i].createwallet(wallet_name=name, blank=True, load_on_startup=True)
-                self.nodes[i].importdescriptors(desc_imports)
+            # The original Bitcoin fixture imported the same WPKH xpriv
+            # descriptors into both nodes. Mercatura disables classical
+            # ownership, so instead create one native PQ wallet and restore
+            # its backup on node 1. This preserves the test's requirement
+            # that both nodes share the same wallet ownership.
+            self.nodes[0].createwallet(
+                wallet_name=self.wallet_names[0],
+                load_on_startup=True,
+            )
+            source_wallet = self.nodes[0].get_wallet_rpc(
+                self.wallet_names[0]
+            )
+
+            # Derive the mining destination before taking the backup so both
+            # copies explicitly know the same PQ destination.
+            self.shared_wallet_address = source_wallet.getnewaddress(
+                "shared-notification-mining"
+            )
+
+            backup_file = (
+                self.nodes[0].datadir_path /
+                "feature_notifications_pq_shared.dat"
+            )
+            source_wallet.backupwallet(backup_file)
+
+            restore_result = self.nodes[1].restorewallet(
+                self.wallet_names[1],
+                backup_file,
+            )
+            assert_equal(
+                restore_result["name"],
+                self.wallet_names[1],
+            )
+
+            restored_wallet = self.nodes[1].get_wallet_rpc(
+                self.wallet_names[1]
+            )
+            restored_wallet.syncwithvalidationinterfacequeue()
+
+            assert_equal(
+                source_wallet.getaddressinfo(
+                    self.shared_wallet_address
+                )["ismine"],
+                True,
+            )
+            assert_equal(
+                restored_wallet.getaddressinfo(
+                    self.shared_wallet_address
+                )["ismine"],
+                True,
+            )
 
         self.log.info("test -blocknotify")
         block_count = 10
-        blocks = self.generatetoaddress(self.nodes[1], block_count, self.nodes[1].getnewaddress() if self.is_wallet_compiled() else ADDRESS_BCRT1_UNSPENDABLE)
+        blocks = self.generatetoaddress(
+            self.nodes[1],
+            block_count,
+            self.shared_wallet_address if self.is_wallet_compiled() else ADDRESS_MCRT1_UNSPENDABLE,
+        )
 
         # wait at most 10 seconds for expected number of files before reading the content
         self.wait_until(lambda: len(os.listdir(self.blocknotify_dir)) == block_count, timeout=10)
@@ -120,11 +155,31 @@ class NotificationsTest(BitcoinTestFramework):
             # triggered by node 1
             self.log.info("test -walletnotify with conflicting transactions")
             self.nodes[0].rescanblockchain()
-            self.generatetoaddress(self.nodes[0], 100, ADDRESS_BCRT1_UNSPENDABLE)
+            self.generatetoaddress(self.nodes[0], 100, ADDRESS_MCRT1_UNSPENDABLE)
 
             # Generate transaction on node 0, sync mempools, and check for
             # notification on node 1.
-            tx1 = self.nodes[0].sendtoaddress(address=ADDRESS_BCRT1_UNSPENDABLE, amount=1, replaceable=True)
+            # The restored PQ wallet has the same master seed as node 0,
+            # but unlike the inherited ranged WPKH descriptor fixture it
+            # cannot discover arbitrary future PQ change commitments from
+            # public derivation. Advance its internal derivation in lockstep
+            # so both wallet copies know node 0's next change destination.
+            tx1_expected_change = restored_wallet.getrawchangeaddress()
+
+            tx1 = self.nodes[0].sendtoaddress(
+                address=ADDRESS_MCRT1_UNSPENDABLE,
+                amount=1,
+                replaceable=True,
+            )
+
+            tx1_decoded = source_wallet.decoderawtransaction(
+                source_wallet.gettransaction(tx1)["hex"]
+            )
+            assert tx1_expected_change in [
+                output["scriptPubKey"].get("address")
+                for output in tx1_decoded["vout"]
+            ]
+
             assert_equal(tx1 in self.nodes[0].getrawmempool(), True)
             self.sync_mempools()
             self.expect_wallet_notify([(tx1, -1, UNCONFIRMED_HASH_STRING)])
@@ -140,14 +195,31 @@ class NotificationsTest(BitcoinTestFramework):
 
             # Add bump1 transaction to new block, checking for a notification
             # and the correct number of confirmations.
-            blockhash1 = self.generatetoaddress(self.nodes[0], 1, ADDRESS_BCRT1_UNSPENDABLE)[0]
+            blockhash1 = self.generatetoaddress(self.nodes[0], 1, ADDRESS_MCRT1_UNSPENDABLE)[0]
             blockheight1 = self.nodes[0].getblockcount()
             self.sync_blocks()
             self.expect_wallet_notify([(bump1, blockheight1, blockhash1)])
             assert_equal(self.nodes[1].gettransaction(bump1)["confirmations"], 1)
 
             # Generate a second transaction to be bumped.
-            tx2 = self.nodes[0].sendtoaddress(address=ADDRESS_BCRT1_UNSPENDABLE, amount=1, replaceable=True)
+            # Keep the restored wallet's PQ internal derivation synchronized
+            # with the source wallet for the second spend as well.
+            tx2_expected_change = restored_wallet.getrawchangeaddress()
+
+            tx2 = self.nodes[0].sendtoaddress(
+                address=ADDRESS_MCRT1_UNSPENDABLE,
+                amount=1,
+                replaceable=True,
+            )
+
+            tx2_decoded = source_wallet.decoderawtransaction(
+                source_wallet.gettransaction(tx2)["hex"]
+            )
+            assert tx2_expected_change in [
+                output["scriptPubKey"].get("address")
+                for output in tx2_decoded["vout"]
+            ]
+
             assert_equal(tx2 in self.nodes[0].getrawmempool(), True)
             self.sync_mempools()
             self.expect_wallet_notify([(tx2, -1, UNCONFIRMED_HASH_STRING)])
@@ -157,7 +229,7 @@ class NotificationsTest(BitcoinTestFramework):
             # about newly confirmed bump2 and newly conflicted tx2.
             self.disconnect_nodes(0, 1)
             bump2 = self.nodes[0].bumpfee(tx2)["txid"]
-            blockhash2 = self.generatetoaddress(self.nodes[0], 1, ADDRESS_BCRT1_UNSPENDABLE, sync_fun=self.no_op)[0]
+            blockhash2 = self.generatetoaddress(self.nodes[0], 1, ADDRESS_MCRT1_UNSPENDABLE, sync_fun=self.no_op)[0]
             blockheight2 = self.nodes[0].getblockcount()
             assert_equal(self.nodes[0].gettransaction(bump2)["confirmations"], 1)
             assert_equal(tx2 in self.nodes[1].getrawmempool(), True)
@@ -172,13 +244,24 @@ class NotificationsTest(BitcoinTestFramework):
         height = self.nodes[0].getblockcount() + 1
         block_time = self.nodes[0].getblock(tip)['time'] + 1
 
+        # Use Mercatura's live template value rather than the inherited
+        # Bitcoin create_coinbase() subsidy. The template coinbase value is
+        # the maximum currently permitted reward including any template fees,
+        # so adding one base unit guarantees an excessive coinbase.
+        invalid_coinbase_value = (
+            self.nodes[0].getblocktemplate({"rules": ["segwit"]})["coinbasevalue"]
+            + 1
+        )
+
         invalid_blocks = []
         for _ in range(7):  # invalid chain must be longer than 6 blocks to trigger warning
-            block = create_block(int(tip, 16), create_coinbase(height), block_time)
-            # make block invalid by exceeding block subsidy
-            block.vtx[0].vout[0].nValue += 1
+            block = create_block(
+                int(tip, 16),
+                create_coinbase(height, nValue=invalid_coinbase_value),
+                block_time,
+            )
             block.hashMerkleRoot = block.calc_merkle_root()
-            block.solve()
+            self.solve_mercatura_block(self.nodes[0], block)
             invalid_blocks.append(block)
             tip = block.hash_hex
             height += 1
