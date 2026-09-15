@@ -1014,9 +1014,25 @@ CTxMemPool::ChangeSet::TxHandle CTxMemPool::ChangeSet::StageAddition(const CTran
     CAmount delta{0};
     m_pool->ApplyDelta(tx->GetHash(), delta);
 
-    FeePerWeight feerate(fee, GetTransactionFeeWeight(*tx, sigops_cost, ::nBytesPerSigOp));
+    // Mercatura deliberately uses full serialized size for fee economics,
+    // while inherited cluster policy remains based on BIP141/sigops-adjusted
+    // transaction weight. Keep those metrics independent.
+    FeePerWeight feerate(
+        fee,
+        GetTransactionFeeWeight(*tx, sigops_cost, ::nBytesPerSigOp));
+    const uint64_t cluster_size{
+        static_cast<uint64_t>(
+            GetSigOpsAdjustedWeight(
+                GetTransactionWeight(*tx),
+                sigops_cost,
+                ::nBytesPerSigOp))
+    };
+
     auto newit = m_to_add.emplace(tx, fee, time, entry_height, entry_sequence, spends_coinbase, sigops_cost, lp).first;
-    m_pool->m_txgraph->AddTransaction(const_cast<CTxMemPoolEntry&>(*newit), feerate);
+    m_pool->m_txgraph->AddTransaction(
+        const_cast<CTxMemPoolEntry&>(*newit),
+        feerate,
+        cluster_size);
     if (delta) {
         newit->UpdateModifiedFee(delta);
         m_pool->m_txgraph->SetTransactionFee(*newit, newit->GetModifiedFee());
