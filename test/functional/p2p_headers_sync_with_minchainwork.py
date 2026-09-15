@@ -23,8 +23,12 @@ from test_framework.util import assert_equal
 
 import time
 
-NODE1_BLOCKS_REQUIRED = 15
-NODE2_BLOCKS_REQUIRED = 2047
+# Keep the default minimum-chainwork coverage inexpensive under MercaHash.
+# Regtest block proof is 2, so cumulative work is 2 * (height + 1):
+#   height 2 -> 0x6, height 3 -> 0x8
+#   height 6 -> 0xe, height 7 -> 0x10
+NODE1_BLOCKS_REQUIRED = 3
+NODE2_BLOCKS_REQUIRED = 7
 
 
 class RejectLowDifficultyHeadersTest(BitcoinTestFramework):
@@ -32,8 +36,23 @@ class RejectLowDifficultyHeadersTest(BitcoinTestFramework):
         self.rpc_timeout *= 4  # To avoid timeout when generating BLOCKS_TO_MINE
         self.setup_clean_chain = True
         self.num_nodes = 4
-        # Node0 has no required chainwork; node1 requires 15 blocks on top of the genesis block; node2 requires 2047
-        self.extra_args = [["-minimumchainwork=0x0", "-checkblockindex=0"], ["-minimumchainwork=0x1f", "-checkblockindex=0"], ["-minimumchainwork=0x1000", "-checkblockindex=0"], ["-minimumchainwork=0x1000", "-checkblockindex=0", "-whitelist=noban@127.0.0.1"]]
+        # Node0 has no required chainwork. Node1 reaches its threshold at
+        # height 3 and nodes 2/3 at height 7. This preserves the low-work
+        # reject -> sufficient-work accept transition without thousands of
+        # expensive MercaHash solves in the default functional suite.
+        self.extra_args = [
+            ["-minimumchainwork=0x0", "-checkblockindex=0"],
+            ["-minimumchainwork=0x7", "-checkblockindex=0"],
+            ["-minimumchainwork=0x10", "-checkblockindex=0"],
+            ["-minimumchainwork=0x10", "-checkblockindex=0", "-whitelist=noban@127.0.0.1"],
+        ]
+
+    def add_options(self, parser):
+        parser.add_argument(
+            "--extended-coverage",
+            action="store_true",
+            help="Run expensive large-reorg and full 2000-header presync coverage",
+        )
 
     def setup_network(self):
         self.setup_nodes()
@@ -57,9 +76,18 @@ class RejectLowDifficultyHeadersTest(BitcoinTestFramework):
     def test_chains_sync_when_long_enough(self):
         self.log.info("Generate blocks on the node with no required chainwork, and verify nodes 1 and 2 have no new headers in their headers tree")
         with (
-                self.nodes[1].assert_debug_log(expected_msgs=["[net] Ignoring low-work chain (height=14)"], timeout=2),
-                self.nodes[2].assert_debug_log(expected_msgs=["[net] Ignoring low-work chain (height=14)"], timeout=2),
-                self.nodes[3].assert_debug_log(expected_msgs=["Synchronizing blockheaders, height: 14"], timeout=2),
+                self.nodes[1].assert_debug_log(
+                    expected_msgs=[f"[net] Ignoring low-work chain (height={NODE1_BLOCKS_REQUIRED - 1})"],
+                    timeout=2,
+                ),
+                self.nodes[2].assert_debug_log(
+                    expected_msgs=[f"[net] Ignoring low-work chain (height={NODE1_BLOCKS_REQUIRED - 1})"],
+                    timeout=2,
+                ),
+                self.nodes[3].assert_debug_log(
+                    expected_msgs=[f"Synchronizing blockheaders, height: {NODE1_BLOCKS_REQUIRED - 1}"],
+                    timeout=2,
+                ),
         ):
             self.generate(self.nodes[0], NODE1_BLOCKS_REQUIRED-1, sync_fun=self.no_op)
 
@@ -78,27 +106,35 @@ class RejectLowDifficultyHeadersTest(BitcoinTestFramework):
 
         check_node3_chaintips(2, self.nodes[0].getbestblockhash(), NODE1_BLOCKS_REQUIRED-1)
 
+        genesis_hash = self.nodes[0].getblockhash(0)
+
         for node in self.nodes[1:3]:
             chaintips = node.getchaintips()
             assert len(chaintips) == 1
             assert {
                 'height': 0,
-                'hash': '0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206',
+                'hash': genesis_hash,
                 'branchlen': 0,
                 'status': 'active',
             } in chaintips
 
         self.log.info("Generate more blocks to satisfy node1's minchainwork requirement, and verify node2 still has no new headers in headers tree")
         with (
-                self.nodes[2].assert_debug_log(expected_msgs=["[net] Ignoring low-work chain (height=15)"], timeout=2),
-                self.nodes[3].assert_debug_log(expected_msgs=["Synchronizing blockheaders, height: 15"], timeout=2),
+                self.nodes[2].assert_debug_log(
+                    expected_msgs=[f"[net] Ignoring low-work chain (height={NODE1_BLOCKS_REQUIRED})"],
+                    timeout=2,
+                ),
+                self.nodes[3].assert_debug_log(
+                    expected_msgs=[f"Synchronizing blockheaders, height: {NODE1_BLOCKS_REQUIRED}"],
+                    timeout=2,
+                ),
         ):
             self.generate(self.nodes[0], NODE1_BLOCKS_REQUIRED - self.nodes[0].getblockcount(), sync_fun=self.no_op)
         self.sync_blocks(self.nodes[0:2]) # node3 will sync headers (noban permissions) but not blocks (due to minchainwork)
 
         assert {
             'height': 0,
-            'hash': '0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206',
+            'hash': genesis_hash,
             'branchlen': 0,
             'status': 'active',
         } in self.nodes[2].getchaintips()
@@ -134,7 +170,7 @@ class RejectLowDifficultyHeadersTest(BitcoinTestFramework):
         hashPrevBlock = int(node.getblockhash(0), 16)
         for i in range(2000):
             block = create_block(hashprev = hashPrevBlock, tmpl=node.getblocktemplate(NORMAL_GBT_REQUEST_PARAMS))
-            block.solve()
+            self.solve_mercatura_block(self.nodes[0], block)
             new_blocks.append(block)
             hashPrevBlock = block.hash_int
 
@@ -168,11 +204,16 @@ class RejectLowDifficultyHeadersTest(BitcoinTestFramework):
 
 
     def run_test(self):
+        # Always exercise minimum-chainwork filtering and the noban exception.
         self.test_chains_sync_when_long_enough()
 
-        self.test_large_reorgs_can_succeed()
-
-        self.test_peerinfo_includes_headers_presync_height()
+        # These retain the original upstream boundary/stress coverage, but are
+        # deliberately excluded from the normal Mercatura functional suite.
+        # MercaHash makes thousands of real PoW solves prohibitively expensive
+        # for routine CI.
+        if self.options.extended_coverage:
+            self.test_large_reorgs_can_succeed()
+            self.test_peerinfo_includes_headers_presync_height()
 
 
 

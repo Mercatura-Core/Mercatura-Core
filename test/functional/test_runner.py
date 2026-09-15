@@ -87,6 +87,9 @@ TEST_FRAMEWORK_UNIT_TESTS = 'feature_framework_unit_tests.py'
 EXTENDED_SCRIPTS = [
     # These tests are not run by default.
     # Longest test should go first, to favor running tests in parallel
+    # Mercatura's real MercaHash PoW makes the original large-reorg and
+    # 2000-header presync coverage particularly expensive.
+    'p2p_headers_sync_with_minchainwork.py --extended-coverage',
     'feature_pruning.py',
     'feature_dbcrash.py',
     'feature_index_prune.py',
