@@ -29,7 +29,9 @@ from test_framework.p2p import (
 )
 from test_framework.test_framework import BitcoinTestFramework
 
-MAX_FEE_FILTER = Decimal(9936506) / COIN
+# FeeFilterRounder produces a different MAX_MONEY bucket with Mercatura's
+# 2-decimal monetary unit than Bitcoin's inherited 8-decimal fixture.
+MAX_FEE_FILTER = Decimal(9893815) / COIN
 NORMAL_FEE_FILTER = Decimal(10) / COIN
 
 
@@ -38,8 +40,8 @@ class P2PIBDTxRelayTest(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 2
         self.extra_args = [
-            ["-minrelaytxfee={:.8f}".format(NORMAL_FEE_FILTER)],
-            ["-minrelaytxfee={:.8f}".format(NORMAL_FEE_FILTER)],
+            ["-minrelaytxfee={:.2f}".format(NORMAL_FEE_FILTER)],
+            ["-minrelaytxfee={:.2f}".format(NORMAL_FEE_FILTER)],
         ]
 
     def run_test(self):
@@ -51,7 +53,7 @@ class P2PIBDTxRelayTest(BitcoinTestFramework):
         self.nodes[0].setmocktime(int(time.time()))
         self.log.info("Mine one old block so we stay in IBD, then remember its coinbase wtxid")
         block = create_block(int(self.nodes[0].getbestblockhash(), 16), create_coinbase(1), int(time.time()) - 2 * 24 * 60 * 60)
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
         self.nodes[0].submitblock(block.serialize().hex())
         assert self.nodes[0].getblockchaininfo()['initialblockdownload']
         ibd_wtxid = int(self.nodes[0].getblock(f"{block.hash_int:064x}", 2)["tx"][0]["hash"], 16)
