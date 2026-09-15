@@ -4650,6 +4650,28 @@ BOOST_FIXTURE_TEST_CASE(mercatura_pq_wallet_randomized_signing, BasicTestingSetu
     BOOST_CHECK(
         signature_a != signature_b);
 
+    // Re-signing an already valid PQ transaction must preserve its
+    // authorization instead of replacing it with another randomized
+    // ML-DSA signature.
+    const CScriptWitness saved_witness_a{
+        spend_a.vin.at(0).scriptWitness
+    };
+
+    {
+        LOCK(wallet->cs_wallet);
+
+        BOOST_REQUIRE(
+            wallet->SignTransaction(
+                spend_a));
+    }
+
+    BOOST_CHECK(
+        spend_a.vin.at(0).scriptSig.empty());
+
+    BOOST_CHECK(
+        spend_a.vin.at(0).scriptWitness.stack ==
+        saved_witness_a.stack);
+
     auto verify_signed_tx =
         [&](CMutableTransaction& spend) {
             std::vector<CTxOut> spent_outputs{

@@ -2756,6 +2756,49 @@ bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint,
             tx.vin.size());
 
         for (size_t i = 0; i < tx.vin.size(); ++i) {
+            // Preserve an existing complete and valid PQ authorization.
+            // Production ML-DSA signing is randomized, so regenerating an
+            // already-valid witness would unnecessarily change the wtxid.
+            const std::vector<unsigned char> program{
+                commitments[i].begin(),
+                commitments[i].end()
+            };
+
+            ScriptError witness_error{
+                SCRIPT_ERR_UNKNOWN_ERROR
+            };
+
+            const auto coin_it{
+                coins.find(tx.vin[i].prevout)
+            };
+
+            MutableTransactionSignatureChecker checker{
+                &tx,
+                static_cast<unsigned int>(i),
+                coin_it->second.out.nValue,
+                txdata,
+                MissingDataBehavior::FAIL,
+                std::optional<uint256>{
+                    genesis_hash}
+            };
+
+            if (tx.vin[i].scriptSig.empty() &&
+                CheckMercaturaPQWitnessStructureV1(
+                    tx.vin[i].scriptWitness,
+                    program,
+                    /*is_p2sh=*/false,
+                    &witness_error) &&
+                checker.CheckMercaturaPQSignature(
+                    std::span<const unsigned char>{
+                        tx.vin[i].scriptWitness.stack[0]},
+                    std::span<const unsigned char>{
+                        tx.vin[i].scriptWitness.stack[1]},
+                    &witness_error)) {
+                staged_witnesses[i] =
+                    tx.vin[i].scriptWitness;
+                continue;
+            }
+
             std::string signing_error;
 
             auto generated{
