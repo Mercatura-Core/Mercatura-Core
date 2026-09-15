@@ -51,16 +51,26 @@ static void addCoin(CoinsResult& coins,
     assert(ret.second);
     CWalletTx& wtx = (*ret.first).second;
     const auto& txout = wtx.tx->vout.at(0);
+    const int input_bytes{
+        CalculateMaximumSignedInputSize(
+            txout, &wallet, /*coin_control=*/nullptr)
+    };
+    const int input_weight{
+        CalculateMaximumSignedInputWeight(
+            txout, &wallet, /*coin_control=*/nullptr)
+    };
+
     coins.Add(*Assert(OutputTypeFromDestination(dest)),
               {COutPoint(wtx.GetHash(), 0),
                    txout,
                    depth,
-                   CalculateMaximumSignedInputSize(txout, &wallet, /*coin_control=*/nullptr),
+                   input_bytes,
                    /*solvable=*/ true,
                    /*safe=*/ true,
                    wtx.GetTxTime(),
                    is_from_me,
-                   fee_rate});
+                   fee_rate,
+                   input_weight});
 }
 
  CoinSelectionParams makeSelectionParams(FastRandomContext& rand, bool avoid_partial_spends)
@@ -233,6 +243,45 @@ BOOST_AUTO_TEST_CASE(outputs_grouping_tests)
             /*expected_with_partial_spends_size=*/ PREVIOUS_ROUND_COUNT + NUM_SINGLE_ENTRIES,
             /*expected_without_partial_spends_size=*/ 5,
             /*positive_only=*/ false);
+}
+
+BOOST_AUTO_TEST_CASE(avoid_partial_spends_respects_input_weight)
+{
+    const auto& wallet = NewWallet(m_node);
+
+    GroupVerifier group_verifier;
+    group_verifier.wallet = wallet;
+
+    // Native Mercatura PQ inputs weigh 5,432 WU each. With the standard
+    // 400,000-WU transaction limit, 73 inputs fit but 74 do not. Because
+    // 74 is below OUTPUT_GROUP_MAX_ENTRIES{100}, two groups here proves
+    // avoid-partial-spends grouping is bounded by input weight as well
+    // as by the inherited entry-count ceiling.
+    constexpr unsigned int NUM_PQ_OUTPUTS{74};
+
+    const CTxDestination dest =
+        *Assert(wallet->GetNewDestination(OutputType::BECH32M, ""));
+
+    for (unsigned int i = 0; i < NUM_PQ_OUTPUTS; ++i) {
+        addCoin(group_verifier.coins_pool,
+                *wallet,
+                dest,
+                9 * COIN,
+                /*is_from_me=*/true);
+    }
+
+    // Include the partial second group. Without the weight-aware grouping
+    // rule all 74 outputs would incorrectly remain in one OutputGroup.
+    const CoinEligibilityFilter filter{
+        1, 6, 0, 0, /*include_partial=*/true
+    };
+
+    group_verifier.GroupVerify(
+        OutputType::BECH32M,
+        filter,
+        /*avoid_partial_spends=*/true,
+        /*positive_only=*/true,
+        /*expected_size=*/2);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
