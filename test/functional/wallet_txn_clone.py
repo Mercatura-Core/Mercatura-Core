@@ -4,7 +4,7 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test the wallet accounts properly when there are cloned transactions with malleated scriptsigs."""
 
-from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_framework import BitcoinTestFramework, SkipTest
 from test_framework.util import (
     assert_equal,
 )
@@ -22,6 +22,10 @@ class TxnMallTest(BitcoinTestFramework):
 
     def skip_test_if_missing_module(self):
         self.skip_if_no_wallet()
+        raise SkipTest(
+            "Mercatura PQ Authorization v1 does not support inherited "
+            "ECDSA signature-malleability or alternate sighash-mode semantics"
+        )
 
     def add_options(self, parser):
         parser.add_argument("--mineblock", dest="mine_block", default=False, action="store_true",
