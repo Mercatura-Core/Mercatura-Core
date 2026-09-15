@@ -8,8 +8,6 @@ If a stale block more than a month old or its header are requested by a peer,
 the node should pretend that it does not have it to avoid fingerprinting.
 """
 
-import time
-
 from test_framework.blocktools import (create_block, create_coinbase)
 from test_framework.messages import CInv, MSG_BLOCK
 from test_framework.p2p import (
@@ -38,7 +36,7 @@ class P2PFingerprintTest(BitcoinTestFramework):
             coinbase = create_coinbase(prev_height + 1)
             block_time = prev_median_time + 1
             block = create_block(int(prev_hash, 16), coinbase, block_time)
-            block.solve()
+            self.solve_mercatura_block(self.nodes[0], block)
 
             blocks.append(block)
             prev_hash = block.hash_hex
@@ -65,8 +63,14 @@ class P2PFingerprintTest(BitcoinTestFramework):
     def run_test(self):
         node0 = self.nodes[0].add_p2p_connection(P2PInterface())
 
-        # Set node time to 60 days ago
-        self.nodes[0].setmocktime(int(time.time()) - 60 * 24 * 60 * 60)
+        # Anchor mocktime just after the Mercatura genesis timestamp. Unlike
+        # Bitcoin's inherited regtest genesis, Mercatura's genesis is recent,
+        # so wall-clock time minus 60 days may be earlier than genesis.
+        genesis_time = self.nodes[0].getblockheader(
+            self.nodes[0].getblockhash(0)
+        )["time"]
+        initial_mocktime = genesis_time + 1
+        self.nodes[0].setmocktime(initial_mocktime)
 
         # Generating a chain of 10 blocks
         block_hashes = self.generatetoaddress(self.nodes[0], 10, self.nodes[0].get_deterministic_priv_key().address)
@@ -96,8 +100,9 @@ class P2PFingerprintTest(BitcoinTestFramework):
         self.send_header_request(stale_hash, node0)
         node0.wait_for_header(hex(stale_hash), timeout=3)
 
-        # Longest chain is extended so stale is much older than chain tip
-        self.nodes[0].setmocktime(0)
+        # Advance simulated time by 60 days so the stale fork is older than
+        # the fingerprinting protection threshold.
+        self.nodes[0].setmocktime(initial_mocktime + 60 * 24 * 60 * 60)
         block_hash = int(self.generatetoaddress(self.nodes[0], 1, self.nodes[0].get_deterministic_priv_key().address)[-1], 16)
         assert_equal(self.nodes[0].getblockcount(), 14)
         node0.wait_for_block(block_hash, timeout=3)
