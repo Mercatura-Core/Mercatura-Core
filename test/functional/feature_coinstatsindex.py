@@ -54,12 +54,14 @@ class CoinStatsIndexTest(BitcoinTestFramework):
         self._test_index_rejects_hash_serialized()
         self._test_init_index_after_reorg()
 
-    def block_sanity_check(self, block_info):
-        block_subsidy = 50
+    def block_sanity_check(self, block_info, block_subsidy):
         assert_equal(
             block_info['prevout_spent'] + block_subsidy,
             block_info['new_outputs_ex_coinbase'] + block_info['coinbase'] + block_info['unspendable']
         )
+
+    def blockstats_amount(self, amount):
+        return Decimal(amount) / COIN
 
     def sync_index_node(self):
         self.wait_until(lambda: self.nodes[1].getindexinfo()['coinstatsindex']['synced'] is True)
@@ -113,32 +115,44 @@ class CoinStatsIndexTest(BitcoinTestFramework):
 
         self.log.info("Test gettxoutsetinfo() with index and verbose flag")
 
+        genesis_subsidy = self.blockstats_amount(
+            node.getblockstats(0, ["subsidy"])["subsidy"]
+        )
+        block_102_stats = node.getblockstats(
+            102,
+            ["subsidy", "totalfee", "total_out"],
+        )
+        block_102_stats = {
+            key: self.blockstats_amount(value)
+            for key, value in block_102_stats.items()
+        }
+
         for hash_option in index_hash_options:
-            # Genesis block is unspendable
+            # The Mercatura genesis coinbase is permanently unspendable.
             res4 = index_node.gettxoutsetinfo(hash_option, 0)
-            assert_equal(res4['total_unspendable_amount'], 50)
+            assert_equal(res4['total_unspendable_amount'], genesis_subsidy)
             assert_equal(res4['block_info'], {
-                'unspendable': 50,
+                'unspendable': genesis_subsidy,
                 'prevout_spent': 0,
                 'new_outputs_ex_coinbase': 0,
                 'coinbase': 0,
                 'unspendables': {
-                    'genesis_block': 50,
+                    'genesis_block': genesis_subsidy,
                     'bip30': 0,
                     'scripts': 0,
                     'unclaimed_rewards': 0
                 }
             })
-            self.block_sanity_check(res4['block_info'])
+            self.block_sanity_check(res4['block_info'], genesis_subsidy)
 
-            # Test an older block height that included a normal tx
+            # Test an older block height that included a normal tx.
             res5 = index_node.gettxoutsetinfo(hash_option, 102)
-            assert_equal(res5['total_unspendable_amount'], 50)
+            assert_equal(res5['total_unspendable_amount'], genesis_subsidy)
             assert_equal(res5['block_info'], {
                 'unspendable': 0,
-                'prevout_spent': 50,
-                'new_outputs_ex_coinbase': Decimal('49.99968800'),
-                'coinbase': Decimal('50.00031200'),
+                'prevout_spent': block_102_stats['total_out'] + block_102_stats['totalfee'],
+                'new_outputs_ex_coinbase': block_102_stats['total_out'],
+                'coinbase': block_102_stats['subsidy'] + block_102_stats['totalfee'],
                 'unspendables': {
                     'genesis_block': 0,
                     'bip30': 0,
@@ -146,7 +160,7 @@ class CoinStatsIndexTest(BitcoinTestFramework):
                     'unclaimed_rewards': 0,
                 }
             })
-            self.block_sanity_check(res5['block_info'])
+            self.block_sanity_check(res5['block_info'], block_102_stats['subsidy'])
 
         # Generate and send a normal tx with two outputs
         tx1 = self.wallet.send_to(
@@ -155,7 +169,7 @@ class CoinStatsIndexTest(BitcoinTestFramework):
             amount=21 * COIN,
         )
 
-        # Find the right position of the 21 BTC output
+        # Find the right position of the 21 MCA output
         tx1_out_21 = self.wallet.get_utxo(txid=tx1["txid"], vout=tx1["sent_vout"])
 
         # Generate and send another tx with an OP_RETURN output (which is unspendable)
@@ -168,23 +182,36 @@ class CoinStatsIndexTest(BitcoinTestFramework):
         # Include both txs in a block
         self.generate(self.nodes[0], 1)
 
+        block_108_stats = node.getblockstats(
+            108,
+            ["subsidy", "totalfee", "total_out"],
+        )
+        block_108_stats = {
+            key: self.blockstats_amount(value)
+            for key, value in block_108_stats.items()
+        }
+        script_unspendable = Decimal(tx2_val)
+
         for hash_option in index_hash_options:
-            # Check all amounts were registered correctly
+            # Check all amounts were registered correctly.
             res6 = index_node.gettxoutsetinfo(hash_option, 108)
-            assert_equal(res6['total_unspendable_amount'], Decimal('70.99000000'))
+            assert_equal(
+                res6['total_unspendable_amount'],
+                genesis_subsidy + script_unspendable,
+            )
             assert_equal(res6['block_info'], {
-                'unspendable': Decimal('20.99000000'),
-                'prevout_spent': 71,
-                'new_outputs_ex_coinbase': Decimal('49.99999000'),
-                'coinbase': Decimal('50.01001000'),
+                'unspendable': script_unspendable,
+                'prevout_spent': block_108_stats['total_out'] + block_108_stats['totalfee'],
+                'new_outputs_ex_coinbase': block_108_stats['total_out'] - script_unspendable,
+                'coinbase': block_108_stats['subsidy'] + block_108_stats['totalfee'],
                 'unspendables': {
                     'genesis_block': 0,
                     'bip30': 0,
-                    'scripts': Decimal('20.99000000'),
+                    'scripts': script_unspendable,
                     'unclaimed_rewards': 0,
                 }
             })
-            self.block_sanity_check(res6['block_info'])
+            self.block_sanity_check(res6['block_info'], block_108_stats['subsidy'])
 
         # Create a coinbase that does not claim full subsidy and also
         # has two outputs
@@ -195,26 +222,35 @@ class CoinStatsIndexTest(BitcoinTestFramework):
         tip = self.nodes[0].getbestblockhash()
         block_time = self.nodes[0].getblock(tip)['time'] + 1
         block = create_block(int(tip, 16), cb, block_time)
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
         self.nodes[0].submitblock(block.serialize().hex())
         self.sync_all()
 
+        block_109_subsidy = self.blockstats_amount(
+            node.getblockstats(109, ["subsidy"])["subsidy"]
+        )
+        claimed_coinbase = Decimal(sum(txout.nValue for txout in cb.vout)) / COIN
+        unclaimed_reward = block_109_subsidy - claimed_coinbase
+
         for hash_option in index_hash_options:
             res7 = index_node.gettxoutsetinfo(hash_option, 109)
-            assert_equal(res7['total_unspendable_amount'], Decimal('80.99000000'))
+            assert_equal(
+                res7['total_unspendable_amount'],
+                genesis_subsidy + script_unspendable + unclaimed_reward,
+            )
             assert_equal(res7['block_info'], {
-                'unspendable': 10,
+                'unspendable': unclaimed_reward,
                 'prevout_spent': 0,
                 'new_outputs_ex_coinbase': 0,
-                'coinbase': 40,
+                'coinbase': claimed_coinbase,
                 'unspendables': {
                     'genesis_block': 0,
                     'bip30': 0,
                     'scripts': 0,
-                    'unclaimed_rewards': 10
+                    'unclaimed_rewards': unclaimed_reward,
                 }
             })
-            self.block_sanity_check(res7['block_info'])
+            self.block_sanity_check(res7['block_info'], block_109_subsidy)
 
         self.log.info("Test that the index is robust across restarts")
 
