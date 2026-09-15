@@ -60,9 +60,9 @@ class SignRawTransactionWithWalletTest(BitcoinTestFramework):
         Expected results:
 
         3) The transaction has no complete set of signatures
-        4) Two script verification errors occurred
+        4) Three Mercatura script verification errors occurred
         5) Script verification errors have certain properties ("txid", "vout", "scriptSig", "sequence", "error")
-        6) The verification errors refer to the invalid (vin 1) and missing input (vin 2)"""
+        6) The verification errors refer to the classical (vin 0), invalid (vin 1), and missing input (vin 2)"""
         self.log.info("Test script verification errors")
         privKeys = ['cUeKHd5orzT3mz8P9pxyREHfsWtVfgsfDjiZZBcjUBAaGk1BTj7N']
 
@@ -102,24 +102,36 @@ class SignRawTransactionWithWalletTest(BitcoinTestFramework):
         # 3) The transaction has no complete set of signatures
         assert not rawTxSigned['complete']
 
-        # 4) Two script verification errors occurred
+        # 4) Mercatura reports three verification errors. The inherited
+        # P2PKH input (vin 0) is also invalid because classical signature
+        # authorization is intentionally disabled.
         assert 'errors' in rawTxSigned
-        assert_equal(len(rawTxSigned['errors']), 2)
+        assert_equal(len(rawTxSigned['errors']), 3)
 
-        # 5) Script verification errors have certain properties
-        assert 'txid' in rawTxSigned['errors'][0]
-        assert 'vout' in rawTxSigned['errors'][0]
-        assert 'witness' in rawTxSigned['errors'][0]
-        assert 'scriptSig' in rawTxSigned['errors'][0]
-        assert 'sequence' in rawTxSigned['errors'][0]
-        assert 'error' in rawTxSigned['errors'][0]
+        # 5) Script verification errors have the expected properties.
+        for error in rawTxSigned['errors']:
+            assert 'txid' in error
+            assert 'vout' in error
+            assert 'witness' in error
+            assert 'scriptSig' in error
+            assert 'sequence' in error
+            assert 'error' in error
 
-        # 6) The verification errors refer to the invalid (vin 1) and missing input (vin 2)
-        assert_equal(rawTxSigned['errors'][0]['txid'], inputs[1]['txid'])
-        assert_equal(rawTxSigned['errors'][0]['vout'], inputs[1]['vout'])
-        assert_equal(rawTxSigned['errors'][1]['txid'], inputs[2]['txid'])
-        assert_equal(rawTxSigned['errors'][1]['vout'], inputs[2]['vout'])
-        assert not rawTxSigned['errors'][0]['witness']
+        # 6) vin 0 fails due to Mercatura's classical-signature shutdown,
+        # vin 1 remains an invalid script, and vin 2 is still missing.
+        assert_equal(rawTxSigned['errors'][0]['txid'], inputs[0]['txid'])
+        assert_equal(rawTxSigned['errors'][0]['vout'], inputs[0]['vout'])
+        assert_equal(rawTxSigned['errors'][0]['error'], 'Opcode missing or not understood')
+
+        assert_equal(rawTxSigned['errors'][1]['txid'], inputs[1]['txid'])
+        assert_equal(rawTxSigned['errors'][1]['vout'], inputs[1]['vout'])
+        assert_equal(rawTxSigned['errors'][1]['error'], 'Opcode missing or not understood')
+
+        assert_equal(rawTxSigned['errors'][2]['txid'], inputs[2]['txid'])
+        assert_equal(rawTxSigned['errors'][2]['vout'], inputs[2]['vout'])
+        assert_equal(rawTxSigned['errors'][2]['error'], 'Input not found or already spent')
+
+        assert all(not error['witness'] for error in rawTxSigned['errors'])
 
         # Now test signing failure for transaction with input witnesses
         p2wpkh_raw_tx = "01000000000102fff7f7881a8099afa6940d42d1e7f6362bec38171ea3edf433541db4e4ad969f00000000494830450221008b9d1dc26ba6a9cb62127b02742fa9d754cd3bebf337f7a55d114c8e5cdd30be022040529b194ba3f9281a99f2b1c0a19c0489bc22ede944ccf4ecbab4cc618ef3ed01eeffffffef51e1b804cc89d182d279655c3aa89e815b1b309fe287d9b2b55d57b90ec68a0100000000ffffffff02202cb206000000001976a9148280b37df378db99f66f85c95a783a76ac7a6d5988ac9093510d000000001976a9143bde42dbee7e4dbe6a21b2d50ce2f0167faa815988ac000247304402203609e17b84f6a7d30c80bfa610b5b4542f32a8a0d5447a12fb1366d7f01cc44a0220573a954c4518331561406f90300e8f3358f51928d43c212a8caed02de67eebee0121025476c2e83188368da1ff3e292e7acafcdb3566bb0ad253f62fc70f07aeee635711000000"
@@ -178,7 +190,7 @@ class SignRawTransactionWithWalletTest(BitcoinTestFramework):
         assert txn["complete"]
 
     def test_signing_with_csv(self):
-        self.log.info("Test signing a transaction containing a fully signed CSV input")
+        self.log.info("Test mixed PQ signing fails closed with a satisfied CSV input")
         self.nodes[0].walletpassphrase("password", 9999)
         getcontext().prec = 8
 
@@ -206,13 +218,24 @@ class SignRawTransactionWithWalletTest(BitcoinTestFramework):
         ctx.wit.vtxinwit[0].scriptWitness.stack = [CScript([OP_TRUE]), script]
         tx = ctx.serialize_with_witness().hex()
 
-        # Sign and send the transaction
+        # Once a native PQ input is present, Mercatura's PQ signer owns
+        # the entire transaction. An already-satisfied non-PQ timelock
+        # input must therefore fail closed instead of falling through to
+        # inherited classical signing machinery.
         signed = self.nodes[0].signrawtransactionwithwallet(tx)
-        assert_equal(signed["complete"], True)
-        self.nodes[0].sendrawtransaction(signed["hex"])
+        assert_equal(signed["complete"], False)
+        assert_equal(signed["hex"], tx)
+        assert_equal(len(signed["errors"]), 1)
+        assert_equal(signed["errors"][0]["txid"], utxo1["txid"])
+        assert_equal(signed["errors"][0]["vout"], utxo1["vout"])
+        assert signed["errors"][0]["witness"]
+        assert_equal(
+            signed["errors"][0]["error"],
+            "Mercatura PQ transaction contains a non-PQ ownership input",
+        )
 
     def test_signing_with_cltv(self):
-        self.log.info("Test signing a transaction containing a fully signed CLTV input")
+        self.log.info("Test mixed PQ signing fails closed with a satisfied CLTV input")
         self.nodes[0].walletpassphrase("password", 9999)
         getcontext().prec = 8
 
@@ -240,10 +263,21 @@ class SignRawTransactionWithWalletTest(BitcoinTestFramework):
         ctx.wit.vtxinwit[0].scriptWitness.stack = [CScript([OP_TRUE]), script]
         tx = ctx.serialize_with_witness().hex()
 
-        # Sign and send the transaction
+        # Once a native PQ input is present, Mercatura's PQ signer owns
+        # the entire transaction. An already-satisfied non-PQ timelock
+        # input must therefore fail closed instead of falling through to
+        # inherited classical signing machinery.
         signed = self.nodes[0].signrawtransactionwithwallet(tx)
-        assert_equal(signed["complete"], True)
-        self.nodes[0].sendrawtransaction(signed["hex"])
+        assert_equal(signed["complete"], False)
+        assert_equal(signed["hex"], tx)
+        assert_equal(len(signed["errors"]), 1)
+        assert_equal(signed["errors"][0]["txid"], utxo1["txid"])
+        assert_equal(signed["errors"][0]["vout"], utxo1["vout"])
+        assert signed["errors"][0]["witness"]
+        assert_equal(
+            signed["errors"][0]["error"],
+            "Mercatura PQ transaction contains a non-PQ ownership input",
+        )
 
     def test_signing_with_missing_prevtx_info(self):
         txid = "1d1d4e24ed99057e84c3f80fd8fbec79ed9e1acee37da269356ecea000000000"
@@ -260,18 +294,17 @@ class SignRawTransactionWithWalletTest(BitcoinTestFramework):
             succ = self.nodes[0].signrawtransactionwithwallet(rawtx, [prevtx])
             assert succ["complete"]
 
-            if type == "legacy":
-                del prevtx["amount"]
-                succ = self.nodes[0].signrawtransactionwithwallet(rawtx, [prevtx])
-                assert succ["complete"]
-            else:
-                assert_raises_rpc_error(-3, "Missing amount", self.nodes[0].signrawtransactionwithwallet, rawtx, [
-                    {
-                        "txid": txid,
-                        "scriptPubKey": pubkey,
-                        "vout": 3,
-                    }
-                ])
+            # Mercatura normal wallet destinations are native PQ
+            # regardless of the inherited requested output-type label.
+            # PQAuth v1 commits to the exact spent amount, so amount is
+            # mandatory for every one of these externally supplied prevouts.
+            assert_raises_rpc_error(-3, "Missing amount", self.nodes[0].signrawtransactionwithwallet, rawtx, [
+                {
+                    "txid": txid,
+                    "scriptPubKey": pubkey,
+                    "vout": 3,
+                }
+            ])
 
             assert_raises_rpc_error(-3, "Missing vout", self.nodes[0].signrawtransactionwithwallet, rawtx, [
                 {
