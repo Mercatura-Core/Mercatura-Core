@@ -122,7 +122,7 @@ class BIP65Test(BitcoinTestFramework):
         tip = self.nodes[0].getbestblockhash()
         block_time = self.nodes[0].getblockheader(tip)['mediantime'] + 1
         block = create_block(int(tip, 16), create_coinbase(CLTV_HEIGHT - 1), block_time, version=3, txlist=invalid_cltv_txs)
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
 
         self.test_cltv_info(is_active=False)  # Not active as of current tip and next block does not need to obey rules
         peer.send_and_ping(msg_block(block))
@@ -133,7 +133,7 @@ class BIP65Test(BitcoinTestFramework):
         tip = block.hash_int
         block_time += 1
         block = create_block(tip, create_coinbase(CLTV_HEIGHT), block_time, version=3)
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
 
         with self.nodes[0].assert_debug_log(expected_msgs=[f'{block.hash_hex}, bad-version(0x00000003)']):
             peer.send_and_ping(msg_block(block))
@@ -180,7 +180,7 @@ class BIP65Test(BitcoinTestFramework):
             # Now we verify that a block with this transaction is also invalid.
             block.vtx[1] = spendtx
             block.hashMerkleRoot = block.calc_merkle_root()
-            block.solve()
+            self.solve_mercatura_block(self.nodes[0], block)
 
             with self.nodes[0].assert_debug_log(expected_msgs=[f'Block validation error: {blk_rej + expected_cltv_reject_reason}']):
                 peer.send_and_ping(msg_block(block))
@@ -193,7 +193,7 @@ class BIP65Test(BitcoinTestFramework):
         block.vtx.pop(1)
         block.vtx.append(spendtx)
         block.hashMerkleRoot = block.calc_merkle_root()
-        block.solve()
+        self.solve_mercatura_block(self.nodes[0], block)
 
         self.test_cltv_info(is_active=True)  # Not active as of current tip, but next block must obey rules
         peer.send_and_ping(msg_block(block))
