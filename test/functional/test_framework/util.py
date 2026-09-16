@@ -323,7 +323,7 @@ def get_binary_paths(config):
         "bitcoin": "BITCOIN_BIN",
         "mercaturad": "BITCOIND",
         "bench_bitcoin": "BITCOIN_BENCH",
-        "bitcoin-cli": "BITCOINCLI",
+        "mercatura-cli": "BITCOINCLI",
         "bitcoin-util": "BITCOINUTIL",
         "bitcoin-tx": "BITCOINTX",
         "bitcoin-chainstate": "BITCOINCHAINSTATE",
