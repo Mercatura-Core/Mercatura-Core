@@ -132,6 +132,13 @@ class TestNode():
         self.binaries = binaries
         self.coverage_dir = coverage_dir
         self.cwd = cwd
+
+        # Mercatura mining helper state must always exist as real TestNode
+        # attributes. TestNode.__getattr__ forwards unknown attributes to RPC,
+        # so relying on getattr(..., default) would otherwise return an RPC
+        # proxy instead of the requested default.
+        self._mercatura_generate_wallet_name = False
+        self._mercatura_generate_address = None
         self.has_explicit_bind = False
         if extra_conf is not None:
             append_config(self.datadir_path, extra_conf)
