@@ -968,9 +968,18 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
             for i in range(3)
         ]
 
+        # The functional cache only creates/restores native PQ wallets when
+        # this test actually starts nodes with wallet RPC enabled. A binary
+        # may be compiled with wallet support while the test deliberately
+        # starts its nodes with -disablewallet.
+        use_cache_wallets = (
+            self.is_wallet_compiled()
+            and self.uses_wallet is not False
+        )
+
         # Automatically discard an inherited cache whose spendable coinbases
         # were created with classical deterministic keys.
-        if self.is_wallet_compiled() and os.path.isdir(cache_node_dir):
+        if use_cache_wallets and os.path.isdir(cache_node_dir):
             pq_cache_complete = (
                 os.path.isfile(cache_wallet_marker)
                 and all(os.path.isfile(path) for path in cache_wallet_backups)
@@ -1016,7 +1025,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
             # must be backed by PQ wallets rather than inherited P2PKH keys.
             sink_address = create_deterministic_address_bcrt1_p2tr_op_true()[0]
 
-            if self.is_wallet_compiled():
+            if use_cache_wallets:
                 funded_addresses = []
 
                 for i in range(3):
@@ -1062,7 +1071,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
 
             assert_equal(cache_node.getblockchaininfo()["blocks"], 199)
 
-            if self.is_wallet_compiled():
+            if use_cache_wallets:
                 with open(cache_wallet_marker, "w", encoding="utf8") as marker:
                     marker.write("Mercatura PQ functional cache v1\n")
 
