@@ -84,6 +84,46 @@ TEST_EXIT_SKIPPED = 77
 
 TEST_FRAMEWORK_UNIT_TESTS = 'feature_framework_unit_tests.py'
 
+# Mercatura-native functional tests are the authoritative default suite.
+# Inherited Bitcoin Core functional tests remain available as reference and
+# compatibility tests through explicit selection or --extended.
+MERCATURA_SCRIPTS = [
+    'mercatura_block_capacity.py',
+    'mercatura_chain_reorg.py',
+    'mercatura_classical_ownership_shutdown.py',
+    'mercatura_coinbase_maturity.py',
+    'mercatura_coinbase_subsidy.py',
+    'mercatura_dgw.py',
+    'mercatura_fee_boundary.py',
+    'mercatura_fee_policy.py',
+    'mercatura_mercahash_pow.py',
+    'mercatura_mining.py',
+    'mercatura_network_identity.py',
+    'mercatura_p2p_propagation.py',
+    'mercatura_pq_address_enforcement.py',
+    'mercatura_pq_auth_commitments.py',
+    'mercatura_pq_batching.py',
+    'mercatura_pq_invalid_auth.py',
+    'mercatura_pq_many_input_selection.py',
+    'mercatura_pq_mempool_persistence.py',
+    'mercatura_pq_multi_input.py',
+    'mercatura_pq_p2p_malformed.py',
+    'mercatura_pq_package.py',
+    'mercatura_pq_prevout_amount.py',
+    'mercatura_pq_psbt.py',
+    'mercatura_pq_rbf.py',
+    'mercatura_pq_reorg.py',
+    'mercatura_pq_send_receive.py',
+    'mercatura_reindex.py',
+    'mercatura_smoke.py',
+    'mercatura_testnet_identity.py',
+    'mercatura_three_node_pq.py',
+    'mercatura_wallet_backup_restore.py',
+    'mercatura_wallet_encryption.py',
+    'mercatura_wallet_historical_recovery.py',
+    'mercatura_wallet_persistence.py',
+]
+
 EXTENDED_SCRIPTS = [
     # These tests are not run by default.
     # Longest test should go first, to favor running tests in parallel
@@ -95,7 +135,7 @@ EXTENDED_SCRIPTS = [
 # Special script to run each bench sanity check
 TOOL_BENCH_SANITY_CHECK = "tool_bench_sanity_check.py"
 
-BASE_SCRIPTS = [
+INHERITED_REFERENCE_SCRIPTS = [
     # Special scripts that are "expanded" later
     TOOL_BENCH_SANITY_CHECK,
     # Scripts that are run by default.
@@ -395,7 +435,7 @@ BASE_SCRIPTS = [
 ]
 
 # Place EXTENDED_SCRIPTS first since it has the 3 longest running tests
-ALL_SCRIPTS = EXTENDED_SCRIPTS + BASE_SCRIPTS
+ALL_SCRIPTS = (MERCATURA_SCRIPTS + EXTENDED_SCRIPTS + INHERITED_REFERENCE_SCRIPTS)
 
 NON_SCRIPTS = [
     # These are python files that live in the functional tests directory, but are not active test scripts.
@@ -508,7 +548,7 @@ def main():
         test_list += ALL_SCRIPTS
     else:
         # Run base tests only
-        test_list += BASE_SCRIPTS
+        test_list += MERCATURA_SCRIPTS
 
     # Remove the test cases that the user has explicitly asked to exclude.
     # The user can specify a test case with or without the .py extension.
@@ -875,7 +915,7 @@ class TestResult():
 def check_script_prefixes():
     """Check that test scripts start with one of the allowed name prefixes."""
 
-    good_prefixes_re = re.compile("^(example|feature|interface|mempool|mining|p2p|rpc|wallet|tool)_")
+    good_prefixes_re = re.compile("^(example|feature|interface|mempool|mining|p2p|rpc|wallet|tool|mercatura)_")
     bad_script_names = [script for script in ALL_SCRIPTS if good_prefixes_re.match(script) is None]
 
     if bad_script_names:
