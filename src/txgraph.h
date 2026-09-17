@@ -75,7 +75,20 @@ public:
      *  strictly positive. In all further calls, only Refs passed to AddTransaction() are allowed
      *  to be passed to this TxGraph object (or empty Ref objects). Ref objects may outlive the
      *  TxGraph they were added to. */
-    virtual void AddTransaction(Ref& arg, const FeePerWeight& feerate) noexcept = 0;
+    void AddTransaction(Ref& arg, const FeePerWeight& feerate) noexcept
+    {
+        AddTransaction(arg, feerate, feerate.size);
+    }
+
+    /**
+     * Add a transaction while supplying an independent cluster-policy size.
+     *
+     * feerate.size is used for fee ordering and mining economics. cluster_size
+     * is used only for cluster-size policy accounting. They are normally equal,
+     * but Mercatura's undiscounted witness fee policy intentionally makes them
+     * different for witness-heavy transactions.
+     */
+    virtual void AddTransaction(Ref& arg, const FeePerWeight& feerate, uint64_t cluster_size) noexcept = 0;
     /** Remove the specified transaction. If a staging graph exists, the removal only happens
      *  there. This is a no-op if the transaction was already removed.
      *

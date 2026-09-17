@@ -378,6 +378,51 @@ BOOST_AUTO_TEST_CASE(txgraph_chunk_chain)
     block_builder_checker({{&refs[0]}});
 }
 
+BOOST_AUTO_TEST_CASE(txgraph_separates_fee_and_cluster_weight)
+{
+    auto graph = MakeTxGraph(
+        /*max_cluster_count=*/10,
+        /*max_cluster_size=*/100,
+        HIGH_ACCEPTABLE_COST,
+        PointerComparator);
+
+    std::vector<TxGraph::Ref> refs;
+    refs.reserve(2);
+
+    // Fee-policy sizes deliberately exceed the cluster limit. The separate
+    // cluster-policy size is what must determine oversizedness.
+    const FeePerWeight feerate_a{200, 150};
+    const FeePerWeight feerate_b{100, 150};
+
+    graph->AddTransaction(
+        refs.emplace_back(),
+        feerate_a,
+        /*cluster_size=*/60);
+
+    BOOST_CHECK(!graph->IsOversized(TxGraph::Level::TOP));
+    BOOST_CHECK(graph->GetIndividualFeerate(refs[0]) == feerate_a);
+
+    graph->AddTransaction(
+        refs.emplace_back(),
+        feerate_b,
+        /*cluster_size=*/60);
+
+    // Separate singletons are each below the 100-unit cluster limit.
+    BOOST_CHECK(!graph->IsOversized(TxGraph::Level::TOP));
+
+    // Connecting them produces a 120-unit cluster, which must be oversized,
+    // while their fee-ordering sizes remain unchanged.
+    graph->AddDependency(
+        /*parent=*/refs[0],
+        /*child=*/refs[1]);
+
+    BOOST_CHECK(graph->IsOversized(TxGraph::Level::TOP));
+    BOOST_CHECK(graph->GetIndividualFeerate(refs[0]) == feerate_a);
+    BOOST_CHECK(graph->GetIndividualFeerate(refs[1]) == feerate_b);
+
+    graph->SanityCheck();
+}
+
 BOOST_AUTO_TEST_CASE(txgraph_staging)
 {
     /* Create a new graph for the test.

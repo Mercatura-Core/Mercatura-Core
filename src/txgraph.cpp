@@ -166,7 +166,7 @@ public:
     /** Get the number of transactions in this Cluster. */
     virtual LinearizationIndex GetTxCount() const noexcept = 0;
     /** Get the total size of the transactions in this Cluster. */
-    virtual uint64_t GetTotalTxSize() const noexcept = 0;
+    virtual uint64_t GetTotalTxSize(const TxGraphImpl& graph) const noexcept = 0;
     /** Given a DepGraphIndex into this Cluster, find the corresponding GraphIndex. */
     virtual GraphIndex GetClusterEntry(DepGraphIndex index) const noexcept = 0;
     /** Append a transaction with given GraphIndex at the end of this Cluster and its
@@ -277,7 +277,7 @@ public:
     constexpr DepGraphIndex GetMaxTxCount() const noexcept final { return MAX_TX_COUNT; }
     DepGraphIndex GetDepGraphIndexRange() const noexcept final { return m_depgraph.PositionRange(); }
     LinearizationIndex GetTxCount() const noexcept final { return m_linearization.size(); }
-    uint64_t GetTotalTxSize() const noexcept final;
+    uint64_t GetTotalTxSize(const TxGraphImpl& graph) const noexcept final;
     GraphIndex GetClusterEntry(DepGraphIndex index) const noexcept final { return m_mapping[index]; }
     DepGraphIndex AppendTransaction(GraphIndex graph_idx, FeePerWeight feerate) noexcept final;
     void AddDependencies(SetType parents, DepGraphIndex child) noexcept final;
@@ -334,7 +334,7 @@ public:
     constexpr DepGraphIndex GetMaxTxCount() const noexcept final { return MAX_TX_COUNT; }
     LinearizationIndex GetTxCount() const noexcept final { return m_graph_index != NO_GRAPH_INDEX; }
     DepGraphIndex GetDepGraphIndexRange() const noexcept final { return GetTxCount(); }
-    uint64_t GetTotalTxSize() const noexcept final { return GetTxCount() ? m_feerate.size : 0; }
+    uint64_t GetTotalTxSize(const TxGraphImpl& graph) const noexcept final;
     GraphIndex GetClusterEntry(DepGraphIndex index) const noexcept final { Assume(index == 0); Assume(GetTxCount()); return m_graph_index; }
     DepGraphIndex AppendTransaction(GraphIndex graph_idx, FeePerWeight feerate) noexcept final;
     void AddDependencies(SetType parents, DepGraphIndex child) noexcept final;
@@ -610,6 +610,8 @@ private:
         Locator m_locator[MAX_LEVELS];
         /** The chunk feerate of this transaction in main (if present in m_locator[0]). */
         FeePerWeight m_main_chunk_feerate;
+        /** Weight used only for inherited cluster-size policy accounting. */
+        uint64_t m_cluster_size{0};
         /** The equal-feerate chunk prefix size of this transaction in main. If the transaction is
          *  part of chunk C in main, then this gives the sum of the sizes of all chunks in C's
          *  cluster, whose feerate is equal to that of C, which do not appear after C itself in
@@ -797,7 +799,7 @@ public:
 
     // Implementations for the public TxGraph interface.
 
-    void AddTransaction(Ref& arg, const FeePerWeight& feerate) noexcept final;
+    void AddTransaction(Ref& arg, const FeePerWeight& feerate, uint64_t cluster_size) noexcept final;
     void RemoveTransaction(const Ref& arg) noexcept final;
     void AddDependency(const Ref& parent, const Ref& child) noexcept final;
     void SetTransactionFee(const Ref&, int64_t fee) noexcept final;
@@ -932,13 +934,18 @@ size_t SingletonClusterImpl::TotalMemoryUsage() const noexcept
            sizeof(std::unique_ptr<Cluster>);
 }
 
-uint64_t GenericClusterImpl::GetTotalTxSize() const noexcept
+uint64_t GenericClusterImpl::GetTotalTxSize(const TxGraphImpl& graph) const noexcept
 {
     uint64_t ret{0};
     for (auto i : m_linearization) {
-        ret += m_depgraph.FeeRate(i).size;
+        ret += graph.m_entries[m_mapping[i]].m_cluster_size;
     }
     return ret;
+}
+
+uint64_t SingletonClusterImpl::GetTotalTxSize(const TxGraphImpl& graph) const noexcept
+{
+    return GetTxCount() ? graph.m_entries[m_graph_index].m_cluster_size : 0;
 }
 
 DepGraphIndex GenericClusterImpl::AppendTransaction(GraphIndex graph_idx, FeePerWeight feerate) noexcept
@@ -2045,7 +2052,7 @@ void TxGraphImpl::GroupClusters(int level) noexcept
         while (an_clusters_it != an_clusters.end() && an_clusters_it->second == rep) {
             clusterset.m_group_data->m_group_clusters.push_back(an_clusters_it->first);
             total_count += an_clusters_it->first->GetTxCount();
-            total_size += an_clusters_it->first->GetTotalTxSize();
+            total_size += an_clusters_it->first->GetTotalTxSize(*this);
             ++an_clusters_it;
             ++new_entry.m_cluster_count;
         }
@@ -2227,10 +2234,11 @@ void TxGraphImpl::MakeAllAcceptable(int level) noexcept
 
 GenericClusterImpl::GenericClusterImpl(uint64_t sequence) noexcept : Cluster{sequence} {}
 
-void TxGraphImpl::AddTransaction(Ref& arg, const FeePerWeight& feerate) noexcept
+void TxGraphImpl::AddTransaction(Ref& arg, const FeePerWeight& feerate, uint64_t cluster_size) noexcept
 {
     Assume(m_main_chunkindex_observers == 0 || GetTopLevel() != 0);
     Assume(feerate.size > 0);
+    Assume(cluster_size > 0);
     Assume(GetRefGraph(arg) == nullptr);
     // Construct a new Entry, and link it with the Ref.
     auto idx = m_entries.size();
@@ -2238,10 +2246,11 @@ void TxGraphImpl::AddTransaction(Ref& arg, const FeePerWeight& feerate) noexcept
     auto& entry = m_entries.back();
     entry.m_main_chunkindex_iterator = m_main_chunkindex.end();
     entry.m_ref = &arg;
+    entry.m_cluster_size = cluster_size;
     GetRefGraph(arg) = this;
     GetRefIndex(arg) = idx;
     // Construct a new singleton Cluster (which is necessarily optimally linearized).
-    bool oversized = uint64_t(feerate.size) > m_max_cluster_size;
+    bool oversized = cluster_size > m_max_cluster_size;
     auto cluster = CreateEmptyCluster(1);
     cluster->AppendTransaction(idx, feerate);
     auto cluster_ptr = cluster.get();
@@ -3009,7 +3018,7 @@ void TxGraphImpl::SanityCheck() const
                 // individually oversized transaction singleton. Note that groups of to-be-merged
                 // clusters which would exceed this limit are marked oversized, which means they
                 // are never applied.
-                assert(cluster.IsOversized() || cluster.GetTotalTxSize() <= m_max_cluster_size);
+                assert(cluster.IsOversized() || cluster.GetTotalTxSize(*this) <= m_max_cluster_size);
                 // OVERSIZED clusters are singletons.
                 assert(!cluster.IsOversized() || cluster.GetTxCount() == 1);
                 // Transaction counts cannot exceed the Cluster implementation's maximum
