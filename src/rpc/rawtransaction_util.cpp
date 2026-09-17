@@ -5,6 +5,7 @@
 
 #include <rpc/rawtransaction_util.h>
 
+#include <addresstype.h>
 #include <coins.h>
 #include <consensus/amount.h>
 #include <core_io.h>
@@ -217,6 +218,27 @@ void ParsePrevouts(const UniValue& prevTxsUnival, FlatSigningProvider* keystore,
             std::vector<unsigned char> pkData(ParseHexO(prevOut, "scriptPubKey"));
             CScript scriptPubKey(pkData.begin(), pkData.end());
 
+            // Mercatura PQ Authorization v1 commits to the exact spent
+            // amount. Never allow a native PQ prevout to reach signing
+            // with the inherited MAX_MONEY missing-amount sentinel.
+            const UniValue& amount{
+                prevOut.find_value("amount")
+            };
+
+            CTxDestination destination;
+
+            if (amount.isNull() &&
+                ExtractDestination(
+                    scriptPubKey,
+                    destination) &&
+                std::holds_alternative<
+                    WitnessV2MercaturaPQ>(
+                        destination)) {
+                throw JSONRPCError(
+                    RPC_TYPE_ERROR,
+                    "Missing amount");
+            }
+
             {
                 auto coin = coins.find(out);
                 if (coin != coins.end() && !coin->second.IsSpent() && coin->second.out.scriptPubKey != scriptPubKey) {
@@ -228,8 +250,9 @@ void ParsePrevouts(const UniValue& prevTxsUnival, FlatSigningProvider* keystore,
                 Coin newcoin;
                 newcoin.out.scriptPubKey = scriptPubKey;
                 newcoin.out.nValue = MAX_MONEY;
-                if (prevOut.exists("amount")) {
-                    newcoin.out.nValue = AmountFromValue(prevOut.find_value("amount"));
+                if (!amount.isNull()) {
+                    newcoin.out.nValue =
+                        AmountFromValue(amount);
                 }
                 newcoin.nHeight = 1;
                 coins[out] = std::move(newcoin);
