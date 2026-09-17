@@ -794,12 +794,23 @@ FilteredOutputGroups GroupOutputs(const CWallet& wallet,
         return filtered_groups;
     }
 
-    // We want to combine COutputs that have the same scriptPubKey into single OutputGroups
-    // except when there are more than OUTPUT_GROUP_MAX_ENTRIES COutputs grouped in an OutputGroup.
-    // To do this, we maintain a map where the key is the scriptPubKey and the value is a vector of OutputGroups.
-    // For each COutput, we check if the scriptPubKey is in the map, and if it is, the COutput is added
-    // to the last OutputGroup in the vector for the scriptPubKey. When the last OutputGroup has
-    // OUTPUT_GROUP_MAX_ENTRIES COutputs, a new OutputGroup is added to the end of the vector.
+    // We want to combine COutputs that have the same scriptPubKey into single OutputGroups.
+    // Keep the inherited entry-count ceiling, but also ensure an individual group can fit
+    // within the transaction's available input-weight budget. This is necessary for
+    // Mercatura PQ inputs, where 100 native ML-DSA inputs would exceed the standard
+    // transaction-weight limit before coin selection could use the group.
+    const int64_t max_transaction_weight{
+        coin_sel_params.m_max_tx_weight.value_or(MAX_STANDARD_TX_WEIGHT)
+    };
+    const int64_t tx_weight_no_input{
+        int64_t{coin_sel_params.tx_noinputs_size} * WITNESS_SCALE_FACTOR
+    };
+    const int64_t max_output_group_weight{
+        std::max<int64_t>(
+            0,
+            max_transaction_weight - tx_weight_no_input)
+    };
+
     typedef std::map<std::pair<CScript, OutputType>, std::vector<OutputGroup>> ScriptPubKeyToOutgroup;
     const auto& insert_output = [&](
             const std::shared_ptr<COutput>& output, OutputType type, size_t ancestors, size_t cluster_count,
@@ -815,10 +826,26 @@ FilteredOutputGroups GroupOutputs(const CWallet& wallet,
         // A pointer is used here so that group can be reassigned later if it is full.
         OutputGroup* group = &groups.back();
 
-        // Check if this OutputGroup is full. We limit to OUTPUT_GROUP_MAX_ENTRIES when using -avoidpartialspends
-        // to avoid surprising users with very high fees.
-        if (group->m_outputs.size() >= OUTPUT_GROUP_MAX_ENTRIES) {
-            // The last output group is full, add a new group to the vector and use that group for the insertion
+        // Split on either the inherited entry-count ceiling or the transaction's
+        // available input-weight budget. A single overweight input remains alone
+        // in its group so the normal coin-selection error path can report it.
+        const int64_t output_weight{
+            output->input_weight > 0
+                ? output->input_weight
+                : (output->input_bytes > 0
+                    ? int64_t{output->input_bytes} * WITNESS_SCALE_FACTOR
+                    : 0)
+        };
+
+        const bool group_count_full{
+            group->m_outputs.size() >= OUTPUT_GROUP_MAX_ENTRIES
+        };
+        const bool group_weight_full{
+            !group->m_outputs.empty() &&
+            int64_t{group->m_weight} + output_weight > max_output_group_weight
+        };
+
+        if (group_count_full || group_weight_full) {
             groups.emplace_back(coin_sel_params);
             group = &groups.back();
         }
