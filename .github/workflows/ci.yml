@@ -115,6 +115,50 @@ jobs:
         with:
           provider: ${{ matrix.provider || needs.runners.outputs.provider }}
 
+  macos-native:
+    name: 'macOS native ARM64'
+    runs-on: macos-15
+    if: ${{ vars.SKIP_BRANCH_PUSH != 'true' || github.event_name == 'pull_request' }}
+    timeout-minutes: 180
+
+    steps:
+      - *ANNOTATION_PR_NUMBER
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.ref || '' }}
+
+      - name: Install dependencies
+        run: |
+          brew install cmake boost pkgconf libevent ninja
+
+      - name: Configure
+        run: |
+          cmake -S . -B build-macos-arm64 \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_GUI=OFF \
+            -DWITH_ZMQ=OFF \
+            -DENABLE_IPC=OFF \
+            -DENABLE_WALLET=ON \
+            -DBUILD_TESTS=ON
+
+      - name: Build
+        run: |
+          cmake --build build-macos-arm64 --parallel 3
+
+      - name: Unit tests
+        run: |
+          ctest --test-dir build-macos-arm64 \
+            --output-on-failure \
+            -j 3
+
+      - name: Mercatura functional tests
+        run: |
+          python3 build-macos-arm64/test/functional/test_runner.py \
+            --jobs=3
+
   windows-native:
     name: 'Windows native x86_64 MSVC'
     runs-on: windows-2025-vs2026
