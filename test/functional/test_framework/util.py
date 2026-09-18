@@ -315,10 +315,43 @@ class Binaries:
             return self.valgrind_cmd + [bin_path]
 
 
+def _get_build_bin_dir(config):
+    """Return the directory containing the configured build's executables."""
+    bin_dir = os.path.join(config["environment"]["BUILDDIR"], "bin")
+    daemon = "mercaturad" + config["environment"]["EXEEXT"]
+
+    # Single-config generators such as Ninja and Make place binaries directly
+    # in BUILDDIR/bin.
+    if os.path.isfile(os.path.join(bin_dir, daemon)):
+        return bin_dir
+
+    # Multi-config generators such as Visual Studio and Xcode place binaries
+    # in a configuration-specific subdirectory.
+    build_config = os.getenv("BITCOIN_BUILD_CONFIG")
+    if build_config:
+        candidate = os.path.join(bin_dir, build_config)
+        if os.path.isfile(os.path.join(candidate, daemon)):
+            return candidate
+
+    candidates = [
+        os.path.join(bin_dir, build_config)
+        for build_config in ("Release", "RelWithDebInfo", "Debug", "MinSizeRel", "Coverage")
+        if os.path.isfile(os.path.join(bin_dir, build_config, daemon))
+    ]
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    # Preserve the historical path when no unambiguous built daemon can be
+    # located. Individual binary paths can still be overridden by environment.
+    return bin_dir
+
+
 def get_binary_paths(config):
     """Get paths of all binaries from environment variables or their default values"""
 
     paths = types.SimpleNamespace()
+    bin_dir = _get_build_bin_dir(config)
     binaries = {
         "bitcoin": "BITCOIN_BIN",
         "mercaturad": "BITCOIND",
@@ -333,8 +366,7 @@ def get_binary_paths(config):
     # variables.
     for binary, env_variable_name in binaries.items():
         default_filename = os.path.join(
-            config["environment"]["BUILDDIR"],
-            "bin",
+            bin_dir,
             binary + config["environment"]["EXEEXT"],
         )
         setattr(paths, env_variable_name.lower(), os.getenv(env_variable_name, default=default_filename))
@@ -346,7 +378,7 @@ def get_binary_paths(config):
 
 def export_env_build_path(config):
     os.environ["PATH"] = os.pathsep.join([
-        os.path.join(config["environment"]["BUILDDIR"], "bin"),
+        _get_build_bin_dir(config),
         os.environ["PATH"],
     ])
 
