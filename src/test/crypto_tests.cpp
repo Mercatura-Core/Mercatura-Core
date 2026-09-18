@@ -1562,6 +1562,7 @@ BOOST_AUTO_TEST_CASE(mercatura_pqkey_commitment_tests)
             short_key));
 
     auto long_key = public_key;
+    long_key.reserve(public_key.size() + 1);
     long_key.push_back(0x00);
 
     BOOST_CHECK(
