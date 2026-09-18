@@ -54,10 +54,10 @@ class MercaturaNetworkIdentityTest(BitcoinTestFramework):
         pass
 
     def daemon_path(self):
-        return Path("build/bin/mercaturad").resolve()
+        return Path(self.binary_paths.bitcoind)
 
     def cli_path(self):
-        return Path("build/bin/mercatura-cli").resolve()
+        return Path(self.binary_paths.bitcoincli)
 
     def cli(self, datadir, chain, port, *args, check=True):
         cmd = [
