@@ -449,6 +449,14 @@ NON_SCRIPTS = [
 ]
 
 def main():
+    # GitHub-hosted Windows runners may use a legacy console encoding such as
+    # cp1252 when stdout/stderr are redirected. The functional runner emits
+    # Unicode paths and status symbols, so use UTF-8 for the runner itself.
+    if os.name == "nt":
+        for stream in (sys.stdout, sys.stderr):
+            if hasattr(stream, "reconfigure"):
+                stream.reconfigure(encoding="utf-8")
+
     # Parse arguments and pass through unrecognised args
     parser = argparse.ArgumentParser(add_help=False,
                                      usage='%(prog)s [test_runner.py options] [script options] [scripts]',
