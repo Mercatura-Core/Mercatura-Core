@@ -637,6 +637,12 @@ def run_tests(*, test_list, build_dir, tmpdir, jobs=1, enable_coverage=False, ar
     # functional tests so every child process inherits PYTHON_GIL=1.
     os.environ["PYTHON_GIL"] = "1"
 
+    # Windows Python otherwise defaults redirected stdout/stderr to the active
+    # legacy code page, which cannot necessarily represent the Unicode paths
+    # deliberately exercised by the functional test runner.
+    if os.name == "nt":
+        os.environ.setdefault("PYTHONUTF8", "1")
+
     # Warn if bitcoind is already running
     try:
         # pgrep exits with code zero when one or more matching processes found
