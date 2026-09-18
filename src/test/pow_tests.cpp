@@ -700,7 +700,7 @@ BOOST_AUTO_TEST_CASE(mercahash_development_genesis_miner)
 {
     static constexpr uint32_t DEV_BITS{0x207fffffU};
 
-    const uint256 dev_pow_limit{
+    constexpr uint256 dev_pow_limit{
         "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
 
     const auto mine_genesis =
