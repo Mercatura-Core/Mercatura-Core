@@ -115,6 +115,51 @@ jobs:
         with:
           provider: ${{ matrix.provider || needs.runners.outputs.provider }}
 
+  windows-native:
+    name: 'Windows native x86_64 MSVC'
+    runs-on: windows-2025-vs2026
+    if: ${{ vars.SKIP_BRANCH_PUSH != 'true' || github.event_name == 'pull_request' }}
+    timeout-minutes: 180
+
+    steps:
+      - *ANNOTATION_PR_NUMBER
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.ref || '' }}
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
+          cmake -B build-win-msvc `
+            --preset vs2026 `
+            -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON `
+            '-DVCPKG_MANIFEST_FEATURES=wallet;tests' `
+            -DBUILD_GUI=OFF `
+            -DWITH_ZMQ=OFF `
+            -DENABLE_IPC=OFF
+
+      - name: Build
+        shell: pwsh
+        run: |
+          cmake --build build-win-msvc --config Release --parallel 4
+
+      - name: Unit tests
+        shell: pwsh
+        run: |
+          ctest --test-dir build-win-msvc `
+            -C Release `
+            --output-on-failure `
+            -j 4
+
+      - name: Mercatura functional tests
+        shell: pwsh
+        run: |
+          python build-win-msvc\test\functional\test_runner.py `
+            --jobs=4
+
   lint:
     name: 'lint'
     needs: runners
