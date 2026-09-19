@@ -1163,6 +1163,8 @@ static DBErrors LoadMercaturaPQWalletRecords(
            DataStream& key,
            DataStream& value,
            std::string& err) {
+            AssertLockHeld(wallet->cs_wallet);
+
             if (!key.empty()) {
                 err = "Error reading wallet database: invalid Mercatura PQ state key";
                 return DBErrors::CORRUPT;
@@ -1194,6 +1196,8 @@ static DBErrors LoadMercaturaPQWalletRecords(
            DataStream& key,
            DataStream& value,
            std::string& err) {
+            AssertLockHeld(wallet->cs_wallet);
+
             if (!key.empty()) {
                 err = "Error reading wallet database: invalid Mercatura PQ seed key";
                 return DBErrors::CORRUPT;
@@ -1225,6 +1229,8 @@ static DBErrors LoadMercaturaPQWalletRecords(
            DataStream& key,
            DataStream& value,
            std::string& err) {
+            AssertLockHeld(wallet->cs_wallet);
+
             if (!key.empty()) {
                 err = "Error reading wallet database: invalid Mercatura PQ encrypted seed key";
                 return DBErrors::CORRUPT;
@@ -1256,6 +1262,8 @@ static DBErrors LoadMercaturaPQWalletRecords(
            DataStream& key,
            DataStream& value,
            std::string& err) {
+            AssertLockHeld(wallet->cs_wallet);
+
             MercaturaPQKeyCommitment commitment{};
 
             key >> commitment;
