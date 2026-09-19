@@ -44,8 +44,8 @@ static void WalletBalance(benchmark::Bench& bench, const bool set_dirty, const b
         LOCK(wallet.cs_wallet);
         wallet.SetWalletFlag(WALLET_FLAG_DESCRIPTORS);
         wallet.SetupDescriptorScriptPubKeyMans();
+        assert(wallet.InitializeMercaturaPQWallet());
     }
-    assert(wallet.InitializeMercaturaPQWallet());
     auto handler = test_setup->m_node.chain->handleNotifications({&wallet, [](CWallet*) {}});
 
     const std::optional<std::string> address_mine{add_mine ? std::optional<std::string>{getnewaddress(wallet)} : std::nullopt};
