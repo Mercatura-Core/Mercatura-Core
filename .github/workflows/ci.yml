@@ -88,11 +88,11 @@ jobs:
             timeout-minutes: 180
             file-env: './ci/test/00_setup_env_mac_cross.sh'
 
-            - name: 'macOS Intel x86_64 cross-compile'
-              warp-runner: 'warp-ubuntu-latest-x64-8x'
-              fallback-runner: 'ubuntu-latest'
-              timeout-minutes: 180
-              file-env: './ci/test/00_setup_env_mac_cross_intel.sh'
+          - name: 'macOS Intel x86_64 cross-compile'
+            warp-runner: 'warp-ubuntu-latest-x64-8x'
+            fallback-runner: 'ubuntu-latest'
+            timeout-minutes: 180
+            file-env: './ci/test/00_setup_env_mac_cross_intel.sh'
 
     steps:
       - *ANNOTATION_PR_NUMBER
