@@ -1162,8 +1162,7 @@ static DBErrors LoadMercaturaPQWalletRecords(
         [](CWallet* wallet,
            DataStream& key,
            DataStream& value,
-           std::string& err) {
-            AssertLockHeld(wallet->cs_wallet);
+           std::string& err) EXCLUSIVE_LOCKS_REQUIRED(wallet->cs_wallet) {
 
             if (!key.empty()) {
                 err = "Error reading wallet database: invalid Mercatura PQ state key";
@@ -1195,8 +1194,7 @@ static DBErrors LoadMercaturaPQWalletRecords(
         [](CWallet* wallet,
            DataStream& key,
            DataStream& value,
-           std::string& err) {
-            AssertLockHeld(wallet->cs_wallet);
+           std::string& err) EXCLUSIVE_LOCKS_REQUIRED(wallet->cs_wallet) {
 
             if (!key.empty()) {
                 err = "Error reading wallet database: invalid Mercatura PQ seed key";
@@ -1228,8 +1226,7 @@ static DBErrors LoadMercaturaPQWalletRecords(
         [](CWallet* wallet,
            DataStream& key,
            DataStream& value,
-           std::string& err) {
-            AssertLockHeld(wallet->cs_wallet);
+           std::string& err) EXCLUSIVE_LOCKS_REQUIRED(wallet->cs_wallet) {
 
             if (!key.empty()) {
                 err = "Error reading wallet database: invalid Mercatura PQ encrypted seed key";
@@ -1261,8 +1258,7 @@ static DBErrors LoadMercaturaPQWalletRecords(
         [](CWallet* wallet,
            DataStream& key,
            DataStream& value,
-           std::string& err) {
-            AssertLockHeld(wallet->cs_wallet);
+           std::string& err) EXCLUSIVE_LOCKS_REQUIRED(wallet->cs_wallet) {
 
             MercaturaPQKeyCommitment commitment{};
 
