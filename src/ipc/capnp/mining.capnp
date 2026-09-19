@@ -12,7 +12,7 @@ using Proxy = import "/mp/proxy.capnp";
 $Proxy.include("interfaces/mining.h");
 $Proxy.includeTypes("ipc/capnp/mining-types.h");
 
-const maxMoney :Int64 = 2100000000000000;
+const maxMoney :Int64 = 999999999999999999;
 const maxDouble :Float64 = 1.7976931348623157e308;
 const defaultBlockReservedSize :UInt32 = 2000;
 const defaultCoinbaseOutputMaxAdditionalSigops :UInt32 = 400;
