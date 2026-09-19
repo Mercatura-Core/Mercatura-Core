@@ -885,6 +885,7 @@ BOOST_AUTO_TEST_CASE(mercatura_coinbase_plus_one_overclaim_rejected)
                 // ConnectBlock requires the supplied UTXO view to identify the
                 // exact synthetic parent as its current best block. The block
                 // is coinbase-only, so no historical UTXOs are required.
+                LOCK(cs_main);
                 CCoinsViewCache view{
                     &chainstate.CoinsTip()};
 
@@ -1165,6 +1166,7 @@ BOOST_AUTO_TEST_CASE(mercatura_adaptive_fee_underclaim_preserves_controller)
 
                 // Give this candidate an isolated UTXO view whose best block
                 // is the exact synthetic adaptive parent.
+                LOCK(cs_main);
                 CCoinsViewCache view{
                     &chainstate.CoinsTip()};
 
