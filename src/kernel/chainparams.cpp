@@ -212,7 +212,7 @@ public:
         consensus.nDGWTargetTimespan = 3600;
         consensus.nDGWMinTimespan = 1200;
         consensus.nDGWMaxTimespan = 10800;
-        consensus.fPowAllowMinDifficultyBlocks = true;
+        consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.enforce_BIP94 = false;
         consensus.fPowNoRetargeting = false;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
@@ -246,12 +246,12 @@ public:
             "Mercatura private testnet genesis v0.1",
             "Mercatura private testnet genesis v0.1",
             1788566400,
-            2,
-            0x207fffff,
+            104862,
+            0x1f0aec33,
             1,
             50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256{"0cee25abd571760687efbebbe8741873dc187ce46afe082282a47b2455320d73"});
+        assert(consensus.hashGenesisBlock == uint256{"b92d6e7f680a111c3e5c91bf87aafabce04ecb16dcefde61a535cadf3941b51d"});
         assert(genesis.hashMerkleRoot == uint256{"98bd90b0fdc8794f4fdfbadc78a068345abb119e0cbb47a6aa2cfc39ebfee891"});
 
         // Mercatura development starts without DNS or fixed seeds.

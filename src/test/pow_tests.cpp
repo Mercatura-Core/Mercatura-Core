@@ -538,11 +538,19 @@ BOOST_AUTO_TEST_CASE(dgw_pow_limit_ceiling)
         POW_LIMIT_BITS);
 }
 
-BOOST_AUTO_TEST_CASE(testnet_min_difficulty_delay)
+BOOST_AUTO_TEST_CASE(min_difficulty_delay_rule)
 {
     const auto test_params =
         CreateChainParams(*m_node.args, ChainType::TESTNET);
-    const auto& consensus = test_params->GetConsensus();
+    auto consensus = test_params->GetConsensus();
+
+    // Mercatura public testnet deliberately disables the minimum-difficulty
+    // escape so the calibrated launch difficulty remains effective.
+    BOOST_CHECK(!consensus.fPowAllowMinDifficultyBlocks);
+
+    // Exercise the generic delayed-block exception independently of the
+    // active Mercatura testnet policy.
+    consensus.fPowAllowMinDifficultyBlocks = true;
 
     constexpr uint32_t START_BITS{0x1c0ffff0U};
 
@@ -894,12 +902,12 @@ BOOST_AUTO_TEST_CASE(mercahash_genesis_vectors)
             ChainType::TESTNET,
             "testnet",
             1788566400U,
-            2U,
-            0x207fffffU,
+            104862U,
+            0x1f0aec33U,
             1,
-            uint256{"0cee25abd571760687efbebbe8741873dc187ce46afe082282a47b2455320d73"},
+            uint256{"b92d6e7f680a111c3e5c91bf87aafabce04ecb16dcefde61a535cadf3941b51d"},
             uint256{"98bd90b0fdc8794f4fdfbadc78a068345abb119e0cbb47a6aa2cfc39ebfee891"},
-            uint256{"06f5e56273c1d90c43e1540c5582e8e94e34e1bb378fd8932e721b1c62df7f8a"},
+            uint256{"000551807c1dc1c5efe0617da8c3b955b6e0839c5da78cffa3a7429e25a1c1be"},
         },
         {
             ChainType::SIGNET,
