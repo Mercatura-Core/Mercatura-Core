@@ -3057,8 +3057,8 @@ BOOST_AUTO_TEST_CASE(mercatura_pq_precomputed_hashes)
         {
             ChainType::TESTNET,
             "testnet",
-            "0cee25abd571760687efbebbe8741873dc187ce46afe082282a47b2455320d73",
-            "127e27c689ce096820338e74ff23e86c4034e7b15fe87b92740276dfbb93ece79ffc7b24f6b6e03cd99d4d1c5544b1fe",
+            "b92d6e7f680a111c3e5c91bf87aafabce04ecb16dcefde61a535cadf3941b51d",
+            "a06e68deec15078f153a9ccdf77eb2a88376aabfbe48eb629d83041134372eb65a3a364077bc6b30a5d40c01bc8cac49",
         },
         {
             ChainType::SIGNET,

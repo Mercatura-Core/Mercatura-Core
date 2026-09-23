@@ -24,7 +24,7 @@ NETWORKS = (
     {
         "arg": "test",
         "rpc_chain": "test",
-        "genesis": "0cee25abd571760687efbebbe8741873dc187ce46afe082282a47b2455320d73",
+        "genesis": "b92d6e7f680a111c3e5c91bf87aafabce04ecb16dcefde61a535cadf3941b51d",
         "address_prefix": "tmca1z",
     },
     {
