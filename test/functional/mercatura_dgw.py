@@ -2,7 +2,7 @@
 # Copyright (c) 2026 The Mercatura developers
 # Distributed under the MIT software license.
 
-"""Mercatura native DGWv3 functional test on isolated testnet."""
+"""Mercatura native DGWv3 functional test on isolated main development chain."""
 
 from test_framework.messages import uint256_from_compact
 from test_framework.test_framework import BitcoinTestFramework
@@ -14,6 +14,7 @@ TARGET_SPACING = 150
 TARGET_TIMESPAN = 3600
 MIN_TIMESPAN = 1200
 MAX_TIMESPAN = 10800
+POW_LIMIT_BITS = 0x207fffff
 
 FAST_SPACING = 50
 SLOW_SPACING = 200
@@ -46,9 +47,10 @@ class MercaturaDGWTest(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.uses_wallet = False
 
-        # Regtest deliberately disables retargeting. Isolated Mercatura
-        # testnet exercises the real DGWv3 consensus path.
-        self.chain = "testnet"
+        # Regtest deliberately disables retargeting. Use the isolated
+        # development main chain so real DGWv3 consensus is exercised with
+        # the current easy provisional genesis target suitable for CI.
+        self.chain = ""  # main
 
         self.extra_args = [[
             "-dnsseed=0",
@@ -179,10 +181,7 @@ class MercaturaDGWTest(BitcoinTestFramework):
 
         assert gap > 0
 
-        #
-        # Testnet's minimum-difficulty exception requires a delay strictly
-        # greater than two target spacings. Keep every test gap <= 300s.
-        #
+        # Keep the synthetic timing scenarios bounded and deterministic.
         assert gap <= TARGET_SPACING * 2
 
         expected_bits = self.calculate_dgw_bits(
@@ -265,7 +264,12 @@ class MercaturaDGWTest(BitcoinTestFramework):
         launch_bits = genesis["bits"]
 
         self.pow_limit_target = self.target_from_bits(
-            launch_bits
+            POW_LIMIT_BITS
+        )
+
+        assert (
+            self.target_from_bits(launch_bits)
+            <= self.pow_limit_target
         )
 
         self.log.info(
@@ -404,8 +408,7 @@ class MercaturaDGWTest(BitcoinTestFramework):
         assert lower_boundary_target <= fast_target
 
         #
-        # Feed slower 200-second blocks into the rolling window. This is still
-        # below testnet's >300-second minimum-difficulty exception.
+        # Feed slower 200-second blocks into the rolling window.
         #
         self.log.info(
             "Mining slow-spacing DGW window"
@@ -437,8 +440,7 @@ class MercaturaDGWTest(BitcoinTestFramework):
         assert slow_target > lower_boundary_target
 
         #
-        # Verify the slow test intervals remained outside the special
-        # testnet delayed-block minimum-difficulty path.
+        # Verify the intended slow-spacing test interval exactly.
         #
         for previous, current in zip(
             slow_headers,
