@@ -32,6 +32,10 @@ set(CLIENT_VERSION_MINOR 1)
 set(CLIENT_VERSION_BUILD 0)
 set(CLIENT_VERSION_RC 0)
 set(CLIENT_VERSION_IS_RELEASE "true")
+set(MERCATURA_VERSION_MAJOR 0)
+set(MERCATURA_VERSION_MINOR 1)
+set(MERCATURA_VERSION_BUILD 0)
+set(MERCATURA_VERSION_STRING "0.1")
 set(COPYRIGHT_YEAR "2026")
 
 # During the enabling of the CXX and CXXOBJ languages, we modify
@@ -52,7 +56,7 @@ set(CMAKE_TRY_COMPILE_PLATFORM_VARIABLES
 
 project(BitcoinCore
   VERSION ${CLIENT_VERSION_MAJOR}.${CLIENT_VERSION_MINOR}.${CLIENT_VERSION_BUILD}
-  DESCRIPTION "Bitcoin client software"
+  DESCRIPTION "Mercatura Core client software"
   HOMEPAGE_URL "https://github.com/Mercatura-Core/Mercatura-Core"
   LANGUAGES NONE
 )

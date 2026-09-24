@@ -86,20 +86,6 @@ void ReceiveCoinsDialog::setModel(WalletModel *_model)
             &QItemSelectionModel::selectionChanged, this,
             &ReceiveCoinsDialog::recentRequestsView_selectionChanged);
 
-        // Populate address type dropdown and select default
-        auto add_address_type = [&](OutputType type, const QString& text, const QString& tooltip) {
-            const auto index = ui->addressType->count();
-            ui->addressType->addItem(text, (int) type);
-            ui->addressType->setItemData(index, tooltip, Qt::ToolTipRole);
-            if (model->wallet().getDefaultAddressType() == type) ui->addressType->setCurrentIndex(index);
-        };
-        add_address_type(OutputType::LEGACY, tr("Base58 (Legacy)"), tr("Not recommended due to higher fees and less protection against typos."));
-        add_address_type(OutputType::P2SH_SEGWIT, tr("Base58 (P2SH-SegWit)"), tr("Generates an address compatible with older wallets."));
-        add_address_type(OutputType::BECH32, tr("Bech32 (SegWit)"), tr("Generates a native segwit address (BIP-173). Some old wallets don't support it."));
-        if (model->wallet().taprootEnabled()) {
-            add_address_type(OutputType::BECH32M, tr("Bech32m (Taproot)"), tr("Bech32m (BIP-350) is an upgrade to Bech32, wallet support is still limited."));
-        }
-
         // Set the button to be enabled or disabled based on whether the wallet can give out new addresses.
         ui->receiveButton->setEnabled(model->wallet().canGetAddresses());
 
@@ -151,7 +137,10 @@ void ReceiveCoinsDialog::on_receiveButton_clicked()
     QString address;
     QString label = ui->reqLabel->text();
     /* Generate new receiving address */
-    const OutputType address_type = (OutputType)ui->addressType->currentData().toInt();
+    // Mercatura PQ Authorization v1 is the sole normal receive path.
+    // BECH32M is retained internally as the wallet compatibility bucket
+    // for native witness-v2 Mercatura PQ destinations.
+    const OutputType address_type{OutputType::BECH32M};
     address = model->getAddressTableModel()->addRow(AddressTableModel::Receive, label, "", address_type);
 
     switch(model->getAddressTableModel()->getEditStatus())
@@ -177,7 +166,7 @@ void ReceiveCoinsDialog::on_receiveButton_clicked()
         break;
     case AddressTableModel::EditStatus::KEY_GENERATION_FAILURE:
         QMessageBox::critical(this, windowTitle(),
-            tr("Could not generate new %1 address").arg(QString::fromStdString(FormatOutputType(address_type))),
+            tr("Could not generate new Mercatura PQ address"),
             QMessageBox::Ok, QMessageBox::Ok);
         break;
     // These aren't valid return values for our action
