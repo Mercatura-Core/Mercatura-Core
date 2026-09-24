@@ -198,26 +198,28 @@ std::shared_ptr<CWallet> SetupDescriptorsWallet(interfaces::Node& node, TestChai
         wallet->SetWalletFlag(WALLET_FLAG_DISABLE_PRIVATE_KEYS);
     } else {
         wallet->SetupDescriptorScriptPubKeyMans();
+        Assert(wallet->InitializeMercaturaPQWallet());
     }
 
-    // Add the coinbase key
-    FlatSigningProvider provider;
-    std::string error;
-    std::string key_str;
     if (watch_only) {
-        key_str = HexStr(test.coinbaseKey.GetPubKey());
-    } else {
-        key_str = EncodeSecret(test.coinbaseKey);
+        // Retain the inherited classical descriptor only for the explicit
+        // watch-only PSBT fixture.
+        FlatSigningProvider provider;
+        std::string error;
+        const std::string key_str{HexStr(test.coinbaseKey.GetPubKey())};
+        auto descs = Parse("combo(" + key_str + ")", provider, error, /* require_checksum=*/ false);
+        assert(!descs.empty());
+        assert(descs.size() == 1);
+        auto& desc = descs.at(0);
+        WalletDescriptor w_desc(std::move(desc), 0, 0, 1, 1);
+        Assert(wallet->AddWalletDescriptor(w_desc, provider, "", false));
+        const PKHash dest{test.coinbaseKey.GetPubKey()};
+        wallet->SetAddressBook(dest, "", wallet::AddressPurpose::RECEIVE);
     }
-    auto descs = Parse("combo(" + key_str + ")", provider, error, /* require_checksum=*/ false);
-    assert(!descs.empty());
-    assert(descs.size() == 1);
-    auto& desc = descs.at(0);
-    WalletDescriptor w_desc(std::move(desc), 0, 0, 1, 1);
-    Assert(wallet->AddWalletDescriptor(w_desc, provider, "", false));
-    const PKHash dest{test.coinbaseKey.GetPubKey()};
-    wallet->SetAddressBook(dest, "", wallet::AddressPurpose::RECEIVE);
-    wallet->SetLastBlockProcessed(105, WITH_LOCK(node.context()->chainman->GetMutex(), return node.context()->chainman->ActiveChain().Tip()->GetBlockHash()));
+
+    wallet->SetLastBlockProcessed(
+        WITH_LOCK(node.context()->chainman->GetMutex(), return node.context()->chainman->ActiveChain().Height()),
+        WITH_LOCK(node.context()->chainman->GetMutex(), return node.context()->chainman->ActiveChain().Tip()->GetBlockHash()));
     SyncUpWallet(wallet, node);
     wallet->SetBroadcastTransactions(true);
     return wallet;
@@ -283,8 +285,11 @@ void TestGUI(interfaces::Node& node, const std::shared_ptr<CWallet>& wallet)
     // Send two transactions, and verify they are added to transaction list.
     TransactionTableModel* transactionTableModel = walletModel.getTransactionTableModel();
     QCOMPARE(transactionTableModel->rowCount({}), 105);
-    Txid txid1 = SendCoins(*wallet.get(), sendCoinsDialog, PKHash(), 5 * COIN, /*rbf=*/false);
-    Txid txid2 = SendCoins(*wallet.get(), sendCoinsDialog, PKHash(), 10 * COIN, /*rbf=*/true);
+    const CTxDestination external_pq_recipient{
+        WitnessV2MercaturaPQ{}
+    };
+    Txid txid1 = SendCoins(*wallet.get(), sendCoinsDialog, external_pq_recipient, 5 * COIN, /*rbf=*/false);
+    Txid txid2 = SendCoins(*wallet.get(), sendCoinsDialog, external_pq_recipient, 10 * COIN, /*rbf=*/true);
     // Transaction table model updates on a QueuedConnection, so process events to ensure it's updated.
     qApp->processEvents();
     QCOMPARE(transactionTableModel->rowCount({}), 107);
@@ -449,6 +454,33 @@ void TestGUI(interfaces::Node& node)
 
     // "Full" GUI tests, use descriptor wallet
     const std::shared_ptr<CWallet>& desc_wallet = SetupDescriptorsWallet(node, test);
+
+    // Fund the full GUI wallet through Mercatura's native PQ ownership path.
+    // Mine 105 blocks to one wallet-owned PQ destination so the first few
+    // coinbases are mature and spendable, while preserving the historical
+    // 105-row transaction-table fixture.
+    auto pq_funding_destination{
+        desc_wallet->GetNewDestination(
+            OutputType::BECH32M,
+            "qt-pq-funding")
+    };
+    QVERIFY(pq_funding_destination);
+    QVERIFY(
+        std::get_if<WitnessV2MercaturaPQ>(
+            &*pq_funding_destination) != nullptr);
+
+    for (int i = 0; i < 105; ++i) {
+        test.CreateAndProcessBlock(
+            {},
+            GetScriptForDestination(
+                *pq_funding_destination));
+    }
+
+    desc_wallet->SetLastBlockProcessed(
+        WITH_LOCK(test.m_node.chainman->GetMutex(), return test.m_node.chainman->ActiveChain().Height()),
+        WITH_LOCK(test.m_node.chainman->GetMutex(), return test.m_node.chainman->ActiveChain().Tip()->GetBlockHash()));
+    SyncUpWallet(desc_wallet, node);
+
     TestGUI(node, desc_wallet);
 
     // Legacy watch-only wallet test
