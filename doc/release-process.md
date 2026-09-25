@@ -7,7 +7,7 @@ Release Process
 
 * Update release candidate version in `CMakeLists.txt` (`CLIENT_VERSION_RC`).
 * Update manpages (after rebuilding the binaries), see [gen-manpages.py](/contrib/devtools/README.md#gen-manpagespy).
-* Update bitcoin.conf and commit changes if they exist, see [gen-bitcoin-conf.sh](/contrib/devtools/README.md#gen-bitcoin-confsh).
+* Update mercatura.conf and commit changes if they exist, see [gen-mercatura-conf.sh](/contrib/devtools/README.md#gen-mercatura-confsh).
 
 ### Before every major and minor release
 

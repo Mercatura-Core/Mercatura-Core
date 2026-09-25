@@ -57,12 +57,12 @@ CRCCheck force
 XPStyle on
 BrandingText " "
 ShowInstDetails show
-VIProductVersion @CLIENT_VERSION_MAJOR@.@CLIENT_VERSION_MINOR@.@CLIENT_VERSION_BUILD@.0
+VIProductVersion @MERCATURA_VERSION_MAJOR@.@MERCATURA_VERSION_MINOR@.@MERCATURA_VERSION_BUILD@.0
 VIAddVersionKey ProductName "@CLIENT_NAME@"
-VIAddVersionKey ProductVersion "@CLIENT_VERSION_STRING@"
+VIAddVersionKey ProductVersion "@MERCATURA_VERSION_STRING@"
 VIAddVersionKey CompanyName "${COMPANY}"
 VIAddVersionKey CompanyWebsite "${URL}"
-VIAddVersionKey FileVersion "@CLIENT_VERSION_STRING@"
+VIAddVersionKey FileVersion "@MERCATURA_VERSION_STRING@"
 VIAddVersionKey FileDescription "Installer for @CLIENT_NAME@"
 VIAddVersionKey LegalCopyright "Copyright (C) 2009-@COPYRIGHT_YEAR@ @COPYRIGHT_HOLDERS_FINAL@"
 InstallDirRegKey HKCU "${REGKEY}" Path
@@ -73,18 +73,14 @@ Section -Main SEC0000
     SetOutPath $INSTDIR
     SetOverwrite on
     File @abs_top_builddir@/release/@BITCOIN_GUI_NAME@@EXEEXT@
-    File @abs_top_builddir@/release/@BITCOIN_WRAPPER_NAME@@EXEEXT@
     File /oname=COPYING.txt @abs_top_srcdir@/COPYING
     File /oname=readme.txt @abs_top_srcdir@/doc/README_windows.txt
-    File /oname=mercatura.conf @abs_top_srcdir@/share/examples/bitcoin.conf
+    File /oname=mercatura.conf @abs_top_srcdir@/share/examples/mercatura.conf
     SetOutPath $INSTDIR\share\rpcauth
     File @abs_top_srcdir@/share/rpcauth/*.*
     SetOutPath $INSTDIR\daemon
     File @abs_top_builddir@/release/@BITCOIN_DAEMON_NAME@@EXEEXT@
     File @abs_top_builddir@/release/@BITCOIN_CLI_NAME@@EXEEXT@
-    File @abs_top_builddir@/release/@BITCOIN_TX_NAME@@EXEEXT@
-    File @abs_top_builddir@/release/@BITCOIN_WALLET_TOOL_NAME@@EXEEXT@
-    File @abs_top_builddir@/release/@BITCOIN_TEST_NAME@@EXEEXT@
     SetOutPath $INSTDIR
     WriteRegStr HKCU "${REGKEY}\Components" Main 1
 SectionEnd
@@ -101,7 +97,7 @@ Section -post SEC0001
     CreateShortcut "$SMPROGRAMS\$StartMenuGroup\Uninstall $(^Name).lnk" $INSTDIR\uninstall.exe
     !insertmacro MUI_STARTMENU_WRITE_END
     WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" DisplayName "$(^Name)"
-    WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" DisplayVersion "@CLIENT_VERSION_STRING@"
+    WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" DisplayVersion "@MERCATURA_VERSION_STRING@"
     WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" Publisher "${COMPANY}"
     WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" URLInfoAbout "${URL}"
     WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$(^Name)" DisplayIcon $INSTDIR\@BITCOIN_GUI_NAME@@EXEEXT@
@@ -140,7 +136,6 @@ done${UNSECTION_ID}:
 
 # Uninstaller sections
 Section /o -un.Main UNSEC0000
-    Delete /REBOOTOK $INSTDIR\@BITCOIN_WRAPPER_NAME@@EXEEXT@
     Delete /REBOOTOK $INSTDIR\@BITCOIN_GUI_NAME@@EXEEXT@
     Delete /REBOOTOK $INSTDIR\COPYING.txt
     Delete /REBOOTOK $INSTDIR\readme.txt
