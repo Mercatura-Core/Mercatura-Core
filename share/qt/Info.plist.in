@@ -17,13 +17,13 @@
   </array>
 
   <key>NSHumanReadableCopyright</key>
-  <string>@CLIENT_VERSION_MAJOR@.@CLIENT_VERSION_MINOR@.@CLIENT_VERSION_BUILD@, Copyright © 2009-@COPYRIGHT_YEAR@ @COPYRIGHT_HOLDERS_FINAL@</string>
+  <string>@MERCATURA_VERSION_MAJOR@.@MERCATURA_VERSION_MINOR@.@MERCATURA_VERSION_BUILD@, Copyright © 2009-@COPYRIGHT_YEAR@ @COPYRIGHT_HOLDERS_FINAL@</string>
 
   <key>CFBundleShortVersionString</key>
-  <string>@CLIENT_VERSION_MAJOR@.@CLIENT_VERSION_MINOR@.@CLIENT_VERSION_BUILD@</string>
+  <string>@MERCATURA_VERSION_MAJOR@.@MERCATURA_VERSION_MINOR@.@MERCATURA_VERSION_BUILD@</string>
 
   <key>CFBundleVersion</key>
-  <string>@CLIENT_VERSION_MAJOR@.@CLIENT_VERSION_MINOR@.@CLIENT_VERSION_BUILD@</string>
+  <string>@MERCATURA_VERSION_MAJOR@.@MERCATURA_VERSION_MINOR@.@MERCATURA_VERSION_BUILD@</string>
 
   <key>CFBundleSignature</key>
   <string>????</string>
@@ -32,13 +32,13 @@
   <string>Mercatura-Qt</string>
 
   <key>CFBundleName</key>
-  <string>Mercatura-Qt</string>
+  <string>@CLIENT_NAME@</string>
 
   <key>LSHasLocalizedDisplayName</key>
   <true/>
 
   <key>CFBundleIdentifier</key>
-  <string>org.mercatura.Mercatura-Qt</string>
+  <string>org.mercaturacore.mercatura-qt</string>
 
   <key>CFBundleURLTypes</key>
   <array>
@@ -46,7 +46,7 @@
       <key>CFBundleTypeRole</key>
       <string>Editor</string>
       <key>CFBundleURLName</key>
-      <string>org.mercatura.MercaturaPayment</string>
+      <string>org.mercaturacore.mercatura-payment</string>
       <key>CFBundleURLSchemes</key>
       <array>
         <string>mercatura</string>
