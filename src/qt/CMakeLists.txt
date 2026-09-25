@@ -270,7 +270,33 @@ target_link_libraries(bitcoin-qt
 )
 
 import_plugins(bitcoin-qt)
-install_binary_component(bitcoin-qt HAS_MANPAGE)
+install_binary_component(bitcoin-qt)
+
+if(INSTALL_MAN)
+  install(FILES
+    ${CMAKE_SOURCE_DIR}/doc/man/mercatura-qt.1
+    DESTINATION ${CMAKE_INSTALL_MANDIR}/man1
+    COMPONENT bitcoin-qt
+  )
+endif()
+
+if(UNIX AND NOT APPLE)
+  install(FILES
+    ${CMAKE_SOURCE_DIR}/share/applications/mercatura-qt.desktop
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+    COMPONENT bitcoin-qt
+  )
+
+  foreach(icon_size 16 32 64 128 256)
+    install(FILES
+      ${CMAKE_SOURCE_DIR}/share/pixmaps/bitcoin${icon_size}.png
+      DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/${icon_size}x${icon_size}/apps
+      RENAME mercatura.png
+      COMPONENT bitcoin-qt
+    )
+  endforeach()
+endif()
+
 if(WIN32)
   set_target_properties(bitcoin-qt PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()

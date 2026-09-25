@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Name=Mercatura Core
+Comment=Mercatura peer-to-peer digital currency
+Exec=mercatura-qt %u
+Terminal=false
+Type=Application
+Icon=mercatura
+MimeType=x-scheme-handler/mercatura;
+Categories=Finance;Network;
+StartupNotify=true
