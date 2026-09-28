@@ -38,7 +38,7 @@ const std::string UA_NAME("MercaturaCore");
     #define BUILD_DESC BUILD_GIT_TAG
     #define BUILD_SUFFIX ""
 #else
-    #define BUILD_DESC "v" CLIENT_VERSION_STRING
+    #define BUILD_DESC "v" MERCATURA_VERSION_STRING
     #if CLIENT_VERSION_IS_RELEASE
         #define BUILD_SUFFIX ""
     #elif defined(BUILD_GIT_COMMIT)

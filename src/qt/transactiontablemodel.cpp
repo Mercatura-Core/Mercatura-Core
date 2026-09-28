@@ -388,15 +388,15 @@ QVariant TransactionTableModel::txAddressDecoration(const TransactionRecord *wtx
     switch(wtx->type)
     {
     case TransactionRecord::Generated:
-        return QIcon(":/icons/tx_mined");
+        return platformStyle->SingleColorIcon(QStringLiteral(":/icons/tx_mined"));
     case TransactionRecord::RecvWithAddress:
     case TransactionRecord::RecvFromOther:
-        return QIcon(":/icons/tx_input");
+        return platformStyle->SingleColorIcon(QStringLiteral(":/icons/tx_input"));
     case TransactionRecord::SendToAddress:
     case TransactionRecord::SendToOther:
-        return QIcon(":/icons/tx_output");
+        return platformStyle->SingleColorIcon(QStringLiteral(":/icons/tx_output"));
     default:
-        return QIcon(":/icons/tx_inout");
+        return platformStyle->SingleColorIcon(QStringLiteral(":/icons/tx_inout"));
     }
 }
 

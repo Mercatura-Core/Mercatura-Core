@@ -19,7 +19,7 @@ static const struct {
     const bool useExtraSpacing;
 } platform_styles[] = {
     {"macosx", false, true, true},
-    {"windows", true, false, false},
+    {"windows", true, true, false},
     /* Other: linux, unix, ... */
     {"other", true, true, false}
 };
@@ -82,17 +82,10 @@ QColor PlatformStyle::TextColor() const
 
 QColor PlatformStyle::SingleColor() const
 {
-    if (colorizeIcons) {
-        QColor colorHighlightBg(QApplication::palette().color(QPalette::Highlight));
-        QColor colorHighlightFg(QApplication::palette().color(QPalette::HighlightedText));
-        const QColor colorText(QApplication::palette().color(QPalette::WindowText));
-        const int colorTextLightness = colorText.lightness();
-        if (abs(colorHighlightBg.lightness() - colorTextLightness) < abs(colorHighlightFg.lightness() - colorTextLightness)) {
-            return colorHighlightBg;
-        }
-        return colorHighlightFg;
-    }
-    return {0, 0, 0};
+    // Mercatura uses neutral monochrome interface glyphs. Following the
+    // platform text color keeps them black on light themes and readable
+    // on dark themes without tying the UI to the system highlight color.
+    return TextColor();
 }
 
 QImage PlatformStyle::SingleColorImage(const QString& filename) const

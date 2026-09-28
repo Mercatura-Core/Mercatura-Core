@@ -28,6 +28,11 @@ static const int CLIENT_VERSION =
                          +     100 * CLIENT_VERSION_MINOR
                          +       1 * CLIENT_VERSION_BUILD;
 
+static const int MERCATURA_VERSION =
+                             10000 * MERCATURA_VERSION_MAJOR
+                         +     100 * MERCATURA_VERSION_MINOR
+                         +       1 * MERCATURA_VERSION_BUILD;
+
 extern const std::string UA_NAME;
 
 

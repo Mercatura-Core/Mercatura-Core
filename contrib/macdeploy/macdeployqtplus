@@ -415,7 +415,7 @@ if os.path.exists("dist"):
 
 # ------------------------------------------------
 
-target = os.path.join("dist", "Mercatura-Qt.app")
+target = os.path.join("dist", "Mercatura Core.app")
 
 print("+ Copying source bundle +")
 if verbose:
@@ -487,7 +487,7 @@ with open(os.path.join(applicationBundle.resourcesPath, "qt.conf"), "wb") as f:
 # ------------------------------------------------
 
 if platform.system() == "Darwin":
-    subprocess.check_call(f"codesign --deep --force --sign - {target}", shell=True)
+    subprocess.check_call(["codesign", "--deep", "--force", "--sign", "-", target])
 
 # ------------------------------------------------
 
@@ -498,7 +498,7 @@ if config.zip is not None:
         print("+ Removing existing .zip +")
         os.unlink(name + ".zip")
 
-    subprocess.check_call(["zip", "-ry", os.path.abspath(name + ".zip"), 'Mercatura-Qt.app'], cwd='dist')
+    subprocess.check_call(["zip", "-ry", os.path.abspath(name + ".zip"), 'Mercatura Core.app'], cwd='dist')
 
 # ------------------------------------------------
 

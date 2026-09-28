@@ -17,6 +17,7 @@
 #include <policy/policy.h>
 #include <wallet/coincontrol.h>
 #include <wallet/coinselection.h>
+#include <wallet/spend.h>
 #include <wallet/wallet.h>
 
 #include <QApplication>
@@ -384,6 +385,7 @@ void CoinControlDialog::updateLabels(CCoinControl& m_coin_control, WalletModel *
     unsigned int nBytes         = 0;
     unsigned int nBytesInputs   = 0;
     unsigned int nQuantity      = 0;
+    unsigned int nWitnessStackCountsIncluded = 0;
     bool fWitness               = false;
 
     auto vCoinControl{m_coin_control.ListSelected()};
@@ -413,18 +415,41 @@ void CoinControlDialog::updateLabels(CCoinControl& m_coin_control, WalletModel *
         std::vector<unsigned char> witnessprogram;
         if (out.txout.scriptPubKey.IsWitnessProgram(witnessversion, witnessprogram))
         {
-            // add input skeleton bytes (outpoint, scriptSig size, nSequence)
-            nBytesInputs += (32 + 4 + 1 + 4);
+            if (witnessversion == 2 && witnessprogram.size() == 32) {
+                // Mercatura PQ Authorization v1 uses native witness-v2 with
+                // a 32-byte program. Fees count the complete serialized PQ
+                // input with no witness discount, so reuse the authoritative
+                // wallet estimator rather than the inherited SegWit estimate.
+                const int pq_input_size{
+                    wallet::CalculateMaximumSignedInputSize(
+                        out.txout,
+                        outpt,
+                        /*pwallet=*/nullptr,
+                        /*can_grind_r=*/false,
+                        /*coin_control=*/nullptr)
+                };
+                if (pq_input_size < 0) {
+                    throw std::runtime_error("Unable to estimate Mercatura PQ input size");
+                }
+                nBytesInputs += static_cast<unsigned int>(pq_input_size);
 
-            if (witnessversion == 0) { // P2WPKH
-                // 1 WU (witness item count) + 72 WU (ECDSA signature with len byte) + 34 WU (pubkey with len byte)
-                nBytesInputs += 107 / WITNESS_SCALE_FACTOR;
-            } else if (witnessversion == 1) { // P2TR key-path spend
-                // 1 WU (witness item count) + 65 WU (Schnorr signature with len byte)
-                nBytesInputs += 66 / WITNESS_SCALE_FACTOR;
+                // The shared PQ fee-size estimate already contains this
+                // input's serialized witness-stack-count byte.
+                ++nWitnessStackCountsIncluded;
             } else {
-                // not supported, should be unreachable
-                throw std::runtime_error("Trying to spend future segwit version script");
+                // add input skeleton bytes (outpoint, scriptSig size, nSequence)
+                nBytesInputs += (32 + 4 + 1 + 4);
+
+                if (witnessversion == 0) { // P2WPKH
+                    // 1 WU (witness item count) + 72 WU (ECDSA signature with len byte) + 34 WU (pubkey with len byte)
+                    nBytesInputs += 107 / WITNESS_SCALE_FACTOR;
+                } else if (witnessversion == 1) { // P2TR key-path spend
+                    // 1 WU (witness item count) + 65 WU (Schnorr signature with len byte)
+                    nBytesInputs += 66 / WITNESS_SCALE_FACTOR;
+                } else {
+                    // Undefined future witness versions remain unsupported.
+                    throw std::runtime_error("Trying to spend future segwit version script");
+                }
             }
             fWitness = true;
         }
@@ -453,7 +478,9 @@ void CoinControlDialog::updateLabels(CCoinControl& m_coin_control, WalletModel *
             // Usually, the result will be an overestimate within a couple of Mercatura base units so that the confirmation dialog ends up displaying a slightly smaller fee.
             // also, the witness stack size value is a variable sized integer. usually, the number of stack items will be well under the single byte var int limit.
             nBytes += 2; // account for the serialized marker and flag bytes
-            nBytes += nQuantity; // account for the witness byte that holds the number of stack items for each input.
+            // Every input in a witness transaction has a serialized witness
+            // stack count. Mercatura PQ input fee size already includes its own.
+            nBytes += nQuantity - nWitnessStackCountsIncluded;
         }
 
         // in the subtract fee from amount case, we can tell if zero change already and subtract the bytes, so that fee calculation afterwards is accurate

@@ -10,11 +10,11 @@ SIGNAPPLE=signapple
 TEMPDIR=sign.temp
 
 BUNDLE_ROOT=dist
-BUNDLE_NAME="Mercatura-Qt.app"
+BUNDLE_NAME="Mercatura Core.app"
 UNSIGNED_BUNDLE="${BUNDLE_ROOT}/${BUNDLE_NAME}"
 UNSIGNED_BINARY="${UNSIGNED_BUNDLE}/Contents/MacOS/Mercatura-Qt"
 
-ARCH=$(${SIGNAPPLE} info ${UNSIGNED_BINARY} | head -n 1 | cut -d " " -f 1)
+ARCH=$(${SIGNAPPLE} info "${UNSIGNED_BINARY}" | head -n 1 | cut -d " " -f 1)
 
 OUTDIR="osx/${ARCH}-apple-darwin"
 OUTROOT="${TEMPDIR}/${OUTDIR}"
