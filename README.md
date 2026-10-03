@@ -245,9 +245,12 @@ Mercatura uses independent network identities so Mercatura nodes cannot be confu
 | Testnet | `tmca` |
 | Regtest | `mcrt` |
 
-Mainnet legacy P2PKH addresses use Mercatura's `M` prefix.
+Mercatura's inherited legacy Base58 P2PKH encoding uses the `M` prefix where
+that encoding is exposed for compatibility. Classical P2PKH is not a normal
+Mercatura ownership path.
 
-Normal Mercatura wallet ownership uses the native PQ witness-v2 path.
+Normal Mercatura wallet receive and change addresses use the native PQ
+witness-v2 path.
 
 ### Network Message Start
 

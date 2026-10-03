@@ -13,56 +13,62 @@ required validation and release process is complete.
 
 ## Running
 
-Mercatura Core provides the primary node, GUI wallet, and command-line
-interfaces.
+The primary Mercatura Core executables are:
 
-On supported platforms, the main executables are:
-
-- `mercatura-qt` — Mercatura Core graphical wallet and node interface
-- `mercaturad` — Mercatura Core headless node
+- `mercatura-qt` — graphical wallet and node interface
+- `mercaturad` — headless full node
 - `mercatura-cli` — command-line RPC client
 
-Runtime options and available RPC commands can be inspected directly from the
-executables using their built-in help commands.
+Use the built-in help provided by these executables for authoritative runtime
+options and RPC arguments.
 
 ## Building
 
-The following documents contain platform-specific build information and
-dependency notes:
+The current primary reviewed build documentation is:
 
-- [Dependencies](dependencies.md)
+- [Unix / Linux Build Notes](build-unix.md)
+- [Windows Build Notes](build-windows.md)
+- [Windows MSVC Build Notes](build-windows-msvc.md)
 - [macOS Build Notes](build-osx.md)
-- [Unix Build Notes](build-unix.md)
-- [Windows Build Notes](build-windows-msvc.md)
-- [FreeBSD Build Notes](build-freebsd.md)
-- [OpenBSD Build Notes](build-openbsd.md)
-- [NetBSD Build Notes](build-netbsd.md)
+- [Dependencies](dependencies.md)
+
+Additional inherited platform build documents remain in the repository for
+upstream reference but have not all received the same Mercatura-specific
+documentation review.
+
+## Configuration and Runtime
+
+- [`mercatura.conf` Configuration](mercatura-conf.md)
+- [Files and Data Directories](files.md)
+- [JSON-RPC Interface](JSON-RPC-interface.md)
+
+## Wallet and Transactions
+
+- [Mercatura Wallet Management](managing-wallets.md)
+- [Output Descriptors in Mercatura Core](descriptors.md)
+- [Partially Signed Transactions in Mercatura Core](psbt.md)
+
+Normal Mercatura ownership uses native witness-v2 ML-DSA-65 authorization.
+
+Classical Bitcoin ECDSA/Schnorr ownership documentation should not be assumed
+to apply to Mercatura.
 
 ## Development
 
-The repository [README](/README.md) contains the primary Mercatura project
-overview, development status, and contribution guidance.
+The repository [README](/README.md) contains the primary project overview,
+development status, and consensus summary.
 
-Additional technical documentation includes:
+The source tree also contains inherited Bitcoin Core developer, design, test,
+networking, and historical documentation. These materials remain useful for
+upstream architecture and provenance, but Mercatura-specific behavior and
+documentation take precedence wherever the projects differ.
 
-- [Developer Notes](developer-notes.md)
-- [Productivity Notes](productivity.md)
-- [Release Process](release-process.md)
-- [Translation Process](translation_process.md)
-- [Translation Strings Policy](translation_strings_policy.md)
-- [JSON-RPC Interface](JSON-RPC-interface.md)
-- [Unauthenticated REST Interface](REST-interface.md)
-- [Benchmarking](benchmarking.md)
-- [Internal Design Documentation](design/)
-- [Files and Data Directories](files.md)
-- [Fuzz Testing](fuzzing.md)
-- [I2P Support](i2p.md)
-- [Tor Support](tor.md)
-- [ZMQ](zmq.md)
+## Release Status
 
-Some inherited Bitcoin Core documentation remains in the repository where it is
-technically relevant or provides useful upstream implementation history.
-Mercatura-specific behavior takes precedence where the projects differ.
+See [Mercatura Core Pre-Release Status](release-notes.md).
+
+Historical upstream release notes under `doc/release-notes/` are retained for
+implementation history and are not Mercatura release announcements.
 
 ## Security
 
@@ -77,9 +83,7 @@ reporting instructions.
 Reproducible technical bugs may be reported through the Mercatura GitHub issue
 tracker.
 
-Before submitting a report, search existing issues and include relevant version,
-platform, reproduction, configuration, and log information where appropriate.
-
 ## License
 
-Distributed under the [MIT software license](/COPYING).
+Mercatura Core retains applicable upstream open-source licensing and attribution.
+See the repository license files for details.
