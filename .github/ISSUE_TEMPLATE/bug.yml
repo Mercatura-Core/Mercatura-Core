@@ -1,92 +1,107 @@
 name: Bug report
-description: Submit a new bug report.
+description: Submit a technical bug report for Mercatura Core.
 labels: [bug]
 body:
   - type: markdown
     attributes:
       value: |
-        ## This issue tracker is only for technical issues related to Bitcoin Core.
+        ## Mercatura Core technical issues
 
-        * General bitcoin questions and/or support requests should use Bitcoin StackExchange at https://bitcoin.stackexchange.com.
-        * For reporting security issues, please read instructions at https://bitcoincore.org/en/contact/.
-        * If the node is "stuck" during sync or giving "block checksum mismatch" errors, please ensure your hardware is stable by running `memtest` and observe CPU temperature with a load-test tool such as `linpack` before creating an issue.
+        This issue tracker is for reproducible technical issues affecting Mercatura Core.
+
+        **Do not report security vulnerabilities through this public issue form.**
+        For security-sensitive issues, follow the private reporting instructions in `SECURITY.md` and use GitHub's **Security → Report a vulnerability** feature.
+
+        General questions, support requests, and community discussion should use the appropriate Mercatura community channels rather than the bug tracker.
+
+        If a node is unexpectedly failing during synchronization or reporting data-corruption errors, please also rule out unstable hardware where practical.
 
         ----
+
   - type: checkboxes
     attributes:
       label: Is there an existing issue for this?
-      description: Please search to see if an issue already exists for the bug you encountered.
+      description: Please search existing issues before submitting a new report.
       options:
-      - label: I have searched the existing issues
-        required: true
+        - label: I have searched the existing issues
+          required: true
+
   - type: textarea
     id: current-behaviour
     attributes:
-      label: Current behaviour
-      description: Tell us what went wrong
+      label: Current behavior
+      description: Describe what went wrong.
     validations:
       required: true
+
   - type: textarea
     id: expected-behaviour
     attributes:
-      label: Expected behaviour
-      description: Tell us what you expected to happen
+      label: Expected behavior
+      description: Describe what you expected to happen.
     validations:
       required: true
+
   - type: textarea
     id: reproduction-steps
     attributes:
       label: Steps to reproduce
       description: |
-        Tell us how to reproduce your bug. Please attach related screenshots if necessary.
-        * Run-time or compile-time configuration options
-        * Actions taken
+        Explain how to reproduce the issue. Include relevant configuration and actions taken.
+
+        Screenshots may be attached when useful.
     validations:
       required: true
+
   - type: textarea
     id: logs
     attributes:
       label: Relevant log output
       description: |
-        Please copy and paste any relevant log output or attach a debug log file.
+        Paste relevant log output or attach the applicable debug log.
 
-        You can find the debug.log in your [data dir.](https://github.com/bitcoin/bitcoin/blob/master/doc/files.md#data-directory-location)
+        See `doc/files.md` for information about Mercatura data-directory locations.
 
-        Please be aware that the debug log might contain personally identifying information.
+        Review logs before posting them publicly. Logs may contain IP addresses, paths, wallet information, or other identifying information.
     validations:
       required: false
+
   - type: dropdown
+    id: installation-method
     attributes:
-      label: How did you obtain Bitcoin Core
+      label: How did you obtain Mercatura Core?
       multiple: false
       options:
         - Compiled from source
-        - Pre-built binaries
+        - Official pre-built binaries
         - Package manager
         - Other
     validations:
       required: true
+
   - type: input
     id: core-version
     attributes:
-      label: What version of Bitcoin Core are you using?
-      description: Run `bitcoind --version` or in Bitcoin-QT use `Help > About Bitcoin Core`
-      placeholder: e.g. v24.0.1 or master@e1bf547
+      label: What version of Mercatura Core are you using?
+      description: Run `mercaturad --version` or use `Help > About Mercatura Core` in the Qt application.
+      placeholder: e.g. v0.1.0 or v0.1@abcdef0
     validations:
       required: true
+
   - type: input
     id: os
     attributes:
       label: Operating system and version
-      placeholder: e.g. "MacOS 26.0" or "Ubuntu 26.04 LTS"
+      placeholder: e.g. "Windows 11", "Ubuntu 22.04 LTS", or "macOS"
     validations:
       required: true
+
   - type: textarea
     id: machine-specs
     attributes:
       label: Machine specifications
       description: |
-        What are the specifications of the host machine?
-        e.g. OS/CPU and disk type, network connectivity
+        Include relevant host specifications where useful:
+        CPU, RAM, storage type, network connectivity, virtualization environment, etc.
     validations:
       required: false
