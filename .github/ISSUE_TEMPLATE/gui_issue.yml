@@ -1,18 +1,63 @@
-name: Issue or feature request related to the GUI
-description: Any report, issue or feature request related to the GUI
+name: GUI issue or feature request
+description: Report an issue or propose an improvement to the Mercatura Core Qt interface.
 labels: [GUI]
 body:
-- type: checkboxes
-  id: acknowledgement
-  attributes:
-    label: Issues, reports or feature requests related to the GUI should be opened directly on the GUI repo
-    description: https://github.com/bitcoin-core/gui/issues/
-    options:
-      - label: I still think this issue should be opened here
-        required: true
-- type: textarea
-  id: gui-request
-  attributes:
-    label: Report
-  validations:
-    required: true
+  - type: checkboxes
+    attributes:
+      label: Before submitting
+      options:
+        - label: I have searched the existing issues for a similar GUI report or request.
+          required: true
+
+  - type: dropdown
+    id: request-type
+    attributes:
+      label: Type of report
+      options:
+        - Bug
+        - Usability issue
+        - Visual issue
+        - Feature request
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: gui-request
+    attributes:
+      label: Description
+      description: Describe the GUI issue or requested improvement.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: For GUI bugs, describe the steps required to reproduce the behavior.
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or additional context
+      description: Attach screenshots or other useful information where appropriate.
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: Mercatura Core version
+      placeholder: e.g. v0.1.0 or v0.1@abcdef0
+    validations:
+      required: false
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: e.g. Windows 11, Ubuntu 22.04 LTS, macOS
+    validations:
+      required: false

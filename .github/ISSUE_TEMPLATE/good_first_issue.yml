@@ -1,41 +1,46 @@
 name: Good First Issue
-description: (Regular devs only) Suggest a new good first issue
+description: Suggest a task suitable for a new Mercatura contributor.
 labels: [good first issue]
 body:
   - type: markdown
     attributes:
       value: |
-        Please add the label "good first issue" manually before or after opening
+        A good first issue should be reasonably self-contained, well understood, and suitable for someone becoming familiar with the Mercatura codebase.
 
-        A good first issue is an uncontroversial issue, that has a relatively unique and obvious solution
+        Please describe both the motivation and a reasonable implementation direction.
 
-        Motivate the issue and explain the solution briefly
   - type: textarea
     id: motivation
     attributes:
       label: Motivation
-      description: Motivate the issue
+      description: Explain why this change would improve Mercatura.
     validations:
       required: true
+
   - type: textarea
     id: solution
     attributes:
       label: Possible solution
-      description: Describe a possible solution
+      description: Describe a possible implementation approach.
     validations:
       required: false
+
   - type: textarea
     id: useful-skills
     attributes:
-      label: Useful Skills
-      description: For example, “`std::thread`”, “Qt6 GUI and async GUI design” or “basic understanding of Bitcoin mining and the Bitcoin Core RPC interface”.
+      label: Useful skills
+      description: Describe knowledge that would help a contributor complete this task.
       value: |
-        * Compiling Bitcoin Core from source
-        * Running the C++ unit tests and the Python functional tests
+        * Compiling Mercatura Core from source
+        * Running the C++ unit tests and Python functional tests
+        * Familiarity with the relevant Mercatura subsystem
         * ...
+
   - type: textarea
     attributes:
       label: Guidance for new contributors
-      description: Please leave this to automatically add the footer for new contributors
+      description: This guidance will be shown to contributors considering the issue.
       value: |
         Want to work on this issue?
+
+        Review the contributing guidance in the Mercatura README before beginning. If the implementation direction is unclear, discuss the approach on the issue before making a large change.
