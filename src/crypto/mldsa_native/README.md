@@ -230,7 +230,7 @@ If you have any other question / non-security related issue / feature request, p
 ## Contributing
 
 If you want to help us build mldsa-native, please reach out. You can contact the mldsa-native team
-through the [PQCA Discord](https://discord.com/invite/xyVnwzfg5R). See also [CONTRIBUTING.md](CONTRIBUTING.md).
+through the [PQCA Discord](https://discord.com/invite/xyVnwzfg5R).
 
 [^C90]: Strictly speaking, we rely on C90 + `stdint.h` + 64-bit `unsigned long long`.
 

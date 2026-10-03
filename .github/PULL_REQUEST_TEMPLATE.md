@@ -6,7 +6,7 @@ immediately.
 
 GUI-related pull requests should be opened against
 https://github.com/bitcoin-core/gui
-first. See CONTRIBUTING.md
+first.
 -->
 
 <!--

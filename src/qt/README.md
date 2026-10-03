@@ -68,10 +68,6 @@ To run:
 * `macdockiconhandler.(h/mm)`: macOS dock icon handler
 * `macnotificationhandler.(h/mm)`: display notifications in macOS
 
-## Contribute
-
-See [CONTRIBUTING.md](/CONTRIBUTING.md) for general guidelines.
-
 **Note:** Do not change `local/bitcoin_en.ts`. It is updated [automatically](/doc/translation_process.md#writing-code-with-translations).
 
 ## Using Qt Creator as an IDE
