@@ -2,14 +2,23 @@
 
 \section intro_sec Introduction
 
-This is the developer documentation of the reference client for an experimental new digital currency called Bitcoin,
-which enables instant payments to anyone, anywhere in the world. Bitcoin uses peer-to-peer technology to operate
-with no central authority: managing transactions and issuing money are carried out collectively by the network.
+Mercatura Core is the reference implementation for Mercatura (MCA), a
+proof-of-work cryptocurrency with Mercatura-specific consensus, mining,
+monetary, scaling, wallet, and post-quantum authorization rules.
 
-The software is a community-driven open source project, released under the MIT license.
+Mercatura Core is derived from Bitcoin Core and retains applicable upstream
+architecture and security improvements while implementing Mercatura-specific
+network behavior.
 
-See https://github.com/bitcoin/bitcoin and https://bitcoincore.org/ for further information about the project.
+The software is an open-source project released under the MIT license.
+
+See the Mercatura repository README for project information, build guidance,
+development status, and technical documentation.
 
 \section Navigation
-Use <a href="modules.html"><code>Modules</code></a>, <a href="namespaces.html"><code>Namespaces</code></a>, <a href="classes.html"><code>Classes</code></a>, or <a href="files.html"><code>Files</code></a> at the top of the page to start navigating the code.
 
+Use <a href="modules.html"><code>Modules</code></a>,
+<a href="namespaces.html"><code>Namespaces</code></a>,
+<a href="classes.html"><code>Classes</code></a>, or
+<a href="files.html"><code>Files</code></a> at the top of the page to navigate
+the source-code documentation.
