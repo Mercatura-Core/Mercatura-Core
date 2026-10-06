@@ -544,13 +544,9 @@ BOOST_AUTO_TEST_CASE(min_difficulty_delay_rule)
         CreateChainParams(*m_node.args, ChainType::TESTNET);
     auto consensus = test_params->GetConsensus();
 
-    // Mercatura public testnet deliberately disables the minimum-difficulty
-    // escape so the calibrated launch difficulty remains effective.
-    BOOST_CHECK(!consensus.fPowAllowMinDifficultyBlocks);
-
-    // Exercise the generic delayed-block exception independently of the
-    // active Mercatura testnet policy.
-    consensus.fPowAllowMinDifficultyBlocks = true;
+    // Mercatura public testnet enables the delayed minimum-difficulty
+    // exception for recovery when early public-testnet hashpower is sparse.
+    BOOST_CHECK(consensus.fPowAllowMinDifficultyBlocks);
 
     constexpr uint32_t START_BITS{0x1c0ffff0U};
 
@@ -901,13 +897,13 @@ BOOST_AUTO_TEST_CASE(mercahash_genesis_vectors)
         {
             ChainType::TESTNET,
             "testnet",
-            1788566400U,
-            104862U,
-            0x1f0aec33U,
+            1791352800U,
+            57U,
+            0x1f19bda3U,
             1,
-            uint256{"b92d6e7f680a111c3e5c91bf87aafabce04ecb16dcefde61a535cadf3941b51d"},
-            uint256{"98bd90b0fdc8794f4fdfbadc78a068345abb119e0cbb47a6aa2cfc39ebfee891"},
-            uint256{"000551807c1dc1c5efe0617da8c3b955b6e0839c5da78cffa3a7429e25a1c1be"},
+            uint256{"b3fc707c9a89dc45d1cf6a837284b22ad2b6fd41b99af601079db9dcbeff6920"},
+            uint256{"972c60904ed9f8acb6d426befd54796d2c925ced977692a749a8350928dd47bc"},
+            uint256{"0016f84bc09e3d3d2adb8b233789a9696fcde50dfa692da107328284903d7054"},
         },
         {
             ChainType::SIGNET,

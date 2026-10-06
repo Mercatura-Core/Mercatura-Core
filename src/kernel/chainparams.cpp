@@ -204,7 +204,7 @@ public:
         consensus.CSVHeight = 1; // Active from the first post-genesis block.
         consensus.SegwitHeight = 0; // Active from genesis.
         consensus.MinBIP9WarningHeight = 0;
-        consensus.powLimit = uint256{"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}; // Temporary MercaHash development ceiling.
+        consensus.powLimit = uint256{"003fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}; // Public-testnet minimum-difficulty ceiling.
         consensus.nPowTargetSpacing = 150; // 2.5 minutes
         consensus.nBIP94TimewarpInterval = 2016;
         consensus.nVersionBitsWarningPeriod = 2016;
@@ -212,7 +212,7 @@ public:
         consensus.nDGWTargetTimespan = 3600;
         consensus.nDGWMinTimespan = 1200;
         consensus.nDGWMaxTimespan = 10800;
-        consensus.fPowAllowMinDifficultyBlocks = false;
+        consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.enforce_BIP94 = false;
         consensus.fPowNoRetargeting = false;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;
@@ -243,19 +243,19 @@ public:
         m_assumed_chain_state_size = 0;
 
         genesis = CreateGenesisBlock(
-            "Mercatura private testnet genesis v0.1",
-            "Mercatura private testnet genesis v0.1",
-            1788566400,
-            104862,
-            0x1f0aec33,
+            "Mercatura public testnet genesis 2026-10-07",
+            "Mercatura public testnet genesis 2026-10-07",
+            1791352800,
+            57,
+            0x1f19bda3,
             1,
             50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256{"b92d6e7f680a111c3e5c91bf87aafabce04ecb16dcefde61a535cadf3941b51d"});
-        assert(genesis.hashMerkleRoot == uint256{"98bd90b0fdc8794f4fdfbadc78a068345abb119e0cbb47a6aa2cfc39ebfee891"});
+        assert(consensus.hashGenesisBlock == uint256{"b3fc707c9a89dc45d1cf6a837284b22ad2b6fd41b99af601079db9dcbeff6920"});
+        assert(genesis.hashMerkleRoot == uint256{"972c60904ed9f8acb6d426befd54796d2c925ced977692a749a8350928dd47bc"});
 
-        // Mercatura development starts without DNS or fixed seeds.
-        // Early test networks use manual addnode/connect configuration.
+        // Public testnet starts without DNS or fixed seeds.
+        // Initial bootstrap uses manual addnode/connect configuration.
         vFixedSeeds.clear();
         vSeeds.clear();
 

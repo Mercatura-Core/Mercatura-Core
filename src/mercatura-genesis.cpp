@@ -53,6 +53,7 @@ struct Options {
     uint64_t max_attempts{DEFAULT_MAX_ATTEMPTS};
     std::string timestamp{DEFAULT_TIMESTAMP};
     std::string output_text{DEFAULT_OUTPUT_TEXT};
+    uint256 pow_limit{DEV_POW_LIMIT};
 };
 
 [[noreturn]] void Usage(const char* argv0, int exit_code)
@@ -66,12 +67,13 @@ struct Options {
         << "Options:\n"
         << "  --time <uint32>          Genesis nTime\n"
         << "  --bits <value>           Compact nBits, decimal or 0x-prefixed hex\n"
+        << "  --pow-limit <hex>        Full 256-bit PoW limit in hexadecimal\n"
         << "  --nonce-start <uint32>   First nonce to test\n"
         << "  --max-attempts <uint64>  Maximum nonce attempts\n"
         << "  --timestamp <text>       Coinbase timestamp text\n"
         << "  --output-text <text>     Unspendable OP_RETURN output text\n"
         << "  --help                    Show this help\n\n"
-        << "Defaults reproduce the current Mercatura development genesis format.\n";
+        << "Defaults remain development-friendly; pass explicit final network values when freezing a genesis block.\n";
 
     std::exit(exit_code);
 }
@@ -100,6 +102,19 @@ uint64_t ParseUnsigned(const std::string& text, const char* option_name)
     }
 
     return value;
+}
+
+uint256 ParseUint256Hex(const std::string& text, const char* option_name)
+{
+    const auto value{uint256::FromHex(text)};
+    if (!value.has_value()) {
+        throw std::runtime_error(
+            std::string{"Invalid 256-bit hexadecimal value for "} +
+            option_name +
+            ": " +
+            text);
+    }
+    return *value;
 }
 
 uint32_t ParseUint32(const std::string& text, const char* option_name)
@@ -138,6 +153,11 @@ Options ParseOptions(int argc, char* argv[])
         } else if (arg == "--bits") {
             options.bits =
                 ParseUint32(require_value("--bits"), "--bits");
+        } else if (arg == "--pow-limit") {
+            options.pow_limit =
+                ParseUint256Hex(
+                    require_value("--pow-limit"),
+                    "--pow-limit");
         } else if (arg == "--nonce-start") {
             options.nonce_start =
                 ParseUint32(
@@ -184,7 +204,7 @@ CBlock CreateGenesisCandidate(
             options.timestamp.begin(),
             options.timestamp.end());
 
-    // Match the current Mercatura development genesis construction.
+    // Match the Mercatura genesis construction.
     // The output is intentionally unspendable.
     tx.vout[0].nValue = 50 * COIN;
 
@@ -236,7 +256,7 @@ int main(int argc, char* argv[])
         };
 
         Consensus::Params consensus{};
-        consensus.powLimit = DEV_POW_LIMIT;
+        consensus.powLimit = options.pow_limit;
 
         const auto target{
             DeriveTarget(
@@ -247,7 +267,7 @@ int main(int argc, char* argv[])
         if (!target.has_value()) {
             std::cerr
                 << "ERROR: nBits does not decode to a valid target "
-                   "within the configured development powLimit.\n";
+                   "within the configured powLimit.\n";
             return EXIT_FAILURE;
         }
 
