@@ -9,6 +9,7 @@ from test_framework.util import assert_equal
 
 
 TESTNET_PQ_PREFIX = "tmca1z"
+TESTNET_GENESIS_TIME = 1791352800
 
 
 class MercaturaTestnetIdentityTest(BitcoinTestFramework):
@@ -22,6 +23,7 @@ class MercaturaTestnetIdentityTest(BitcoinTestFramework):
         self.extra_args = [[
             "-dnsseed=0",
             "-fixedseeds=0",
+            f"-mocktime={TESTNET_GENESIS_TIME}",
         ]]
 
     def skip_test_if_missing_module(self):
