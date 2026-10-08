@@ -53,12 +53,12 @@ jobs:
           shasum -a 256 build-macos-release/mercatura-macos-app.zip
 
           mv build-macos-release/mercatura-macos-app.zip \
-            Mercatura-Core-v0.1.0-testnet1-macos-arm64.zip
+            Mercatura-Core-v0.1.1-testnet-macos-arm64.zip
 
       - name: Upload macOS release artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Mercatura-Core-v0.1.0-testnet1-macos-arm64
-          path: Mercatura-Core-v0.1.0-testnet1-macos-arm64.zip
+          name: Mercatura-Core-v0.1.1-testnet-macos-arm64
+          path: Mercatura-Core-v0.1.1-testnet-macos-arm64.zip
           if-no-files-found: error
           retention-days: 14
