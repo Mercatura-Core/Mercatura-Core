@@ -111,6 +111,18 @@ struct Params {
     uint256 powLimit;
     bool fPowAllowMinDifficultyBlocks;
     /**
+     * First candidate height at which the delayed minimum-difficulty
+     * exception is disabled. Negative means no scheduled removal.
+     */
+    int nMinDifficultyDisableHeight{-1};
+    /**
+     * Height at which Mercatura's corrected interaction between delayed
+     * minimum-difficulty blocks and DGW history becomes active.
+     *
+     * A negative value disables the rule.
+     */
+    int nMinDifficultyDGWFixHeight{-1};
+    /**
       * Enforce the retained BIP94 timewarp attack mitigation.
       * Mercatura's DGW handles proof-of-work difficulty independently.
       */

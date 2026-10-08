@@ -1,0 +1,64 @@
+name: macOS Public Testnet Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v0.1
+    paths:
+      - '.github/workflows/macos-release.yml'
+
+jobs:
+  macos-arm64-release:
+    name: macOS ARM64 Public Testnet
+    runs-on: macos-15
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          brew install cmake boost pkgconf libevent ninja qt@6 qrencode
+
+      - name: Configure
+        run: |
+          cmake -S . -B build-macos-release \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6)" \
+            -DMERCATURA_PUBLIC_TESTNET_RELEASE=ON \
+            -DBUILD_GUI=ON \
+            -DWITH_ZMQ=OFF \
+            -DENABLE_IPC=OFF \
+            -DENABLE_WALLET=ON \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_BENCH=OFF \
+            -DBUILD_FUZZ_BINARY=OFF
+
+      - name: Build Mercatura Core app
+        run: |
+          cmake --build build-macos-release \
+            --target deploy \
+            --parallel 3
+
+      - name: Validate package
+        run: |
+          test -f build-macos-release/mercatura-macos-app.zip
+
+          unzip -l build-macos-release/mercatura-macos-app.zip \
+            | grep 'Mercatura Core.app/Contents/MacOS/Mercatura-Qt'
+
+          shasum -a 256 build-macos-release/mercatura-macos-app.zip
+
+          mv build-macos-release/mercatura-macos-app.zip \
+            Mercatura-Core-v0.1.1-testnet-macos-arm64.zip
+
+      - name: Upload macOS release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mercatura-Core-v0.1.1-testnet-macos-arm64
+          path: Mercatura-Core-v0.1.1-testnet-macos-arm64.zip
+          if-no-files-found: error
+          retention-days: 14

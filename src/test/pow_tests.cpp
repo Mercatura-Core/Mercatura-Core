@@ -544,13 +544,10 @@ BOOST_AUTO_TEST_CASE(min_difficulty_delay_rule)
         CreateChainParams(*m_node.args, ChainType::TESTNET);
     auto consensus = test_params->GetConsensus();
 
-    // Mercatura public testnet deliberately disables the minimum-difficulty
-    // escape so the calibrated launch difficulty remains effective.
-    BOOST_CHECK(!consensus.fPowAllowMinDifficultyBlocks);
-
-    // Exercise the generic delayed-block exception independently of the
-    // active Mercatura testnet policy.
-    consensus.fPowAllowMinDifficultyBlocks = true;
+    // Mercatura public testnet enables the delayed minimum-difficulty
+    // exception for recovery when early public-testnet hashpower is sparse.
+    BOOST_CHECK(consensus.fPowAllowMinDifficultyBlocks);
+    BOOST_CHECK_EQUAL(consensus.nMinDifficultyDGWFixHeight, -1);
 
     constexpr uint32_t START_BITS{0x1c0ffff0U};
 
@@ -587,6 +584,352 @@ BOOST_AUTO_TEST_CASE(min_difficulty_delay_rule)
     BOOST_CHECK_EQUAL(
         GetNextWorkRequired(&blocks.back(), &delayed, consensus),
         pow_limit_bits);
+}
+
+BOOST_AUTO_TEST_CASE(min_difficulty_timeout_removal_activation)
+{
+    const auto test_params =
+        CreateChainParams(*m_node.args, ChainType::TESTNET);
+    const auto& consensus = test_params->GetConsensus();
+
+    BOOST_REQUIRE(consensus.fPowAllowMinDifficultyBlocks);
+    BOOST_REQUIRE_EQUAL(consensus.nMinDifficultyDisableHeight, 500);
+    BOOST_REQUIRE_EQUAL(consensus.nMinDifficultyDGWFixHeight, -1);
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+
+    const uint32_t pow_limit_bits =
+        UintToArith256(consensus.powLimit).GetCompact();
+
+    const auto next_bits = [&](int candidate_height, int64_t delay) {
+        auto blocks = BuildDGWChain(
+            25, START_BITS, 1'700'000'000,
+            consensus.nPowTargetSpacing);
+
+        const int offset =
+            candidate_height - (blocks.back().nHeight + 1);
+
+        for (auto& block : blocks) {
+            block.nHeight += offset;
+        }
+
+        CBlockHeader candidate;
+        candidate.nTime = blocks.back().GetBlockTime() + delay;
+
+        return GetNextWorkRequired(
+            &blocks.back(), &candidate, consensus);
+    };
+
+    // Height 499: exactly 300 seconds uses normal DGW.
+    BOOST_CHECK_EQUAL(next_bits(499, 300), START_BITS);
+
+    // Height 499: 301 seconds still triggers minimum difficulty.
+    BOOST_CHECK_EQUAL(next_bits(499, 301), pow_limit_bits);
+
+    // Height 500: the timeout exception is permanently disabled.
+    BOOST_CHECK_EQUAL(next_bits(500, 301), START_BITS);
+
+    // Height 501: ordinary DGW behavior continues.
+    BOOST_CHECK_EQUAL(next_bits(501, 301), START_BITS);
+}
+
+BOOST_AUTO_TEST_CASE(min_difficulty_block_does_not_poison_dgw_history)
+{
+    const auto test_params =
+        CreateChainParams(*m_node.args, ChainType::TESTNET);
+    auto consensus = test_params->GetConsensus();
+
+    BOOST_REQUIRE(consensus.fPowAllowMinDifficultyBlocks);
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+
+    const uint32_t pow_limit_bits =
+        UintToArith256(consensus.powLimit).GetCompact();
+
+    auto contaminated = BuildDGWChain(
+        26,
+        START_BITS,
+        1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    auto reference = BuildDGWChain(
+        26,
+        START_BITS,
+        1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    const int64_t delayed_time =
+        contaminated[24].GetBlockTime() +
+        consensus.nPowTargetSpacing * 2 + 1;
+
+    contaminated[25].nTime = delayed_time;
+    contaminated[25].nBits = pow_limit_bits;
+
+    reference[25].nTime = delayed_time;
+    reference[25].nBits = START_BITS;
+
+    CBlockHeader next_block;
+    next_block.nTime =
+        delayed_time + consensus.nPowTargetSpacing;
+
+    const uint32_t legacy_contaminated_next =
+        GetNextWorkRequired(
+            &contaminated.back(),
+            &next_block,
+            consensus);
+
+    const uint32_t reference_next =
+        GetNextWorkRequired(
+            &reference.back(),
+            &next_block,
+            consensus);
+
+    // Before activation, preserve the exact historical public-testnet
+    // consensus behavior.
+    BOOST_CHECK(legacy_contaminated_next != reference_next);
+
+    const int candidate_height{
+        contaminated.back().nHeight + 1};
+
+    consensus.nMinDifficultyDGWFixHeight =
+        candidate_height;
+
+    const uint32_t fixed_contaminated_next =
+        GetNextWorkRequired(
+            &contaminated.back(),
+            &next_block,
+            consensus);
+
+    // At activation, the delayed block's real timestamp still contributes to
+    // the DGW timespan, but its exceptional powLimit target no longer poisons
+    // the target average.
+    BOOST_CHECK_EQUAL(fixed_contaminated_next, reference_next);
+}
+BOOST_AUTO_TEST_CASE(min_difficulty_dgw_fix_activation_boundary)
+{
+    const auto test_params =
+        CreateChainParams(*m_node.args, ChainType::TESTNET);
+    auto consensus = test_params->GetConsensus();
+
+    BOOST_REQUIRE(consensus.fPowAllowMinDifficultyBlocks);
+    BOOST_REQUIRE_EQUAL(consensus.nMinDifficultyDGWFixHeight, -1);
+
+    // Exercise the historical DGW correction in isolation.
+    // It is no longer scheduled for public testnet activation.
+    consensus.nMinDifficultyDGWFixHeight = 1000;
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+
+    const uint32_t pow_limit_bits =
+        UintToArith256(consensus.powLimit).GetCompact();
+
+    // Candidate height 999: the historical behavior must remain unchanged.
+    auto contaminated_pre = BuildDGWChain(
+        26,
+        START_BITS,
+        1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    auto reference_pre = BuildDGWChain(
+        26,
+        START_BITS,
+        1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    for (auto& block : contaminated_pre) {
+        block.nHeight += 973;
+    }
+
+    for (auto& block : reference_pre) {
+        block.nHeight += 973;
+    }
+
+    BOOST_REQUIRE_EQUAL(contaminated_pre.back().nHeight, 998);
+
+    const int64_t delayed_pre =
+        contaminated_pre[24].GetBlockTime() +
+        consensus.nPowTargetSpacing * 2 + 1;
+
+    contaminated_pre[25].nTime = delayed_pre;
+    contaminated_pre[25].nBits = pow_limit_bits;
+
+    reference_pre[25].nTime = delayed_pre;
+    reference_pre[25].nBits = START_BITS;
+
+    CBlockHeader candidate_999;
+    candidate_999.nTime =
+        delayed_pre + consensus.nPowTargetSpacing;
+
+    const uint32_t contaminated_999 =
+        GetNextWorkRequired(
+            &contaminated_pre.back(),
+            &candidate_999,
+            consensus);
+
+    const uint32_t reference_999 =
+        GetNextWorkRequired(
+            &reference_pre.back(),
+            &candidate_999,
+            consensus);
+
+    BOOST_CHECK(contaminated_999 != reference_999);
+
+    // Candidate height 1000: the corrected rule becomes active.
+    auto contaminated_post = BuildDGWChain(
+        26,
+        START_BITS,
+        1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    auto reference_post = BuildDGWChain(
+        26,
+        START_BITS,
+        1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    for (auto& block : contaminated_post) {
+        block.nHeight += 974;
+    }
+
+    for (auto& block : reference_post) {
+        block.nHeight += 974;
+    }
+
+    BOOST_REQUIRE_EQUAL(contaminated_post.back().nHeight, 999);
+
+    const int64_t delayed_post =
+        contaminated_post[24].GetBlockTime() +
+        consensus.nPowTargetSpacing * 2 + 1;
+
+    contaminated_post[25].nTime = delayed_post;
+    contaminated_post[25].nBits = pow_limit_bits;
+
+    reference_post[25].nTime = delayed_post;
+    reference_post[25].nBits = START_BITS;
+
+    CBlockHeader candidate_1000;
+    candidate_1000.nTime =
+        delayed_post + consensus.nPowTargetSpacing;
+
+    const uint32_t contaminated_1000 =
+        GetNextWorkRequired(
+            &contaminated_post.back(),
+            &candidate_1000,
+            consensus);
+
+    const uint32_t reference_1000 =
+        GetNextWorkRequired(
+            &reference_post.back(),
+            &candidate_1000,
+            consensus);
+
+    BOOST_CHECK_EQUAL(contaminated_1000, reference_1000);
+}
+
+BOOST_AUTO_TEST_CASE(min_difficulty_dgw_fix_preserves_nondelayed_powlimit)
+{
+    const auto test_params =
+        CreateChainParams(*m_node.args, ChainType::TESTNET);
+    auto consensus = test_params->GetConsensus();
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+
+    const uint32_t pow_limit_bits =
+        UintToArith256(consensus.powLimit).GetCompact();
+
+    auto blocks = BuildDGWChain(
+        26,
+        START_BITS,
+        1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    // A powLimit target that did not result from the >2-spacing delay rule
+    // must remain ordinary DGW history and must not be normalized away.
+    blocks[25].nBits = pow_limit_bits;
+
+    CBlockHeader next_block;
+    next_block.nTime =
+        blocks.back().GetBlockTime() +
+        consensus.nPowTargetSpacing;
+
+    consensus.nMinDifficultyDGWFixHeight =
+        blocks.back().nHeight + 1;
+
+    const uint32_t fixed_result =
+        GetNextWorkRequired(
+            &blocks.back(),
+            &next_block,
+            consensus);
+
+    consensus.nMinDifficultyDGWFixHeight =
+        blocks.back().nHeight + 2;
+
+    const uint32_t legacy_result =
+        GetNextWorkRequired(
+            &blocks.back(),
+            &next_block,
+            consensus);
+
+    BOOST_CHECK_EQUAL(fixed_result, legacy_result);
+}
+
+BOOST_AUTO_TEST_CASE(min_difficulty_timeout_removal_preserves_history)
+{
+    const auto test_params =
+        CreateChainParams(*m_node.args, ChainType::TESTNET);
+    const auto& consensus = test_params->GetConsensus();
+
+    BOOST_REQUIRE_EQUAL(consensus.nMinDifficultyDisableHeight, 500);
+    BOOST_REQUIRE_EQUAL(consensus.nMinDifficultyDGWFixHeight, -1);
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+
+    const uint32_t pow_limit_bits =
+        UintToArith256(consensus.powLimit).GetCompact();
+
+    auto contaminated = BuildDGWChain(
+        26, START_BITS, 1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    auto reference = BuildDGWChain(
+        26, START_BITS, 1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    for (auto& block : contaminated) {
+        block.nHeight += 474;
+    }
+    for (auto& block : reference) {
+        block.nHeight += 474;
+    }
+
+    BOOST_REQUIRE_EQUAL(contaminated.back().nHeight, 499);
+
+    const int64_t delayed_time =
+        contaminated[24].GetBlockTime() +
+        consensus.nPowTargetSpacing * 2 + 1;
+
+    contaminated[25].nTime = delayed_time;
+    contaminated[25].nBits = pow_limit_bits;
+
+    reference[25].nTime = delayed_time;
+    reference[25].nBits = START_BITS;
+
+    CBlockHeader candidate;
+    candidate.nTime = delayed_time + 301;
+
+    const uint32_t contaminated_result =
+        GetNextWorkRequired(
+            &contaminated.back(), &candidate, consensus);
+
+    const uint32_t reference_result =
+        GetNextWorkRequired(
+            &reference.back(), &candidate, consensus);
+
+    // Historical minimum-difficulty targets remain in DGW history.
+    BOOST_CHECK(contaminated_result != reference_result);
+
+    // The removed timeout must not override DGW at height 500.
+    BOOST_CHECK(contaminated_result != pow_limit_bits);
 }
 
 BOOST_AUTO_TEST_CASE(regtest_no_retarget)
@@ -901,13 +1244,13 @@ BOOST_AUTO_TEST_CASE(mercahash_genesis_vectors)
         {
             ChainType::TESTNET,
             "testnet",
-            1788566400U,
-            104862U,
-            0x1f0aec33U,
+            1791352800U,
+            57U,
+            0x1f19bda3U,
             1,
-            uint256{"b92d6e7f680a111c3e5c91bf87aafabce04ecb16dcefde61a535cadf3941b51d"},
-            uint256{"98bd90b0fdc8794f4fdfbadc78a068345abb119e0cbb47a6aa2cfc39ebfee891"},
-            uint256{"000551807c1dc1c5efe0617da8c3b955b6e0839c5da78cffa3a7429e25a1c1be"},
+            uint256{"b3fc707c9a89dc45d1cf6a837284b22ad2b6fd41b99af601079db9dcbeff6920"},
+            uint256{"972c60904ed9f8acb6d426befd54796d2c925ced977692a749a8350928dd47bc"},
+            uint256{"0016f84bc09e3d3d2adb8b233789a9696fcde50dfa692da107328284903d7054"},
         },
         {
             ChainType::SIGNET,

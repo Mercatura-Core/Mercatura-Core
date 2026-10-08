@@ -143,6 +143,10 @@ set_property(SOURCE macnotificationhandler.mm
   # Ignore warnings "'NSUserNotificationCenter' is deprecated: first deprecated in macOS 11.0".
   APPEND PROPERTY COMPILE_OPTIONS -Wno-deprecated-declarations
 )
+if(MERCATURA_PUBLIC_TESTNET_RELEASE)
+  target_compile_definitions(bitcoinqt PRIVATE MERCATURA_PUBLIC_TESTNET_RELEASE=1)
+endif()
+
 target_link_libraries(bitcoinqt
   PUBLIC
     Qt6::Widgets

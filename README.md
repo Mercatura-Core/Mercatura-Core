@@ -4,7 +4,7 @@ Mercatura is a Bitcoin-family, pure proof-of-work cryptocurrency focused on a si
 
 Mercatura Core is derived from the modern Bitcoin Core codebase and is being adapted into an independent network with its own consensus rules, monetary policy, network identity, wallet behavior, mining algorithm, and test infrastructure.
 
-> **Project status:** Mercatura is currently in **pre-mainnet v0.1 development**. The chain, miner, post-quantum wallet path, difficulty adjustment, and testnet parameters are under active validation. Mainnet is **not yet launched**, and launch-sensitive values such as the final mainnet genesis identity may still change before release.
+> **Project status:** Mercatura public testnet is live. Mainnet has not launched. The v0.1 software and protocol remain under active public-testnet validation, and mainnet launch-sensitive values may still change before release.
 
 ## Protocol Overview
 
@@ -106,7 +106,7 @@ Current parameters:
 
 The launch target remains unchanged during the initial startup window before DGW begins calculating from historical chain data.
 
-The current testnet has been calibrated and exercised with real MercaHash mining.
+The public testnet is live and is being exercised with real MercaHash mining.
 
 Final mainnet launch parameters will be set and validated immediately before mainnet release.
 
@@ -271,25 +271,35 @@ Config file: mercatura.conf
 
 Mercatura also uses its own data directory and network-specific subdirectories.
 
-## DNS Seeds and Peer Discovery
+## Public Testnet Connectivity
 
-During early development, Mercatura intentionally operates with limited or empty DNS and fixed seed lists.
+Mercatura's public testnet is live.
 
-Private and early public networks may use manual:
-
-```text
-addnode=
-```
-
-or:
+Current bootstrap peer:
 
 ```text
-connect=
+node1.mercaturacore.com:27778
 ```
 
-configuration.
+A persistent `mercatura.conf` configuration can use:
 
-Stable public seed infrastructure will be added before or during public network deployment.
+```ini
+testnet=1
+
+[test]
+addnode=node1.mercaturacore.com:27778
+```
+
+DNS seeds and fixed seeds remain intentionally limited during the early public-testnet period. Additional independent peers can be added with `addnode` as the network grows.
+
+Public testnet resources:
+
+- Website: https://mercaturacore.com
+- Explorer: https://explorer.mercaturacore.com/?network=testnet
+- Mercatura Core release: https://github.com/Mercatura-Core/Mercatura-Core/releases/tag/v0.1.0-testnet1
+- MercaMiner release: https://github.com/Mercatura-Core/MercaMiner/releases/tag/v0.1.0-testnet2
+
+**Testnet MCA is for testing only and has no monetary value.**
 
 ## Software Components
 
@@ -336,88 +346,59 @@ https://github.com/Mercatura-Core/MercaMiner
 
 ### Mercatura Qt
 
-Mercatura Core retains the mature Bitcoin Core Qt application architecture.
+Mercatura Core includes the Mercatura-branded Qt wallet while retaining the mature Bitcoin Core Qt application architecture where practical.
 
-The Qt wallet is being rebranded and validated specifically for:
+The wallet supports Mercatura-specific behavior including:
 
 - Mercatura network identity
 - MCA units
 - two-decimal display
-- PQ receive addresses
+- native PQ receive addresses
 - PQ sends
 - transaction history
-- fee handling
+- Mercatura fee handling
 - coin control
 - wallet encryption
 - wallet backup
 - address-book functionality
 - PSBT workflows
 
-The goal for the initial release is a stable and functional Mercatura Core wallet rather than an unnecessary rewrite of the mature upstream GUI architecture.
+Linux, Windows, and macOS are treated as supported Mercatura Core GUI targets.
 
 ### Block Explorer
 
-Mercatura plans to operate self-hosted block explorer infrastructure based on a compatible Bitcoin-family RPC explorer.
+The official Mercatura Explorer is live at:
 
-Separate explorer instances can be operated for:
+https://explorer.mercaturacore.com
 
-- testnet
-- mainnet
+Public testnet:
 
-Explorer infrastructure is expected to use an archival Mercatura node with appropriate indexing enabled.
+https://explorer.mercaturacore.com/?network=testnet
+
+The Explorer uses Mercatura Core RPC together with indexed blockchain data and Mercatura-specific analytics.
+
+Mainnet and testnet explorer data are kept separate.
 
 ## Current Development Status
 
-Mercatura is currently in its **v0.1 pre-mainnet development cycle**.
+Mercatura is in its **v0.1 pre-mainnet development cycle**, with the **public testnet now live**.
 
-Major completed or substantially completed work includes:
+Core consensus, MercaHash V1, DGWv3, adaptive emission, native ML-DSA-65 transaction authorization, PQ wallet functionality, Mercatura Qt branding, standalone CPU mining, and public Explorer infrastructure have reached the public-testnet stage.
 
-- independent Mercatura network identity
-- Mercatura-specific ports and address formats
-- Mercatura-specific genesis infrastructure
-- MercaHash V1 implementation
-- permanent MercaHash test vectors
-- DGWv3 difficulty adjustment
-- deterministic DGW tests
-- adaptive emission implementation
-- deterministic emission tests
-- native ML-DSA-65 integration
-- PQ authorization format
-- PQ transaction digest design
-- deterministic PQ wallet derivation
-- randomized production PQ signing
-- PQ wallet persistence
-- PQ receive and change handling
-- `sendtoaddress`
-- `sendmany`
-- PSBT integration
-- transaction batching compatibility
-- wallet backup and restore behavior
-- pruning support
-- optional indexing support
-- block-cap scheduling
-- no-witness-discount accounting
-- MercaMiner v0.1
-- calibrated testnet launch difficulty
-- local testnet MercaHash mining
-- live DGW testnet validation
-- cross-platform build and functional-test work
+Current work focuses on:
 
-Current pre-mainnet work includes:
+- extended public-testnet operation and soak testing
+- multi-node and mining validation
+- cross-platform testing
+- documentation and release hardening
+- final mainnet parameter selection
+- final mainnet genesis generation and validation
 
-- Mercatura Qt wallet rebranding and GUI validation
-- real multi-node testnet deployment
-- extended testnet soak testing
-- public testnet infrastructure
-- explorer deployment
-- launch documentation
-- final mainnet difficulty confirmation
-- final mainnet genesis generation
-- final release validation
+**Mercatura mainnet has not launched.**
 
-Development status should not be interpreted as an independent security audit or production-readiness certification.
+**Testnet MCA is for testing only and has no monetary value.**
 
-Public testing and external review remain important before mainnet launch.
+Development status should not be interpreted as an independent security audit or production-readiness certification. Public testing and external review remain important before mainnet launch.
 
 ## Building From Source
 
@@ -483,19 +464,30 @@ build/bin/mercatura-cli stop
 
 ## Running Testnet
 
-Start a testnet node:
+Start a public-testnet node with the current bootstrap peer:
 
 ```bash
-build/bin/mercaturad -testnet -daemon
+build/bin/mercaturad -testnet -addnode=node1.mercaturacore.com:27778 -daemon
 ```
 
-Query testnet:
+Query the node:
 
 ```bash
 build/bin/mercatura-cli -testnet getblockchaininfo
 ```
 
-Early test networks may require explicit peer configuration because public DNS seeds and fixed seeds are intentionally limited during development.
+For persistent configuration, add the bootstrap peer to `mercatura.conf`:
+
+```ini
+testnet=1
+
+[test]
+addnode=node1.mercaturacore.com:27778
+```
+
+The public-testnet P2P port is `27778`.
+
+RPC should normally remain bound to localhost unless the operator has a specific secured deployment requirement.
 
 ## Mining
 
@@ -605,11 +597,9 @@ Large consensus or architectural changes should normally be discussed before imp
 
 Mercatura is currently in the `v0.1` pre-mainnet development cycle.
 
-Development parameters may change before the first public mainnet release.
+The public testnet is active, but development parameters may still change before the first mainnet release.
 
-The repository's stable branch and development branches may differ while work is underway.
-
-Mainnet launch parameters should be considered final only when explicitly published as part of the launch release.
+The repository's stable and development branches may differ while work is underway. Mainnet launch parameters should be considered final only when explicitly published as part of the mainnet launch release.
 
 ## Mainnet Status
 
@@ -668,6 +658,4 @@ The project acknowledges and retains appropriate attribution for upstream open-s
 
 ---
 
-**Mercatura is currently under active pre-mainnet development.**
-
-Documentation will continue to be updated as testnet validation, Qt wallet work, explorer deployment, public infrastructure, and final mainnet launch preparation are completed.
+**Mercatura public testnet is live. Mainnet has not launched.**

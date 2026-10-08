@@ -17,6 +17,20 @@
 #include <cassert>
 #include <vector>
 
+static bool IsDelayedMinDifficultyBlock(
+    const CBlockIndex* pindex,
+    const Consensus::Params& params,
+    unsigned int pow_limit_bits)
+{
+    return params.fPowAllowMinDifficultyBlocks &&
+        pindex != nullptr &&
+        pindex->pprev != nullptr &&
+        pindex->nBits == pow_limit_bits &&
+        pindex->GetBlockTime() >
+            pindex->pprev->GetBlockTime() +
+                params.nPowTargetSpacing * 2;
+}
+
 static unsigned int DarkGravityWave(const CBlockIndex* pindexLast, const Consensus::Params& params)
 {
     assert(pindexLast != nullptr);
@@ -26,6 +40,11 @@ static unsigned int DarkGravityWave(const CBlockIndex* pindexLast, const Consens
     assert(params.nDGWMaxTimespan >= params.nDGWMinTimespan);
 
     const arith_uint256 bnPowLimit = UintToArith256(params.powLimit);
+    const unsigned int nProofOfWorkLimit = bnPowLimit.GetCompact();
+
+    const bool normalize_min_difficulty_history{
+        params.nMinDifficultyDGWFixHeight >= 0 &&
+        pindexLast->nHeight + 1 >= params.nMinDifficultyDGWFixHeight};
 
     // Keep the launch difficulty unchanged until a complete DGW window exists.
     // With a 24-block window, DGW first calculates the target for block 25.
@@ -38,8 +57,26 @@ static unsigned int DarkGravityWave(const CBlockIndex* pindexLast, const Consens
 
     // Preserve the established DGWv3 averaging recurrence exactly.
     for (int64_t nCountBlocks = 1; nCountBlocks <= params.nDGWPastBlocks; ++nCountBlocks) {
+        const CBlockIndex* pindexTarget{pindex};
+
+        if (normalize_min_difficulty_history) {
+            // A delayed minimum-difficulty block already contributes its real
+            // long interval to DGW's elapsed-time calculation. Do not also
+            // inject the exceptional powLimit target into the target average.
+            //
+            // Instead, carry forward the most recent preceding target that was
+            // not itself a delayed minimum-difficulty exception.
+            while (IsDelayedMinDifficultyBlock(
+                pindexTarget,
+                params,
+                nProofOfWorkLimit)) {
+                assert(pindexTarget->pprev);
+                pindexTarget = pindexTarget->pprev;
+            }
+        }
+
         arith_uint256 bnTarget;
-        bnTarget.SetCompact(pindex->nBits);
+        bnTarget.SetCompact(pindexTarget->nBits);
 
         if (nCountBlocks == 1) {
             bnPastTargetAvg = bnTarget;
@@ -191,10 +228,15 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     const unsigned int nProofOfWorkLimit =
         UintToArith256(params.powLimit).GetCompact();
 
-    // Test-chain minimum-difficulty exception: preserve Bitcoin Core's
-    // proportional two-target-spacing delay rule. A normally timed block
-    // immediately returns to the ordinary DGW calculation.
-    if (params.fPowAllowMinDifficultyBlocks && pblock != nullptr &&
+    // Preserve the historical delayed minimum-difficulty exception
+    // until its scheduled removal height.
+    const bool min_difficulty_disabled{
+        params.nMinDifficultyDisableHeight >= 0 &&
+        pindexLast->nHeight + 1 >= params.nMinDifficultyDisableHeight};
+
+    if (params.fPowAllowMinDifficultyBlocks &&
+        !min_difficulty_disabled &&
+        pblock != nullptr &&
         pblock->GetBlockTime() >
             pindexLast->GetBlockTime() + params.nPowTargetSpacing * 2) {
         return nProofOfWorkLimit;

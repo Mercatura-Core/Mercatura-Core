@@ -518,6 +518,30 @@ int GuiMain(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
+#ifdef MERCATURA_PUBLIC_TESTNET_RELEASE
+    // Public Testnet wallet builds are deliberately locked to Mercatura testnet.
+    // Reject explicit attempts to select another network, then force command-line
+    // testnet selection so config-file settings cannot move this GUI off testnet.
+    const auto chain_arg = gArgs.GetArg("-chain");
+    const bool invalid_chain =
+        gArgs.GetBoolArg("-regtest", false) ||
+        gArgs.GetBoolArg("-signet", false) ||
+        (chain_arg && *chain_arg != "test") ||
+        (gArgs.IsArgSet("-testnet") && !gArgs.GetBoolArg("-testnet", false));
+
+    if (invalid_chain) {
+        const std::string message{"This Mercatura Core build is restricted to the public testnet."};
+        InitError(Untranslated(message));
+        QMessageBox::critical(nullptr, CLIENT_NAME, QString::fromStdString(message));
+        return EXIT_FAILURE;
+    }
+
+    gArgs.ForceSetArg("-regtest", "0");
+    gArgs.ForceSetArg("-signet", "0");
+    gArgs.ForceSetArg("-testnet", "0");
+    gArgs.ForceSetArg("-chain", "test");
+#endif
+
     // Error out when loose non-argument tokens are encountered on command line
     // However, allow BIP-21 URIs only if no options follow
     bool payment_server_token_seen = false;
