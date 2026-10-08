@@ -547,7 +547,7 @@ BOOST_AUTO_TEST_CASE(min_difficulty_delay_rule)
     // Mercatura public testnet enables the delayed minimum-difficulty
     // exception for recovery when early public-testnet hashpower is sparse.
     BOOST_CHECK(consensus.fPowAllowMinDifficultyBlocks);
-    BOOST_CHECK_EQUAL(consensus.nMinDifficultyDGWFixHeight, 1000);
+    BOOST_CHECK_EQUAL(consensus.nMinDifficultyDGWFixHeight, -1);
 
     constexpr uint32_t START_BITS{0x1c0ffff0U};
 
@@ -584,6 +584,53 @@ BOOST_AUTO_TEST_CASE(min_difficulty_delay_rule)
     BOOST_CHECK_EQUAL(
         GetNextWorkRequired(&blocks.back(), &delayed, consensus),
         pow_limit_bits);
+}
+
+BOOST_AUTO_TEST_CASE(min_difficulty_timeout_removal_activation)
+{
+    const auto test_params =
+        CreateChainParams(*m_node.args, ChainType::TESTNET);
+    const auto& consensus = test_params->GetConsensus();
+
+    BOOST_REQUIRE(consensus.fPowAllowMinDifficultyBlocks);
+    BOOST_REQUIRE_EQUAL(consensus.nMinDifficultyDisableHeight, 500);
+    BOOST_REQUIRE_EQUAL(consensus.nMinDifficultyDGWFixHeight, -1);
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+
+    const uint32_t pow_limit_bits =
+        UintToArith256(consensus.powLimit).GetCompact();
+
+    const auto next_bits = [&](int candidate_height, int64_t delay) {
+        auto blocks = BuildDGWChain(
+            25, START_BITS, 1'700'000'000,
+            consensus.nPowTargetSpacing);
+
+        const int offset =
+            candidate_height - (blocks.back().nHeight + 1);
+
+        for (auto& block : blocks) {
+            block.nHeight += offset;
+        }
+
+        CBlockHeader candidate;
+        candidate.nTime = blocks.back().GetBlockTime() + delay;
+
+        return GetNextWorkRequired(
+            &blocks.back(), &candidate, consensus);
+    };
+
+    // Height 499: exactly 300 seconds uses normal DGW.
+    BOOST_CHECK_EQUAL(next_bits(499, 300), START_BITS);
+
+    // Height 499: 301 seconds still triggers minimum difficulty.
+    BOOST_CHECK_EQUAL(next_bits(499, 301), pow_limit_bits);
+
+    // Height 500: the timeout exception is permanently disabled.
+    BOOST_CHECK_EQUAL(next_bits(500, 301), START_BITS);
+
+    // Height 501: ordinary DGW behavior continues.
+    BOOST_CHECK_EQUAL(next_bits(501, 301), START_BITS);
 }
 
 BOOST_AUTO_TEST_CASE(min_difficulty_block_does_not_poison_dgw_history)
@@ -665,7 +712,11 @@ BOOST_AUTO_TEST_CASE(min_difficulty_dgw_fix_activation_boundary)
     auto consensus = test_params->GetConsensus();
 
     BOOST_REQUIRE(consensus.fPowAllowMinDifficultyBlocks);
-    BOOST_REQUIRE_EQUAL(consensus.nMinDifficultyDGWFixHeight, 1000);
+    BOOST_REQUIRE_EQUAL(consensus.nMinDifficultyDGWFixHeight, -1);
+
+    // Exercise the historical DGW correction in isolation.
+    // It is no longer scheduled for public testnet activation.
+    consensus.nMinDifficultyDGWFixHeight = 1000;
 
     constexpr uint32_t START_BITS{0x1c0ffff0U};
 
@@ -820,6 +871,65 @@ BOOST_AUTO_TEST_CASE(min_difficulty_dgw_fix_preserves_nondelayed_powlimit)
             consensus);
 
     BOOST_CHECK_EQUAL(fixed_result, legacy_result);
+}
+
+BOOST_AUTO_TEST_CASE(min_difficulty_timeout_removal_preserves_history)
+{
+    const auto test_params =
+        CreateChainParams(*m_node.args, ChainType::TESTNET);
+    const auto& consensus = test_params->GetConsensus();
+
+    BOOST_REQUIRE_EQUAL(consensus.nMinDifficultyDisableHeight, 500);
+    BOOST_REQUIRE_EQUAL(consensus.nMinDifficultyDGWFixHeight, -1);
+
+    constexpr uint32_t START_BITS{0x1c0ffff0U};
+
+    const uint32_t pow_limit_bits =
+        UintToArith256(consensus.powLimit).GetCompact();
+
+    auto contaminated = BuildDGWChain(
+        26, START_BITS, 1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    auto reference = BuildDGWChain(
+        26, START_BITS, 1'700'000'000,
+        consensus.nPowTargetSpacing);
+
+    for (auto& block : contaminated) {
+        block.nHeight += 474;
+    }
+    for (auto& block : reference) {
+        block.nHeight += 474;
+    }
+
+    BOOST_REQUIRE_EQUAL(contaminated.back().nHeight, 499);
+
+    const int64_t delayed_time =
+        contaminated[24].GetBlockTime() +
+        consensus.nPowTargetSpacing * 2 + 1;
+
+    contaminated[25].nTime = delayed_time;
+    contaminated[25].nBits = pow_limit_bits;
+
+    reference[25].nTime = delayed_time;
+    reference[25].nBits = START_BITS;
+
+    CBlockHeader candidate;
+    candidate.nTime = delayed_time + 301;
+
+    const uint32_t contaminated_result =
+        GetNextWorkRequired(
+            &contaminated.back(), &candidate, consensus);
+
+    const uint32_t reference_result =
+        GetNextWorkRequired(
+            &reference.back(), &candidate, consensus);
+
+    // Historical minimum-difficulty targets remain in DGW history.
+    BOOST_CHECK(contaminated_result != reference_result);
+
+    // The removed timeout must not override DGW at height 500.
+    BOOST_CHECK(contaminated_result != pow_limit_bits);
 }
 
 BOOST_AUTO_TEST_CASE(regtest_no_retarget)

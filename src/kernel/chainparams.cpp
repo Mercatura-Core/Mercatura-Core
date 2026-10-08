@@ -213,7 +213,8 @@ public:
         consensus.nDGWMinTimespan = 1200;
         consensus.nDGWMaxTimespan = 10800;
         consensus.fPowAllowMinDifficultyBlocks = true;
-        consensus.nMinDifficultyDGWFixHeight = 1000;
+        consensus.nMinDifficultyDisableHeight = 500;
+        consensus.nMinDifficultyDGWFixHeight = -1;
         consensus.enforce_BIP94 = false;
         consensus.fPowNoRetargeting = false;
         consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 28;

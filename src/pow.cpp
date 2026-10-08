@@ -228,10 +228,15 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     const unsigned int nProofOfWorkLimit =
         UintToArith256(params.powLimit).GetCompact();
 
-    // Test-chain minimum-difficulty exception: preserve Bitcoin Core's
-    // proportional two-target-spacing delay rule. A normally timed block
-    // immediately returns to the ordinary DGW calculation.
-    if (params.fPowAllowMinDifficultyBlocks && pblock != nullptr &&
+    // Preserve the historical delayed minimum-difficulty exception
+    // until its scheduled removal height.
+    const bool min_difficulty_disabled{
+        params.nMinDifficultyDisableHeight >= 0 &&
+        pindexLast->nHeight + 1 >= params.nMinDifficultyDisableHeight};
+
+    if (params.fPowAllowMinDifficultyBlocks &&
+        !min_difficulty_disabled &&
+        pblock != nullptr &&
         pblock->GetBlockTime() >
             pindexLast->GetBlockTime() + params.nPowTargetSpacing * 2) {
         return nProofOfWorkLimit;
