@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/file.h>
 #include <unistd.h>
+#include <util/string.h>
 
 #include <limits>
 #include <stdexcept>
@@ -138,7 +139,7 @@ int64_t Ledger::Counter(const std::string& name)
     }
     if (n < 0 || n == std::numeric_limits<int64_t>::max()) throw std::overflow_error("namespace exhausted");
     auto set = Query("INSERT INTO metadata VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value");
-    set.Bind(1, name).Bind(2, std::to_string(++n)).Row();
+    set.Bind(1, name).Bind(2, util::ToString(++n)).Row();
     tx.Commit();
     return n;
 }

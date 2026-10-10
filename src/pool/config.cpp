@@ -3,6 +3,7 @@
 #include <pool/config.h>
 
 #include <pool/job.h>
+#include <util/string.h>
 
 #include <algorithm>
 #include <chrono>
@@ -106,5 +107,5 @@ void Config::Validate() const
     } else if (tls_certificate.empty() || tls_key.empty())
         throw std::invalid_argument("TLS certificate and key required; no plaintext fallback");
 }
-std::string Config::Policy() const { return "MCA-PPLNS/1:blocks=" + std::to_string(window_blocks) + ":lifetime-identities=" + std::to_string(payout_cap); }
+std::string Config::Policy() const { return "MCA-PPLNS/1:blocks=" + util::ToString(window_blocks) + ":lifetime-identities=" + util::ToString(payout_cap); }
 } // namespace pool

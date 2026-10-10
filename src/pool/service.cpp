@@ -6,8 +6,10 @@
 #include <crypto/hex_base.h>
 #include <openssl/rand.h>
 #include <util/strencodings.h>
+#include <util/string.h>
 
 #include <algorithm>
+#include <charconv>
 #include <chrono>
 #include <limits>
 #include <stdexcept>
@@ -208,9 +210,9 @@ UniValue Service::Hello(int64_t& session, const std::string& ip, const UniValue&
     reply.pushKV("algorithm", "MercaHash-V1");
     reply.pushKV("network", m_cfg.network);
     reply.pushKV("genesis", m_cfg.genesis);
-    reply.pushKV("session", std::to_string(id));
+    reply.pushKV("session", util::ToString(id));
     reply.pushKV("resume_token", token);
-    reply.pushKV("extranonce_namespace", std::to_string(id));
+    reply.pushKV("extranonce_namespace", util::ToString(id));
     reply.pushKV("pool_name", "Mercatura Pool");
     reply.pushKV("fee_base_units", 0);
     reply.pushKV("heartbeat_seconds", m_cfg.heartbeat_seconds);
@@ -313,8 +315,8 @@ std::optional<UniValue> Service::Handle(int64_t& session, const std::string& ip,
 UniValue Service::Receipt(const std::string& work, int64_t sequence, const Job& job, bool candidate)
 {
     UniValue o{UniValue::VOBJ};
-    o.pushKV("sequence", std::to_string(sequence));
-    o.pushKV("receipt_id", Digest("MCA-PPLNS/1/receipt", m_cfg.genesis + ":" + work + ":" + std::to_string(sequence)));
+    o.pushKV("sequence", util::ToString(sequence));
+    o.pushKV("receipt_id", Digest("MCA-PPLNS/1/receipt", m_cfg.genesis + ":" + work + ":" + util::ToString(sequence)));
     o.pushKV("work_id", work);
     o.pushKV("job_id", job.id);
     o.pushKV("snapshot_id", job.snapshot);
@@ -526,7 +528,11 @@ UniValue Service::Stats()
     recent.Bind(1, Now() - 300);
     while (recent.Row())
         work += Number::Parse(recent.Text(0));
-    o.pushKV("hashrate_estimate", static_cast<double>(std::stold(work.Decimal()) / std::min<int64_t>(300, duration)));
+    const auto decimal_work = work.Decimal();
+    long double estimated_work{0};
+    const auto [end, error] = std::from_chars(decimal_work.data(), decimal_work.data() + decimal_work.size(), estimated_work);
+    if (error != std::errc{} || end != decimal_work.data() + decimal_work.size()) throw std::runtime_error("invalid reporting work estimate");
+    o.pushKV("hashrate_estimate", static_cast<double>(estimated_work / std::min<int64_t>(300, duration)));
     o.pushKV("hashrate_window_seconds", std::min<int64_t>(300, duration));
     UniValue blocks{UniValue::VOBJ};
     auto states = m_db.Query("SELECT state,COUNT(*) FROM candidates GROUP BY state");
@@ -548,7 +554,7 @@ UniValue Service::Stats()
     UniValue sessions{UniValue::VARR};
     for (const auto& [id, s] : m_sessions) {
         UniValue item{UniValue::VOBJ};
-        item.pushKV("session", std::to_string(id));
+        item.pushKV("session", util::ToString(id));
         item.pushKV("assigned_target", s.target);
         item.pushKV("assigned_score", WorkScore(Number::Parse(s.target, true)).Decimal());
         item.pushKV("accepted_since_connect", s.accepted);

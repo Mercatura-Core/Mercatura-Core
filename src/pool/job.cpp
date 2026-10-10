@@ -8,6 +8,7 @@
 #include <hash.h>
 #include <streams.h>
 #include <util/strencodings.h>
+#include <util/string.h>
 
 #include <algorithm>
 #include <stdexcept>
@@ -152,7 +153,7 @@ Job BuildJob(const UniValue& t, const Window& w, int64_t cutoff, const Number& w
     // mathematically, but would be an unusable operational target here.
     if (j.share_target < j.network_target) throw std::runtime_error("share target is harder than network target");
     const auto template_id = Digest("MCA-POOL/1/template", t.write());
-    const auto seed = Digest("MCA-PPLNS/1/seed", network + ":" + genesis + ":" + t["previousblockhash"].get_str() + ":" + template_id + ":" + std::to_string(cutoff) + ":" + window_limit.Decimal() + ":" + std::to_string(reward));
+    const auto seed = Digest("MCA-PPLNS/1/seed", network + ":" + genesis + ":" + t["previousblockhash"].get_str() + ":" + template_id + ":" + util::ToString(cutoff) + ":" + window_limit.Decimal() + ":" + util::ToString(reward));
     auto allocations = Allocate(reward, w, seed);
     if (allocations.size() > 1000) throw std::runtime_error("pool recipient launch limit exceeded");
     j.manifest.setObject();
@@ -211,7 +212,7 @@ Job BuildJob(const UniValue& t, const Window& w, int64_t cutoff, const Number& w
     j.manifest.pushKV("snapshot_id", j.snapshot);
     j.manifest.pushKV("coinbase_txid", b.vtx[0]->GetHash().GetHex());
     j.manifest.pushKV("serialized_bytes", static_cast<uint64_t>(bytes));
-    j.id = Digest("MCA-POOL/1/job", j.snapshot + ":" + std::to_string(session) + ":" + std::to_string(serial) + ":" + HeaderHex(b) + ":" + j.share_target.GetHex() + ":" + std::to_string(now));
+    j.id = Digest("MCA-POOL/1/job", j.snapshot + ":" + util::ToString(session) + ":" + util::ToString(serial) + ":" + HeaderHex(b) + ":" + j.share_target.GetHex() + ":" + util::ToString(now));
     return j;
 }
 UniValue Job::Message() const
@@ -227,7 +228,7 @@ UniValue Job::Message() const
     o.pushKV("network_target", network_target.GetHex());
     o.pushKV("expires", expires);
     o.pushKV("parent", block.hashPrevBlock.GetHex());
-    o.pushKV("extranonce_namespace", std::to_string(session));
+    o.pushKV("extranonce_namespace", util::ToString(session));
     UniValue path{UniValue::VARR};
     for (const auto& h : TransactionMerklePath(block, 0))
         path.push_back(h.GetHex());

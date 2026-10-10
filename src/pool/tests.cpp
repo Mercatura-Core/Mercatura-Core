@@ -16,6 +16,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <util/strencodings.h>
+#include <util/string.h>
 
 #include <filesystem>
 #include <functional>
@@ -144,7 +145,7 @@ void Rounding()
     auto equal = Participants(3);
     std::set<std::string> winners;
     for (int i = 0; i < 100; ++i)
-        for (const auto& p : Allocate(1, equal, "seed" + std::to_string(i)))
+        for (const auto& p : Allocate(1, equal, "seed" + util::ToString(i)))
             if (p.amount) winners.insert(p.script);
     Check(winners.size() == 3, "domain-separated ties do not always favor first address");
     auto huge = Participants(3);
@@ -184,6 +185,8 @@ void Coinbases()
         std::cout << "  " << count << " recipients: " << actual << " block bytes, " << GetSerializeSize(TX_WITH_WITNESS(cb)) << " coinbase bytes\n";
     }
     auto j = MakeJob(3);
+    Check(j.id == "365a28a922fed051fb42a48cb290966426b0a2fff8b1ced962b073e1ad73b803", "locale-independent conversion preserves issued job identity");
+    Check(j.snapshot == "fe033864d18c24f7bb3aa8b69b2c25dbf12cfa5e6d398ea1de242ea81b2799ce", "locale-independent conversion preserves frozen payout snapshot");
     const auto frozen = BlockHex(j.block);
     auto w = Participants(3);
     w.weights[Script(4)] = Number{20};
@@ -256,7 +259,7 @@ void InsertJob(Ledger& db, const Job& j)
 }
 void Persistence()
 {
-    auto path = std::filesystem::temp_directory_path() / ("mercatura-pool-test-" + std::to_string(getpid()));
+    auto path = std::filesystem::temp_directory_path() / ("mercatura-pool-test-" + util::ToString(getpid()));
     std::filesystem::create_directory(path);
     const auto file = (path / "ledger.sqlite").string();
     auto j = MakeJob(3);
@@ -338,7 +341,7 @@ void Persistence()
 }
 void Registration()
 {
-    auto file = std::filesystem::temp_directory_path() / ("mercatura-admission-" + std::to_string(getpid()));
+    auto file = std::filesystem::temp_directory_path() / ("mercatura-admission-" + util::ToString(getpid()));
     auto attempt = [](Ledger& db, unsigned identity, const std::string& ip, int64_t now) {
         Transaction tx{db};
         bool admitted = db.Register(Script(identity), ip, now, 60, 1, 2, 1000);
