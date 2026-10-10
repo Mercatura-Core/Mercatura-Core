@@ -15,10 +15,10 @@
 #include <streams.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <util/fs.h>
 #include <util/strencodings.h>
 #include <util/string.h>
 
-#include <filesystem>
 #include <functional>
 #include <iostream>
 #include <set>
@@ -259,9 +259,9 @@ void InsertJob(Ledger& db, const Job& j)
 }
 void Persistence()
 {
-    auto path = std::filesystem::temp_directory_path() / ("mercatura-pool-test-" + util::ToString(getpid()));
-    std::filesystem::create_directory(path);
-    const auto file = (path / "ledger.sqlite").string();
+    auto path = fs::path{fs::temp_directory_path()} / fs::u8path("mercatura-pool-test-" + util::ToString(getpid()));
+    fs::create_directory(path);
+    const auto file = PathToString(path / "ledger.sqlite");
     auto j = MakeJob(3);
     {
         Ledger db{file, "regtest", "genesis", "policy"};
@@ -337,11 +337,11 @@ void Persistence()
         db.Exec("PRAGMA user_version=99");
     }
     Throws([&] { Ledger bad{file, "regtest", "genesis", "policy"}; }, "schema version mismatch rejected");
-    std::filesystem::remove_all(path);
+    fs::remove_all(path);
 }
 void Registration()
 {
-    auto file = std::filesystem::temp_directory_path() / ("mercatura-admission-" + util::ToString(getpid()));
+    auto file = fs::path{fs::temp_directory_path()} / fs::u8path("mercatura-admission-" + util::ToString(getpid()));
     auto attempt = [](Ledger& db, unsigned identity, const std::string& ip, int64_t now) {
         Transaction tx{db};
         bool admitted = db.Register(Script(identity), ip, now, 60, 1, 2, 1000);
@@ -349,7 +349,7 @@ void Registration()
         return admitted;
     };
     {
-        Ledger db{file.string(), "regtest", "genesis", "policy"};
+        Ledger db{PathToString(file), "regtest", "genesis", "policy"};
         Check(attempt(db, 1, "one", 100), "first identity admitted");
         Check(!attempt(db, 2, "one", 100), "new addresses limited per IP");
         Check(attempt(db, 1, "one", 100), "known identity does not consume registration quota");
@@ -357,7 +357,7 @@ void Registration()
         Check(!attempt(db, 3, "three", 100) && db.IdentityCount() == 2, "global limit and refusal do not consume lifetime slots");
     }
     {
-        Ledger db{file.string(), "regtest", "genesis", "policy"};
+        Ledger db{PathToString(file), "regtest", "genesis", "policy"};
         Check(!attempt(db, 3, "three", 101), "registration limit survives restart");
         Check(!attempt(db, 3, "three", 90), "clock rollback cannot replenish registration quota");
         Check(attempt(db, 3, "three", 160), "rolling registration quota releases only rate capacity");
@@ -371,7 +371,7 @@ void Registration()
         Check(!db.SessionAllowed("four", 160, 60, 1, 1), "namespace quota has global bound");
         Check(db.SessionAllowed("three", 220, 60, 1, 2), "namespace rolling quota expires without dropping history");
     }
-    std::filesystem::remove(file);
+    fs::remove(file);
 }
 void ProtocolAndTls()
 {
