@@ -17,6 +17,7 @@
     "qt": {
       "description": "Build GUI, Qt 6",
       "dependencies": [
+        "boost-multiprecision",
         {
           "name": "qtbase",
           "default-features": false,
