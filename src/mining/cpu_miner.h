@@ -59,7 +59,7 @@ public:
     virtual std::string Destination() const { return {}; }
 };
 
-enum class MiningState { STOPPED, STARTING, RUNNING, STOPPING, ERROR };
+enum class MiningState { STOPPED, STARTING, RUNNING, STOPPING, FAILED };
 struct MiningStats {
     MiningState state{MiningState::STOPPED};
     bool busy{false};

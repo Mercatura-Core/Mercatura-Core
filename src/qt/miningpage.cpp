@@ -113,7 +113,7 @@ void MiningPage::updateStatus()
     m_blocks->setText(QStringLiteral("%1 / %2 / %3").arg(qulonglong{stats.solutions}).arg(qulonglong{stats.submitted}).arg(qulonglong{stats.accepted}));
     QString status{QString::fromStdString(stats.status)};
     if (!m_session || !m_client) status = tr("Mining is unavailable until the node and wallet are loaded.");
-    else if (!running && stats.state != mining::MiningState::ERROR) {
+    else if (!running && stats.state != mining::MiningState::FAILED) {
         if (m_limits.maximum == 0) status = tr("Insufficient available memory for a mining worker.");
         else if (syncing) status = tr("Waiting for initial block download to complete.");
         else status = tr("Ready. Mining starts only when you press Start Mining.");

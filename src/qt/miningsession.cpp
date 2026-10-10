@@ -104,7 +104,7 @@ void MiningSession::poll()
         m_owner = nullptr;
         m_unload_token.reset();
     }
-    if (!m_prompting && !m_shutdown && !m_cancelled && !m_wallet_unloaded && current.state == mining::MiningState::ERROR && !current.busy && m_needs_unlock.exchange(false) && m_owner) {
+    if (!m_prompting && !m_shutdown && !m_cancelled && !m_wallet_unloaded && current.state == mining::MiningState::FAILED && !current.busy && m_needs_unlock.exchange(false) && m_owner) {
         // Only address creation needs unlocking. A cached public destination
         // never enters this path, so a locked wallet can keep mining safely.
         m_prompting = true;
@@ -117,7 +117,7 @@ void MiningSession::poll()
             if (!start(wallet, m_requested)) m_unlock_context.reset();
         }
         m_prompting = false;
-    } else if (!m_prompting && (!current.destination.empty() || current.state == mining::MiningState::STOPPED || current.state == mining::MiningState::ERROR)) {
+    } else if (!m_prompting && (!current.destination.empty() || current.state == mining::MiningState::STOPPED || current.state == mining::MiningState::FAILED)) {
         m_unlock_context.reset();
     }
     Q_EMIT changed();

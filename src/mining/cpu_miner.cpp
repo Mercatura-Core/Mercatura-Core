@@ -105,7 +105,7 @@ void MiningController::Fail(const std::string& error)
     m_stop = true;
     {
         std::lock_guard lock{m_mutex};
-        m_stats.state = MiningState::ERROR;
+        m_stats.state = MiningState::FAILED;
         m_stats.status = error;
     }
     RequestStop();
@@ -171,7 +171,7 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested)
                 {
                     std::lock_guard lock{m_mutex};
                     if (result.active_chain) ++m_stats.accepted;
-                    if (m_stats.state != MiningState::ERROR) m_stats.status = result.message;
+                    if (m_stats.state != MiningState::FAILED) m_stats.status = result.message;
                 }
                 CancelWork();
                 work.reset();
@@ -218,7 +218,7 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested)
     }
     std::lock_guard lock{m_mutex};
     m_stats.hashes_per_second = 0;
-    if (m_stats.state != MiningState::ERROR) {
+    if (m_stats.state != MiningState::FAILED) {
         m_stats.state = MiningState::STOPPED;
         m_stats.status = "Stopped";
     }

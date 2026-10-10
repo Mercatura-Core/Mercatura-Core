@@ -95,7 +95,7 @@ BOOST_AUTO_TEST_CASE(native_controller_submits_valid_pq_regtest_block)
         return std::make_unique<mining::SoloWorkProvider>(interfaces::MakeMining(m_node, false), script, EncodeDestination(*destination), true);
     }, 1));
     const auto deadline{std::chrono::steady_clock::now() + std::chrono::seconds{120}};
-    while (controller.GetStats().accepted == 0 && controller.GetStats().state != mining::MiningState::ERROR && std::chrono::steady_clock::now() < deadline) {
+    while (controller.GetStats().accepted == 0 && controller.GetStats().state != mining::MiningState::FAILED && std::chrono::steady_clock::now() < deadline) {
         std::this_thread::sleep_for(std::chrono::milliseconds{10});
     }
     controller.RequestStop();

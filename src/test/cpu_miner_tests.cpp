@@ -180,7 +180,7 @@ BOOST_AUTO_TEST_CASE(worker_and_provider_failure_cleanup)
         }, 1));
         BOOST_REQUIRE(Until([&] { return !controller.GetStats().busy; }));
         controller.Wait();
-        BOOST_CHECK(controller.GetStats().state == mining::MiningState::ERROR);
+        BOOST_CHECK(controller.GetStats().state == mining::MiningState::FAILED);
         BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
         BOOST_CHECK_EQUAL(controller.GetStats().hashes, 0U);
     }
@@ -239,7 +239,7 @@ BOOST_AUTO_TEST_CASE(excessive_worker_count_rejected_before_allocation)
     }};
     BOOST_REQUIRE(controller.Start([] { return std::unique_ptr<mining::WorkProvider>{}; }, std::numeric_limits<unsigned int>::max()));
     controller.Wait();
-    BOOST_CHECK(controller.GetStats().state == mining::MiningState::ERROR);
+    BOOST_CHECK(controller.GetStats().state == mining::MiningState::FAILED);
     BOOST_CHECK_EQUAL(allocations, 0U);
 }
 
