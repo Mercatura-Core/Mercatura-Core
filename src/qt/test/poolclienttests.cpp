@@ -1,5 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
+#ifndef Q_MOC_RUN
 #include <chainparams.h>
 #include <consensus/merkle.h>
 #include <hash.h>
@@ -12,6 +13,7 @@
 #include <util/strencodings.h>
 #include <util/translation.h>
 #include <validation.h>
+#endif
 
 #include <QCoreApplication>
 #include <QSslSocket>

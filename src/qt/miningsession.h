@@ -4,9 +4,11 @@
 #ifndef BITCOIN_QT_MININGSESSION_H
 #define BITCOIN_QT_MININGSESSION_H
 
+#ifndef Q_MOC_RUN
 #include <mining/cpu_miner.h>
 #include <qt/poolclient.h>
 #include <qt/walletmodel.h>
+#endif
 
 #include <QObject>
 #include <QPointer>

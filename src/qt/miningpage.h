@@ -4,7 +4,9 @@
 #ifndef BITCOIN_QT_MININGPAGE_H
 #define BITCOIN_QT_MININGPAGE_H
 
+#ifndef Q_MOC_RUN
 #include <mining/cpu_miner.h>
+#endif
 #include <QPointer>
 #include <QWidget>
 
