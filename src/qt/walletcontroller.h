@@ -12,6 +12,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -23,6 +24,7 @@
 #include <QString>
 
 class ClientModel;
+class MiningSession;
 class OptionsModel;
 class PlatformStyle;
 class WalletModel;
@@ -57,6 +59,8 @@ public:
     WalletController(ClientModel& client_model, const PlatformStyle* platform_style, QObject* parent);
     ~WalletController();
 
+    MiningSession* miningSession() const { return m_mining_session.get(); }
+
     WalletModel* getOrCreateWallet(std::unique_ptr<interfaces::Wallet> wallet);
 
     //! Returns all wallet names in the wallet dir mapped to whether the wallet
@@ -73,6 +77,7 @@ Q_SIGNALS:
     void coinsSent(WalletModel* wallet_model, SendCoinsRecipient recipient, QByteArray transaction);
 
 private:
+    std::unique_ptr<MiningSession> m_mining_session;
     QThread* const m_activity_thread;
     QObject* const m_activity_worker;
     ClientModel& m_client_model;
@@ -81,6 +86,7 @@ private:
     OptionsModel* const m_options_model;
     mutable QMutex m_mutex;
     std::vector<WalletModel*> m_wallets;
+    std::set<WalletModel*> m_pending_mining_removals;
     std::unique_ptr<interfaces::Handler> m_handler_load_wallet;
 
     friend class WalletControllerActivity;

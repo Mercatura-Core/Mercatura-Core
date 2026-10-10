@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <qt/walletview.h>
+#include <qt/miningpage.h>
 
 #include <qt/addressbookpage.h>
 #include <qt/askpassphrasedialog.h>
@@ -73,6 +74,9 @@ WalletView::WalletView(WalletModel* wallet_model, const PlatformStyle* _platform
     addWidget(transactionsPage);
     addWidget(receiveCoinsPage);
     addWidget(sendCoinsPage);
+    miningPage = new MiningPage(walletModel, this);
+    addWidget(miningPage);
+    connect(this, &WalletView::setPrivacy, miningPage, &MiningPage::setPrivacy);
 
     connect(overviewPage, &OverviewPage::transactionClicked, this, &WalletView::transactionClicked);
     // Clicking on a transaction on the overview pre-selects the transaction on the transaction history page
@@ -113,10 +117,14 @@ WalletView::WalletView(WalletModel* wallet_model, const PlatformStyle* _platform
 
 WalletView::~WalletView() = default;
 
+void WalletView::setMiningSession(MiningSession* session) { miningPage->setSession(session); }
+void WalletView::gotoMiningPage() { setCurrentWidget(miningPage); }
+
 void WalletView::setClientModel(ClientModel *_clientModel)
 {
     this->clientModel = _clientModel;
 
+    miningPage->setClientModel(_clientModel);
     overviewPage->setClientModel(_clientModel);
     sendCoinsPage->setClientModel(_clientModel);
     walletModel->setClientModel(_clientModel);

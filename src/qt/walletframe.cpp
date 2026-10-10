@@ -155,6 +155,11 @@ void WalletFrame::gotoOverviewPage()
         i.value()->gotoOverviewPage();
 }
 
+void WalletFrame::gotoMiningPage()
+{
+    for (auto* view : mapWalletViews) view->gotoMiningPage();
+}
+
 void WalletFrame::gotoHistoryPage()
 {
     QMap<WalletModel*, WalletView*>::const_iterator i;

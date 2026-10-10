@@ -52,3 +52,14 @@ if(WIN32 AND VCPKG_TARGET_TRIPLET)
 endif()
 
 install_binary_component(test_bitcoin-qt INTERNAL)
+
+if(ENABLE_WALLET)
+  # Focused native miner lifecycle test, independently runnable from inherited
+  # GUI/wallet test cases and their legacy Bitcoin assumptions.
+  add_executable(test_mining-qt miningtests.cpp ../../init/bitcoin-qt.cpp)
+  target_link_libraries(test_mining-qt
+    core_interface bitcoinqt test_util bitcoin_node bitcoin_wallet Boost::headers Qt6::Test
+  )
+  import_plugins(test_mining-qt)
+  add_test(NAME test_mining-qt COMMAND test_mining-qt)
+endif()

@@ -40,6 +40,7 @@
 #ifdef ENABLE_WALLET
 #include <qt/paymentserver.h>
 #include <qt/walletcontroller.h>
+#include <qt/miningsession.h>
 #include <qt/walletmodel.h>
 #include <wallet/types.h>
 #endif // ENABLE_WALLET
@@ -348,6 +349,9 @@ void BitcoinApplication::requestShutdown()
     // Request node shutdown, which can interrupt long operations, like
     // rescanning a wallet.
     node().startShutdown();
+#ifdef ENABLE_WALLET
+    if (m_wallet_controller) m_wallet_controller->miningSession()->shutdown();
+#endif
     // Prior to unsetting the client model, stop listening backend signals
     if (clientModel) {
         clientModel->stop();

@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <qt/walletcontroller.h>
+#include <qt/miningsession.h>
 
 #include <qt/askpassphrasedialog.h>
 #include <qt/clientmodel.h>
@@ -38,6 +39,7 @@ using wallet::WALLET_FLAG_EXTERNAL_SIGNER;
 
 WalletController::WalletController(ClientModel& client_model, const PlatformStyle* platform_style, QObject* parent)
     : QObject(parent)
+    , m_mining_session(std::make_unique<MiningSession>(client_model.node()))
     , m_activity_thread(new QThread(this))
     , m_activity_worker(new QObject)
     , m_client_model(client_model)
@@ -60,6 +62,7 @@ WalletController::WalletController(ClientModel& client_model, const PlatformStyl
 // available in the header, just forward declared.
 WalletController::~WalletController()
 {
+    m_mining_session->shutdown();
     m_activity_thread->quit();
     m_activity_thread->wait();
     delete m_activity_worker;
@@ -152,6 +155,7 @@ WalletModel* WalletController::getOrCreateWallet(std::unique_ptr<interfaces::Wal
     assert(called);
 
     connect(wallet_model, &WalletModel::unload, this, [this, wallet_model] {
+        m_mining_session->walletUnloaded(wallet_model);
         // Defer removeAndDeleteWallet when no modal widget is actively waiting for an action.
         // TODO: remove this workaround by removing usage of QDialog::exec.
         QWidget* active_dialog = QApplication::activeModalWidget();
@@ -176,12 +180,28 @@ WalletModel* WalletController::getOrCreateWallet(std::unique_ptr<interfaces::Wal
 
 void WalletController::removeAndDeleteWallet(WalletModel* wallet_model)
 {
-    // Unregister wallet model.
+    if (m_pending_mining_removals.contains(wallet_model)) return;
+    // Unregister immediately so a wallet reloaded while mining stops gets a
+    // fresh model, instead of the model already being unloaded.
     {
         QMutexLocker locker(&m_mutex);
         m_wallets.erase(std::remove(m_wallets.begin(), m_wallets.end(), wallet_model));
     }
     Q_EMIT walletRemoved(wallet_model);
+    // Keep the selected model (and its wallet interface) alive until the
+    // coordinator has joined. Defer deletion on signals rather than waiting
+    // for a MercaHash attempt on the GUI thread.
+    if (m_mining_session->owner() == wallet_model && m_mining_session->stats().busy) {
+        m_mining_session->walletUnloaded(wallet_model);
+        m_pending_mining_removals.insert(wallet_model);
+        connect(m_mining_session.get(), &MiningSession::changed, wallet_model, [this, wallet_model] {
+            if (!m_mining_session->stats().busy) {
+                m_pending_mining_removals.erase(wallet_model);
+                delete wallet_model;
+            }
+        });
+        return;
+    }
     // Currently this can trigger the unload since the model can hold the last
     // CWallet shared pointer.
     delete wallet_model;

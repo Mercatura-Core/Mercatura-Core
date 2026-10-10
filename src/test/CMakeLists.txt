@@ -37,6 +37,7 @@ add_executable(test_bitcoin
   common_url_tests.cpp
   compress_tests.cpp
   crypto_tests.cpp
+  cpu_miner_tests.cpp
   cuckoocache_tests.cpp
   dbwrapper_tests.cpp
   denialofservice_tests.cpp

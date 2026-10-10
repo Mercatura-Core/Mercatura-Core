@@ -179,6 +179,10 @@ if(ENABLE_WALLET)
       editaddressdialog.h
       openuridialog.cpp
       openuridialog.h
+      miningpage.cpp
+      miningpage.h
+      miningsession.cpp
+      miningsession.h
       overviewpage.cpp
       overviewpage.h
       paymentserver.cpp
