@@ -27,19 +27,21 @@ std::optional<NonceRange> AllocateNonceRange(std::atomic<uint64_t>& cursor)
 }
 
 struct MiningController::Work {
-    explicit Work(MiningJob work) : job{std::move(work)} {}
+    explicit Work(MiningJob work) : job{std::move(work)}, expires{job.deadline.value_or(std::chrono::steady_clock::now() + JOB_LIFETIME)} {}
     const MiningJob job;
-    const std::chrono::steady_clock::time_point expires{std::chrono::steady_clock::now() + JOB_LIFETIME};
+    const std::chrono::steady_clock::time_point expires;
     std::atomic<uint64_t> next_nonce{0};
     std::atomic<bool> cancelled{false};
     std::atomic<bool> solved{false};
 };
 
-MiningController::MiningController(HashFactory factory, LimitDetector limits)
+MiningController::MiningController(HashFactory factory, LimitDetector limits, RangeAllocator ranges)
     : m_hash_factory{factory ? std::move(factory) : HashFactory{[] {
-        auto context{std::make_shared<PoWHashContext>()};
-        return [context](const CBlockHeader& header) { return context->GetHash(header); };
-    }}}, m_detect_limits{limits ? std::move(limits) : LimitDetector{DetectWorkerLimits}}
+          auto context{std::make_shared<PoWHashContext>()};
+          return [context](const CBlockHeader& header) { return context->GetHash(header); };
+      }}},
+      m_detect_limits{limits ? std::move(limits) : LimitDetector{DetectWorkerLimits}},
+      m_allocate_range{ranges ? std::move(ranges) : RangeAllocator{AllocateNonceRange}}
 {
 }
 MiningController::~MiningController() { RequestStop(); Wait(); }
@@ -62,7 +64,7 @@ bool MiningController::Start(ProviderFactory factory, unsigned int workers)
         m_stats = {};
         m_stats.state = MiningState::STARTING;
         m_stats.status = "Preparing mining";
-        m_solution.reset();
+        m_solutions.clear();
     }
     try {
         m_coordinator = std::thread{[this, factory = std::move(factory), workers] { Run(factory, workers); }};
@@ -115,7 +117,7 @@ void MiningController::CancelWork()
     std::lock_guard lock{m_mutex};
     if (m_work) m_work->cancelled = true;
     m_work.reset();
-    m_solution.reset();
+    m_solutions.clear();
     m_cv.notify_all();
 }
 
@@ -152,7 +154,11 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested)
             {
                 std::lock_guard lock{m_mutex};
                 work = m_work;
-                solution = std::exchange(m_solution, std::nullopt);
+                if (!m_solutions.empty()) {
+                    solution = m_solutions.front();
+                    m_solutions.pop_front();
+                    m_cv.notify_all();
+                }
             }
             const auto now{std::chrono::steady_clock::now()};
             // The provider is used only here; its lifetime is protected until
@@ -173,10 +179,19 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested)
                     if (result.active_chain) ++m_stats.accepted;
                     if (m_stats.state != MiningState::FAILED) m_stats.status = result.message;
                 }
-                CancelWork();
-                work.reset();
+                if (!work->job.continuous) {
+                    CancelWork();
+                    work.reset();
+                }
             }
-            if (!work || (work->next_nonce >= NONCE_SPACE && m_active == 0)) {
+            bool exhausted{false};
+            if (work && work->next_nonce >= NONCE_SPACE && m_active == 0) {
+                std::lock_guard lock{m_mutex};
+                // Headers in the FIFO still belong to this job. Drain them
+                // before installing a new job and its independent nonce cursor.
+                exhausted = m_solutions.empty();
+            }
+            if (!work || exhausted) {
                 auto job{m_provider->GetJob()};
                 if (m_stop) break;
                 std::lock_guard lock{m_mutex};
@@ -188,7 +203,7 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested)
                     m_stats.status = "Mining";
                     m_cv.notify_all();
                 } else {
-                    m_stats.status = "Waiting for synchronization and a connected chain tip";
+                    m_stats.status = m_provider->WaitingStatus();
                     m_stats.state = MiningState::STARTING;
                 }
             }
@@ -200,7 +215,7 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested)
                 sampled_at = now;
             }
             std::unique_lock lock{m_mutex};
-            m_cv.wait_for(lock, std::chrono::milliseconds{100}, [this] { return m_stop.load() || m_solution.has_value(); });
+            m_cv.wait_for(lock, std::chrono::milliseconds{100}, [this] { return m_stop.load() || !m_solutions.empty(); });
         }
     } catch (const std::bad_alloc&) {
         Fail("Unable to allocate mining memory; reduce the worker count or free memory");
@@ -248,23 +263,35 @@ void MiningController::Worker()
             ++m_active;
             active = true;
             CBlockHeader header{work->job.header};
-            while (!m_stop && !work->cancelled && !work->solved) {
-                const auto range{AllocateNonceRange(work->next_nonce)};
+            while (!m_stop && !work->cancelled && !work->solved && (!work->job.valid || *work->job.valid) && std::chrono::steady_clock::now() < work->expires) {
+                const auto range{m_allocate_range(work->next_nonce)};
                 if (!range) break;
                 for (uint64_t nonce{range->begin}; nonce < range->end; ++nonce) {
                     // Do not alter MercaHash for cancellation; finish the current
                     // attempt, then check stop, replacement and expiry.
-                    if (m_stop || work->cancelled || work->solved || std::chrono::steady_clock::now() >= work->expires) break;
+                    if (m_stop || work->cancelled || work->solved || (work->job.valid && !*work->job.valid) || std::chrono::steady_clock::now() >= work->expires) break;
                     header.nNonce = static_cast<uint32_t>(nonce);
                     const auto result{hash(header)};
                     ++m_hashes;
                     if (UintToArith256(result) <= work->job.target) {
+                        if (work->job.continuous) {
+                            std::unique_lock lock{m_mutex};
+                            ++m_stats.solutions;
+                            // Bounded backpressure, including during slow TLS replies.
+                            while (!m_stop && !work->cancelled && (!work->job.valid || *work->job.valid) && std::chrono::steady_clock::now() < work->expires && m_solutions.size() >= 64)
+                                m_cv.wait_for(lock, std::chrono::milliseconds{100});
+                            if (!m_stop && m_work == work && !work->cancelled && (!work->job.valid || *work->job.valid) && std::chrono::steady_clock::now() < work->expires) {
+                                m_solutions.push_back(header);
+                                m_cv.notify_all();
+                            }
+                            continue;
+                        }
                         bool expected{false};
                         if (work->solved.compare_exchange_strong(expected, true)) {
                             std::lock_guard lock{m_mutex};
                             ++m_stats.solutions;
                             if (!m_stop && m_work == work && !work->cancelled) {
-                                m_solution = header;
+                                m_solutions.push_back(header);
                                 m_cv.notify_all();
                             }
                         }

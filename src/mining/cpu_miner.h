@@ -8,7 +8,9 @@
 #include <primitives/block.h>
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -38,6 +40,11 @@ struct MiningJob {
     CBlockHeader header;
     arith_uint256 target;
     CTransactionRef coinbase;
+    // Pool shares do not retire the job or reset its nonce cursor.
+    bool continuous{false};
+    // A transport can revoke work while the coordinator awaits a receipt.
+    std::shared_ptr<std::atomic<bool>> valid{};
+    std::optional<std::chrono::steady_clock::time_point> deadline{};
 };
 
 struct SubmissionResult {
@@ -57,6 +64,7 @@ public:
     virtual void Interrupt() = 0;
     virtual bool IsCancelled() const { return false; }
     virtual std::string Destination() const { return {}; }
+    virtual std::string WaitingStatus() const { return "Waiting for synchronization and a connected chain tip"; }
 };
 
 enum class MiningState { STOPPED, STARTING, RUNNING, STOPPING, FAILED };
@@ -80,7 +88,9 @@ public:
     using HashFunction = std::function<uint256(const CBlockHeader&)>;
     using HashFactory = std::function<HashFunction()>;
     using LimitDetector = std::function<WorkerLimits()>;
-    explicit MiningController(HashFactory hash_factory = {}, LimitDetector limits = {});
+    // Boundary-test seam; production always uses AllocateNonceRange.
+    using RangeAllocator = std::function<std::optional<NonceRange>(std::atomic<uint64_t>&)>;
+    explicit MiningController(HashFactory hash_factory = {}, LimitDetector limits = {}, RangeAllocator ranges = {});
     ~MiningController();
     MiningController(const MiningController&) = delete;
     MiningController& operator=(const MiningController&) = delete;
@@ -102,6 +112,7 @@ private:
 
     const HashFactory m_hash_factory;
     const LimitDetector m_detect_limits;
+    const RangeAllocator m_allocate_range;
     std::thread m_coordinator;
     std::atomic<bool> m_stop{false};
     std::atomic<bool> m_finished{true};
@@ -110,7 +121,7 @@ private:
     mutable std::mutex m_mutex;
     std::condition_variable m_cv;
     std::shared_ptr<Work> m_work;
-    std::optional<CBlockHeader> m_solution;
+    std::deque<CBlockHeader> m_solutions;
     MiningStats m_stats;
     std::mutex m_provider_mutex;
     std::unique_ptr<WorkProvider> m_provider;
