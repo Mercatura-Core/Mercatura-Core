@@ -24,7 +24,7 @@
 
 using namespace wallet;
 
-BOOST_FIXTURE_TEST_SUITE(wallet_mining_tests, BasicTestingSetup)
+BOOST_FIXTURE_TEST_SUITE(mining_tests_wallet, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(pq_destination_persistence_and_locked_reuse)
 {
@@ -66,7 +66,7 @@ BOOST_AUTO_TEST_SUITE_END()
 struct SoloTestingSetup : TestingSetup {
     SoloTestingSetup() : TestingSetup{ChainType::REGTEST} { m_node.notifications->setChainstateLoaded(true); }
 };
-BOOST_FIXTURE_TEST_SUITE(native_solo_tests, SoloTestingSetup)
+BOOST_FIXTURE_TEST_SUITE(mining_tests_solo, SoloTestingSetup)
 
 BOOST_AUTO_TEST_CASE(native_controller_submits_valid_pq_regtest_block)
 {

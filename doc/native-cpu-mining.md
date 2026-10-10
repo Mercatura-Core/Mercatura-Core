@@ -86,7 +86,7 @@ cmake -S . -B build-m2 -G Ninja -DBUILD_GUI=ON -DBUILD_TESTS=ON \
   -DENABLE_IPC=OFF -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
 cmake --build build-m2 --target bitcoin-qt test_bitcoin test_mining-qt \
   bitcoind bitcoin-cli -j 2
-build-m2/bin/test_bitcoin --run_test=cpu_miner_tests,wallet_mining_tests,native_solo_tests \
+build-m2/bin/test_bitcoin --run_test=cpu_miner_tests,mining_tests_wallet,mining_tests_solo \
   --log_level=test_suite
 QT_QPA_PLATFORM=minimal build-m2/bin/test_mining-qt
 python3 build-m2/test/functional/test_runner.py \
