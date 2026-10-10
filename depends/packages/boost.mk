@@ -15,6 +15,8 @@ define $(package)_set_vars
   $(package)_config_opts += -DCMAKE_DISABLE_FIND_PACKAGE_ICU=ON
   # Install to a unique path to prevent accidental inclusion via other dependencies' -I flags.
   $(package)_config_opts += -DCMAKE_INSTALL_INCLUDEDIR=$(package)/include
+  # CMake does not discover LLVM's install-name tool in Darwin cross-builds.
+  $(package)_config_opts_darwin = -DCMAKE_INSTALL_NAME_TOOL=$(shell $(SHELL) $(.SHELLFLAGS) "command -v install_name_tool || command -v llvm-install-name-tool")
 endef
 
 define $(package)_config_cmds
