@@ -66,14 +66,14 @@ BOOST_AUTO_TEST_CASE(nonce_space_boundary)
     std::atomic<uint64_t> cursor{mining::NONCE_SPACE - 1000};
     std::mutex mutex;
     std::vector<mining::NonceRange> ranges;
-    std::vector<std::jthread> workers;
+    std::vector<std::thread> workers;
     for (int i{0}; i < 16; ++i) {
         workers.emplace_back([&] {
             const auto range{mining::AllocateNonceRange(cursor)};
             if (range) { std::lock_guard lock{mutex}; ranges.push_back(*range); }
         });
     }
-    workers.clear();
+    for (auto& worker : workers) worker.join();
     std::sort(ranges.begin(), ranges.end(), [](const auto& a, const auto& b) { return a.begin < b.begin; });
     BOOST_REQUIRE_EQUAL(ranges.size(), 4U);
     BOOST_CHECK_EQUAL(ranges.front().begin, mining::NONCE_SPACE - 1000);
@@ -217,6 +217,55 @@ BOOST_AUTO_TEST_CASE(stop_does_not_wait_for_an_inflight_hash)
     BOOST_CHECK(!controller.GetStats().busy);
 }
 
+BOOST_AUTO_TEST_CASE(worker_failure_joins_started_workers_before_restart)
+{
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool release{false};
+    std::atomic<bool> entered{false};
+    std::atomic<bool> fail{true};
+    std::atomic<unsigned int> factories{0};
+    std::atomic<unsigned int> destroyed{0};
+    auto state{std::make_shared<FakeState>()};
+    mining::MiningController controller{[&]() -> mining::MiningController::HashFunction {
+        if (factories++ == 1 && fail) throw std::runtime_error{"Second worker startup failed"};
+        auto context{std::shared_ptr<int>{new int{0}, [&](int* value) { delete value; ++destroyed; }}};
+        entered = true;
+        {
+            std::unique_lock lock{mutex};
+            cv.wait(lock, [&] { return release; });
+        }
+        return [context](const CBlockHeader&) { return uint256::FromHex(std::string(64, 'f')).value(); };
+    }, [] { return mining::CalculateWorkerLimits(8, uint64_t{8} << 30); }};
+    BOOST_REQUIRE(controller.Start([state] { return std::make_unique<FakeProvider>(state); }, 2));
+    const bool failed{Until([&] { return entered && controller.GetStats().state == mining::MiningState::FAILED; })};
+    controller.RequestStop();
+    const bool waiting_for_worker{controller.GetStats().busy};
+    const unsigned int destroyed_before_release{destroyed.load()};
+    {
+        std::lock_guard lock{mutex};
+        release = true;
+    }
+    cv.notify_all();
+    controller.Wait();
+    BOOST_REQUIRE(failed);
+    BOOST_CHECK(waiting_for_worker);
+    BOOST_CHECK_EQUAL(destroyed_before_release, 0U);
+    BOOST_CHECK_EQUAL(destroyed, 1U);
+    BOOST_CHECK(!controller.GetStats().busy);
+    BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
+    fail = false;
+    factories = 0;
+    BOOST_REQUIRE(controller.Start([state] { return std::make_unique<FakeProvider>(state); }, 2));
+    const bool hashing{Until([&] { return controller.GetStats().hashes > 0 && factories == 2; })};
+    controller.RequestStop();
+    controller.Wait();
+    BOOST_CHECK(hashing);
+    BOOST_CHECK_EQUAL(destroyed, 3U);
+    BOOST_CHECK(!controller.GetStats().busy);
+    BOOST_CHECK(controller.GetStats().state == mining::MiningState::STOPPED);
+}
+
 BOOST_AUTO_TEST_CASE(submission_does_not_imply_acceptance)
 {
     auto state{std::make_shared<FakeState>()};
@@ -252,9 +301,9 @@ BOOST_AUTO_TEST_CASE(authoritative_contexts_are_independent)
     reader >> header;
     const auto expected{ParseHex("2321712af21502878986c0c4f21d79e17e2281619e3958f11e3c634c9f17f7d8")};
     std::array<uint256, 2> results;
-    std::array<std::jthread, 2> workers;
+    std::array<std::thread, 2> workers;
     for (size_t i{0}; i < workers.size(); ++i) {
-        workers[i] = std::jthread{[&, i] {
+        workers[i] = std::thread{[&, i] {
             PoWHashContext context;
             results[i] = context.GetHash(header);
         }};

@@ -25,7 +25,9 @@ Existing wallet accounting reports coinbase maturity and spendable rewards.
 Architecture
 ------------
 
-`MiningController` owns a coordinator and persistent `std::jthread` workers.
+`MiningController` owns a coordinator and persistent `std::thread` workers.
+Workers are explicitly joined on the coordinator after cancellation, including
+partial startup failures; the owner joins the coordinator before destruction.
 `WorkProvider` supplies immutable public jobs, checks currency, submits solutions,
 and exposes interruption/cancellation. Provider methods run on the coordinator;
 `Interrupt` must be safe from another thread. A future pool provider can use the

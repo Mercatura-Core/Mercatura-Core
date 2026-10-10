@@ -65,7 +65,7 @@ bool MiningController::Start(ProviderFactory factory, unsigned int workers)
         m_solution.reset();
     }
     try {
-        m_coordinator = std::jthread{[this, factory = std::move(factory), workers] { Run(factory, workers); }};
+        m_coordinator = std::thread{[this, factory = std::move(factory), workers] { Run(factory, workers); }};
     } catch (const std::exception& e) {
         Fail(e.what());
         m_finished = true;
@@ -121,7 +121,7 @@ void MiningController::CancelWork()
 
 void MiningController::Run(ProviderFactory factory, unsigned int requested)
 {
-    std::vector<std::jthread> workers;
+    std::vector<std::thread> workers;
     try {
         util::ThreadRename("mca-mining");
         const auto limits{m_detect_limits()};
@@ -211,7 +211,10 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested)
     }
     m_stop = true;
     CancelWork();
-    workers.clear(); // jthread joins occur on the coordinator, never on UI Stop.
+    // Join every started worker, including after partial startup or failure.
+    // This runs on the coordinator, never on UI Stop, before provider teardown.
+    for (auto& worker : workers) worker.join();
+    workers.clear();
     {
         std::lock_guard lock{m_provider_mutex};
         m_provider.reset();

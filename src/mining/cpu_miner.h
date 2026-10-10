@@ -102,7 +102,7 @@ private:
 
     const HashFactory m_hash_factory;
     const LimitDetector m_detect_limits;
-    std::jthread m_coordinator;
+    std::thread m_coordinator;
     std::atomic<bool> m_stop{false};
     std::atomic<bool> m_finished{true};
     std::atomic<uint64_t> m_hashes{0};
