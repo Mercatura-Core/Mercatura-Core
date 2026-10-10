@@ -3,14 +3,14 @@
 
 #include <interfaces/node.h>
 #include <interfaces/wallet.h>
+#include <node/kernel_notifications.h>
 #include <qt/clientmodel.h>
 #include <qt/miningpage.h>
 #include <qt/miningsession.h>
 #include <qt/optionsmodel.h>
 #include <qt/platformstyle.h>
-#include <qt/walletmodel.h>
 #include <qt/walletcontroller.h>
-#include <node/kernel_notifications.h>
+#include <qt/walletmodel.h>
 #include <test/util/setup_common.h>
 #include <wallet/context.h>
 #include <wallet/test/util.h>
@@ -18,9 +18,13 @@
 #include <wallet/walletdb.h>
 
 #include <QApplication>
+#include <QComboBox>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSettings>
+#include <QSpinBox>
 #include <QTest>
 
 #include <functional>
@@ -33,6 +37,92 @@ Q_DECLARE_METATYPE(wallet::AddressPurpose)
 class MiningTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void poolWalletAndPageLifecycle()
+    {
+        TestingSetup setup{ChainType::REGTEST};
+        setup.m_node.notifications->setChainstateLoaded(true);
+        auto node{interfaces::MakeNode(setup.m_node)};
+        auto loader{interfaces::MakeWalletLoader(*setup.m_node.chain, setup.m_args)};
+        setup.m_node.wallet_loader = loader.get();
+        auto& context{*loader->context()};
+        auto wallet{wallet::TestCreateWallet(wallet::CreateMockableWalletDatabase(), context, wallet::WALLET_FLAG_DESCRIPTORS)};
+        QVERIFY(wallet::AddWallet(context, wallet));
+        SecureString passphrase;
+        passphrase.assign("qt-pool-creation-passphrase");
+        QVERIFY(wallet->EncryptWallet(passphrase));
+        OptionsModel options{*node};
+        bilingual_str error;
+        QVERIFY(options.Init(error));
+        ClientModel client{*node, &options};
+        std::unique_ptr<const PlatformStyle> style{PlatformStyle::instantiate("other")};
+        WalletModel model{interfaces::MakeWallet(context, wallet), client, style.get()};
+        unsigned int unlocks{0};
+        connect(&model, &WalletModel::requireUnlock, this, [&] { ++unlocks; QVERIFY(wallet->Unlock(passphrase)); });
+        MiningSession session{*node};
+        MiningPage page{&model};
+        page.setClientModel(&client);
+        page.setSession(&session);
+        auto* mode{page.findChild<QComboBox*>("miningMode")};
+        auto* host{page.findChild<QLineEdit*>("poolHost")};
+        auto* port{page.findChild<QSpinBox*>("poolPort")};
+        auto* start{page.findChild<QPushButton*>("startMining")};
+        auto* stop{page.findChild<QPushButton*>("stopMining")};
+        QVERIFY(mode && host && port && start && stop);
+        QCOMPARE(mode->currentIndex(), 0);
+        QVERIFY(!session.stats().busy);
+        mode->setCurrentIndex(1);
+        host->clear();
+        page.resize(640, 480);
+        page.show();
+        QCoreApplication::processEvents();
+        auto* scroll{page.findChild<QScrollArea*>()};
+        QVERIFY(scroll);
+        QVERIFY(scroll->widget()->minimumSizeHint().width() <= scroll->viewport()->width());
+        QVERIFY(page.rect().contains(start->mapTo(&page, QPoint{0, 0})));
+        QVERIFY(page.rect().contains(stop->mapTo(&page, QPoint{0, 0})));
+        QVERIFY(!mode->accessibleName().isEmpty());
+        if (const auto directory{qEnvironmentVariable("MERCATURA_UI_CAPTURE")}; !directory.isEmpty()) {
+            QVERIFY(page.grab().save(directory + "/pool-page.png"));
+        }
+        QVERIFY(!start->isEnabled());
+        host->setText("127.0.0.1");
+        port->setValue(1);
+        QVERIFY(start->isEnabled());
+        start->click();
+        QTRY_VERIFY_WITH_TIMEOUT(!session.stats().destination.empty(), 30000);
+        QCOMPARE(unlocks, 1U);
+        QVERIFY(session.poolMode());
+        QTRY_VERIFY_WITH_TIMEOUT(session.stats().status.find("Pool disconnected") != std::string::npos, 10000);
+        QVERIFY(session.stats().destination.starts_with("mcrt1z"));
+        QTRY_VERIFY_WITH_TIMEOUT(wallet->IsLocked(), 10000);
+        const auto address{session.stats().destination};
+        page.setPrivacy(true);
+        QCOMPARE(page.findChild<QLabel*>("miningDestination")->text(), QString{"(hidden)"});
+        QVERIFY(!page.findChild<QPushButton*>("inspectPoolManifest")->isEnabled());
+        page.setPrivacy(false);
+        QVERIFY(!mode->isEnabled());
+        QVERIFY(!host->isEnabled());
+        stop->click();
+        QTRY_VERIFY_WITH_TIMEOUT(!session.stats().busy, 10000);
+        QCOMPARE(session.stats().active_workers, 0U);
+        QVERIFY(!session.poolStats().connected);
+        QVERIFY(session.startPool(&model, 1, {"127.0.0.1", 1, {}}));
+        QTRY_VERIFY_WITH_TIMEOUT(session.stats().destination == address, 10000);
+        QCOMPARE(unlocks, 1U);
+        QVERIFY(wallet->IsLocked());
+        QVERIFY(wallet::RemoveWallet(context, wallet, std::nullopt));
+        session.walletUnloaded(&model);
+        QTRY_VERIFY_WITH_TIMEOUT(!session.stats().busy, 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(!session.owner(), 10000);
+        QVERIFY(wallet::AddWallet(context, wallet));
+        QVERIFY(session.startPool(&model, 1, {"127.0.0.1", 1, {}}));
+        QTRY_VERIFY_WITH_TIMEOUT(session.stats().destination == address, 10000);
+        QCOMPARE(unlocks, 1U);
+        session.shutdown();
+        QVERIFY(!session.stats().busy);
+        QVERIFY(wallet::RemoveWallet(context, wallet, std::nullopt));
+        setup.m_node.wallet_loader = nullptr;
+    }
     void controllerDefersWalletDestruction()
     {
         TestingSetup setup{ChainType::REGTEST};

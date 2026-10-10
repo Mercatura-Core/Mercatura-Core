@@ -206,6 +206,9 @@ class MercaturaPoolCoordinatorTest(BitcoinTestFramework):
                 assert_equal(node.getbestblockhash(), large.hash_hex)
                 self.log.info("Live Core accepted %d native PQ recipients in %d serialized block bytes", count, len(large.serialize()))
             for _ in range(10):
+                # Native MercaHash maturity batches can outlast the session's
+                # idle timeout on constrained hosts; keep v1's heartbeat alive.
+                assert_equal(client.request("ping")["error"], None)
                 self.generatetodescriptor(node, 10, "raw(51)")
             self.wait_until(lambda: client.request("status")["result"]["blocks"].get("matured", 0) == 1)
             for wallet, address in zip(wallets, addresses):

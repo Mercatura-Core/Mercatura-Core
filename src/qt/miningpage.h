@@ -15,6 +15,9 @@ class QCheckBox;
 class QLabel;
 class QPushButton;
 class QSpinBox;
+class QComboBox;
+class QLineEdit;
+class QGroupBox;
 
 class MiningPage : public QWidget {
     Q_OBJECT
@@ -39,6 +42,21 @@ private:
     QLabel* m_active;
     QLabel* m_blocks;
     QLabel* m_destination;
+    QComboBox* m_mode;
+    QGroupBox* m_pool;
+    QLineEdit* m_host;
+    QSpinBox* m_port;
+    QLabel* m_certificate;
+    QLabel* m_connection;
+    QLabel* m_shares;
+    QLabel* m_last_share;
+    QLabel* m_reported;
+    QLabel* m_commitment;
+    QPushButton* m_ca;
+    QPushButton* m_system_ca;
+    QPushButton* m_inspect;
+    QPushButton* m_reset;
+    QString m_ca_file;
     bool m_privacy{false};
 };
 #endif // BITCOIN_QT_MININGPAGE_H

@@ -30,6 +30,9 @@ EXPECTED_BOOST_INCLUDES = [
                            "boost/multi_index/sequenced_index.hpp",
                            "boost/multi_index/tag.hpp",
                            "boost/multi_index_container.hpp",
+                           # M4 independently checks bounded, exact PPLNS work
+                           # without linking coordinator OpenSSL into the GUI.
+                           "boost/multiprecision/cpp_int.hpp",
                            "boost/operators.hpp",
                            "boost/signals2/connection.hpp",
                            "boost/signals2/optional_last_value.hpp",

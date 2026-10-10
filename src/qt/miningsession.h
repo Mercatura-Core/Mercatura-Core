@@ -5,6 +5,7 @@
 #define BITCOIN_QT_MININGSESSION_H
 
 #include <mining/cpu_miner.h>
+#include <qt/poolclient.h>
 #include <qt/walletmodel.h>
 
 #include <QObject>
@@ -20,6 +21,13 @@ public:
     explicit MiningSession(interfaces::Node& node, QObject* parent = nullptr);
     ~MiningSession();
     bool start(WalletModel* wallet, unsigned int workers);
+    bool startPool(WalletModel* wallet, unsigned int workers, mining::PoolEndpoint endpoint);
+    mining::PoolStats poolStats() const { return m_pool_state->Snapshot(); }
+    bool poolMode() const { return m_pool_mode; }
+    void forgetPoolSession()
+    {
+        if (!stats().busy) m_pool_state->ForgetSession();
+    }
     void stop();
     void walletUnloaded(WalletModel* wallet);
     void shutdown();
@@ -30,11 +38,15 @@ Q_SIGNALS:
     void changed();
 
 private:
+    bool startMode(WalletModel* wallet, unsigned int workers);
     void poll();
     interfaces::Node& m_node;
     mining::MiningController m_controller;
     QPointer<WalletModel> m_owner;
     unsigned int m_requested{0};
+    bool m_pool_mode{false};
+    mining::PoolEndpoint m_endpoint;
+    const std::shared_ptr<mining::PoolState> m_pool_state{std::make_shared<mining::PoolState>()};
     QTimer* m_timer;
     std::atomic<bool> m_needs_unlock{false};
     std::atomic<bool> m_cancelled{false};

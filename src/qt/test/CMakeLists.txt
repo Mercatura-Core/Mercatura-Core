@@ -62,4 +62,34 @@ if(ENABLE_WALLET)
   )
   import_plugins(test_mining-qt)
   add_test(NAME test_mining-qt COMMAND test_mining-qt)
+  if(WIN32 AND VCPKG_TARGET_TRIPLET)
+    set(plugin_path "$<SHELL_PATH:$<PATH:GET_PARENT_PATH,$<PATH:GET_PARENT_PATH,$<TARGET_PROPERTY:Qt6::QWindowsIntegrationPlugin,LOCATION_$<CONFIG>>>>>")
+    set_property(TEST test_mining-qt APPEND PROPERTY ENVIRONMENT_MODIFICATION
+      QT_QPA_PLATFORM=set:windows
+      QT_PLUGIN_PATH=set:${plugin_path}
+    )
+    unset(plugin_path)
+  endif()
+  add_executable(pool-native-test-client poolminer.cpp)
+  target_link_libraries(pool-native-test-client PRIVATE core_interface bitcoinqt bitcoin_node bitcoin_wallet univalue Boost::headers Qt6::Network)
+  import_plugins(pool-native-test-client)
+  # Authoritative M3 fixtures use its accounting/job code and OpenSSL integers,
+  # without the optional Linux service, CURL or coordinator database. This is
+  # a test dependency only; ordinary GUI builds use Qt's TLS backend.
+  find_package(OpenSSL QUIET)
+  if(OpenSSL_FOUND)
+    add_executable(test_poolclient-qt poolclienttests.cpp ../../pool/accounting.cpp ../../pool/job.cpp)
+    target_link_libraries(test_poolclient-qt PRIVATE core_interface bitcoinqt test_util bitcoin_node bitcoin_wallet OpenSSL::Crypto Boost::headers Qt6::Test Qt6::Network)
+    import_plugins(test_poolclient-qt)
+    add_test(NAME test_poolclient-qt COMMAND test_poolclient-qt)
+    if(WIN32 AND VCPKG_TARGET_TRIPLET)
+      set(plugin_path "$<SHELL_PATH:$<PATH:GET_PARENT_PATH,$<PATH:GET_PARENT_PATH,$<TARGET_PROPERTY:Qt6::QWindowsIntegrationPlugin,LOCATION_$<CONFIG>>>>>")
+      set_property(TEST test_poolclient-qt APPEND PROPERTY ENVIRONMENT_MODIFICATION
+        QT_PLUGIN_PATH=set:${plugin_path}
+      )
+      unset(plugin_path)
+    endif()
+  else()
+    message(STATUS "M4 authoritative pool-client tests omitted: OpenSSL fixture dependency unavailable")
+  endif()
 endif()

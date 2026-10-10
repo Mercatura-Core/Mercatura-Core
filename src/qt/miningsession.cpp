@@ -29,6 +29,19 @@ MiningSession::~MiningSession() { shutdown(); }
 
 bool MiningSession::start(WalletModel* wallet, unsigned int workers)
 {
+    if (stats().busy) return false;
+    m_pool_mode = false;
+    return startMode(wallet, workers);
+}
+bool MiningSession::startPool(WalletModel* wallet, unsigned int workers, mining::PoolEndpoint endpoint)
+{
+    if (stats().busy || !mining::ValidPoolEndpoint(endpoint)) return false;
+    m_pool_mode = true;
+    m_endpoint = std::move(endpoint);
+    return startMode(wallet, workers);
+}
+bool MiningSession::startMode(WalletModel* wallet, unsigned int workers)
+{
     if (m_shutdown || !wallet || m_node.shutdownRequested()) return false;
     if (stats().busy) return false;
     const auto state{stats().state};
@@ -54,6 +67,13 @@ bool MiningSession::start(WalletModel* wallet, unsigned int workers)
             if (!destination) {
                 m_needs_unlock = !m_cancelled && !*cancelled && selected->isLocked();
                 throw std::runtime_error{util::ErrorString(destination).original};
+            }
+            if (m_pool_mode) {
+                auto* context{m_node.context()};
+                return std::make_unique<mining::PoolWorkProvider>(m_endpoint,
+                                                                  ChainTypeToString(Params().GetChainType()), Params().GenesisBlock().GetHash().GetHex(),
+                                                                  EncodeDestination(*destination), GetScriptForDestination(*destination), Params().GetConsensus(),
+                                                                  m_pool_state, cancelled, std::move(unload), context ? interfaces::MakeMining(*context, /*wait_loaded=*/false) : nullptr);
             }
             auto* context{m_node.context()};
             if (!context) throw std::runtime_error{"Native mining requires an in-process Core node"};
@@ -114,7 +134,7 @@ void MiningSession::poll()
         auto context{std::unique_ptr<WalletModel::UnlockContext>{new WalletModel::UnlockContext{wallet->requestUnlock()}}};
         if (!m_shutdown && !m_cancelled && !m_wallet_unloaded && wallet && wallet == m_owner && context->isValid()) {
             m_unlock_context = std::move(context);
-            if (!start(wallet, m_requested)) m_unlock_context.reset();
+            if (!startMode(wallet, m_requested)) m_unlock_context.reset();
         }
         m_prompting = false;
     } else if (!m_prompting && (!current.destination.empty() || current.state == mining::MiningState::STOPPED || current.state == mining::MiningState::FAILED)) {
