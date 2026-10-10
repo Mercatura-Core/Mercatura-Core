@@ -1,0 +1,18 @@
+Use Qt's existing runtime OS-version check for SecureTransport's macOS 15 import.
+
+Darwin cross-builds do not supply Clang's __isPlatformVersionAtLeast helper.
+QOperatingSystemVersion preserves the macOS 15 memory-only key import and the
+older temporary-keychain fallback without that compiler runtime dependency.
+Peer certificate, hostname and TLS protocol verification are unchanged.
+
+--- a/qtbase/src/plugins/tls/securetransport/qtls_st.cpp
++++ b/qtbase/src/plugins/tls/securetransport/qtls_st.cpp
+@@ -823,7 +823,7 @@ bool TlsCryptographSecureTransport::setSessionCertificate(QString &errorDescription
+         // instead. This key is "memory" but looks like Security framework
+         // does not compare strings, but pointers instead, so we need an actual
+         // key/constant.
+-        if (__builtin_available(macOS 15, *)) {
++        if (QOperatingSystemVersion::current() >= QOperatingSystemVersion::MacOSSequoia) {
+             nKeys = 2;
+             keys[1] = kSecImportToMemoryOnly;
+             values[1] = kCFBooleanTrue;
