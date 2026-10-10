@@ -1,0 +1,124 @@
+# Copyright (c) 2026 The Mercatura Core developers
+# Distributed under the MIT software license, see the accompanying file COPYING.
+name: Mercatura M3 Pool
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/mercatura-pool.yml'
+      - 'CMakeLists.txt'
+      - 'src/**'
+      - 'doc/pool-coordinator.md'
+      - 'test/functional/mercatura_pool*.py'
+      - 'test/functional/test_framework/**'
+      - 'test/functional/test_runner.py'
+      - 'test/lint/lint-pool.py'
+  push:
+    branches: [feature/qt-pool-mining]
+    paths:
+      - '.github/workflows/mercatura-pool.yml'
+      - 'CMakeLists.txt'
+      - 'src/**'
+      - 'doc/pool-coordinator.md'
+      - 'test/functional/mercatura_pool*.py'
+      - 'test/functional/test_framework/**'
+      - 'test/functional/test_runner.py'
+      - 'test/lint/lint-pool.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mercatura-pool-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  standalone:
+    name: Optional M3 standalone accounting and security
+    if: github.event_name != 'pull_request' || github.head_ref == 'feature/qt-pool-mining'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Linux coordinator dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential cmake ninja-build python3 python3-venv openssl \
+            libssl-dev libcurl4-openssl-dev libsqlite3-dev
+      - name: Install formatter matching the repository style
+        run: |
+          python3 -m venv work/lint-tools
+          work/lint-tools/bin/pip install --disable-pip-version-check clang-format==19.1.7
+      - name: Lint and format
+        run: |
+          python3 test/lint/lint-pool.py
+          work/lint-tools/bin/clang-format --dry-run --Werror src/pool/*.cpp src/pool/*.h
+          python3 test/lint/lint-includes.py
+          python3 test/lint/lint-include-guards.py
+          git diff --check
+      - name: Standalone build and CTest
+        run: |
+          mkdir -p work/ci-pool
+          cmake -S src/pool -B work/build-pool -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build work/build-pool --parallel 2
+          ctest --test-dir work/build-pool --output-on-failure | tee work/ci-pool/ctest.log
+      - name: Process, recovery, warm-up, TLS and RPC fault tests
+        run: |
+          python3 -u src/pool/test_service.py \
+            --pool-binary="$PWD/work/build-pool/mercatura-pool" | tee work/ci-pool/process.log
+      - name: Retain selected public test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-standalone-logs
+          path: work/ci-pool/*.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  live-regtest:
+    name: Optional M3 live Core and PQ coinbase regression
+    needs: standalone
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Linux headless dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential cmake ninja-build python3 libboost-dev libevent-dev \
+            libssl-dev libcurl4-openssl-dev libsqlite3-dev
+      - name: Configure optional integrated build
+        run: |
+          cmake -S . -B work/build-core -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_GUI=OFF -DBUILD_TESTS=ON -DENABLE_WALLET=ON \
+            -DENABLE_IPC=OFF -DWITH_ZMQ=OFF -DWITH_QRENCODE=OFF -DWITH_DBUS=OFF \
+            -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF -DBUILD_POOL_COORDINATOR=ON
+      - name: Build required targets
+        run: |
+          cmake --build work/build-core --parallel 2 --target \
+            bitcoind bitcoin-cli test_bitcoin mercatura-pool test_mercatura_pool pool-hash-test-client
+      - name: Accounting and existing M2 mining regressions
+        run: |
+          mkdir -p work/ci-pool
+          work/build-core/bin/test_mercatura_pool | tee work/ci-pool/unit.log
+          work/build-core/bin/test_bitcoin \
+            --run_test=cpu_miner_tests,mining_tests_wallet,mining_tests_solo 2>&1 | tee work/ci-pool/m2.log
+      - name: Real M1 and M3 regtest integration
+        run: |
+          python3 work/build-core/test/functional/test_runner.py --jobs=1 \
+            mercatura_pool_coinbase.py mercatura_pool_coordinator.py 2>&1 | tee work/ci-pool/live.log
+      - name: Retain selected public test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-live-regtest-logs
+          path: work/ci-pool/*.log
+          retention-days: 7
+          if-no-files-found: ignore
