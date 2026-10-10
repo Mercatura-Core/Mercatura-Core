@@ -49,6 +49,12 @@
       "dependencies": [
         "zeromq"
       ]
+    },
+    "pool-client-tests": {
+      "description": "Authoritative M3 fixtures for the native Qt pool-client tests",
+      "dependencies": [
+        "openssl"
+      ]
     }
   },
   "overrides": [

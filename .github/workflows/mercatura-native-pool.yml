@@ -1,0 +1,162 @@
+# Copyright (c) 2026 The Mercatura Core developers
+# Distributed under the MIT software license, see the accompanying file COPYING.
+name: Mercatura M4 Native Qt Pool
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ['.github/workflows/mercatura-native-pool.yml', 'src/**', 'depends/**', 'contrib/macdeploy/**', 'vcpkg.json', 'CMakeLists.txt', 'test/functional/**', 'doc/native-pool-mining.md']
+  push:
+    branches: [feature/qt-pool-mining]
+    paths: ['.github/workflows/mercatura-native-pool.yml', 'src/**', 'depends/**', 'contrib/macdeploy/**', 'vcpkg.json', 'CMakeLists.txt', 'test/functional/**', 'doc/native-pool-mining.md']
+permissions:
+  contents: read
+concurrency:
+  group: mercatura-native-pool-${{ github.ref }}
+  cancel-in-progress: true
+defaults:
+  run:
+    shell: bash
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential cmake ninja-build python3 \
+            libboost-dev libevent-dev qt6-base-dev qt6-tools-dev qt6-tools-dev-tools \
+            libssl-dev libcurl4-openssl-dev libsqlite3-dev openssl
+      - name: Configure and build native GUI and optional coordinator
+        run: |
+          cmake -S . -B work/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_GUI=ON -DBUILD_TESTS=ON -DBUILD_POOL_COORDINATOR=ON \
+            -DENABLE_IPC=OFF -DWITH_ZMQ=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=OFF \
+            -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
+          cmake --build work/build --parallel 2 --target bitcoin-qt bitcoind bitcoin-cli \
+            test_bitcoin test_mining-qt test_poolclient-qt pool-native-test-client \
+            mercatura-pool test_mercatura_pool pool-hash-test-client
+      - name: Complete focused M1–M4 matrix
+        run: |
+          work/build/bin/test_bitcoin --run_test=cpu_miner_tests,mining_tests_wallet,mining_tests_solo
+          work/build/bin/test_mercatura_pool
+          QT_QPA_PLATFORM=offscreen work/build/bin/test_mining-qt
+          QT_QPA_PLATFORM=offscreen QT_SCALE_FACTOR=2 work/build/bin/test_mining-qt poolWalletAndPageLifecycle
+          work/build/bin/test_poolclient-qt
+          python3 contrib/macdeploy/test_tls_plugins.py
+          python3 src/pool/test_service.py --pool-binary="$PWD/work/build/bin/mercatura-pool"
+          python3 work/build/test/functional/test_runner.py --jobs=1 \
+            mercatura_pool_coinbase.py mercatura_pool_coordinator.py mercatura_pool_native.py
+      - name: Pool-off Qt and walletless dependency isolation
+        run: |
+          cmake -S . -B work/build -DBUILD_POOL_COORDINATOR=OFF
+          cmake --build work/build --parallel 2 --target bitcoin-qt test_mining-qt test_poolclient-qt pool-native-test-client
+          work/build/bin/test_poolclient-qt
+          cmake -S . -B work/headless -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_GUI=OFF -DENABLE_WALLET=OFF -DBUILD_TESTS=OFF -DBUILD_POOL_COORDINATOR=OFF \
+            -DENABLE_IPC=OFF -DWITH_ZMQ=OFF -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
+          cmake --build work/headless --parallel 2 --target bitcoind bitcoin-cli
+
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: brew install cmake ninja boost libevent qt@6 openssl@3
+      - name: Build GUI without coordinator
+        run: |
+          cmake -S . -B work/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6);$(brew --prefix openssl@3)" \
+            -DBUILD_GUI=ON -DBUILD_TESTS=ON -DBUILD_POOL_COORDINATOR=OFF \
+            -DENABLE_IPC=OFF -DWITH_ZMQ=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=OFF \
+            -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
+          cmake --build work/build --parallel 3 --target bitcoin-qt test_bitcoin test_mining-qt test_poolclient-qt pool-native-test-client
+      - name: Native lifecycle, protocol, real hashing and TLS backend
+        run: |
+          work/build/bin/test_bitcoin --run_test=cpu_miner_tests,mining_tests_wallet,mining_tests_solo
+          QT_QPA_PLATFORM=offscreen work/build/bin/test_mining-qt
+          work/build/bin/test_poolclient-qt
+
+      - name: Bundle native Qt and operational TLS plugins
+        run: |
+          cmake --build work/build --parallel 3 --target deploy
+          python3 contrib/macdeploy/test_tls_plugins.py
+          test -n "$(find 'work/build/dist/Mercatura Core.app/Contents/PlugIns/tls' -name 'libq*backend*' -print -quit)"
+
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [vs2026, vs2026-static]
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+      - name: Configure native MSVC Qt, including authoritative fixture dependency
+        env:
+          M4_PRESET: ${{ matrix.preset }}
+        run: |
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
+          cmake -B work/build --preset $env:M4_PRESET `
+            -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON `
+            '-DVCPKG_MANIFEST_FEATURES=qt;wallet;tests;pool-client-tests' `
+            -DBUILD_GUI=ON -DBUILD_TESTS=ON -DBUILD_POOL_COORDINATOR=OFF `
+            -DENABLE_IPC=OFF -DWITH_ZMQ=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=OFF `
+            -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --build work/build --config Release --parallel 4 --target bitcoin-qt test_bitcoin test_mining-qt test_poolclient-qt pool-native-test-client
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Native lifecycle, protocol, real hashing and static TLS imports
+        run: |
+          & work/build/bin/Release/test_bitcoin.exe --run_test=cpu_miner_tests,mining_tests_wallet,mining_tests_solo
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ctest --test-dir work/build -C Release --output-on-failure -R '^test_(mining|poolclient)-qt$'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+  ucrt-cross:
+    name: Packaged Qt Schannel with Windows UCRT cross-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      DANGER_CI_ON_HOST_FOLDERS: 1
+      FILE_ENV: './ci/test/00_setup_env_win64.sh'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/configure-environment
+      - uses: ./.github/actions/configure-docker
+      - name: Existing UCRT deployment checks with M4 and native TLS enabled
+        run: ./ci/test_run_all.sh
+
+  packaged-linux:
+    name: Static depends Qt and linked TLS backend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install dependency-build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential cmake ninja-build \
+            python3 perl pkg-config autoconf automake libtool gperf bison flex curl
+      - name: Build pinned dependencies and static Qt client
+        run: |
+          make -C depends -j2 NO_QR=1 NO_ZMQ=1 NO_IPC=1 NO_USDT=1
+          cmake -S . -B work/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$PWD/depends/x86_64-pc-linux-gnu/toolchain.cmake" \
+            -DBUILD_GUI=ON -DBUILD_TESTS=ON -DBUILD_POOL_COORDINATOR=OFF \
+            -DENABLE_IPC=OFF -DWITH_ZMQ=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=OFF \
+            -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
+          cmake --build work/build --parallel 2 --target bitcoin-qt test_mining-qt test_poolclient-qt pool-native-test-client
+      - name: Verify static TLS import and wallet lifecycle
+        run: |
+          work/build/bin/test_poolclient-qt
+          QT_QPA_PLATFORM=minimal work/build/bin/test_mining-qt

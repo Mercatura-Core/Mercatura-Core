@@ -159,15 +159,15 @@ class DeploymentInfo(object):
 
     def detectQtPath(self, frameworkDirectory: str):
         parentDir = os.path.dirname(frameworkDirectory)
-        if os.path.exists(os.path.join(parentDir, "share", "qt", "plugins")):
-            self.qtPath = parentDir
-        else:
-            self.qtPath = os.getenv("QTDIR", None)
-
-        if self.qtPath is not None:
-            pluginPath = os.path.join(self.qtPath, "share", "qt", "plugins")
-            if os.path.exists(pluginPath):
-                self.pluginPath = pluginPath
+        for prefix in (parentDir, os.getenv("QTDIR")):
+            if prefix is None:
+                continue
+            for relative in ("share/qt/plugins", "share/qt6/plugins", "plugins", "lib/qt6/plugins"):
+                pluginPath = os.path.join(prefix, relative)
+                if os.path.isdir(pluginPath):
+                    self.qtPath = prefix
+                    self.pluginPath = pluginPath
+                    return
 
     def usesFramework(self, name: str) -> bool:
         for framework in self.deployedFrameworks:
@@ -344,13 +344,14 @@ def deployPlugins(appBundleInfo: ApplicationBundleInfo, deploymentInfo: Deployme
     for dirpath, dirnames, filenames in os.walk(deploymentInfo.pluginPath):
         pluginDirectory = os.path.relpath(dirpath, deploymentInfo.pluginPath)
 
-        if pluginDirectory not in ['styles', 'platforms']:
+        if pluginDirectory not in ['styles', 'platforms', 'tls']:
             continue
 
         for pluginName in filenames:
             pluginPath = os.path.join(pluginDirectory, pluginName)
 
-            if pluginName.split('.')[0] not in ['libqminimal', 'libqcocoa', 'libqmacstyle']:
+            if pluginName.split('.')[0] not in ['libqminimal', 'libqcocoa', 'libqmacstyle',
+                                              'libqopensslbackend', 'libqsecuretransportbackend']:
                 continue
 
             plugins.append((pluginDirectory, pluginName))
