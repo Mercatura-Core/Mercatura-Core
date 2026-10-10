@@ -1,0 +1,32 @@
+[Unit]
+Description=Mercatura noncustodial mining pool coordinator
+After=network-online.target mercatura.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mercatura-pool
+Group=mercatura-pool
+ExecStart=/usr/local/bin/mercatura-pool /etc/mercatura-pool/pool.json
+WorkingDirectory=/var/lib/mercatura-pool
+StateDirectory=mercatura-pool
+UMask=0077
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=90
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/etc/mercatura-pool
+ReadWritePaths=/var/lib/mercatura-pool
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LimitNOFILE=512
+MemoryMax=1G
+TasksMax=16
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

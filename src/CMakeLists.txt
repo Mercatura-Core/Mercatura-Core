@@ -446,3 +446,7 @@ endif()
 if(BUILD_FUZZ_BINARY)
   add_subdirectory(test/fuzz)
 endif()
+
+if(BUILD_POOL_COORDINATOR)
+  add_subdirectory(pool)
+endif()
