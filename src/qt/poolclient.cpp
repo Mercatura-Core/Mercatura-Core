@@ -219,7 +219,8 @@ PoolJob ValidatePoolJob(const UniValue& message, const UniValue& audit,
     Require(t.isObject() && Digest("MCA-POOL/1/template", t.write()) == audit["template_id"].get_str());
     Require(t["height"].getInt<int>() == height && HashHex(t["previousblockhash"]) == job.work.header.hashPrevBlock && HashHex(audit["parent"]) == job.work.header.hashPrevBlock);
     Require(t["bits"].get_str().size() == 8 && IsHex(t["bits"].get_str()));
-    Require(std::stoul(t["bits"].get_str(), nullptr, 16) == job.work.header.nBits && t["version"].getInt<int32_t>() == job.work.header.nVersion);
+    const auto bits{ToIntegral<uint32_t>(t["bits"].get_str(), 16)};
+    Require(bits && *bits == job.work.header.nBits && t["version"].getInt<int32_t>() == job.work.header.nVersion);
     Require(UintToArith256(HashHex(t["target"])) == *target);
     Require(std::max(t["curtime"].getInt<uint32_t>(), t["mintime"].getInt<uint32_t>()) == job.work.header.nTime);
     Require(t["coinbaseaux"].isObject() && t["coinbaseaux"].empty() && t["transactions"].isArray());

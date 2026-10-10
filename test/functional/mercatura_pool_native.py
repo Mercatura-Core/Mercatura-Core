@@ -213,6 +213,15 @@ class MercaturaPoolNativeTest(BitcoinTestFramework):
             wallets.append(wallet)
             addresses.append(address)
         root = Path(self.options.tmpdir)
+        # The driver must reject partial, signed and overflowing numeric
+        # arguments before creating a mining session or connecting a socket.
+        for index, value in ((1, "1junk"), (1, "+1"), (1, " 1"), (1, "0"), (1, "65536"),
+                             (4, "1junk"), (4, "-1"), (4, "4294967296"),
+                             (5, "1junk"), (5, "-1"), (5, "4294967296")):
+            arguments = ["127.0.0.1", "1", "", addresses[0], "1", "1"]
+            arguments[index] = value
+            invalid = subprocess.run([str(self.miner), *arguments], capture_output=True, timeout=5)
+            assert_equal(invalid.returncode, 2)
         certificate, key = root / "pool-ca.crt", root / "pool-tls.key"
         subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
                         "-subj", "/CN=127.0.0.1", "-addext", "subjectAltName=IP:127.0.0.1",

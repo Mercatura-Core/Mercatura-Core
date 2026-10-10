@@ -5,6 +5,7 @@
 #include <key_io.h>
 #include <qt/poolclient.h>
 #include <util/chaintype.h>
+#include <util/strencodings.h>
 #include <util/string.h>
 #include <util/translation.h>
 
@@ -23,22 +24,24 @@ int main(int argc, char** argv)
         SelectParams(ChainType::REGTEST);
         auto destination{DecodeDestination(argv[4])};
         if (!std::holds_alternative<WitnessV2MercaturaPQ>(destination)) return 2;
-        const auto port{std::stoul(argv[2])};
-        if (port == 0 || port > 65535) return 2;
+        const auto port{ToIntegral<uint16_t>(argv[2])};
+        const auto workers{ToIntegral<unsigned int>(argv[5])};
+        const auto seconds{ToIntegral<uint32_t>(argv[6])};
+        if (!port || *port == 0 || !workers || !seconds) return 2;
         auto state{std::make_shared<mining::PoolState>()};
         mining::MiningController controller;
-        const mining::PoolEndpoint endpoint{argv[1], static_cast<uint16_t>(port), argv[3]};
+        const mining::PoolEndpoint endpoint{argv[1], *port, argv[3]};
         const auto start{std::chrono::steady_clock::now()};
         const auto factory{[&] {
             return std::make_unique<mining::PoolWorkProvider>(endpoint, "regtest", Params().GenesisBlock().GetHash().GetHex(), argv[4], GetScriptForDestination(destination), Params().GetConsensus(), state);
         }};
-        if (!controller.Start(factory, std::stoul(argv[5]))) return 3;
+        if (!controller.Start(factory, *workers)) return 3;
         bool restarted{false};
-        while (controller.GetStats().busy && std::chrono::steady_clock::now() - start < std::chrono::seconds{std::stoul(argv[6])}) {
+        while (controller.GetStats().busy && std::chrono::steady_clock::now() - start < std::chrono::seconds{*seconds}) {
             if (argc == 8 && !restarted && controller.GetStats().submitted > 0 && !state->Snapshot().connected) {
                 controller.RequestStop();
                 controller.Wait();
-                if (!controller.Start(factory, std::stoul(argv[5]))) return 3;
+                if (!controller.Start(factory, *workers)) return 3;
                 restarted = true;
             }
             QCoreApplication::processEvents();
