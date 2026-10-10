@@ -101,6 +101,7 @@ MERCATURA_SCRIPTS = [
     'mercatura_network_identity.py',
     'mercatura_p2p_propagation.py',
     'mercatura_pool_coinbase.py',
+    'mercatura_pool_coordinator.py',
     'mercatura_pq_address_enforcement.py',
     'mercatura_pq_auth_commitments.py',
     'mercatura_pq_batching.py',
