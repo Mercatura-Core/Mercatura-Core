@@ -279,6 +279,8 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   $<$<TARGET_EXISTS:bitcoin_wallet>:wallet/init.cpp>
   $<$<NOT:$<TARGET_EXISTS:bitcoin_wallet>>:dummywallet.cpp>
 )
+add_subdirectory(mining)
+
 target_link_libraries(bitcoin_node
   PRIVATE
     core_interface

@@ -1,0 +1,6 @@
+// Generated from the same device source compiled by CUDA and parity tests.
+#ifndef MERCATURA_OPENCL_SOURCE_H
+#define MERCATURA_OPENCL_SOURCE_H
+inline constexpr const char* OPENCL_MERCAHASH_SOURCE =
+@MERCAHASH_GPU_LITERALS@;
+#endif

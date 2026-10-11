@@ -5,6 +5,7 @@
 #define BITCOIN_MINING_CPU_MINER_H
 
 #include <arith_uint256.h>
+#include <mining/gpu_backend.h>
 #include <primitives/block.h>
 
 #include <atomic>
@@ -68,12 +69,24 @@ public:
 };
 
 enum class MiningState { STOPPED, STARTING, RUNNING, STOPPING, FAILED };
+struct GpuStats {
+    GpuDevice device;
+    uint64_t hashes{0};
+    double hashes_per_second{0};
+    uint64_t memory_bytes{0};
+    unsigned int contexts{0};
+    std::string status{"Preparing device"};
+    bool failed{false};
+};
 struct MiningStats {
     MiningState state{MiningState::STOPPED};
     bool busy{false};
     uint64_t hashes{0};
     double hashes_per_second{0};
     unsigned int active_workers{0};
+    uint64_t cpu_hashes{0};
+    double cpu_hashes_per_second{0};
+    std::vector<GpuStats> devices;
     uint64_t solutions{0};
     uint64_t submitted{0};
     uint64_t accepted{0};
@@ -90,7 +103,9 @@ public:
     using LimitDetector = std::function<WorkerLimits()>;
     // Boundary-test seam; production always uses AllocateNonceRange.
     using RangeAllocator = std::function<std::optional<NonceRange>(std::atomic<uint64_t>&)>;
-    explicit MiningController(HashFactory hash_factory = {}, LimitDetector limits = {}, RangeAllocator ranges = {});
+    using DeviceDetector = std::function<GpuDiscovery()>;
+    using BackendFactory = std::function<std::unique_ptr<GpuBackend>(const GpuDevice&, unsigned int)>;
+    explicit MiningController(HashFactory hash_factory = {}, LimitDetector limits = {}, RangeAllocator ranges = {}, DeviceDetector devices = {}, BackendFactory backends = {});
     ~MiningController();
     MiningController(const MiningController&) = delete;
     MiningController& operator=(const MiningController&) = delete;
@@ -98,14 +113,16 @@ public:
     // Start/Wait are serialized by the owner. 0 requests automatic selection.
     // All allocation, wallet preparation, block assembly, hashing and submission
     // happen off the caller's thread. Start never automatically runs at launch.
-    bool Start(ProviderFactory provider, unsigned int workers = 0);
+    bool Start(ProviderFactory provider, unsigned int workers = 0, GpuConfig hardware = {});
     void RequestStop();
     void Wait(); // Lifecycle barrier before node destruction; not a UI Stop action.
     MiningStats GetStats() const;
 
 private:
     struct Work;
-    void Run(ProviderFactory factory, unsigned int requested);
+    void Run(ProviderFactory factory, unsigned int requested, GpuConfig hardware);
+    void GpuWorker(size_t index, GpuConfig hardware);
+    void ReportCandidate(const std::shared_ptr<Work>& work, const CBlockHeader& header);
     void Worker();
     void Fail(const std::string& error);
     void CancelWork();
@@ -113,6 +130,11 @@ private:
     const HashFactory m_hash_factory;
     const LimitDetector m_detect_limits;
     const RangeAllocator m_allocate_range;
+    const DeviceDetector m_detect_devices;
+    const BackendFactory m_create_backend;
+    std::atomic<unsigned int> m_worker_count{0};
+    std::atomic<unsigned int> m_ready_workers{0};
+    std::atomic<uint64_t> m_cpu_hashes{0};
     std::thread m_coordinator;
     std::atomic<bool> m_stop{false};
     std::atomic<bool> m_finished{true};
