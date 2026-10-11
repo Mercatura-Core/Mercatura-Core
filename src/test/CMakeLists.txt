@@ -40,6 +40,7 @@ add_executable(test_bitcoin
   cpu_miner_tests.cpp
   gpu_miner_tests.cpp
   mercahash_gpu_tests.cpp
+  mercahash_gpu_sync_tests.cpp
   cuckoocache_tests.cpp
   dbwrapper_tests.cpp
   denialofservice_tests.cpp

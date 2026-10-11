@@ -164,6 +164,9 @@ SDK or system headers. Ubuntu 24.04 is the NVCC 12.8 CI build platform.
 Permanent `mercahash_gpu_tests` execute the same arithmetic as C++ and compare
 all four frozen vectors to Core. They test independent contexts, scratchpad guard
 words/reuse, irregular stage boundaries, SHA3 padding and 64-bit rotations.
+`mercahash_gpu_sync_tests` executes cooperative stores in a controlled host
+thread model and rejects writes before every lane can read the old line. It
+protects the pre-store barrier regression; it does not execute a GPU memory model.
 `gpu_miner_tests` use explicitly simulated devices to exercise scheduling,
 selection, budgets, cancellation, faults and authoritative candidate rejection.
 They provide no evidence of actual GPU execution.

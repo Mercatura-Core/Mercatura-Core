@@ -35,7 +35,7 @@ jobs:
       - name: Software and M4 regression gates (no hardware claim)
         run: |
           clang -x cl -cl-std=CL1.2 -DMH_OPENCL -Werror -fsyntax-only src/mining/mercahash_gpu.h
-          work/build/bin/test_bitcoin --run_test=cpu_miner_tests,gpu_miner_tests,mercahash_gpu_tests,mining_tests_wallet,mining_tests_solo
+          work/build/bin/test_bitcoin --run_test=cpu_miner_tests,gpu_miner_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,mining_tests_wallet,mining_tests_solo
           QT_QPA_PLATFORM=offscreen work/build/bin/test_mining-qt
           work/build/bin/test_poolclient-qt
   cuda-compile:
