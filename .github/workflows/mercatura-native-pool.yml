@@ -101,12 +101,17 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v6
+      - name: Available Windows build storage
+        run: Get-PSDrive -PSProvider FileSystem | Select-Object Name, Used, Free | Format-Table -AutoSize
       - name: Configure native MSVC Qt, including authoritative fixture dependency
         env:
           M4_PRESET: ${{ matrix.preset }}
         run: |
           $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
+          # The static triplet also builds shared host Qt tools. Let vcpkg clean
+          # completed packages before building the next one; keep installed tools.
           cmake -B work/build --preset $env:M4_PRESET `
+            -DVCPKG_INSTALL_OPTIONS=--clean-after-build `
             -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON `
             '-DVCPKG_MANIFEST_FEATURES=qt;wallet;tests;pool-client-tests' `
             -DBUILD_GUI=ON -DBUILD_TESTS=ON -DBUILD_POOL_COORDINATOR=OFF `
@@ -121,6 +126,22 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           ctest --test-dir work/build -C Release --output-on-failure -R '^test_(mining|poolclient)-qt$'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Remaining Windows build storage
+        if: always()
+        run: |
+          Get-PSDrive -PSProvider FileSystem | Select-Object Name, Used, Free | Format-Table -AutoSize
+          foreach ($path in @(
+            "$env:VCPKG_INSTALLATION_ROOT/buildtrees",
+            "$env:VCPKG_INSTALLATION_ROOT/packages",
+            "$env:VCPKG_INSTALLATION_ROOT/downloads",
+            "$env:LOCALAPPDATA/vcpkg/archives",
+            "$env:GITHUB_WORKSPACE/work/build"
+          )) {
+            if (Test-Path -LiteralPath $path) {
+              $bytes = (Get-ChildItem -LiteralPath $path -File -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+              Write-Host ('{0}: {1:N2} GiB' -f $path, ($bytes / 1GB))
+            }
+          }
 
   ucrt-cross:
     name: Packaged Qt Schannel with Windows UCRT cross-build
