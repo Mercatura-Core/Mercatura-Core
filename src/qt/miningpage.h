@@ -20,6 +20,7 @@ class QSpinBox;
 class QComboBox;
 class QLineEdit;
 class QGroupBox;
+class QListWidget;
 
 class MiningPage : public QWidget {
     Q_OBJECT
@@ -45,6 +46,15 @@ private:
     QLabel* m_blocks;
     QLabel* m_destination;
     QComboBox* m_mode;
+    QComboBox* m_hardware;
+    QCheckBox* m_all_devices;
+    QListWidget* m_devices;
+    QSpinBox* m_contexts;
+    QSpinBox* m_yield;
+    QPushButton* m_refresh_devices;
+    QLabel* m_gpu_status;
+    QLabel* m_gpu_rates;
+    std::optional<uint64_t> m_devices_revision;
     QGroupBox* m_pool;
     QLineEdit* m_host;
     QSpinBox* m_port;

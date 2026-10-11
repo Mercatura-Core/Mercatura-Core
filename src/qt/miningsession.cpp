@@ -18,24 +18,29 @@
 
 #include <stdexcept>
 
-MiningSession::MiningSession(interfaces::Node& node, QObject* parent)
-    : QObject{parent}, m_node{node}, m_timer{new QTimer{this}}
+MiningSession::MiningSession(interfaces::Node& node, QObject* parent, mining::MiningController::DeviceDetector devices)
+    : QObject{parent}, m_node{node},
+      m_detect_devices{devices ? std::move(devices) : mining::MiningController::DeviceDetector{mining::DiscoverGpuDevices}},
+      m_timer{new QTimer{this}}
 {
     m_timer->setInterval(500);
     connect(m_timer, &QTimer::timeout, this, &MiningSession::poll);
     m_timer->start();
+    refreshDevices();
 }
 MiningSession::~MiningSession() { shutdown(); }
 
-bool MiningSession::start(WalletModel* wallet, unsigned int workers)
+bool MiningSession::start(WalletModel* wallet, unsigned int workers, mining::GpuConfig hardware)
 {
     if (stats().busy) return false;
+    m_hardware = std::move(hardware);
     m_pool_mode = false;
     return startMode(wallet, workers);
 }
-bool MiningSession::startPool(WalletModel* wallet, unsigned int workers, mining::PoolEndpoint endpoint)
+bool MiningSession::startPool(WalletModel* wallet, unsigned int workers, mining::PoolEndpoint endpoint, mining::GpuConfig hardware)
 {
     if (stats().busy || !mining::ValidPoolEndpoint(endpoint)) return false;
+    m_hardware = std::move(hardware);
     m_pool_mode = true;
     m_endpoint = std::move(endpoint);
     return startMode(wallet, workers);
@@ -82,7 +87,7 @@ bool MiningSession::startMode(WalletModel* wallet, unsigned int workers)
                 EncodeDestination(*destination), Params().GetChainType() == ChainType::REGTEST, std::move(unload), cancelled);
         }
         throw std::runtime_error{"The selected mining wallet is no longer loaded"};
-    }, workers)};
+    }, workers, m_hardware)};
     Q_EMIT changed();
     return started;
 }
@@ -109,6 +114,7 @@ void MiningSession::shutdown()
     m_timer->stop();
     stop();
     m_controller.Wait();
+    if (m_discovery_thread.joinable()) m_discovery_thread.join();
     m_unlock_context.reset();
     m_owner = nullptr;
     m_unload_token.reset();
@@ -141,4 +147,38 @@ void MiningSession::poll()
         m_unlock_context.reset();
     }
     Q_EMIT changed();
+}
+
+void MiningSession::refreshDevices()
+{
+    if (m_shutdown || stats().busy || m_discovering.exchange(true)) return;
+    if (m_discovery_thread.joinable()) m_discovery_thread.join();
+    { std::lock_guard lock{m_discovery_mutex}; m_discovery.reset(); }
+    try {
+        m_discovery_thread = std::thread{[this] {
+            mining::GpuDiscovery result;
+            try { result = m_detect_devices(); }
+            catch (const std::exception& error) { result.errors.emplace_back(error.what()); }
+            catch (...) { result.errors.emplace_back("Unexpected GPU discovery failure"); }
+            {
+                std::lock_guard lock{m_discovery_mutex};
+                m_discovery = GpuDiscoverySnapshot{std::move(result), ++m_discovery_revision};
+            }
+            m_discovering = false;
+        }};
+    } catch (const std::exception& error) {
+        std::lock_guard lock{m_discovery_mutex};
+        m_discovery = GpuDiscoverySnapshot{mining::GpuDiscovery{{}, {error.what()}}, ++m_discovery_revision};
+        m_discovering = false;
+    }
+}
+std::optional<mining::GpuDiscovery> MiningSession::gpuDiscovery() const
+{
+    std::lock_guard lock{m_discovery_mutex};
+    if (m_discovery) return m_discovery->result;
+    return {};
+}
+std::optional<MiningSession::GpuDiscoverySnapshot> MiningSession::gpuDiscoverySnapshot() const
+{
+    std::lock_guard lock{m_discovery_mutex}; return m_discovery;
 }

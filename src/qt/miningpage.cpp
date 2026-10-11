@@ -22,15 +22,18 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSettings>
+#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QTimer>
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <array>
 #include <limits>
 
 MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
@@ -51,12 +54,41 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
     m_mode->setAccessibleName(tr("Mining mode"));
     m_mode->addItems({tr("Solo Mining"), tr("Pool Mining")});
     layout->addWidget(m_mode);
-    auto* group{new QGroupBox{tr("CPU Mining"), this}};
+    auto* group{new QGroupBox{tr("Mining hardware"), this}};
     auto* form{new QFormLayout{group}};
     form->setRowWrapPolicy(QFormLayout::WrapLongRows);
     auto* description{new QLabel{tr("Mine with this wallet's native PQ reward address. Mining software fees, developer fees and automatic donations are permanently 0%."), group}};
     description->setWordWrap(true);
     form->addRow(description);
+    m_hardware = new QComboBox{group};
+    m_hardware->setObjectName(QStringLiteral("miningHardware"));
+    m_hardware->addItems({tr("CPU"), tr("GPU (NVIDIA / AMD)"), tr("CPU + GPU")});
+    form->addRow(tr("Hardware"), m_hardware);
+    m_all_devices = new QCheckBox{tr("All compatible GPUs"), group};
+    m_all_devices->setObjectName(QStringLiteral("automaticGpuDevices"));
+    m_all_devices->setChecked(true);
+    form->addRow(m_all_devices);
+    m_devices = new QListWidget{group};
+    m_devices->setObjectName(QStringLiteral("gpuDevices"));
+    m_devices->setMaximumHeight(100);
+    form->addRow(tr("GPU devices"), m_devices);
+    m_contexts = new QSpinBox{group};
+    m_contexts->setObjectName(QStringLiteral("gpuContexts"));
+    m_contexts->setRange(0, 256);
+    m_contexts->setSpecialValueText(tr("Automatic"));
+    form->addRow(tr("Concurrent contexts per GPU"), m_contexts);
+    m_yield = new QSpinBox{group};
+    m_yield->setObjectName(QStringLiteral("gpuYield"));
+    m_yield->setRange(0, 1000); m_yield->setValue(10); m_yield->setSuffix(tr(" ms"));
+    form->addRow(tr("Rest between GPU batches"), m_yield);
+    m_refresh_devices = new QPushButton{tr("Refresh GPU devices"), group};
+    m_refresh_devices->setObjectName(QStringLiteral("refreshGpuDevices"));
+    form->addRow(m_refresh_devices);
+    m_gpu_status = new QLabel{group}; m_gpu_status->setTextFormat(Qt::PlainText); m_gpu_status->setWordWrap(true);
+    form->addRow(m_gpu_status);
+    m_gpu_rates = new QLabel{group}; m_gpu_rates->setTextFormat(Qt::PlainText); m_gpu_rates->setWordWrap(true);
+    form->addRow(tr("CPU / GPU statistics"), m_gpu_rates);
+
     m_automatic = new QCheckBox{tr("Automatic (recommended: %1 workers)").arg(m_limits.recommended), group};
     m_automatic->setObjectName(QStringLiteral("automaticWorkers"));
     m_automatic->setChecked(true);
@@ -144,7 +176,7 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
     for (auto* label : content->findChildren<QLabel*>()) {
         label->setWordWrap(true);
     }
-    for (auto* label : {m_destination, m_certificate, m_connection, m_reported, m_commitment, m_status}) {
+    for (auto* label : {m_destination, m_certificate, m_connection, m_reported, m_commitment, m_status, m_gpu_status, m_gpu_rates}) {
         auto policy{label->sizePolicy()};
         policy.setHorizontalPolicy(QSizePolicy::Ignored);
         label->setSizePolicy(policy);
@@ -160,6 +192,13 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
     outer->addLayout(buttons);
     layout->addStretch();
     connect(m_automatic, &QCheckBox::toggled, this, [this] { updateStatus(); });
+    connect(m_hardware, &QComboBox::currentIndexChanged, this, [this] { updateStatus(); });
+    connect(m_all_devices, &QCheckBox::toggled, this, [this] { updateStatus(); });
+    connect(m_devices, &QListWidget::itemChanged, this, [this] { updateStatus(); });
+    connect(m_refresh_devices, &QPushButton::clicked, this, [this] {
+        if (m_session) m_session->refreshDevices();
+        updateStatus();
+    });
     connect(m_mode, &QComboBox::currentIndexChanged, this, [this] { updateStatus(); });
     connect(m_host, &QLineEdit::textChanged, this, [this] { updateStatus(); });
     connect(m_ca, &QPushButton::clicked, this, [this] {
@@ -189,14 +228,26 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
     connect(m_start, &QPushButton::clicked, this, [this] {
         if (m_session) {
             const unsigned int workers{m_automatic->isChecked() ? 0 : static_cast<unsigned int>(m_workers->value())};
+            mining::GpuConfig hardware;
+            hardware.cpu = m_hardware->currentIndex() != 1;
+            hardware.gpu = m_hardware->currentIndex() != 0;
+            hardware.contexts = static_cast<unsigned int>(m_contexts->value());
+            hardware.yield_ms = static_cast<unsigned int>(m_yield->value());
+            if (!m_all_devices->isChecked()) {
+                for (int i{0}; i < m_devices->count(); ++i) {
+                    const auto* item{m_devices->item(i)};
+                    if (item->checkState() == Qt::Checked) hardware.devices.push_back(item->data(Qt::UserRole).toString().toStdString());
+                }
+                if (hardware.gpu && hardware.devices.empty()) return;
+            }
             if (m_mode->currentIndex() == 1) {
                 QSettings settings;
                 settings.setValue("mining/poolHost", m_host->text());
                 settings.setValue("mining/poolPort", m_port->value());
                 settings.setValue("mining/poolCA", m_ca_file);
-                m_session->startPool(m_wallet, workers, {m_host->text().toStdString(), static_cast<uint16_t>(m_port->value()), m_ca_file.toStdString()});
+                m_session->startPool(m_wallet, workers, {m_host->text().toStdString(), static_cast<uint16_t>(m_port->value()), m_ca_file.toStdString()}, hardware);
             } else
-                m_session->start(m_wallet, workers);
+                m_session->start(m_wallet, workers, hardware);
         }
         updateStatus();
     });
@@ -213,6 +264,7 @@ void MiningPage::setSession(MiningSession* session)
 {
     if (m_session) disconnect(m_session, nullptr, this, nullptr);
     m_session = session;
+    m_devices_revision.reset();
     if (session) connect(session, &MiningSession::changed, this, &MiningPage::updateStatus);
     updateStatus();
 }
@@ -225,10 +277,52 @@ void MiningPage::updateStatus()
     const bool pool{m_mode->currentIndex() == 1};
     const bool syncing{!pool && m_client && Params().GetChainType() != ChainType::REGTEST && m_client->node().isInitialBlockDownload()};
     const bool endpoint{mining::ValidPoolEndpoint({m_host->text().toStdString(), static_cast<uint16_t>(m_port->value()), m_ca_file.toStdString()})};
-    m_start->setEnabled(m_session && m_client && !running && !syncing && m_limits.maximum > 0 && (!pool || endpoint));
+    const bool use_cpu{m_hardware->currentIndex() != 1};
+    const bool use_gpu{m_hardware->currentIndex() != 0};
+    const auto discovery{m_session ? m_session->gpuDiscoverySnapshot() : std::optional<MiningSession::GpuDiscoverySnapshot>{}};
+    if (discovery && m_devices_revision != discovery->revision) {
+        const QSignalBlocker block{m_devices};
+        m_devices->clear();
+        for (const auto& device : discovery->result.devices) {
+            auto* item{new QListWidgetItem{QString::fromStdString(device.name + " (" + device.capability + ")"), m_devices}};
+            item->setData(Qt::UserRole, QString::fromStdString(device.id));
+            item->setToolTip(QString::fromStdString(device.error));
+            item->setFlags(device.supported ? Qt::ItemIsEnabled | Qt::ItemIsUserCheckable : Qt::NoItemFlags);
+            item->setCheckState(device.supported ? Qt::Checked : Qt::Unchecked);
+        }
+        m_devices_revision = discovery->revision;
+    }
+    bool gpu_available{false};
+    for (int i{0}; i < m_devices->count(); ++i) if ((m_devices->item(i)->flags() & Qt::ItemIsEnabled) &&
+        (m_all_devices->isChecked() || m_devices->item(i)->checkState() == Qt::Checked)) gpu_available = true;
+    m_start->setEnabled(m_session && m_client && !running && !syncing && (!use_cpu || m_limits.maximum > 0) && (!use_gpu || (discovery && gpu_available)) && (!pool || endpoint));
     m_stop->setEnabled(m_session && running && stats.state != mining::MiningState::STOPPING);
-    m_automatic->setEnabled(!running);
-    m_workers->setEnabled(!running && !m_automatic->isChecked() && m_limits.maximum > 0);
+    m_hardware->setEnabled(!running);
+    m_all_devices->setEnabled(!running && use_gpu);
+    m_devices->setEnabled(!running && use_gpu && !m_all_devices->isChecked());
+    m_contexts->setEnabled(!running && use_gpu);
+    m_yield->setEnabled(!running && use_gpu);
+    m_refresh_devices->setEnabled(m_session && !running && bool(discovery));
+    for (QWidget* field : std::array<QWidget*, 6>{m_all_devices, m_devices, m_contexts, m_yield, m_refresh_devices, m_gpu_status}) {
+        field->setVisible(use_gpu);
+        if (auto* form{qobject_cast<QFormLayout*>(field->parentWidget()->layout())}) {
+            if (auto* label{form->labelForField(field)}) label->setVisible(use_gpu);
+        }
+    }
+    QStringList gpu_messages;
+    if (!discovery) gpu_messages << tr("Detecting GPU devices…");
+    else {
+        for (const auto& error : discovery->result.errors) gpu_messages << QString::fromStdString(error);
+        if (!gpu_available) gpu_messages << tr("Select an available GPU or choose CPU mining.");
+    }
+    m_gpu_status->setText(gpu_messages.join(QStringLiteral("\n")));
+    QStringList device_rates{tr("CPU: %1 H/s (%2 hashes)").arg(stats.cpu_hashes_per_second, 0, 'f', 2).arg(qulonglong{stats.cpu_hashes})};
+    for (const auto& device : stats.devices) device_rates << tr("%1: %2 H/s, %3 hashes, %4 MiB, %5 contexts — %6")
+        .arg(QString::fromStdString(device.device.name)).arg(device.hashes_per_second, 0, 'f', 2).arg(qulonglong{device.hashes})
+        .arg(qulonglong{device.memory_bytes >> 20}).arg(device.contexts).arg(QString::fromStdString(device.status));
+    m_gpu_rates->setText(device_rates.join(QStringLiteral("\n")));
+    m_automatic->setEnabled(!running && use_cpu);
+    m_workers->setEnabled(!running && use_cpu && !m_automatic->isChecked() && m_limits.maximum > 0);
     m_mode->setEnabled(!running);
     m_pool->setVisible(pool);
     m_host->setEnabled(!running);
@@ -250,7 +344,8 @@ void MiningPage::updateStatus()
     QString status{QString::fromStdString(stats.status)};
     if (!m_session || !m_client) status = tr("Mining is unavailable until the node and wallet are loaded.");
     else if (!running && stats.state != mining::MiningState::FAILED) {
-        if (m_limits.maximum == 0) status = tr("Insufficient available memory for a mining worker.");
+        if (use_gpu && !gpu_available) status = tr("No selected compatible GPU is available. Choose CPU mining or refresh devices.");
+        else if (use_cpu && m_limits.maximum == 0) status = tr("Insufficient available memory for a mining worker.");
         else if (syncing) status = tr("Waiting for initial block download to complete.");
         else if (pool && !endpoint)
             status = tr("Enter a pool hostname and port. TLS is required.");

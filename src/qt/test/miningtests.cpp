@@ -21,6 +21,7 @@
 #include <QComboBox>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QScrollBar>
@@ -38,6 +39,54 @@ Q_DECLARE_METATYPE(wallet::AddressPurpose)
 class MiningTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void sharedDeviceDiscoveryRefresh()
+    {
+        TestingSetup setup{ChainType::REGTEST};
+        auto node{interfaces::MakeNode(setup.m_node)};
+        std::atomic<unsigned int> scans{0};
+        MiningSession session{*node, nullptr, [&] {
+            mining::GpuDiscovery result;
+            const auto scan{++scans};
+            if (scan < 3) {
+                mining::GpuDevice device{scan == 1 ? mining::GpuVendor::NVIDIA_CUDA : mining::GpuVendor::AMD_OPENCL};
+                device.id = scan == 1 ? "cuda:0" : "opencl:0";
+                device.name = scan == 1 ? "Simulated NVIDIA" : "Simulated AMD";
+                device.supported = scan == 1;
+                result.devices.push_back(std::move(device));
+            }
+            return result;
+        }};
+        MiningPage first{nullptr};
+        MiningPage second{nullptr};
+        first.setSession(&session);
+        second.setSession(&session);
+        auto* first_devices{first.findChild<QListWidget*>("gpuDevices")};
+        auto* second_devices{second.findChild<QListWidget*>("gpuDevices")};
+        auto* refresh{first.findChild<QPushButton*>("refreshGpuDevices")};
+        auto* hardware{first.findChild<QComboBox*>("miningHardware")};
+        QVERIFY(first_devices && second_devices && refresh && hardware);
+        hardware->setCurrentIndex(1);
+        QTRY_COMPARE(first_devices->count(), 1);
+        QTRY_COMPARE(second_devices->count(), 1);
+        QCOMPARE(first_devices->item(0)->data(Qt::UserRole).toString(), QString{"cuda:0"});
+        QCOMPARE(second_devices->item(0)->data(Qt::UserRole).toString(), QString{"cuda:0"});
+        QVERIFY(second_devices->item(0)->flags() & Qt::ItemIsEnabled);
+        const auto original{session.gpuDiscoverySnapshot()};
+        QVERIFY(original);
+        QVERIFY(refresh->isEnabled());
+        refresh->click();
+        QTRY_VERIFY(session.gpuDiscoverySnapshot() && session.gpuDiscoverySnapshot()->revision > original->revision);
+        QTRY_COMPARE(first_devices->item(0)->data(Qt::UserRole).toString(), QString{"opencl:0"});
+        // The other wallet page must reload the shared snapshot even when the
+        // discovery completes between timer ticks and it never sees an empty one.
+        QTRY_COMPARE(second_devices->item(0)->data(Qt::UserRole).toString(), QString{"opencl:0"});
+        QVERIFY(!(second_devices->item(0)->flags() & Qt::ItemIsEnabled));
+        refresh->click();
+        QTRY_COMPARE(first_devices->count(), 0);
+        QTRY_COMPARE(second_devices->count(), 0);
+        QCOMPARE(scans.load(), 3U);
+    }
+
     void poolWalletAndPageLifecycle()
     {
         TestingSetup setup{ChainType::REGTEST};
@@ -70,6 +119,14 @@ private Q_SLOTS:
         auto* stop{page.findChild<QPushButton*>("stopMining")};
         QVERIFY(mode && host && port && start && stop);
         QCOMPARE(mode->currentIndex(), 0);
+        auto* hardware{page.findChild<QComboBox*>("miningHardware")};
+        QVERIFY(hardware); QCOMPARE(hardware->currentIndex(), 0);
+        QTRY_VERIFY_WITH_TIMEOUT(session.gpuDiscovery().has_value(), 10000);
+        const auto discovery{session.gpuDiscovery()};
+        const bool compatible{std::any_of(discovery->devices.begin(), discovery->devices.end(), [](const auto& device) { return device.supported; })};
+        hardware->setCurrentIndex(1);
+        if (!compatible) QVERIFY(!start->isEnabled());
+        hardware->setCurrentIndex(0);
         QVERIFY(!session.stats().busy);
         mode->setCurrentIndex(1);
         host->clear();
@@ -107,6 +164,7 @@ private Q_SLOTS:
         QVERIFY(!page.findChild<QPushButton*>("inspectPoolManifest")->isEnabled());
         page.setPrivacy(false);
         QVERIFY(!mode->isEnabled());
+        QVERIFY(!hardware->isEnabled());
         QVERIFY(!host->isEnabled());
         stop->click();
         QTRY_VERIFY_WITH_TIMEOUT(!session.stats().busy, 10000);

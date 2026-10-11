@@ -20,10 +20,17 @@ class QTimer;
 class MiningSession : public QObject {
     Q_OBJECT
 public:
-    explicit MiningSession(interfaces::Node& node, QObject* parent = nullptr);
+    struct GpuDiscoverySnapshot {
+        mining::GpuDiscovery result;
+        uint64_t revision{0};
+    };
+    explicit MiningSession(interfaces::Node& node, QObject* parent = nullptr, mining::MiningController::DeviceDetector devices = {});
     ~MiningSession();
-    bool start(WalletModel* wallet, unsigned int workers);
-    bool startPool(WalletModel* wallet, unsigned int workers, mining::PoolEndpoint endpoint);
+    bool start(WalletModel* wallet, unsigned int workers, mining::GpuConfig hardware = {});
+    bool startPool(WalletModel* wallet, unsigned int workers, mining::PoolEndpoint endpoint, mining::GpuConfig hardware = {});
+    void refreshDevices();
+    std::optional<mining::GpuDiscovery> gpuDiscovery() const;
+    std::optional<GpuDiscoverySnapshot> gpuDiscoverySnapshot() const;
     mining::PoolStats poolStats() const { return m_pool_state->Snapshot(); }
     bool poolMode() const { return m_pool_mode; }
     void forgetPoolSession()
@@ -46,6 +53,13 @@ private:
     mining::MiningController m_controller;
     QPointer<WalletModel> m_owner;
     unsigned int m_requested{0};
+    mining::GpuConfig m_hardware;
+    const mining::MiningController::DeviceDetector m_detect_devices;
+    mutable std::mutex m_discovery_mutex;
+    std::optional<GpuDiscoverySnapshot> m_discovery;
+    uint64_t m_discovery_revision{0};
+    std::thread m_discovery_thread;
+    std::atomic<bool> m_discovering{false};
     bool m_pool_mode{false};
     mining::PoolEndpoint m_endpoint;
     const std::shared_ptr<mining::PoolState> m_pool_state{std::make_shared<mining::PoolState>()};
