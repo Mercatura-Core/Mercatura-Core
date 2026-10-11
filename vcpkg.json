@@ -56,6 +56,12 @@
       "dependencies": [
         "openssl"
       ]
+    },
+    "gpu-amd": {
+      "description": "Optional AMD OpenCL mining headers and ICD loader for developer builds",
+      "dependencies": [
+        "opencl"
+      ]
     }
   },
   "overrides": [

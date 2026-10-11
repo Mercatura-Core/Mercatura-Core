@@ -1,0 +1,66 @@
+name: Mercatura M5 GPU compile and software validation
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ['src/mining/**', 'src/qt/mining*', 'src/test/*gpu*', 'src/CMakeLists.txt', 'src/test/CMakeLists.txt', 'vcpkg.json', '.github/workflows/mercatura-gpu.yml']
+  push:
+    branches: [feature/qt-gpu-mining]
+permissions:
+  contents: read
+concurrency:
+  group: mercatura-gpu-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  software:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        amd: ['OFF', 'ON']
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install CPU and optional AMD build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential cmake ninja-build python3 clang \
+            libboost-dev libevent-dev libsqlite3-dev libssl-dev qt6-base-dev \
+            qt6-tools-dev qt6-tools-dev-tools ocl-icd-opencl-dev
+      - name: Configure and build
+        run: |
+          cmake -S . -B work/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_GUI=ON -DENABLE_IPC=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=OFF \
+            -DWITH_OPENCL_MINING=${{ matrix.amd }}
+          cmake --build work/build -j4 --target bitcoin-qt test_bitcoin test_mining-qt test_poolclient-qt
+      - name: Software and M4 regression gates (no hardware claim)
+        run: |
+          clang -x cl -cl-std=CL1.2 -DMH_OPENCL -Werror -fsyntax-only src/mining/mercahash_gpu.h
+          work/build/bin/test_bitcoin --run_test=cpu_miner_tests,gpu_miner_tests,mercahash_gpu_tests,mining_tests_wallet,mining_tests_solo
+          QT_QPA_PLATFORM=offscreen work/build/bin/test_mining-qt
+          work/build/bin/test_poolclient-qt
+  cuda-compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install supported CUDA compiler toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential cmake ninja-build libboost-dev libevent-dev libsqlite3-dev
+          curl --fail --location --output work-cuda-keyring.deb \
+            https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i work-cuda-keyring.deb
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y cuda-nvcc-12-8
+      - name: Compile real CUDA source (runner has no NVIDIA device)
+        run: |
+          cmake -S . -B work/cuda -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCUDAToolkit_ROOT=/usr/local/cuda-12.8 -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.8/bin/nvcc \
+            -DWITH_CUDA_MINING=ON -DCMAKE_CUDA_ARCHITECTURES='75-real;75-virtual' \
+            -DBUILD_GUI=OFF -DENABLE_IPC=OFF -DBUILD_TESTS=ON
+          cmake --build work/cuda -j4 --target mercatura-gpu-check
+          set +e
+          work/cuda/bin/mercatura-gpu-check --list
+          result=$?
+          set -e
+          test "$result" -eq 77

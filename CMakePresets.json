@@ -85,6 +85,44 @@
         "WITH_USDT": "ON",
         "WITH_ZMQ": "ON"
       }
+    },
+    {
+      "name": "vs2022-gpu",
+      "inherits": "vs2026",
+      "displayName": "Optional CUDA 12.8 / AMD OpenCL with VS2022 v143 14.40",
+      "generator": "Visual Studio 17 2022",
+      "toolset": "v143,version=14.40,cuda=$env{CUDA_PATH}",
+      "binaryDir": "${sourceDir}/work/vs2022-gpu",
+      "cacheVariables": {
+        "CUDAToolkit_ROOT": "$env{CUDA_PATH}",
+        "CMAKE_CUDA_COMPILER": "$env{CUDA_PATH}/bin/nvcc.exe",
+        "CMAKE_CUDA_ARCHITECTURES": "75-real;75-virtual",
+        "WITH_CUDA_MINING": "ON",
+        "WITH_OPENCL_MINING": "ON",
+        "WITH_ZMQ": "OFF",
+        "VCPKG_INSTALL_OPTIONS": "--clean-after-build",
+        "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON",
+        "VCPKG_MANIFEST_FEATURES": "qt;wallet;tests;pool-client-tests;gpu-amd"
+      }
+    },
+    {
+      "name": "vs2022-gpu-static",
+      "inherits": "vs2026-static",
+      "displayName": "Optional CUDA 12.8 / AMD OpenCL with VS2022 v143 14.40 and static Qt",
+      "generator": "Visual Studio 17 2022",
+      "toolset": "v143,version=14.40,cuda=$env{CUDA_PATH}",
+      "binaryDir": "${sourceDir}/work/vs2022-gpu-static",
+      "cacheVariables": {
+        "CUDAToolkit_ROOT": "$env{CUDA_PATH}",
+        "CMAKE_CUDA_COMPILER": "$env{CUDA_PATH}/bin/nvcc.exe",
+        "CMAKE_CUDA_ARCHITECTURES": "75-real;75-virtual",
+        "WITH_CUDA_MINING": "ON",
+        "WITH_OPENCL_MINING": "ON",
+        "WITH_ZMQ": "OFF",
+        "VCPKG_INSTALL_OPTIONS": "--clean-after-build",
+        "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON",
+        "VCPKG_MANIFEST_FEATURES": "qt;wallet;tests;pool-client-tests;gpu-amd"
+      }
     }
   ]
 }
