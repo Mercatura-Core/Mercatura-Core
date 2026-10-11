@@ -305,13 +305,14 @@ BOOST_AUTO_TEST_CASE(pool_shares_preserve_cursor_and_workers)
                                         },
                                         [] { return mining::CalculateWorkerLimits(8, uint64_t{8} << 30); }};
     BOOST_REQUIRE(controller.Start([state] { return std::make_unique<ContinuousProvider>(state); }, 4));
-    BOOST_REQUIRE(Until([&] { return state->submissions > 100; }));
+    BOOST_REQUIRE(Until([&] { return contexts.load() == 4 && state->submissions > 100; }));
     BOOST_CHECK_EQUAL(state->jobs, 1U);
-    BOOST_CHECK_EQUAL(contexts, 4U);
+    BOOST_CHECK_EQUAL(contexts.load(), 4U);
     ++state->parent;
     BOOST_REQUIRE(Until([&] { return state->jobs >= 2; }));
     controller.RequestStop();
     controller.Wait();
+    BOOST_CHECK_EQUAL(contexts.load(), 4U);
     BOOST_CHECK(!duplicate);
     BOOST_CHECK(!controller.GetStats().busy);
     BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
