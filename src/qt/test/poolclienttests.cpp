@@ -23,6 +23,11 @@
 #include <set>
 #include <thread>
 
+// Keep the existing Qt 6.2 minimum while avoiding the deprecated macro on newer Qt.
+#if QT_VERSION < QT_VERSION_CHECK(6, 3, 0)
+#define QVERIFY_THROWS_EXCEPTION(exceptiontype, expression) QVERIFY_EXCEPTION_THROWN(expression, exceptiontype)
+#endif
+
 const std::function<void(const std::string&)> G_TEST_LOG_FUN{};
 const std::function<std::vector<const char*>()> G_TEST_COMMAND_LINE_ARGUMENTS{};
 const std::function<std::string()> G_TEST_GET_FULL_NAME{};
@@ -122,7 +127,7 @@ private Q_SLOTS:
         };
         for (const auto& mutate : mutations) {
             const auto fixture{Fixture(true, mutate)};
-            QVERIFY_EXCEPTION_THROWN(Validate(fixture.Message(), fixture.manifest), std::exception);
+            QVERIFY_THROWS_EXCEPTION(std::exception, Validate(fixture.Message(), fixture.manifest));
         }
     }
     void rejectResealedTemplateTarget()
@@ -144,7 +149,7 @@ private Q_SLOTS:
         // This reward divides evenly, so amounts/remainders are unchanged.
         manifest.pushKV("allocations", allocations);
         Reseal(job, manifest);
-        QVERIFY_EXCEPTION_THROWN(Validate(job, manifest), std::exception);
+        QVERIFY_THROWS_EXCEPTION(std::exception, Validate(job, manifest));
     }
     void realM3WorkMultipleLocalWorkers()
     {
@@ -228,12 +233,12 @@ private Q_SLOTS:
         QVERIFY(mining::ParsePoolFrame("{\"id\":1,\"result\":{},\"error\":null}").isObject());
         const std::vector<std::string> invalid{"", "[]", "{", "{\"x\":1,\"x\":2}", "{\"x\":{\"a\":1,\"a\":2}}", std::string(8 * 1024 * 1024 + 1, ' '), std::string(33, '[') + "0" + std::string(33, ']'), std::string{"{\"x\":\"\xff\"}"}, std::string{"{}\0", 3}};
         for (const auto& frame : invalid)
-            QVERIFY_EXCEPTION_THROWN(mining::ParsePoolFrame(frame), std::exception);
+            QVERIFY_THROWS_EXCEPTION(std::exception, mining::ParsePoolFrame(frame));
         std::string dense{"{\"x\":[0"};
         for (size_t i{0}; i < 524288; ++i)
             dense += ",0";
         dense += "]}";
-        QVERIFY_EXCEPTION_THROWN(mining::ParsePoolFrame(dense), std::exception);
+        QVERIFY_THROWS_EXCEPTION(std::exception, mining::ParsePoolFrame(dense));
         // A frame exactly at the byte limit with a single large string remains
         // admissible; this is a node bound, not a reduced wire capacity.
         const std::string large{"{\"x\":\"" + std::string(8 * 1024 * 1024 - 8, 'a') + "\"}"};
@@ -277,7 +282,7 @@ private Q_SLOTS:
         const auto warmup{Fixture(false, {}, 1, true)};
         QCOMPARE(Validate(warmup.Message(), warmup.manifest).work.coinbase->vout.size(), size_t{2});
         const auto redirected{Fixture(false, {}, 1, true, 2)};
-        QVERIFY_EXCEPTION_THROWN(Validate(redirected.Message(), redirected.manifest), std::exception);
+        QVERIFY_THROWS_EXCEPTION(std::exception, Validate(redirected.Message(), redirected.manifest));
     }
     void rejectInconsistentWork()
     {
@@ -287,12 +292,12 @@ private Q_SLOTS:
         for (const auto& [key, value] : changes) {
             auto job{fixture.Message()};
             job.pushKV(key, value);
-            QVERIFY_EXCEPTION_THROWN(Validate(job, fixture.manifest), std::exception);
+            QVERIFY_THROWS_EXCEPTION(std::exception, Validate(job, fixture.manifest));
         }
         for (const auto& key : {"network", "genesis", "coinbase_txid", "template_id", "rounding_seed"}) {
             auto manifest{fixture.manifest};
             manifest.pushKV(key, UniValue{"wrong"});
-            QVERIFY_EXCEPTION_THROWN(Validate(fixture.Message(), manifest), std::exception);
+            QVERIFY_THROWS_EXCEPTION(std::exception, Validate(fixture.Message(), manifest));
         }
         auto manifest{fixture.manifest};
         auto allocation{manifest["allocations"][0]};
@@ -304,13 +309,13 @@ private Q_SLOTS:
         manifest.pushKV("allocations", allocations);
         auto job{fixture.Message()};
         Reseal(job, manifest);
-        QVERIFY_EXCEPTION_THROWN(Validate(job, manifest), std::exception);
+        QVERIFY_THROWS_EXCEPTION(std::exception, Validate(job, manifest));
         const auto transactions{Fixture(true)};
         job = transactions.Message();
         UniValue wrong_path{UniValue::VARR};
         wrong_path.push_back(std::string(64, '4'));
         job.pushKV("merkle_path", wrong_path);
-        QVERIFY_EXCEPTION_THROWN(Validate(job, transactions.manifest), std::exception);
+        QVERIFY_THROWS_EXCEPTION(std::exception, Validate(job, transactions.manifest));
     }
 };
 QTEST_GUILESS_MAIN(PoolClientTests)
