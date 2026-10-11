@@ -45,6 +45,7 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
     scroll->setWidget(content);
     outer->addWidget(scroll);
     auto* layout{new QVBoxLayout{content}};
+    layout->setContentsMargins(0, 0, 0, 0);
     m_mode = new QComboBox{this};
     m_mode->setObjectName(QStringLiteral("miningMode"));
     m_mode->setAccessibleName(tr("Mining mode"));
@@ -140,6 +141,14 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
     trust->setWordWrap(true);
     pool_form->addRow(trust);
     layout->addWidget(m_pool);
+    for (auto* label : content->findChildren<QLabel*>()) {
+        label->setWordWrap(true);
+    }
+    for (auto* label : {m_destination, m_certificate, m_connection, m_reported, m_commitment, m_status}) {
+        auto policy{label->sizePolicy()};
+        policy.setHorizontalPolicy(QSizePolicy::Ignored);
+        label->setSizePolicy(policy);
+    }
     auto* buttons{new QHBoxLayout};
     m_start = new QPushButton{tr("Start Mining"), this};
     m_start->setObjectName(QStringLiteral("startMining"));

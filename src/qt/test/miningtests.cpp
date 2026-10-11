@@ -23,6 +23,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QSettings>
 #include <QSpinBox>
 #include <QTest>
@@ -78,6 +79,7 @@ private Q_SLOTS:
         auto* scroll{page.findChild<QScrollArea*>()};
         QVERIFY(scroll);
         QVERIFY(scroll->widget()->minimumSizeHint().width() <= scroll->viewport()->width());
+        QCOMPARE(scroll->horizontalScrollBar()->maximum(), 0);
         QVERIFY(page.rect().contains(start->mapTo(&page, QPoint{0, 0})));
         QVERIFY(page.rect().contains(stop->mapTo(&page, QPoint{0, 0})));
         QVERIFY(!mode->accessibleName().isEmpty());
@@ -96,6 +98,10 @@ private Q_SLOTS:
         QVERIFY(session.stats().destination.starts_with("mcrt1z"));
         QTRY_VERIFY_WITH_TIMEOUT(wallet->IsLocked(), 10000);
         const auto address{session.stats().destination};
+        QTRY_COMPARE(page.findChild<QLabel*>("miningDestination")->text(), QString::fromStdString(address));
+        QCoreApplication::processEvents();
+        QVERIFY(scroll->widget()->minimumSizeHint().width() <= scroll->viewport()->width());
+        QCOMPARE(scroll->horizontalScrollBar()->maximum(), 0);
         page.setPrivacy(true);
         QCOMPARE(page.findChild<QLabel*>("miningDestination")->text(), QString{"(hidden)"});
         QVERIFY(!page.findChild<QPushButton*>("inspectPoolManifest")->isEnabled());
