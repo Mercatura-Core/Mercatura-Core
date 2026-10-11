@@ -78,8 +78,15 @@ if(WITH_OPENCL_MINING)
   endwhile()
   configure_file(opencl_source.h.in ${PROJECT_BINARY_DIR}/src/mining/opencl_source.h @ONLY)
   target_sources(bitcoin_node PRIVATE opencl_backend.cpp)
-  set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/opencl_backend.cpp TARGET_DIRECTORY bitcoin_node
-    APPEND PROPERTY INCLUDE_DIRECTORIES ${OpenCL_INCLUDE_DIRS})
+  # Source-level includes do not receive CMake's target-level implicit-directory
+  # filtering. Adding /usr/include explicitly as a system include reorders GCC's
+  # C++ headers and breaks their include_next lookup of the C standard library.
+  foreach(opencl_include_dir IN LISTS OpenCL_INCLUDE_DIRS)
+    if(NOT opencl_include_dir IN_LIST CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES)
+      set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/opencl_backend.cpp TARGET_DIRECTORY bitcoin_node
+        APPEND PROPERTY INCLUDE_DIRECTORIES ${opencl_include_dir})
+    endif()
+  endforeach()
   set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/opencl_backend.cpp TARGET_DIRECTORY bitcoin_node
     APPEND PROPERTY COMPILE_DEFINITIONS MERCATURA_OPENCL)
   set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/gpu_backend.cpp TARGET_DIRECTORY bitcoin_node
