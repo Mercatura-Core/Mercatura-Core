@@ -18,6 +18,7 @@ on:
     branches: [feature/qt-pool-mining, feature/qt-gpu-mining]
     paths:
       - '.github/workflows/mercatura-pool.yml'
+      - '.github/workflows/mercatura-native-pool.yml'
       - 'CMakeLists.txt'
       - 'src/**'
       - 'doc/pool-coordinator.md'

@@ -103,6 +103,17 @@ jobs:
       - uses: actions/checkout@v6
       - name: Available Windows build storage
         run: Get-PSDrive -PSProvider FileSystem | Select-Object Name, Used, Free | Format-Table -AutoSize
+      - name: Locate completed vcpkg binary packages
+        id: vcpkg-cache-path
+        run: |
+          'path=' + (Join-Path $env:LOCALAPPDATA 'vcpkg/archives') >> $env:GITHUB_OUTPUT
+          'image=' + $env:ImageVersion >> $env:GITHUB_OUTPUT
+      - name: Restore completed vcpkg packages
+        id: vcpkg-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.vcpkg-cache-path.outputs.path }}
+          key: native-qt-vcpkg-v1-${{ matrix.preset }}-${{ steps.vcpkg-cache-path.outputs.image }}-${{ hashFiles('vcpkg*.json', 'CMakePresets.json', 'contrib/vcpkg-ports/**') }}
       - name: Configure native MSVC Qt, including authoritative fixture dependency
         env:
           M4_PRESET: ${{ matrix.preset }}
@@ -129,6 +140,9 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           & work/build/bin/Release/mercatura-gpu-check.exe --list
           if ($LASTEXITCODE -ne 77) { throw 'Expected hardware validation to be skipped without a compatible AMD GPU' }
+          # pwsh -command propagates the last native nonzero exit even after the
+          # assertion accepts it. Only the expected no-device result reaches here.
+          exit 0
       - name: Remaining Windows build storage
         if: always()
         run: |
@@ -145,6 +159,12 @@ jobs:
               Write-Host ('{0}: {1:N2} GiB' -f $path, ($bytes / 1GB))
             }
           }
+      - name: Save completed vcpkg packages even after test failure
+        if: always() && steps.vcpkg-cache.outcome == 'success' && steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ steps.vcpkg-cache-path.outputs.path }}
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
 
   ucrt-cross:
     name: Packaged Qt Schannel with Windows UCRT cross-build
