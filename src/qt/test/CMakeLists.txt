@@ -57,6 +57,7 @@ if(ENABLE_WALLET)
   # Focused native miner lifecycle test, independently runnable from inherited
   # GUI/wallet test cases and their legacy Bitcoin assumptions.
   add_executable(test_mining-qt miningtests.cpp ../../init/bitcoin-qt.cpp)
+  add_windows_application_manifest(test_mining-qt)
   target_link_libraries(test_mining-qt
     core_interface bitcoinqt test_util bitcoin_node bitcoin_wallet Boost::headers Qt6::Test
   )
@@ -71,6 +72,7 @@ if(ENABLE_WALLET)
     unset(plugin_path)
   endif()
   add_executable(pool-native-test-client poolminer.cpp)
+  add_windows_application_manifest(pool-native-test-client)
   target_link_libraries(pool-native-test-client PRIVATE core_interface bitcoinqt bitcoin_node bitcoin_wallet univalue Boost::headers Qt6::Network)
   import_plugins(pool-native-test-client)
   # Authoritative M3 fixtures use its accounting/job code and OpenSSL integers,
@@ -79,6 +81,7 @@ if(ENABLE_WALLET)
   find_package(OpenSSL QUIET)
   if(OpenSSL_FOUND)
     add_executable(test_poolclient-qt poolclienttests.cpp ../../pool/accounting.cpp ../../pool/job.cpp)
+    add_windows_application_manifest(test_poolclient-qt)
     target_link_libraries(test_poolclient-qt PRIVATE core_interface bitcoinqt test_util bitcoin_node bitcoin_wallet OpenSSL::Crypto Boost::headers Qt6::Test Qt6::Network)
     import_plugins(test_poolclient-qt)
     add_test(NAME test_poolclient-qt COMMAND test_poolclient-qt)
