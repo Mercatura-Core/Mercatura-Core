@@ -1,0 +1,56 @@
+{
+  "$comment": "Based on vcpkg baseline 120deac3062162151622ca4860575a33844ba10b; backport Boost PR 667 for the conforming MSVC preprocessor.",
+  "name": "boost-multiprecision",
+  "version": "1.88.0",
+  "port-version": 1,
+  "description": "Boost multiprecision module",
+  "homepage": "https://www.boost.org/libs/multiprecision",
+  "license": "BSL-1.0",
+  "dependencies": [
+    {
+      "name": "boost-assert",
+      "version>=": "1.88.0"
+    },
+    {
+      "name": "boost-cmake",
+      "version>=": "1.88.0"
+    },
+    {
+      "name": "boost-config",
+      "version>=": "1.88.0"
+    },
+    {
+      "name": "boost-core",
+      "version>=": "1.88.0"
+    },
+    {
+      "name": "boost-headers",
+      "version>=": "1.88.0"
+    },
+    {
+      "name": "boost-integer",
+      "version>=": "1.88.0"
+    },
+    {
+      "name": "boost-lexical-cast",
+      "version>=": "1.88.0"
+    },
+    {
+      "name": "boost-math",
+      "version>=": "1.88.0"
+    },
+    {
+      "name": "boost-predef",
+      "version>=": "1.88.0"
+    },
+    {
+      "name": "boost-random",
+      "platform": "!uwp",
+      "version>=": "1.88.0"
+    },
+    {
+      "name": "boost-throw-exception",
+      "version>=": "1.88.0"
+    }
+  ]
+}

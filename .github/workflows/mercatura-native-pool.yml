@@ -4,10 +4,10 @@ name: Mercatura M4 Native Qt Pool
 on:
   workflow_dispatch:
   pull_request:
-    paths: ['.github/workflows/mercatura-native-pool.yml', 'src/**', 'depends/**', 'contrib/macdeploy/**', 'vcpkg.json', 'CMakeLists.txt', 'test/functional/**', 'doc/native-pool-mining.md']
+    paths: ['.github/workflows/mercatura-native-pool.yml', 'src/**', 'depends/**', 'contrib/macdeploy/**', 'contrib/vcpkg-ports/**', 'vcpkg*.json', 'CMakeLists.txt', 'test/functional/**', 'doc/native-pool-mining.md']
   push:
     branches: [feature/qt-pool-mining]
-    paths: ['.github/workflows/mercatura-native-pool.yml', 'src/**', 'depends/**', 'contrib/macdeploy/**', 'vcpkg.json', 'CMakeLists.txt', 'test/functional/**', 'doc/native-pool-mining.md']
+    paths: ['.github/workflows/mercatura-native-pool.yml', 'src/**', 'depends/**', 'contrib/macdeploy/**', 'contrib/vcpkg-ports/**', 'vcpkg*.json', 'CMakeLists.txt', 'test/functional/**', 'doc/native-pool-mining.md']
 permissions:
   contents: read
 concurrency:

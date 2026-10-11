@@ -1,0 +1,15 @@
+Backport the token-pasting correction from Boost Multiprecision PR 667.
+Preserve the pinned 1.88 arithmetic and conforming MSVC preprocessor.
+
+--- a/include/boost/multiprecision/cpp_int/literals.hpp
++++ b/include/boost/multiprecision/cpp_int/literals.hpp
+@@ -253,3 +253,3 @@
+    template <char... STR>                                                                                                                                                                                                          \
+-   constexpr boost::multiprecision::number<boost::multiprecision::backends::cpp_int_backend<Bits, Bits, boost::multiprecision::signed_magnitude, boost::multiprecision::unchecked, void> > operator BOOST_JOIN(""_cppi, Bits)()    \
++   constexpr boost::multiprecision::number<boost::multiprecision::backends::cpp_int_backend<Bits, Bits, boost::multiprecision::signed_magnitude, boost::multiprecision::unchecked, void> > BOOST_JOIN(operator "", BOOST_JOIN(_cppi, Bits))()    \
+    {                                                                                                                                                                                                                               \
+@@ -261,3 +261,3 @@
+    template <char... STR>                                                                                                                                                                                                          \
+-   constexpr boost::multiprecision::number<boost::multiprecision::backends::cpp_int_backend<Bits, Bits, boost::multiprecision::unsigned_magnitude, boost::multiprecision::unchecked, void> > operator BOOST_JOIN(""_cppui, Bits)() \
++   constexpr boost::multiprecision::number<boost::multiprecision::backends::cpp_int_backend<Bits, Bits, boost::multiprecision::unsigned_magnitude, boost::multiprecision::unchecked, void> > BOOST_JOIN(operator "", BOOST_JOIN(_cppui, Bits))() \
+    {                                                                                                                                                                                                                               \

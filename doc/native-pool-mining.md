@@ -194,6 +194,9 @@ authoritative M3 fixture test separately needs OpenSSL headers/libcrypto and
 is omitted with an explicit configure message if those are unavailable; this
 does not affect the production GUI. Windows CI enables the optional vcpkg
 `pool-client-tests` feature to supply that test dependency.
+The vcpkg overlay preserves the pinned Boost 1.88 port and backports
+Multiprecision's upstream PR 667 literal-macro fix for MSVC's conforming
+preprocessor. Multiprecision remains a Qt-only feature dependency.
 `pool-native-test-client` is a non-installed test driver, not a new
 standalone mining application.
 
