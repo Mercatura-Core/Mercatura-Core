@@ -15,7 +15,7 @@ on:
       - 'test/functional/test_runner.py'
       - 'test/lint/lint-pool.py'
   push:
-    branches: [feature/qt-pool-mining]
+    branches: [feature/qt-pool-mining, feature/qt-gpu-mining]
     paths:
       - '.github/workflows/mercatura-pool.yml'
       - 'CMakeLists.txt'

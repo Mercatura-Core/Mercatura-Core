@@ -6,7 +6,7 @@ on:
   pull_request:
     paths: ['.github/workflows/mercatura-native-pool.yml', 'src/**', 'depends/**', 'contrib/macdeploy/**', 'contrib/vcpkg-ports/**', 'vcpkg*.json', 'CMakeLists.txt', 'test/functional/**', 'doc/native-pool-mining.md']
   push:
-    branches: [feature/qt-pool-mining]
+    branches: [feature/qt-pool-mining, feature/qt-gpu-mining]
     paths: ['.github/workflows/mercatura-native-pool.yml', 'src/**', 'depends/**', 'contrib/macdeploy/**', 'contrib/vcpkg-ports/**', 'vcpkg*.json', 'CMakeLists.txt', 'test/functional/**', 'doc/native-pool-mining.md']
 permissions:
   contents: read
@@ -113,19 +113,22 @@ jobs:
           cmake -B work/build --preset $env:M4_PRESET `
             -DVCPKG_INSTALL_OPTIONS=--clean-after-build `
             -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON `
-            '-DVCPKG_MANIFEST_FEATURES=qt;wallet;tests;pool-client-tests' `
+            '-DVCPKG_MANIFEST_FEATURES=qt;wallet;tests;pool-client-tests;gpu-amd' `
+            -DWITH_OPENCL_MINING=ON `
             -DBUILD_GUI=ON -DBUILD_TESTS=ON -DBUILD_POOL_COORDINATOR=OFF `
             -DENABLE_IPC=OFF -DWITH_ZMQ=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=OFF `
             -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          cmake --build work/build --config Release --parallel 4 --target bitcoin-qt test_bitcoin test_mining-qt test_poolclient-qt pool-native-test-client
+          cmake --build work/build --config Release --parallel 4 --target bitcoin-qt test_bitcoin test_mining-qt test_poolclient-qt pool-native-test-client mercatura-gpu-check
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Native lifecycle, protocol, real hashing and static TLS imports
         run: |
-          & work/build/bin/Release/test_bitcoin.exe --run_test=cpu_miner_tests,mining_tests_wallet,mining_tests_solo
+          & work/build/bin/Release/test_bitcoin.exe --run_test=cpu_miner_tests,gpu_miner_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,mining_tests_wallet,mining_tests_solo
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           ctest --test-dir work/build -C Release --output-on-failure -R '^test_(mining|poolclient)-qt$'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & work/build/bin/Release/mercatura-gpu-check.exe --list
+          if ($LASTEXITCODE -ne 77) { throw 'Expected hardware validation to be skipped without a compatible AMD GPU' }
       - name: Remaining Windows build storage
         if: always()
         run: |

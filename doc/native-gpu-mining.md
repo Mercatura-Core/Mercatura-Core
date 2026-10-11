@@ -39,6 +39,11 @@ The authoritative implementation is `src/crypto/mercahash.cpp` and its frozen
 V1 constants in `mercahash.h`: 128 MiB scratchpad, 2,097,152 fill lines, one binding
 pass, 131,072 mixing steps, SHA3-512 checkpoints and SHA3-256 finalization. The
 informal prompt's mixing-step summary is not used as an algorithm specification.
+`src/crypto/mercahash.h` defines `LINE_COUNT = SCRATCHPAD_BYTES / LINE_BYTES`
+and asserts 2,097,152 lines. Its frozen `V1_MIX_STEPS` is 131,072;
+`HashV1` in `src/crypto/mercahash.cpp` passes that constant to `MixScratchpad`,
+whose loop runs from 1 through the supplied count. The larger number describes
+scratchpad lines and fill iterations, not V1 mixing steps or total memory accesses.
 
 `mercahash_gpu.h` contains the actual device arithmetic compiled by CUDA and
 embedded into the OpenCL program. Its C++ execution path exists only for
