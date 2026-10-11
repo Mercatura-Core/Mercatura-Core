@@ -1,8 +1,8 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
 // Exact staged MercaHash V1 device arithmetic. Also compiled as C++ for parity tests.
-#ifndef MERCATURA_MINING_MERCAHASH_GPU_H
-#define MERCATURA_MINING_MERCAHASH_GPU_H
+#ifndef BITCOIN_MINING_MERCAHASH_GPU_H
+#define BITCOIN_MINING_MERCAHASH_GPU_H
 #ifdef MH_OPENCL
 typedef ulong mh_u64;
 #define MH_GLOBAL __global
@@ -584,4 +584,4 @@ MH_KERNEL void mh_stage(MH_GLOBAL const unsigned char *headers, MH_GLOBAL mh_u64
         for (unsigned j = 0; j < 16; ++j)
             states[id * 16 + j] = state[j];
 }
-#endif
+#endif // BITCOIN_MINING_MERCAHASH_GPU_H

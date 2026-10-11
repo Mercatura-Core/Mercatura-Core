@@ -8,6 +8,7 @@
 #include <mining/gpu_backend.h>
 #include <mining/opencl_source.h>
 #include <stdexcept>
+#include <util/string.h>
 #include <string_view>
 #ifdef WIN32
 #ifndef NOMINMAX
@@ -24,7 +25,7 @@ namespace
 void Check(cl_int result, const char *operation)
 {
     if (result != CL_SUCCESS)
-        throw std::runtime_error{std::string{operation} + " failed (OpenCL " + std::to_string(result) + ")"};
+        throw std::runtime_error{std::string{operation} + " failed (OpenCL " + util::ToString(result) + ")"};
 }
 bool SupportsOpenCl12(std::string_view version)
 {
@@ -217,7 +218,7 @@ class OpenClBackend final : public GpuBackend
                     log.assign(length, '\0');
                     api.clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, length, log.data(), nullptr);
                 }
-                throw std::runtime_error{"AMD MercaHash OpenCL compilation failed (" + std::to_string(error) +
+                throw std::runtime_error{"AMD MercaHash OpenCL compilation failed (" + util::ToString(error) +
                                          "): " + log};
             }
             init = api.clCreateKernel(program, "mh_init", &error);
@@ -343,7 +344,7 @@ GpuDiscovery DiscoverOpenClDevices()
         for (unsigned int index{0}; index < devices.size(); ++index) {
             GpuDevice entry{GpuVendor::AMD_OPENCL};
             entry.ordinal = index;
-            entry.id = "opencl:" + std::to_string(index);
+            entry.id = "opencl:" + util::ToString(index);
             try {
                 const auto device{devices[index]};
                 entry.name = Text(api, device, CL_DEVICE_NAME);

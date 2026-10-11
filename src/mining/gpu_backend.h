@@ -71,4 +71,4 @@ GpuDiscovery DiscoverOpenClDevices();
 std::unique_ptr<GpuBackend> CreateOpenClBackend(const GpuDevice &device, unsigned int contexts);
 #endif
 } // namespace mining
-#endif
+#endif // BITCOIN_MINING_GPU_BACKEND_H

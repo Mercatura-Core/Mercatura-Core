@@ -79,7 +79,9 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
     form->addRow(tr("Concurrent contexts per GPU"), m_contexts);
     m_yield = new QSpinBox{group};
     m_yield->setObjectName(QStringLiteral("gpuYield"));
-    m_yield->setRange(0, 1000); m_yield->setValue(10); m_yield->setSuffix(tr(" ms"));
+    m_yield->setRange(0, 1000);
+    m_yield->setValue(10);
+    m_yield->setSuffix(QStringLiteral(" ") + tr("ms"));
     form->addRow(tr("Rest between GPU batches"), m_yield);
     m_refresh_devices = new QPushButton{tr("Refresh GPU devices"), group};
     m_refresh_devices->setObjectName(QStringLiteral("refreshGpuDevices"));

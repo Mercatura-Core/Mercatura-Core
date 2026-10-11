@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <mining/mercahash_gpu.h>
 #include <stdexcept>
+#include <util/string.h>
 #ifndef MERCATURA_CUDA_MIN_ARCH
 #define MERCATURA_CUDA_MIN_ARCH 75
 #endif
@@ -149,12 +150,12 @@ GpuDiscovery DiscoverCudaDevices()
     for (int index{0}; index < count; ++index) {
         GpuDevice entry{GpuVendor::NVIDIA_CUDA};
         entry.ordinal = index;
-        entry.id = "cuda:" + std::to_string(index);
+        entry.id = "cuda:" + util::ToString(index);
         try {
             cudaDeviceProp properties{};
             Check(cudaGetDeviceProperties(&properties, index), "Read NVIDIA capability");
             entry.name = properties.name;
-            entry.capability = "CUDA " + std::to_string(properties.major) + "." + std::to_string(properties.minor);
+            entry.capability = "CUDA " + util::ToString(properties.major) + "." + util::ToString(properties.minor);
             entry.total_memory = properties.totalGlobalMem;
             Check(cudaSetDevice(index), "Select NVIDIA discovery device");
             size_t available{0}, total{0};
@@ -165,8 +166,8 @@ GpuDiscovery DiscoverCudaDevices()
                               CalculateGpuBudget(available, available).contexts > 0;
             if (!entry.supported)
                 entry.error = "NVIDIA device needs compute capability at least " +
-                              std::to_string(MERCATURA_CUDA_MIN_ARCH / 10) + "." +
-                              std::to_string(MERCATURA_CUDA_MIN_ARCH % 10) + " and sufficient free VRAM";
+                              util::ToString(MERCATURA_CUDA_MIN_ARCH / 10) + "." +
+                              util::ToString(MERCATURA_CUDA_MIN_ARCH % 10) + " and sufficient free VRAM";
         } catch (const std::exception &error) {
             entry.error = error.what();
         }
