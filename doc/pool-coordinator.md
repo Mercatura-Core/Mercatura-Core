@@ -34,7 +34,7 @@ untouched and uses compiler dependency files for incremental rebuilds.
 For an integrated Core build, add `-DBUILD_POOL_COORDINATOR=ON` to the existing
 M2 CMake configuration. Default is OFF, so ordinary Qt builds acquire no pool
 dependencies. The targets are `mercatura-pool`, `test_mercatura_pool`, and the
-test-only `pool-hash-test-client`. Only the coordinator is installed.
+test-only `pool-hash-test-client` and `pool-verifier-bench`. Only the coordinator is installed.
 
 ```sh
 sudo apt-get install libboost-dev libevent-dev qt6-base-dev qt6-tools-dev qt6-l10n-tools
@@ -159,8 +159,11 @@ more in later transaction fees than its value; that does not justify skimming it
 
 VarDiff is enabled by default. Protocol v1 already commits a separate target in
 **each job**; no hello fields, job fields, receipt fields or manifest versions
-change. M4 clients validate the target as part of the issued job identifier and
-credit checks. The next target commits in the existing `sessions.target` row,
+change. M4 clients validate target bounds, require an unchanged message when the same
+job identifier is refreshed, and check credit against that issued target.
+Protocol v1 does not expose issuance time for independently recomputing job IDs;
+IDs remain opaque to M4. TLS authenticates the assignment and the coordinator
+reconstructs persisted job commitments on resume/audit. The next target commits in the existing `sessions.target` row,
 in the same transaction as the new job. Issued jobs keep their original target,
 including in-flight and old-job submissions. Accepted shares always use
 `floor(2^256/(issued_target+1))`, including after reconnect/restart.
@@ -596,3 +599,48 @@ include/guard lints and `git diff --check`. Selected public stdout test logs are
 retained; node directories, cookies, SQLite files, resume tokens and TLS keys
 are excluded from upload. Local syntax/command validation is not a remote
 GitHub Actions pass. Check remote results for the exact published commit.
+
+## Repeatable launch measurements
+
+Run these sequentially on each actual VPS, with Core using its intended data
+and node workload. Do not run saturated verification in parallel with tests.
+
+```sh
+work/build-pool/pool-verifier-bench 1 256 16
+python3 src/pool/bench_pool.py --pool-binary="$PWD/work/build-pool/mercatura-pool" --sessions=4 --hashes=32
+python3 src/pool/bench_pool.py --pool-binary="$PWD/work/build-pool/mercatura-pool" --queue=1 --sessions=8 --hashes=8
+python3 src/pool/test_hardening.py --pool-binary="$PWD/work/build-pool/mercatura-pool"
+```
+
+The first command measures native verification and RSS. The Python benchmark
+starts a temporary private coordinator, synthetic RPC, real sockets, real
+MercaHash and SQLite WAL/FULL writes. It uses an intentionally maximal share
+target and raised message limits only inside that private fixture; this isolates
+verification/commit capacity from transport-abuse limits. Outputs identify the
+fixture and report accepted throughput, overload responses and requests that
+remain uncredited after bounded retries. A tiny queue can lose credit under
+sustained demand. These commands do not create production payout identities,
+validate real chain blocks, model WAN TLS, or prove live Core RPC capacity.
+
+For full qualification, repeat the live M1/M3/M4 regtest tests, use owned PQ
+wallets and test the intended TLS endpoint/RPC configuration, then run a bounded
+public cohort for long enough to exercise candidate history, tip changes,
+backups/restores, registration quotas and overload recovery. Monitor CPU/RSS,
+queue depth, pending bytes, health faults, overload/stale requests and disk
+space. Rejected shares can lose PPLNS eligibility; do not use an acceptance
+percentage alone as evidence of safety.
+
+KVM 4 (4 vCPU, 16 GB) and KVM 8 (8 vCPU, 32 GB) are planned sizes, not measured
+hosts. Begin with one verifier, queue 16 and the retained session/identity caps;
+reserve CPU and memory for the full node, OS, socket buffers and current jobs.
+The private scratchpads alone require 128 MiB per verifier, while configuration
+reserves at least 160 MiB each. Pending block accounting reserves a separate
+64 MiB by default, and 128 clients times the 8 MiB output cap permits a further
+1 GiB of buffered output. These are component bounds, not complete process RSS.
+The sample systemd `MemoryMax=1G` can terminate the service before all allowed
+buffers are filled; size it with measured headroom or reduce output/session
+limits. Do not merely increase verification workers because the VPS has more
+RAM. Test one and then two workers on KVM 8 if actual CPU/node headroom supports
+it; M2's worker detector can refuse over-budget counts. Local workstation
+throughput cannot be extrapolated to Hostinger CPU contention, storage latency
+or WAN behavior.

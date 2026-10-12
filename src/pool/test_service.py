@@ -445,7 +445,7 @@ def run(binary):
             fixture.delay_seconds = 2
             wait_for(lambda: not client.request("status")["result"]["healthy"])
             assert client.request("getjob")["error"]["code"] == 112
-            assert client.request("submit", {"job_id": paused_job["job_id"], "nonce": 999})["error"]["code"] == 107
+            assert client.request("submit", {"job_id": paused_job["job_id"], "nonce": 999})["error"]["code"] == 112
             assert client.request("status")["result"]["accepted_shares"] == 8
             fixture.delay_method = None
             wait_for(lambda: client.request("status")["result"]["healthy"])

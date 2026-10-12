@@ -121,7 +121,7 @@ private Q_SLOTS:
             const auto verified{Validate(fixture.Message(), fixture.manifest)};
             QCOMPARE(verified.work.target.GetHex(), target);
             auto altered{fixture.Message()};
-            altered.pushKV("share_target", fixture.network_target.GetHex());
+            altered.pushKV("share_target", std::string(64, '0'));
             QVERIFY_THROWS_EXCEPTION(std::exception, Validate(altered, fixture.manifest));
             // Job target changes never alter the older immutable job/receipt basis.
             QCOMPARE(Validate(fixture.Message(), fixture.manifest).work.target.GetHex(), target);

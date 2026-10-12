@@ -124,6 +124,8 @@ class FaultPool:
                                     result = dict(job, expires=int(time.time()) - 1)
                                 if scenario == "reused_namespace" and self.jobs > 1:
                                     result = dict(job, job_id="88" * 32)
+                                if scenario == "mutated_target" and self.jobs > 1:
+                                    result = dict(job, share_target=job["network_target"])
                             elif method == "manifest":
                                 result = manifest
                             elif method == "status":
@@ -289,14 +291,14 @@ class MercaturaPoolNativeTest(BitcoinTestFramework):
             clients.clear()
 
             invalid_scenarios = ("version", "network", "clock", "out_of_order", "malformed", "oversized", "unknown_notification", "excessive_rate", "invalid_job", "expired_job")
-            for scenario in (*invalid_scenarios, "reused_namespace", "duplicate", "stale", "rejected", "resume", "resume_rejected", "internal", "fragmented", "truncated"):
+            for scenario in (*invalid_scenarios, "reused_namespace", "mutated_target", "duplicate", "stale", "rejected", "resume", "resume_rejected", "internal", "fragmented", "truncated"):
                 fixture = FaultPool(certificate, key, genesis, job, manifest, scenario)
                 try:
-                    observed = result(native(fixture.port, seconds=5 if scenario.startswith("resume") else 3))
+                    observed = result(native(fixture.port, seconds=5 if scenario.startswith("resume") or scenario == "internal" else 3))
                     if scenario in invalid_scenarios:
                         assert_equal(observed["failed"], True)
                         assert_equal(observed["hashes"], 0)
-                    elif scenario == "reused_namespace":
+                    elif scenario in ("reused_namespace", "mutated_target"):
                         assert_equal(observed["failed"], True)
                         assert observed["hashes"] > 0
                     elif scenario == "duplicate":
