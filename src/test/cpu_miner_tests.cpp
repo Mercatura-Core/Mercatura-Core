@@ -505,4 +505,118 @@ BOOST_AUTO_TEST_CASE(authoritative_contexts_are_independent)
         BOOST_CHECK_EQUAL_COLLECTIONS(result.begin(), result.end(), expected.begin(), expected.end());
     }
 }
+
+BOOST_AUTO_TEST_CASE(late_solo_target_hit_is_discarded_on_tip_change_and_stop)
+{
+    for (bool stop : {false, true}) {
+        auto state{std::make_shared<FakeState>()};
+        std::atomic<bool> entered{false}, release{false};
+        mining::MiningController controller{[&] {
+            return [&](const CBlockHeader& header) {
+                if (header.nVersion == 1) {
+                    entered = true;
+                    while (!release)
+                        std::this_thread::sleep_for(std::chrono::milliseconds{1});
+                    return uint256{};
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds{1});
+                return uint256::FromHex(std::string(64, 'f')).value();
+            };
+        }};
+        BOOST_REQUIRE(controller.Start([state] { return std::make_unique<FakeProvider>(state); }, 1));
+        const bool hashing{Until([&] { return entered.load(); })};
+        bool replaced{true};
+        if (stop)
+            controller.RequestStop();
+        else {
+            ++state->parent;
+            replaced = Until([&] { return state->jobs >= 2; });
+        }
+        release = true;
+        const bool completed{Until([&] { return controller.GetStats().hashes > 0; })};
+        controller.RequestStop();
+        controller.Wait();
+        BOOST_CHECK(hashing && replaced && completed);
+        BOOST_CHECK_EQUAL(state->submissions, 0U);
+        BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(issued_target_and_submission_outcomes_are_authoritative)
+{
+    struct Provider : FakeProvider {
+        Provider(std::shared_ptr<FakeState> state, bool stale) : FakeProvider{std::move(state)}, is_stale{stale} {}
+        mining::SubmissionResult Submit(const mining::MiningJob&, const CBlockHeader&) override
+        {
+            return {false, false, "Not accepted", is_stale};
+        }
+        bool is_stale;
+    };
+    for (bool hit : {false, true})
+        for (bool stale : {false, true}) {
+            auto state{std::make_shared<FakeState>()};
+            mining::MiningController controller{[hit] {
+                return [hit](const CBlockHeader&) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds{1});
+                    return uint256{static_cast<uint8_t>(hit ? 1 : 2)};
+                };
+            }};
+            BOOST_REQUIRE(controller.Start([=] { return std::make_unique<Provider>(state, stale); }, 1));
+            const bool worked{Until([&] { return hit ? controller.GetStats().submitted > 0 : controller.GetStats().hashes > 10; })};
+            controller.RequestStop();
+            controller.Wait();
+            BOOST_CHECK(worked);
+            const auto stats{controller.GetStats()};
+            BOOST_CHECK_EQUAL(stats.accepted, 0U);
+            BOOST_CHECK_EQUAL(stats.rejected, hit && !stale ? stats.submitted : 0U);
+            if (hit && stale) BOOST_CHECK(stats.stale >= stats.submitted);
+            if (!hit) BOOST_CHECK_EQUAL(stats.submitted, 0U);
+        }
+}
+
+BOOST_AUTO_TEST_CASE(rate_sampling_includes_blocked_submission_time)
+{
+    struct State {
+        std::atomic<unsigned int> calls{0};
+        std::atomic<bool> blocked{false}, release{false};
+    } state;
+    struct Provider : FakeProvider {
+        Provider(std::shared_ptr<FakeState> fake, State& value) : FakeProvider{std::move(fake)}, state{value} {}
+        std::optional<mining::MiningJob> GetJob() override
+        {
+            auto job{FakeProvider::GetJob()};
+            job->continuous = true;
+            return job;
+        }
+        mining::SubmissionResult Submit(const mining::MiningJob&, const CBlockHeader&) override
+        {
+            const auto call{++state.calls};
+            if (call <= 2)
+                std::this_thread::sleep_for(std::chrono::milliseconds{call == 1 ? 600 : 1200});
+            else {
+                state.blocked = true;
+                while (!state.release)
+                    std::this_thread::sleep_for(std::chrono::milliseconds{1});
+            }
+            return {true, false, "Processed only"};
+        }
+        void Interrupt() override { state.release = true; }
+        State& state;
+    };
+    auto fake{std::make_shared<FakeState>()};
+    mining::MiningController controller{[] {
+        return [](const CBlockHeader&) {
+            std::this_thread::sleep_for(std::chrono::milliseconds{5});
+            return uint256{};
+        };
+    }};
+    BOOST_REQUIRE(controller.Start([&] { return std::make_unique<Provider>(fake, state); }, 1));
+    const bool sampled{Until([&] { return state.blocked.load(); })};
+    const auto rate{controller.GetStats().hashes_per_second};
+    controller.RequestStop();
+    controller.Wait();
+    BOOST_CHECK(sampled);
+    BOOST_CHECK(rate > 0 && rate < 70); // FIFO bounds completed work to about 67 / 1.8 s.
+    BOOST_CHECK_EQUAL(controller.GetStats().rejected, 0U);
+}
 BOOST_AUTO_TEST_SUITE_END()

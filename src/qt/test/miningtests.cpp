@@ -39,6 +39,56 @@ Q_DECLARE_METATYPE(wallet::AddressPurpose)
 class MiningTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void missingWalletUnlockCancellationAndNodeShutdown()
+    {
+        TestingSetup setup{ChainType::REGTEST};
+        setup.m_node.notifications->setChainstateLoaded(true);
+        auto node{interfaces::MakeNode(setup.m_node)};
+        auto loader{interfaces::MakeWalletLoader(*setup.m_node.chain, setup.m_args)};
+        setup.m_node.wallet_loader = loader.get();
+        auto& context{*loader->context()};
+        auto wallet{wallet::TestCreateWallet(wallet::CreateMockableWalletDatabase(), context, wallet::WALLET_FLAG_DESCRIPTORS)};
+        QVERIFY(wallet::AddWallet(context, wallet));
+        SecureString passphrase;
+        passphrase.assign("qt-solo-shutdown-passphrase");
+        QVERIFY(wallet->EncryptWallet(passphrase));
+        OptionsModel options{*node};
+        bilingual_str error;
+        QVERIFY(options.Init(error));
+        ClientModel client{*node, &options};
+        std::unique_ptr<const PlatformStyle> style{PlatformStyle::instantiate("other")};
+        WalletModel model{interfaces::MakeWallet(context, wallet), client, style.get()};
+        MiningSession session{*node};
+        MiningPage empty{nullptr};
+        empty.setClientModel(&client);
+        empty.setSession(&session);
+        QVERIFY(!empty.findChild<QPushButton*>("startMining")->isEnabled());
+        QVERIFY(empty.findChild<QLabel*>("miningStatus")->text().contains("unavailable"));
+        QVERIFY(!session.start(nullptr, 1));
+        unsigned int prompts{0};
+        const auto cancelled_prompt{connect(&model, &WalletModel::requireUnlock, this, [&] { ++prompts; })};
+        QVERIFY(session.start(&model, 1));
+        QTRY_COMPARE_WITH_TIMEOUT(prompts, 1U, 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(!session.stats().busy, 10000);
+        QVERIFY(session.stats().state == mining::MiningState::FAILED);
+        QCOMPARE(session.stats().hashes, uint64_t{0});
+        QVERIFY(wallet->IsLocked());
+        disconnect(cancelled_prompt);
+        const auto successful_prompt{connect(&model, &WalletModel::requireUnlock, this, [&] { ++prompts; QVERIFY(wallet->Unlock(passphrase)); })};
+        QVERIFY(session.start(&model, 1));
+        QTRY_VERIFY_WITH_TIMEOUT(session.stats().hashes > 0, 30000);
+        QTRY_VERIFY_WITH_TIMEOUT(wallet->IsLocked(), 10000);
+        QCOMPARE(prompts, 2U);
+        node->startShutdown();
+        QTRY_VERIFY_WITH_TIMEOUT(!session.stats().busy, 10000);
+        QCOMPARE(session.stats().active_workers, 0U);
+        QVERIFY(!session.start(&model, 1));
+        disconnect(successful_prompt);
+        session.shutdown();
+        QVERIFY(wallet::RemoveWallet(context, wallet, std::nullopt));
+        setup.m_node.wallet_loader = nullptr;
+    }
+
     void sharedDeviceDiscoveryRefresh()
     {
         TestingSetup setup{ChainType::REGTEST};

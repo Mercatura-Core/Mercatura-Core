@@ -32,7 +32,7 @@ struct State {
     std::atomic<unsigned int> submitted{0}, gpu_batches{0}, blocked_hashes{0}, late_batches{0}, authoritative_checks{0};
     std::atomic<bool> continuous{true};
     std::atomic<bool> revoked{false}, failing{false}, bad_candidate{false}, target_hits{false}, bad_self_test{false},
-        block_batches{false}, entered{false}, release{true};
+        block_batches{false}, entered{false}, release{true}, incomplete{false};
     void Record(const CBlockHeader &header)
     {
         std::lock_guard lock{mutex};
@@ -160,6 +160,7 @@ class MockBackend : public mining::GpuBackend
             ++state->late_batches;
             return hashes;
         }
+        if (mining_batch && state->incomplete && !hashes.empty()) hashes.pop_back();
         return cancelled() ? std::vector<mining::GpuHash>{} : hashes;
     }
 };
@@ -451,5 +452,47 @@ BOOST_AUTO_TEST_CASE(cancel_and_restart_gpu_sessions)
         BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
     }
     BOOST_CHECK(!state->duplicate);
+}
+BOOST_AUTO_TEST_CASE(unknown_host_memory_bounds_gpu_authoritative_contexts)
+{
+    for (const bool cpu : {false, true}) {
+        auto state{std::make_shared<State>()};
+        std::atomic<unsigned int> allocations{0};
+        mining::MiningController controller{Hashes(state), [] { return mining::CalculateWorkerLimits(8, {}); }, {}, Devices, [&](const auto&, unsigned) { ++allocations; return std::make_unique<MockBackend>(state, false); }};
+        BOOST_REQUIRE(controller.Start([state] { return std::make_unique<Provider>(state); }, 1, {cpu, true, {}, 0, 0}));
+        controller.Wait();
+        BOOST_CHECK(controller.GetStats().state == mining::MiningState::FAILED);
+        BOOST_CHECK_EQUAL(allocations, 0U);
+        BOOST_CHECK_EQUAL(state->submitted, 0U);
+    }
+    auto state{std::make_shared<State>()};
+    mining::MiningController controller{Hashes(state), [] { return mining::CalculateWorkerLimits(8, {}); }, {}, Devices, [state](const auto&, unsigned) { return std::make_unique<MockBackend>(state, false); }};
+    BOOST_REQUIRE(controller.Start([state] { return std::make_unique<Provider>(state); }, 0, {false, true, {"cuda:0"}, 0, 0}));
+    const bool started{Until([&] { return state->gpu_batches > 5; })};
+    controller.RequestStop();
+    controller.Wait();
+    BOOST_CHECK(started);
+}
+BOOST_AUTO_TEST_CASE(incomplete_device_batch_is_rejected_and_restart_recovers)
+{
+    auto state{std::make_shared<State>()};
+    state->target_hits = true;
+    state->incomplete = true;
+    mining::MiningController controller{Hashes(state), Limits, {}, Devices, [state](const auto&, unsigned) { return std::make_unique<MockBackend>(state, false); }};
+    BOOST_REQUIRE(controller.Start([state] { return std::make_unique<Provider>(state); }, 0, {false, true, {"cuda:0"}, 0, 0}));
+    const bool failed{Until([&] { return !controller.GetStats().busy; })};
+    controller.Wait();
+    BOOST_CHECK(failed);
+    BOOST_CHECK(controller.GetStats().state == mining::MiningState::FAILED);
+    BOOST_CHECK_EQUAL(state->submitted, 0U);
+    state->incomplete = false;
+    state->revoked = false;
+    ++state->parent;
+    BOOST_REQUIRE(controller.Start([state] { return std::make_unique<Provider>(state); }, 0, {false, true, {"cuda:0"}, 0, 0}));
+    const bool recovered{Until([&] { return state->submitted > 5; })};
+    controller.RequestStop();
+    controller.Wait();
+    BOOST_CHECK(recovered);
+    BOOST_CHECK(controller.GetStats().state == mining::MiningState::STOPPED);
 }
 BOOST_AUTO_TEST_SUITE_END()

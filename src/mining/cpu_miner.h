@@ -52,6 +52,7 @@ struct SubmissionResult {
     bool processed{false};
     bool active_chain{false};
     std::string message;
+    bool stale{false};
 };
 
 // Methods other than Interrupt are called only by the controller's coordinator.
@@ -90,6 +91,8 @@ struct MiningStats {
     uint64_t solutions{0};
     uint64_t submitted{0};
     uint64_t accepted{0};
+    uint64_t rejected{0}; // Provider reported neither processing nor acceptance.
+    uint64_t stale{0};    // Obsolete queued candidates or provider-reported stale work.
     std::string status{"Stopped"};
     std::string destination;
 };

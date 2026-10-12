@@ -119,6 +119,7 @@ MERCATURA_SCRIPTS = [
     'mercatura_pq_send_receive.py',
     'mercatura_reindex.py',
     'mercatura_smoke.py',
+    'mercatura_solo_native.py',
     'mercatura_testnet_identity.py',
     'mercatura_three_node_pq.py',
     'mercatura_wallet_backup_restore.py',

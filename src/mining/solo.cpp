@@ -7,9 +7,11 @@
 #include <consensus/merkle.h>
 #include <crypto/common.h>
 #include <interfaces/handler.h>
+#include <node/context.h>
 #include <pow.h>
 #include <random.h>
 #include <script/solver.h>
+#include <validation.h>
 
 #include <limits>
 #include <stdexcept>
@@ -32,21 +34,35 @@ SoloWorkProvider::SoloWorkProvider(std::unique_ptr<interfaces::Mining> mining, C
 }
 SoloWorkProvider::~SoloWorkProvider() = default;
 
+bool SoloWorkProvider::IsReady()
+{
+    if (IsCancelled()) return false;
+    if (m_regtest) return true;
+    if (m_mining->isInitialBlockDownload()) return false;
+    // IBD is latched once completed, and Core's template cooldown is bounded.
+    // Native Solo must also pause if later valid headers extend our local tip
+    // but their blocks have not connected yet. This uses the same local node;
+    // it adds no peer-direction or external-service requirement.
+    const auto* context{m_mining->context()};
+    return !context || !context->chainman || !context->chainman->BlocksAheadOfTip();
+}
+
 std::optional<MiningJob> SoloWorkProvider::GetJob()
 {
+    if (m_job && m_job->valid) *m_job->valid = false;
+    m_job.reset();
     m_template.reset();
-    if (IsCancelled()) return {};
-    if ((!m_regtest && m_mining->isInitialBlockDownload()) || !m_mining->getTip()) return {};
+    if (!IsReady() || !m_mining->getTip()) return {};
     node::BlockCreateOptions options;
     options.coinbase_output_script = m_payout;
     // The assembler validates its preliminary coinbase before we append our
     // extranonce. Height 1 needs its existing dummy byte to satisfy the
     // consensus minimum scriptSig length.
     options.include_dummy_extranonce = true;
-    // Readiness above handles IBD. Avoid blocking on cooldown; in particular,
-    // a peerless regtest must be able to mine its first block.
-    m_template = m_mining->createNewBlock(options, /*cooldown=*/false);
-    if (!m_template) return {};
+    // Public networks also wait for the best headers to connect after IBD.
+    // Peerless regtest must still be able to mine its first block.
+    m_template = m_mining->createNewBlock(options, /*cooldown=*/!m_regtest);
+    if (!m_template || !IsReady()) return {};
     const auto fields{m_template->getCoinbaseTx()};
     CMutableTransaction coinbase;
     coinbase.version = fields.version;
@@ -74,18 +90,22 @@ std::optional<MiningJob> SoloWorkProvider::GetJob()
     block.nNonce = 0;
     auto target{DeriveTarget(block.nBits, Params().GetConsensus().powLimit)};
     if (!target) throw std::runtime_error{"Core returned an invalid mining target"};
-    return MiningJob{static_cast<const CBlockHeader&>(block), *target, block.vtx[0]};
+    m_job = MiningJob{static_cast<const CBlockHeader&>(block), *target, block.vtx[0]};
+    m_job->valid = std::make_shared<std::atomic<bool>>(true);
+    return m_job;
 }
 
 bool SoloWorkProvider::IsCurrent(const MiningJob& job)
 {
-    if (IsCancelled() || (!m_regtest && m_mining->isInitialBlockDownload())) return false;
+    if (!m_job || job.valid != m_job->valid || !job.valid || !*job.valid ||
+        job.header.GetHash() != m_job->header.GetHash() || job.target != m_job->target ||
+        job.coinbase != m_job->coinbase || !IsReady()) return false;
     const auto tip{m_mining->getTip()};
     return tip && tip->hash == job.header.hashPrevBlock;
 }
 SubmissionResult SoloWorkProvider::Submit(const MiningJob& job, const CBlockHeader& solution)
 {
-    if (!m_template || !IsCurrent(job)) return {false, false, "Discarded stale solo solution"};
+    if (!m_template || !IsCurrent(job)) return {false, false, "Discarded stale solo solution", true};
     if (solution.hashPrevBlock != job.header.hashPrevBlock || solution.hashMerkleRoot != job.header.hashMerkleRoot ||
         solution.nBits != job.header.nBits || solution.nTime != job.header.nTime || solution.nVersion != job.header.nVersion) {
         throw std::runtime_error{"Mining solution does not match its job"};
@@ -97,5 +117,9 @@ SubmissionResult SoloWorkProvider::Submit(const MiningJob& job, const CBlockHead
     return {processed, accepted, accepted ? "Solo block accepted in the active chain" :
             processed ? "Solo solution processed; active-chain acceptance not observed" : "Solo solution rejected"};
 }
-void SoloWorkProvider::Interrupt() { m_mining->interrupt(); }
+void SoloWorkProvider::Interrupt()
+{
+    m_interrupted = true;
+    m_mining->interrupt();
+}
 } // namespace mining

@@ -121,6 +121,7 @@ void MiningSession::shutdown()
 }
 void MiningSession::poll()
 {
+    if (m_node.shutdownRequested() && stats().busy) stop();
     if (m_unload_token && *m_unload_token) {
         stop();
         m_wallet_unloaded = true;

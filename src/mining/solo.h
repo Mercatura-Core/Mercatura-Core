@@ -22,10 +22,11 @@ public:
     bool IsCurrent(const MiningJob& job) override;
     SubmissionResult Submit(const MiningJob& job, const CBlockHeader& solution) override;
     void Interrupt() override;
-    bool IsCancelled() const override { return m_cancelled && m_cancelled->load(); }
+    bool IsCancelled() const override { return m_interrupted || (m_cancelled && m_cancelled->load()); }
     std::string Destination() const override { return m_destination; }
 
 private:
+    bool IsReady();
     const std::unique_ptr<interfaces::Mining> m_mining;
     const CScript m_payout;
     const std::string m_destination;
@@ -33,8 +34,10 @@ private:
     const uint64_t m_session;
     uint64_t m_extranonce{0};
     std::unique_ptr<interfaces::BlockTemplate> m_template;
+    std::optional<MiningJob> m_job;
     std::unique_ptr<interfaces::Handler> m_unload_handler;
     const std::shared_ptr<std::atomic<bool>> m_cancelled;
+    std::atomic<bool> m_interrupted{false};
 };
 } // namespace mining
 #endif // BITCOIN_MINING_SOLO_H

@@ -112,10 +112,13 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
     m_destination->setFont(GUIUtil::fixedPitchFont());
     form->addRow(tr("PQ reward destination"), m_destination);
     m_hashrate = new QLabel{group};
+    m_hashrate->setObjectName(QStringLiteral("miningHashrate"));
     form->addRow(tr("Local hashrate"), m_hashrate);
     m_active = new QLabel{group};
+    m_active->setObjectName(QStringLiteral("miningActiveWorkers"));
     form->addRow(tr("Active workers"), m_active);
     m_blocks = new QLabel{group};
+    m_blocks->setObjectName(QStringLiteral("miningBlocks"));
     form->addRow(tr("Solutions / submitted / accepted"), m_blocks);
     m_status = new QLabel{group};
     m_status->setObjectName(QStringLiteral("miningStatus"));
@@ -297,7 +300,7 @@ void MiningPage::updateStatus()
     bool gpu_available{false};
     for (int i{0}; i < m_devices->count(); ++i) if ((m_devices->item(i)->flags() & Qt::ItemIsEnabled) &&
         (m_all_devices->isChecked() || m_devices->item(i)->checkState() == Qt::Checked)) gpu_available = true;
-    m_start->setEnabled(m_session && m_client && !running && !syncing && (!use_cpu || m_limits.maximum > 0) && (!use_gpu || (discovery && gpu_available)) && (!pool || endpoint));
+    m_start->setEnabled(m_wallet && m_session && m_client && !running && !syncing && (!use_cpu || m_limits.maximum > 0) && (!use_gpu || (discovery && gpu_available)) && (!pool || endpoint));
     m_stop->setEnabled(m_session && running && stats.state != mining::MiningState::STOPPING);
     m_hardware->setEnabled(!running);
     m_all_devices->setEnabled(!running && use_gpu);
@@ -343,8 +346,9 @@ void MiningPage::updateStatus()
     m_hashrate->setText(tr("%1 H/s (%2 hashes)").arg(stats.hashes_per_second, 0, 'f', 2).arg(qulonglong{stats.hashes}));
     m_active->setText(QString::number(stats.active_workers));
     m_blocks->setText(pool ? tr("%1 target hits / %2 submission attempts (local)").arg(qulonglong{stats.solutions}).arg(qulonglong{stats.submitted}) : QStringLiteral("%1 / %2 / %3").arg(qulonglong{stats.solutions}).arg(qulonglong{stats.submitted}).arg(qulonglong{stats.accepted}));
+    m_blocks->setToolTip(tr("Not processed: %1; stale or discarded: %2. Processing without observed active-chain acceptance is not counted as accepted.").arg(qulonglong{stats.rejected}).arg(qulonglong{stats.stale}));
     QString status{QString::fromStdString(stats.status)};
-    if (!m_session || !m_client) status = tr("Mining is unavailable until the node and wallet are loaded.");
+    if (!m_wallet || !m_session || !m_client) status = tr("Mining is unavailable until the node and wallet are loaded.");
     else if (!running && stats.state != mining::MiningState::FAILED) {
         if (use_gpu && !gpu_available) status = tr("No selected compatible GPU is available. Choose CPU mining or refresh devices.");
         else if (use_cpu && m_limits.maximum == 0) status = tr("Insufficient available memory for a mining worker.");

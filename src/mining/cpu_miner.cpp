@@ -128,6 +128,7 @@ void MiningController::CancelWork()
     std::lock_guard lock{m_mutex};
     if (m_work) m_work->cancelled = true;
     m_work.reset();
+    m_stats.stale += m_solutions.size();
     m_solutions.clear();
     m_cv.notify_all();
 }
@@ -157,10 +158,8 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
         }
         // Every GPU verifier owns a separate authoritative 128 MiB CPU context.
         // Include those contexts in the host memory budget even in GPU-only mode.
-        if (limits.available_memory) {
-            const auto host_limits{CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), limits.available_memory)};
-            if (uint64_t{count} + selected.size() > host_limits.maximum) throw std::runtime_error{"Insufficient host memory for CPU workers and GPU candidate verification"};
-        }
+        const auto host_limits{CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), limits.available_memory)};
+        if (uint64_t{count} + selected.size() > host_limits.maximum) throw std::runtime_error{"Insufficient host memory for CPU workers and GPU candidate verification"};
         {
             std::lock_guard lock{m_mutex};
             for (const auto& device : selected) m_stats.devices.push_back(GpuStats{device});
@@ -206,6 +205,10 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
             // The provider is used only here; its lifetime is protected until
             // workers have joined and Interrupt callers release the mutex.
             if (work && (!m_provider->IsCurrent(work->job) || now >= work->expires)) {
+                if (solution) {
+                    std::lock_guard lock{m_mutex};
+                    ++m_stats.stale;
+                }
                 CancelWork();
                 work.reset();
                 solution.reset();
@@ -219,6 +222,10 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
                 {
                     std::lock_guard lock{m_mutex};
                     if (result.active_chain) ++m_stats.accepted;
+                    else if (result.stale)
+                        ++m_stats.stale;
+                    else if (!result.processed)
+                        ++m_stats.rejected;
                     if (m_stats.state != MiningState::FAILED) m_stats.status = result.message;
                 }
                 if (!work->job.continuous) {
@@ -249,20 +256,24 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
                     m_stats.state = MiningState::STARTING;
                 }
             }
-            if (now - sampled_at >= std::chrono::milliseconds{500}) {
+            // Provider calls can block while workers finish hashes. Include
+            // that time in the denominator, rather than using the earlier tip
+            // check timestamp with the newer completed-work counters.
+            const auto sampled_now{std::chrono::steady_clock::now()};
+            if (sampled_now - sampled_at >= std::chrono::milliseconds{500}) {
                 const uint64_t hashes{m_hashes.load()};
                 std::lock_guard lock{m_mutex};
-                m_stats.hashes_per_second = (hashes - sampled_hashes) / std::chrono::duration<double>(now - sampled_at).count();
+                m_stats.hashes_per_second = (hashes - sampled_hashes) / std::chrono::duration<double>(sampled_now - sampled_at).count();
                 const uint64_t cpu_hashes{m_cpu_hashes.load()};
-                m_stats.cpu_hashes_per_second = (cpu_hashes - sampled_cpu) / std::chrono::duration<double>(now - sampled_at).count();
+                m_stats.cpu_hashes_per_second = (cpu_hashes - sampled_cpu) / std::chrono::duration<double>(sampled_now - sampled_at).count();
                 sampled_cpu = cpu_hashes;
                 for (size_t i{0}; i < m_stats.devices.size(); ++i) {
                     auto& device{m_stats.devices[i]};
-                    device.hashes_per_second = device.failed ? 0 : (device.hashes - sampled_devices[i]) / std::chrono::duration<double>(now - sampled_at).count();
+                    device.hashes_per_second = device.failed ? 0 : (device.hashes - sampled_devices[i]) / std::chrono::duration<double>(sampled_now - sampled_at).count();
                     sampled_devices[i] = device.hashes;
                 }
                 sampled_hashes = hashes;
-                sampled_at = now;
+                sampled_at = sampled_now;
             }
             std::unique_lock lock{m_mutex};
             m_cv.wait_for(lock, std::chrono::milliseconds{100}, [this] { return m_stop.load() || !m_solutions.empty(); });
