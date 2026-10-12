@@ -6,7 +6,7 @@ on:
   pull_request:
     paths: ['.github/workflows/mercatura-native-pool.yml', 'src/**', 'depends/**', 'contrib/macdeploy/**', 'contrib/vcpkg-ports/**', 'vcpkg*.json', 'CMakeLists.txt', 'test/functional/**', 'doc/native-pool-mining.md']
   push:
-    branches: [feature/qt-pool-mining, feature/qt-gpu-mining, feature/qt-mining-release-hardening]
+    branches: [feature/qt-pool-mining, feature/qt-gpu-mining, feature/qt-mining-release-hardening, feature/qt-solo-release-qualification]
     paths: ['.github/workflows/mercatura-native-pool.yml', 'src/**', 'depends/**', 'contrib/macdeploy/**', 'contrib/vcpkg-ports/**', 'vcpkg*.json', 'CMakeLists.txt', 'test/functional/**', 'doc/native-pool-mining.md']
 permissions:
   contents: read

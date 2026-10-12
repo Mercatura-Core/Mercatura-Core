@@ -4,7 +4,7 @@ on:
   pull_request:
     paths: ['src/pool/**', 'src/qt/poolclient*', 'src/mining/**', 'src/qt/mining*', 'src/test/*gpu*', 'src/CMakeLists.txt', 'src/test/CMakeLists.txt', 'vcpkg.json', '.github/workflows/mercatura-gpu.yml']
   push:
-    branches: [feature/qt-gpu-mining, feature/qt-mining-release-hardening]
+    branches: [feature/qt-gpu-mining, feature/qt-mining-release-hardening, feature/qt-solo-release-qualification]
 permissions:
   contents: read
 concurrency:

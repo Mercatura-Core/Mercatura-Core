@@ -15,7 +15,7 @@ on:
       - 'test/functional/test_runner.py'
       - 'test/lint/lint-pool.py'
   push:
-    branches: [feature/qt-pool-mining, feature/qt-gpu-mining, feature/qt-mining-release-hardening]
+    branches: [feature/qt-pool-mining, feature/qt-gpu-mining, feature/qt-mining-release-hardening, feature/qt-solo-release-qualification]
     paths:
       - '.github/workflows/mercatura-pool.yml'
       - '.github/workflows/mercatura-native-pool.yml'
