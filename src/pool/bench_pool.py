@@ -31,6 +31,7 @@ def run(options):
                   "warmup": True, "vardiff": False, "share_target": "ff" * 32,
                   "verifier_workers": options.workers, "verifier_memory_mib": options.workers * 160,
                   "verifier_queue": options.queue, "refresh_seconds": 15, "lifetime_seconds": 300,
+                  "messages_per_session": 1000, "messages_per_ip": 10000,
                   "stats_seconds": 0}
         file = root / "config.json"
         file.write_text(json.dumps(config))
@@ -95,6 +96,7 @@ def run(options):
                       "overload_responses": sum(row[1] for row in outcomes), "uncredited_requests": sum(row[2] for row in outcomes),
                       "mean_hash_us": status["verification_mean_us"], "pool_peak_rss_bytes": peak,
                       "durability": "SQLite WAL/FULL", "candidate_blocks": status["block_candidates"]}
+            result["request_limits"] = "raised only for this private verification-capacity fixture"
             assert status["accepted_shares"] == accepted and status["healthy"]
             print(json.dumps(result))
         finally:
