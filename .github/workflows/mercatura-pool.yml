@@ -15,7 +15,7 @@ on:
       - 'test/functional/test_runner.py'
       - 'test/lint/lint-pool.py'
   push:
-    branches: [feature/qt-pool-mining, feature/qt-gpu-mining]
+    branches: [feature/qt-pool-mining, feature/qt-gpu-mining, feature/qt-mining-release-hardening]
     paths:
       - '.github/workflows/mercatura-pool.yml'
       - '.github/workflows/mercatura-native-pool.yml'
@@ -41,7 +41,7 @@ defaults:
 jobs:
   standalone:
     name: Optional M3 standalone accounting and security
-    if: github.event_name != 'pull_request' || github.head_ref == 'feature/qt-pool-mining'
+    if: github.event_name != 'pull_request' || github.head_ref == 'feature/qt-pool-mining' || github.head_ref == 'feature/qt-gpu-mining' || github.head_ref == 'feature/qt-mining-release-hardening'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -73,6 +73,9 @@ jobs:
         run: |
           python3 -u src/pool/test_service.py \
             --pool-binary="$PWD/work/build-pool/mercatura-pool" | tee work/ci-pool/process.log
+          python3 -u src/pool/test_hardening.py --pool-binary="$PWD/work/build-pool/mercatura-pool" | tee work/ci-pool/hardening.log
+          work/build-pool/pool-verifier-bench 1 128 16 | tee work/ci-pool/benchmark.json
+          python3 src/pool/bench_pool.py --pool-binary="$PWD/work/build-pool/mercatura-pool" --hashes=8 | tee work/ci-pool/coordinator-benchmark.json
       - name: Retain selected public test logs
         if: always()
         uses: actions/upload-artifact@v4

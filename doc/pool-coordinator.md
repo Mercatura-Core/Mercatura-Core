@@ -5,7 +5,7 @@ block, script, Merkle, serialization, target and frozen MercaHash primitives,
 and M2's worker-budget detector. It connects to one ordinary authenticated Core
 node; it opens no chainstate or wallet. SQLite contains pool accounting only.
 No private ownership keys, withdrawal endpoint, balances, fee switch, donation,
-operator payout, or Qt pooled-mining client exist. Mining fees are permanently
+operator payout exists. The native M4 Qt client uses this service or other compatible independent pools. Mining fees are permanently
 zero. A TLS transport key authenticates the service, not ownership of rewards.
 
 The coordinator controls job construction, transaction selection and accounting.
@@ -154,6 +154,70 @@ but may have no output. Every positive amount goes to its intended native PQ
 script and the sum equals GBT's exact subsidy plus selected-transaction fees.
 There is no remainder sink or deferred balance. A tiny nominal payout can cost
 more in later transaction fees than its value; that does not justify skimming it.
+
+## M7.1 bounded share difficulty
+
+VarDiff is enabled by default. Protocol v1 already commits a separate target in
+**each job**; no hello fields, job fields, receipt fields or manifest versions
+change. M4 clients validate the target as part of the issued job identifier and
+credit checks. The next target commits in the existing `sessions.target` row,
+in the same transaction as the new job. Issued jobs keep their original target,
+including in-flight and old-job submissions. Accepted shares always use
+`floor(2^256/(issued_target+1))`, including after reconnect/restart.
+
+| Configuration | Default | Meaning |
+|---|---|---|
+| `vardiff` | true | Enable accepted-work estimation; false retains operator-selected fixed work |
+| `share_target` | `003fff…ffff` | Initial target, expected score 1,024 (probability 1/1,024) |
+| `share_min_target` | 1, encoded as 64 hex digits | Hardest operator bound; network floor overrides it |
+| `share_max_target` | `0fff…ffff` | Easiest operator bound, score 16 |
+| `share_interval_seconds` | 150 | Desired per-session share interval, allowed 30–3,600 s |
+| `vardiff_min_seconds` | 60 | Minimum observation time; at least four accepted shares for early adjustment |
+| `vardiff_window_seconds` | 600 | Timeout observation, including no-share/no-hash intervals |
+| `pending_block_memory_mib` | 64 | Aggregate serialized block bytes retained by pending verifications |
+| `reconcile_batch` | 16 | Maximum candidate records visited per reconciliation pass |
+
+For elapsed connected, continuously served work time `E`, committed accepted
+work `W`, current score `S`, and desired interval `I`, estimate
+`A=floor(W*I/E)`. Ignore an estimate within 25% of `S`; otherwise smooth with
+`floor((S+A)/2)`. Clamp the proposed score to `[max(1,floor(S/2)), min(2^256,2*S)]`.
+Convert back with `ceil(2^256/proposed_score)-1`, then also clamp the target's
+`T+1` denominator to `[ceil((old_T+1)/2), min(2^256,2*(old_T+1))]`.
+This prevents quantized very hard targets from exceeding a twofold expected-work
+change. Finally apply operator bounds and `max(share_target, network_target)`;
+a network-target change or new operator bound can override the twofold step.
+Every conversion uses integer BIGNUM intermediates and strict 256-bit targets.
+There is no reported hashrate input, floating point, zero division or unchecked
+256-bit multiplication. Observation work is bounded below 287 bits.
+
+No accepted work after the full timeout permits a bounded easing step, down to
+the configured easiest target. A no-hash client also eventually reaches that
+bound; the coordinator cannot infer whether a client hashes without accepting
+untrusted hashrate claims. Very slow miners may take several windows to reach an
+appropriate target. Fast miners increase difficulty progressively; initial
+registration uses the conservative initial target. Reconnect/restart retain the
+durable target and reset the observation, so disconnected time earns no easing.
+Expired work gaps, RPC recovery and exceptionally long reactor stalls reset
+observations. Parent changes with continuously served work preserve observations.
+Overload marks affected observations: they may harden from accepted work but
+cannot ease from the downward-biased sample of accepted submissions.
+
+This regulates normal sustained work, not hostile invalid-nonce traffic or a
+hard aggregate capacity guarantee. Keep registration/IP/session controls and
+measure actual throughput. The network floor can make every other regtest hash
+qualify; VarDiff cannot exclude valid blocks to enforce a lower submission rate.
+The regtest sample and inherited fixed-target test fixtures explicitly set
+`vardiff:false`. Existing operator configs with initial targets outside the new
+bounds fail startup with an explicit error; review bounds or select fixed mode.
+Existing issued jobs and historical accounting are never rewritten. Existing
+resumed easy session targets are bounded only on subsequent job issuance.
+
+Pending duplicate work now returns retryable overload (110), or internal failure
+(112) after a latched accounting fault, until a durable receipt is available.
+Accepted replay still returns the original 108 receipt. Updated Qt clients pause,
+retain and replay submissions on 112, as they already do for verifier overload.
+Older M4 clients speak the same wire protocol and mine adjusted targets correctly;
+upgrade for improved internal-failure receipt recovery.
 
 ## Immutable snapshots and coinbases
 
@@ -338,6 +402,14 @@ outbound cap is 8 MiB. Size aggregate socket memory accordingly; connection
 limits times output caps are an upper bound, not an allocation at startup.
 Only the current job per connected session is cached; disconnect releases it.
 Older persisted jobs are loaded transiently for verification or audit requests.
+Pending jobs have a separate aggregate serialized-byte budget. The accounting is
+conservative when transactions share storage; it is not a complete RSS limit.
+Scratchpads, current-job caches, JSON, TLS buffers and node RAM need separate
+headroom. Budget exhaustion returns explicit 110 before queue admission and adds
+to `overload_share_requests_since_start`; current pending bytes/budget appear in
+status. A refused share is not credited. Retrying can still miss expiry or a
+parent transition and lose PPLNS eligibility; saturation is an operator problem,
+not a harmless protective event.
 Pending verification keeps the exact block without duplicate manifest data.
 
 Workers preallocate and reuse 128 MiB scratchpads; require a configured budget
@@ -355,9 +427,15 @@ Remote RPC requires HTTPS with certificate verification; local HTTP is allowed.
 No redirects, debug credential dumps, secret logging or login flow exist.
 
 The simple reactor currently performs bounded synchronous RPC calls. A slow
-node can delay all connections. Candidate reconciliation currently visits the
-retained candidate set; large long-lived deployments need incremental scanning
-and measured throughput. Do not raise worker/connection settings without sizing
+node can delay all connections. Candidate reconciliation prioritizes discovered solutions and visits at most
+`reconcile_batch` records, then walks retained history using a bounded cursor.
+Indexed candidate-state/hash and session/job scans avoid loading full history.
+Completed candidate hashes cannot bypass an earlier full verifier queue: their
+network status is unknown until CPU verification. No client-provided priority
+claim can safely reserve that path. Candidate discovery commits with its share
+before submitblock; RPC failures leave it retryable. Synchronous node refresh can
+still delay completed verification processing, and per-call timeouts can add up.
+Large/remote deployments need measured latency and further asynchronous RPC work. Do not raise worker/connection settings without sizing
 Core RPC capacity, scratchpad RAM, output buffers, filesystem and OS limits.
 
 `handshake_seconds` bounds TLS plus initial hello negotiation (default 30,
@@ -381,6 +459,13 @@ remain outstanding; incremental/asynchronous RPC work is deferred.
 Accounting version remains 1; database schema is now 2. Startup transactionally
 migrates schema 1 by adding registration history and indexes, preserving all
 shares, namespaces, jobs and frozen manifests. Unknown schema versions fail.
+M7.1 adds indexes, without a schema-version, identity-lifecycle or account
+migration. Only the next session target changes, atomically with job publication.
+Any SQL operation failure latches a work pause that healthy RPC cannot clear;
+authoritative hash failures likewise latch a pause. Inspect/recover storage or
+verification resources, then restart. An aborted share/candidate transaction
+receives no accepted ACK; queued submissions become interrupted on restart and
+can be retried while still valid. Historical committed receipts remain replayable.
 Registration IPs are private operational records and are not exported in public
 manifests. Tables:
 

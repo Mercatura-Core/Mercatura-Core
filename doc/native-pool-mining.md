@@ -220,3 +220,18 @@ The issuance-time job-ID gap and unauthenticated historical PPLNS claims remain
 v1 limitations. A separately versioned protocol could disclose issuance time
 and authenticated complete share-history anchors; neither can be inferred from
 a coordinator-supplied manifest alone. No protocol extension is introduced here.
+
+## M7.1 share difficulty and service failures
+
+Compatible pools can vary difficulty using the existing protocol v1 job target.
+The wallet validates each immutable job and checks receipts against its exact
+issued target. CPU and GPU workers use the same validated job; GPU solutions
+still require authoritative CPU rehash before submission. No registration,
+account retirement or navigation screens are added.
+
+If the coordinator reports internal failure, the updated client pauses work and
+retains the submission for resume/replay, as it does for verifier overload.
+Only a valid durable receipt increments accepted-share status. A retry can
+become stale before service recovery and then earn no PPLNS credit. Operators
+must minimize overload and outages; users can configure independent compatible
+pools through the existing Pool Mining settings. Solo remains independent.
