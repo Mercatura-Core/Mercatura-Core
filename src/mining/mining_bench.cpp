@@ -5,6 +5,7 @@
 #include <univalue.h>
 
 #include <algorithm>
+#include <charconv>
 #include <chrono>
 #include <ctime>
 #include <fstream>
@@ -12,6 +13,7 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <string_view>
 #include <thread>
 #ifndef WIN32
 #include <sys/resource.h>
@@ -61,9 +63,15 @@ int main(int argc, char** argv)
 {
     try {
         if (argc > 4) throw std::runtime_error{"usage: mining-bench [workers=0] [seconds=10] [cycles=1]"};
-        const unsigned long workers{argc > 1 ? std::stoul(argv[1]) : 0};
-        const unsigned long seconds{argc > 2 ? std::stoul(argv[2]) : 10};
-        const unsigned long cycles{argc > 3 ? std::stoul(argv[3]) : 1};
+        const auto number = [](std::string_view input) {
+            unsigned long value{0};
+            const auto [end, error]{std::from_chars(input.data(), input.data() + input.size(), value)};
+            if (error != std::errc{} || end != input.data() + input.size()) throw std::runtime_error{"expected an unsigned decimal integer"};
+            return value;
+        };
+        const unsigned long workers{argc > 1 ? number(argv[1]) : 0};
+        const unsigned long seconds{argc > 2 ? number(argv[2]) : 10};
+        const unsigned long cycles{argc > 3 ? number(argv[3]) : 1};
         if (!seconds || seconds > 60 || !cycles || cycles > 10) throw std::runtime_error{"duration is 1..60 seconds; cycles are 1..10"};
         const auto detected{mining::DetectWorkerLimits()};
         auto budget{detected};
