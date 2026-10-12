@@ -464,9 +464,13 @@ migrates schema 1 by adding registration history and indexes, preserving all
 shares, namespaces, jobs and frozen manifests. Unknown schema versions fail.
 M7.1 adds indexes, without a schema-version, identity-lifecycle or account
 migration. Only the next session target changes, atomically with job publication.
-Any SQL operation failure latches a work pause that healthy RPC cannot clear;
+Any SQL operation failure or invalid durable job/session/share data latches a
+work pause that healthy RPC cannot clear;
 authoritative hash failures likewise latch a pause. Inspect/recover storage or
-verification resources, then restart. An aborted share/candidate transaction
+verification resources, then restart. Disconnect and worker shutdown do not
+require successful connection-metadata writes after such a fault. Candidate RPC
+reconciliation failures also pause issuance until a real reconciliation succeeds;
+normal template polling alone cannot clear them. An aborted share/candidate transaction
 receives no accepted ACK; queued submissions become interrupted on restart and
 can be retried while still valid. Historical committed receipts remain replayable.
 Registration IPs are private operational records and are not exported in public

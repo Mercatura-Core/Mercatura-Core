@@ -55,8 +55,8 @@ void Service::Refresh()
         m_template_time = now;
     }
     m_parent = parent;
-    m_healthy = true;
-    m_health = "ready";
+    m_healthy = !m_reconcile_failed;
+    m_health = m_reconcile_failed ? "chain reconciliation unavailable; work paused" : "ready";
     if (!was_healthy)
         for (auto& [id, s] : m_sessions)
             s.difficulty.Reset();
@@ -69,7 +69,7 @@ void Service::Refresh()
     }
 }
 Job Service::LoadJob(const std::string& id)
-{
+try {
     auto q = m_db.Query("SELECT serial,session,snapshot,target,block,issued,expires,manifest FROM jobs WHERE id=?");
     q.Bind(1, id);
     if (!q.Row()) throw ProtocolError{STALE, "unknown job"};
@@ -98,6 +98,14 @@ Job Service::LoadJob(const std::string& id)
     const auto expected = BuildJob(j.snapshot_manifest["template"], weights, j.snapshot_manifest["cutoff"].getInt<int64_t>(), Number::Parse(j.snapshot_manifest["window_limit"].get_str()), m_cfg.network, m_cfg.genesis, j.session, j.serial, j.share_target.GetHex(), j.issued, j.expires - j.issued, j.snapshot_manifest["warmup"].get_bool());
     if (expected.id != j.id || expected.snapshot != j.snapshot || BlockHex(expected.block) != BlockHex(j.block) || expected.manifest.write() != j.manifest.write()) throw std::runtime_error("issued job differs from its frozen snapshot");
     return j;
+} catch (const ProtocolError&) {
+    throw;
+} catch (const DatabaseError&) {
+    throw;
+} catch (const std::exception&) {
+    // Persisted public work that fails reconstruction is a storage/integrity
+    // fault, not a temporary RPC failure that Refresh may clear.
+    throw DatabaseError("issued job differs from its durable commitment");
 }
 Job& Service::GetJob(int64_t session)
 {
@@ -183,6 +191,12 @@ UniValue Service::Hello(int64_t& session, const std::string& ip, const UniValue&
         id = q.Integer(0);
         state.script = q.Text(1);
         state.target = q.Text(2);
+        try {
+            PqScript(state.script);
+            if (ParseTarget(state.target) == 0) throw std::runtime_error("zero assigned target");
+        } catch (const std::exception&) {
+            throw DatabaseError("invalid durable session binding/target");
+        }
         if (m_sessions.contains(id)) throw ProtocolError{SESSION, "session already connected"};
         auto latest = m_db.Query("SELECT id FROM jobs WHERE session=? ORDER BY serial DESC LIMIT 1");
         latest.Bind(1, id);
@@ -470,11 +484,13 @@ std::vector<Response> Service::Tick()
     if (!m_stopping && !m_accounting_failed && Now() - m_reconcile_time >= m_cfg.reconcile_seconds) {
         try {
             Reconcile();
+            m_reconcile_failed = false;
         } catch (const DatabaseError&) {
             m_accounting_failed = true;
             m_healthy = false;
             m_health = "accounting error; restart required after storage recovery";
         } catch (const std::exception&) {
+            m_reconcile_failed = true;
             m_healthy = false;
             m_health = "chain reconciliation unavailable";
         }
@@ -557,8 +573,16 @@ void Service::Disconnect(int64_t session)
             ++it;
     }
     m_sessions.erase(session);
-    auto q = m_db.Query("UPDATE sessions SET connected=0 WHERE id=?");
-    q.Bind(1, session).Row();
+    if (!m_accounting_failed) {
+        try {
+            auto q = m_db.Query("UPDATE sessions SET connected=0 WHERE id=?");
+            q.Bind(1, session).Row();
+        } catch (const DatabaseError&) {
+            m_accounting_failed = true;
+            m_healthy = false;
+            m_health = "accounting error; restart required after storage recovery";
+        }
+    }
 }
 void Service::Shutdown()
 {
@@ -569,8 +593,15 @@ void Service::Shutdown()
     // disconnected client can retry interrupted requests using its resume token.
     Tick();
     for (const auto& [id, s] : m_sessions) {
-        auto q = m_db.Query("UPDATE sessions SET connected=0 WHERE id=?");
-        q.Bind(1, id).Row();
+        if (m_accounting_failed) break;
+        try {
+            auto q = m_db.Query("UPDATE sessions SET connected=0 WHERE id=?");
+            q.Bind(1, id).Row();
+        } catch (const DatabaseError&) {
+            m_accounting_failed = true;
+            m_healthy = false;
+            m_health = "accounting error; restart required after storage recovery";
+        }
     }
     m_sessions.clear();
 }
@@ -589,6 +620,7 @@ UniValue Service::Stats()
     o.pushKV("overload_share_requests_since_start", m_overload);
     o.pushKV("accounting_fault", m_accounting_failed);
     o.pushKV("verification_fault", m_verifier_failed);
+    o.pushKV("reconciliation_fault", m_reconcile_failed);
     o.pushKV("vardiff", m_cfg.vardiff);
     o.pushKV("share_interval_seconds", m_cfg.share_interval_seconds);
     auto q = m_db.Query("SELECT COUNT(*) FROM shares");

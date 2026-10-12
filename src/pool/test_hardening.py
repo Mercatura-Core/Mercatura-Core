@@ -30,7 +30,7 @@ def run(binary):
                   "warmup": True, "vardiff": True, "share_target": "7" + "f" * 63,
                   "share_max_target": "ff" * 32, "share_interval_seconds": 30,
                   "vardiff_min_seconds": 30, "vardiff_window_seconds": 30,
-                  "refresh_seconds": 1, "lifetime_seconds": 180, "stats_seconds": 0}
+                  "refresh_seconds": 1, "lifetime_seconds": 180, "reconcile_seconds": 1, "stats_seconds": 0}
         file = root / "config.json"
         clients = []
         process = None
@@ -189,6 +189,35 @@ def run(binary):
             status = client.request("status")["result"]
             assert status["pending_block_bytes"] == 0 and status["overload_share_requests_since_start"] >= 1
             print("PASS actual pending-block budget overload, explicit refusal and recovery without lost ACK", flush=True)
+            fixture.fail_submit = True
+            time.sleep(1.1)
+            job = getjob(client)
+            hash_worker = str(Path(binary).resolve().with_name("pool-hash-test-client"))
+            solved = subprocess.run([hash_worker, job["header"], job["share_target"], job["network_target"], "network"],
+                                    check=True, capture_output=True, text=True, timeout=30)
+            network_nonce = json.loads(solved.stdout)["nonce"]
+            receipt = submit(client, job, network_nonce)
+            assert receipt["error"] is None or receipt.get("receipt", {}).get("accepted"), receipt
+            wait_for(lambda: client.request("status")["result"]["reconciliation_fault"])
+            time.sleep(1.2)
+            assert client.request("getjob")["error"]["code"] == 112
+            fixture.fail_submit = False
+            wait_for(lambda: client.request("status")["result"]["healthy"], timeout=30)
+            print("PASS candidate RPC failure pauses issuance until actual reconciliation recovers", flush=True)
+            with sqlite3.connect(config["database"]) as db:
+                db.execute("UPDATE jobs SET target=? WHERE id=?", ("00" * 32, job["job_id"]))
+            corrupt = client.request("manifest", {"job_id": job["job_id"]})
+            assert corrupt["error"]["code"] == 112 and corrupt["result"] is None
+            with sqlite3.connect(config["database"]) as db:
+                db.execute("UPDATE jobs SET target=? WHERE id=?", (job["share_target"], job["job_id"]))
+            time.sleep(1.2)
+            assert client.request("status")["result"]["accounting_fault"]
+            assert client.request("getjob")["error"]["code"] == 112
+            print("PASS corrupted durable job commitment latches issuance pause after RPC refresh", flush=True)
+            with sqlite3.connect(config["database"]) as db:
+                db.execute("CREATE TRIGGER test_shutdown_fault BEFORE UPDATE ON sessions BEGIN SELECT RAISE(ABORT,'test shutdown fault'); END;")
+            stop()  # Workers must join and exit cleanly despite unavailable metadata writes.
+            print("PASS shutdown after accounting fault needs no successful metadata writes", flush=True)
         finally:
             stop()
             log.close()

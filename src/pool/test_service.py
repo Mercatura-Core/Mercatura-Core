@@ -41,6 +41,7 @@ class Fixture:
         self.bits = 0x207fffff
         self.transactions = []
         self.witness_commitment = "6a24aa21a9ed" + sha256d(bytes(64)).hex()
+        self.fail_submit = False
         self.submitted = []
         self.headers = {}
         self.active = {}
@@ -96,6 +97,8 @@ class Fixture:
                     fixture.submit_entered.set()
                     fixture.submit_release.wait(timeout=15)
                     result = "fixture-rejected"
+                    if fixture.fail_submit:
+                        error = {"code": -32601, "message": "fixture submission unavailable"}
                 elif method == "getblockheader":
                     if args[0] in fixture.headers:
                         result = fixture.headers[args[0]]

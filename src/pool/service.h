@@ -57,6 +57,7 @@ class Service
     bool m_stopping{false};
     bool m_accounting_failed{false};
     bool m_verifier_failed{false};
+    bool m_reconcile_failed{false};
     std::string m_reconcile_cursor;
     std::string m_health;
     std::map<int64_t, Session> m_sessions;

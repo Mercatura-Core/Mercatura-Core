@@ -160,8 +160,13 @@ Window Ledger::Pplns(int64_t cutoff, const Number& limit)
     auto q = Query("SELECT sequence,script,score FROM shares WHERE sequence<=? ORDER BY sequence DESC");
     q.Bind(1, cutoff);
     while (q.Row() && w.total < limit) {
-        const auto score = Number::Parse(q.Text(2));
-        if (score.Zero()) throw std::runtime_error("corrupt share score");
+        Number score;
+        try {
+            score = Number::Parse(q.Text(2));
+            if (score.Zero() || score > Number::PowerOfTwo(256)) throw std::runtime_error("corrupt share score");
+        } catch (const std::exception&) {
+            throw DatabaseError("corrupt durable share score");
+        }
         const auto used = std::min(score, limit - w.total);
         w.total += used;
         w.weights[q.Text(1)] += used;
