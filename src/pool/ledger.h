@@ -11,6 +11,11 @@
 #include <vector>
 
 namespace pool {
+class DatabaseError : public std::runtime_error
+{
+public:
+    using std::runtime_error::runtime_error;
+};
 class Statement
 {
     sqlite3_stmt* m_stmt{nullptr};

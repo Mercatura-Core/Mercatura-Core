@@ -33,7 +33,7 @@ const std::function<std::vector<const char*>()> G_TEST_COMMAND_LINE_ARGUMENTS{};
 const std::function<std::string()> G_TEST_GET_FULL_NAME{};
 
 namespace {
-pool::Job Fixture(bool transaction = false, const std::function<void(CMutableTransaction&)>& mutate = {}, int recipients = 3, bool warmup = false, unsigned char warmup_program = 1)
+pool::Job Fixture(bool transaction = false, const std::function<void(CMutableTransaction&)>& mutate = {}, int recipients = 3, bool warmup = false, unsigned char warmup_program = 1, const std::string& share_target = std::string(64, 'f'))
 {
     UniValue t{UniValue::VOBJ};
     t.pushKV("version", 0x20000000);
@@ -86,7 +86,7 @@ pool::Job Fixture(bool transaction = false, const std::function<void(CMutableTra
     w.oldest = warmup ? 0 : 1;
     w.oldest_used = pool::Number{warmup ? 0U : 1U};
     const auto limit{pool::WorkScore(pool::Number::Parse(target.GetHex(), true)) * pool::Number{2}};
-    return pool::BuildJob(t, w, warmup ? 0 : recipients, limit, "regtest", std::string(64, '2'), 1, 1, std::string(64, 'f'), 1700000000, 45, warmup);
+    return pool::BuildJob(t, w, warmup ? 0 : recipients, limit, "regtest", std::string(64, '2'), 1, 1, share_target, 1700000000, 45, warmup);
 }
 void Reseal(UniValue& job, UniValue& manifest)
 {
@@ -113,6 +113,19 @@ private Q_SLOTS:
     {
         QVERIFY2(QSslSocket::supportsSsl(), "Qt must include an operational TLS backend");
         QVERIFY(!QSslSocket::availableBackends().isEmpty());
+    }
+    void difficultyAdjustedJobs()
+    {
+        for (const auto& target : {std::string(64, 'f'), std::string{"003fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}, std::string{"0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}}) {
+            const auto fixture{Fixture(false, {}, 4, false, 1, target)};
+            const auto verified{Validate(fixture.Message(), fixture.manifest)};
+            QCOMPARE(verified.work.target.GetHex(), target);
+            auto altered{fixture.Message()};
+            altered.pushKV("share_target", fixture.network_target.GetHex());
+            QVERIFY_THROWS_EXCEPTION(std::exception, Validate(altered, fixture.manifest));
+            // Job target changes never alter the older immutable job/receipt basis.
+            QCOMPARE(Validate(fixture.Message(), fixture.manifest).work.target.GetHex(), target);
+        }
     }
     void rejectSelfConsistentInvalidTransactions()
     {

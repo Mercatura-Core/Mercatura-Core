@@ -40,6 +40,8 @@ Service::~Service() { Shutdown(); }
 void Service::Refresh()
 {
     const auto now = Now();
+    if (m_accounting_failed || m_verifier_failed) return; // RPC recovery cannot clear a local fault.
+    const bool was_healthy = m_healthy;
     // Stop issuing and accepting work when the authoritative node is not
     // reachable/current. Previously durable shares remain in the ledger.
     m_healthy = false;
@@ -55,6 +57,9 @@ void Service::Refresh()
     m_parent = parent;
     m_healthy = true;
     m_health = "ready";
+    if (!was_healthy)
+        for (auto& [id, s] : m_sessions)
+            s.difficulty.Reset();
     m_poll_time = now;
     for (auto it = m_jobs.begin(); it != m_jobs.end();) {
         if (it->second.expires <= now || it->second.block.hashPrevBlock.GetHex() != m_parent)
@@ -102,7 +107,11 @@ Job& Service::GetJob(int64_t session)
     auto old = m_jobs.find(s.latest);
     if (old != m_jobs.end() && old->second.block.hashPrevBlock.GetHex() == m_parent && old->second.expires > now && now - old->second.issued < m_cfg.refresh_seconds) return old->second;
     const auto network_target = TemplateTarget(m_template);
-    if (ParseTarget(s.target) < network_target) throw ProtocolError{CAPACITY, "assigned share target is harder than current network target"};
+    auto difficulty = s.difficulty;
+    // Only continuous live job service contributes observation time. Expired
+    // jobs and coordinator outages cannot earn an idle-time difficulty decrease.
+    if (now > s.observed_until) difficulty.Reset();
+    const auto target = difficulty.Next(m_cfg, ParseTarget(s.target), network_target, MonotonicSeconds()).GetHex();
     // Reserve room for all admitted identities, even if a tiny allocation is
     // zero now. No accepted identity is evicted to accommodate a later one.
     if (RequiredBlockBytes(m_template, m_db.IdentityCount()) > m_template["sizelimit"].getInt<uint64_t>()) throw ProtocolError{CAPACITY, "template cannot honor admitted payout identities"};
@@ -117,7 +126,7 @@ Job& Service::GetJob(int64_t session)
         window.weights[s.script] = Number{1};
     }
     const auto serial = m_db.Counter("job_namespace");
-    Job job = BuildJob(m_template, window, cutoff, limit, m_cfg.network, m_cfg.genesis, session, serial, s.target, now, m_cfg.lifetime_seconds, warmup);
+    Job job = BuildJob(m_template, window, cutoff, limit, m_cfg.network, m_cfg.genesis, session, serial, target, now, m_cfg.lifetime_seconds, warmup);
     // Ask normal Core proposal validation before publishing a finalized job.
     // Proposal mode deliberately skips PoW; actual solutions use submitblock.
     UniValue proposal{UniValue::VOBJ}, args{UniValue::VARR};
@@ -129,8 +138,13 @@ Job& Service::GetJob(int64_t session)
     auto snapshot = m_db.Query("INSERT OR IGNORE INTO snapshots VALUES(?,?)");
     snapshot.Bind(1, job.snapshot).Bind(2, job.snapshot_manifest.write()).Row();
     auto insert = m_db.Query("INSERT INTO jobs(id,serial,session,snapshot,parent,target,block,issued,expires,manifest) VALUES(?,?,?,?,?,?,?,?,?,?)");
-    insert.Bind(1, job.id).Bind(2, job.serial).Bind(3, job.session).Bind(4, job.snapshot).Bind(5, m_parent).Bind(6, s.target).Bind(7, BlockHex(job.block)).Bind(8, job.issued).Bind(9, job.expires).Bind(10, job.manifest.write()).Row();
+    insert.Bind(1, job.id).Bind(2, job.serial).Bind(3, job.session).Bind(4, job.snapshot).Bind(5, m_parent).Bind(6, target).Bind(7, BlockHex(job.block)).Bind(8, job.issued).Bind(9, job.expires).Bind(10, job.manifest.write()).Row();
+    auto assigned = m_db.Query("UPDATE sessions SET target=? WHERE id=?");
+    assigned.Bind(1, target).Bind(2, session).Row();
     tx.Commit();
+    s.target = target;
+    s.difficulty = std::move(difficulty);
+    s.observed_until = job.expires;
     s.latest = job.id;
     ++m_jobs_issued;
     // Keep one current job per connection. Older jobs remain durable and can
@@ -152,6 +166,7 @@ UniValue Service::Hello(int64_t& session, const std::string& ip, const UniValue&
     if (p["network"].get_str() != m_cfg.network || p["genesis"].get_str() != m_cfg.genesis) throw ProtocolError{IDENTITY, "network/genesis mismatch"};
     if (p["payout"].isNull() == p["resume_token"].isNull()) throw ProtocolError{MALFORMED, "specify payout or resume_token"};
     if (!m_healthy) throw ProtocolError{INTERNAL, "Core unavailable"};
+    if (m_sessions.size() >= m_cfg.max_sessions || std::count_if(m_sessions.begin(), m_sessions.end(), [&](const auto& item) { return item.second.ip == ip; }) >= static_cast<int64_t>(m_cfg.max_sessions_per_ip)) throw ProtocolError{CAPACITY, "concurrent session capacity reached"};
     int64_t id = 0;
     Session state;
     state.ip = ip;
@@ -192,7 +207,7 @@ UniValue Service::Hello(int64_t& session, const std::string& ip, const UniValue&
         known.Bind(1, state.script);
         const auto count = m_db.IdentityCount() + (!known.Row());
         if (count > m_cfg.payout_cap || RequiredBlockBytes(m_template, count) > m_template["sizelimit"].getInt<uint64_t>()) throw ProtocolError{CAPACITY, "payout admission exceeds recipient/template capacity"};
-        if (ParseTarget(state.target) < TemplateTarget(m_template)) throw ProtocolError{CAPACITY, "share target harder than network target"};
+        state.target = BoundTarget(m_cfg, ParseTarget(state.target), TemplateTarget(m_template)).GetHex();
         token = RandomToken();
         Transaction tx{m_db};
         if (!m_db.Register(state.script, ip, Now(), m_cfg.registration_window_seconds, m_cfg.new_identities_per_ip, m_cfg.new_identities_global, m_cfg.payout_cap)) throw ProtocolError{RATE, "new payout identity registration limit reached"};
@@ -271,6 +286,10 @@ std::optional<UniValue> Service::Handle(int64_t& session, const std::string& ip,
         auto duplicate = m_db.Query("SELECT status FROM submissions WHERE work=?");
         duplicate.Bind(1, work);
         if (duplicate.Row() && duplicate.Text(0) != "interrupted") {
+            // A lost ACK may be replayed while the old connection's hash is
+            // still running. A duplicate without a receipt must not make M4
+            // discard this recoverable request before its commit completes.
+            if (duplicate.Text(0) == "queued") throw ProtocolError{m_accounting_failed ? INTERNAL : OVERLOAD, "work awaits a durable receipt; retry the same submission"};
             auto q = m_db.Query("SELECT sequence FROM shares WHERE work=?");
             q.Bind(1, work);
             UniValue message = Failure(request.id, DUPLICATE, "work already submitted");
@@ -282,17 +301,30 @@ std::optional<UniValue> Service::Handle(int64_t& session, const std::string& ip,
             return message;
         }
         const auto received = Now();
-        if (!m_healthy || job.expires <= received || job.block.hashPrevBlock.GetHex() != m_parent) throw ProtocolError{STALE, "expired or stale parent job"};
+        if (!m_healthy) throw ProtocolError{INTERNAL, "coordinator unavailable; work paused"};
+        if (job.expires <= received || job.block.hashPrevBlock.GetHex() != m_parent) throw ProtocolError{STALE, "expired or stale parent job"};
         if (s.pending >= 2) throw ProtocolError{OVERLOAD, "session has two outstanding verification requests"};
+        const auto block_bytes = GetSerializeSize(TX_WITH_WITNESS(job.block));
+        const auto block_budget = m_cfg.pending_block_memory_mib * 1024 * 1024;
+        if (block_bytes > block_budget || m_pending_block_bytes > block_budget - block_bytes) {
+            for (auto& [id, state] : m_sessions)
+                state.difficulty.Overloaded();
+            throw ProtocolError{OVERLOAD, "pending block memory budget is full"};
+        }
         auto verification = m_verifier.Submit(job.block);
-        if (!verification) throw ProtocolError{OVERLOAD, "verification queue is full"};
+        if (!verification) {
+            for (auto& [id, state] : m_sessions)
+                state.difficulty.Overloaded();
+            throw ProtocolError{OVERLOAD, "verification queue is full"};
+        }
         auto persist = m_db.Query("INSERT INTO submissions VALUES(?,?,?,?,?,?) ON CONFLICT(work) DO UPDATE SET status='queued',received=excluded.received WHERE submissions.status='interrupted'");
         persist.Bind(1, work).Bind(2, job.id).Bind(3, session).Bind(4, static_cast<int64_t>(nonce)).Bind(5, "queued").Bind(6, received).Row();
         // Verification needs exact public block state, not copies of the
         // template and accounting JSON. The originals are already durable.
         job.manifest.setNull();
         job.snapshot_manifest.setNull();
-        m_pending.emplace(work, Pending{request.id, std::move(job), work, std::move(*verification), received, s.connection});
+        m_pending.emplace(work, Pending{request.id, std::move(job), work, std::move(*verification), received, s.connection, block_bytes});
+        m_pending_block_bytes += block_bytes;
         ++s.pending;
         return {};
     } catch (const ProtocolError& error) {
@@ -300,13 +332,24 @@ std::optional<UniValue> Service::Handle(int64_t& session, const std::string& ip,
         if (request.method == "submit") {
             ++m_rejected;
             if (error.code == STALE) ++m_stale;
+            if (error.code == OVERLOAD) ++m_overload;
+            if (error.code == OVERLOAD && m_sessions.contains(session)) m_sessions.at(session).difficulty.Overloaded();
         }
         return Failure(request.id, error.code, error.what());
     } catch (const UniValue::type_error&) {
         ++m_request_errors;
         if (request.method == "submit") ++m_rejected;
         return Failure(request.id, MALFORMED, "field type or integer range invalid");
+    } catch (const DatabaseError&) {
+        m_accounting_failed = true;
+        m_healthy = false;
+        m_health = "accounting error; restart required after storage recovery";
+        ++m_request_errors;
+        if (request.method == "submit") ++m_rejected;
+        return Failure(request.id, INTERNAL, "durable accounting failed; work paused");
     } catch (const std::exception&) {
+        m_healthy = false;
+        m_health = "coordinator operation failed; work paused";
         ++m_request_errors;
         if (request.method == "submit") ++m_rejected;
         return Failure(request.id, INTERNAL, "coordinator operation failed");
@@ -335,7 +378,7 @@ std::vector<Response> Service::Tick()
             Refresh();
         } catch (const std::exception&) {
             m_healthy = false;
-            m_health = "Core unavailable; work paused";
+            if (!m_accounting_failed) m_health = "Core unavailable; work paused";
             m_poll_time = Now();
         }
         if (m_parent != old)
@@ -353,10 +396,12 @@ std::vector<Response> Service::Tick()
             continue;
         }
         auto result = p.verification.get();
+        m_pending_block_bytes -= p.block_bytes;
         UniValue reply;
         const auto session = p.job.session;
         if (auto s = m_sessions.find(session); s != m_sessions.end() && s->second.pending) --s->second.pending;
         try {
+            if (m_accounting_failed) throw DatabaseError("accounting fault latched");
             const auto hash = UintToArith256(result.hash);
             const bool candidate = !result.cancelled && result.error.empty() && hash <= p.job.network_target;
             int error = 0;
@@ -367,6 +412,9 @@ std::vector<Response> Service::Tick()
             } else if (!result.error.empty()) {
                 error = INTERNAL;
                 message = result.error;
+                m_verifier_failed = true;
+                m_healthy = false;
+                m_health = "verification failed; restart required";
             } else if (p.job.block.hashPrevBlock.GetHex() != m_parent || p.job.expires <= p.received) {
                 error = STALE;
                 message = "job parent became stale during verification";
@@ -403,13 +451,15 @@ std::vector<Response> Service::Tick()
                 if (auto s = m_sessions.find(session); s != m_sessions.end() && s->second.connection == p.connection) {
                     ++s->second.accepted;
                     s->second.work += score;
+                    s->second.difficulty.Accepted(score);
                 }
                 reply = Success(p.request, Receipt(p.work, sequence, p.job, candidate));
                 if (candidate) m_reconcile_time = 0;
             }
         } catch (const std::exception&) {
+            m_accounting_failed = true;
             m_healthy = false;
-            m_health = "accounting error; work paused";
+            m_health = "accounting error; restart required after storage recovery";
             reply = Failure(p.request, INTERNAL, "durable accounting failed; acceptance not acknowledged");
         }
         // A resumed namespace must not receive an old connection's request ID.
@@ -417,10 +467,15 @@ std::vector<Response> Service::Tick()
         if (auto s = m_sessions.find(session); s != m_sessions.end() && s->second.connection == p.connection) replies.push_back({session, std::move(reply)});
         it = m_pending.erase(it);
     }
-    if (!m_stopping && Now() - m_reconcile_time >= m_cfg.reconcile_seconds) {
+    if (!m_stopping && !m_accounting_failed && Now() - m_reconcile_time >= m_cfg.reconcile_seconds) {
         try {
             Reconcile();
+        } catch (const DatabaseError&) {
+            m_accounting_failed = true;
+            m_healthy = false;
+            m_health = "accounting error; restart required after storage recovery";
         } catch (const std::exception&) {
+            m_healthy = false;
             m_health = "chain reconciliation unavailable";
         }
         m_reconcile_time = Now();
@@ -429,8 +484,7 @@ std::vector<Response> Service::Tick()
 }
 void Service::Reconcile()
 {
-    auto q = m_db.Query("SELECT hash,job,block,state,ever_active FROM candidates ORDER BY created");
-    while (q.Row()) {
+    auto reconcile = [&](Statement& q) {
         const auto hash = q.Text(0);
         std::string state = q.Text(3);
         const bool ever = q.Integer(4) != 0;
@@ -469,6 +523,28 @@ void Service::Reconcile()
             event.Bind(1, hash).Bind(2, state).Bind(3, Now()).Row();
         }
         tx.Commit();
+    };
+    // Submit newly verified solutions before walking retained chain history.
+    // Both scans use indexes; total RPC work per pass is bounded by the batch.
+    size_t visited = 0;
+    auto fresh = m_db.Query("SELECT hash,job,block,state,ever_active FROM candidates WHERE state='discovered' ORDER BY hash LIMIT ?");
+    fresh.Bind(1, static_cast<int64_t>(m_cfg.reconcile_batch));
+    while (fresh.Row()) {
+        reconcile(fresh);
+        ++visited;
+    }
+    for (int pass = 0; pass < 2 && visited < m_cfg.reconcile_batch; ++pass) {
+        auto history = m_db.Query("SELECT hash,job,block,state,ever_active FROM candidates WHERE hash>? AND state!='discovered' ORDER BY hash LIMIT ?");
+        history.Bind(1, m_reconcile_cursor).Bind(2, static_cast<int64_t>(m_cfg.reconcile_batch - visited));
+        bool found = false;
+        while (history.Row()) {
+            found = true;
+            reconcile(history);
+            m_reconcile_cursor = history.Text(0);
+            ++visited;
+        }
+        if (found || m_reconcile_cursor.empty()) break;
+        m_reconcile_cursor.clear();
     }
 }
 void Service::Disconnect(int64_t session)
@@ -510,12 +586,19 @@ UniValue Service::Stats()
     o.pushKV("rejected_share_requests_since_start", m_rejected);
     o.pushKV("stale_share_requests_since_start", m_stale);
     o.pushKV("request_errors_since_start", m_request_errors);
+    o.pushKV("overload_share_requests_since_start", m_overload);
+    o.pushKV("accounting_fault", m_accounting_failed);
+    o.pushKV("verification_fault", m_verifier_failed);
+    o.pushKV("vardiff", m_cfg.vardiff);
+    o.pushKV("share_interval_seconds", m_cfg.share_interval_seconds);
     auto q = m_db.Query("SELECT COUNT(*) FROM shares");
     q.Row();
     o.pushKV("accepted_shares", q.Integer(0));
     o.pushKV("assigned_target", m_cfg.share_target);
     o.pushKV("assigned_work_score", WorkScore(Number::Parse(m_cfg.share_target, true)).Decimal());
     o.pushKV("verification_queue_depth", static_cast<uint64_t>(m_verifier.Depth()));
+    o.pushKV("pending_block_bytes", static_cast<uint64_t>(m_pending_block_bytes));
+    o.pushKV("pending_block_budget_bytes", static_cast<uint64_t>(m_cfg.pending_block_memory_mib * 1024 * 1024));
     o.pushKV("verification_workers", static_cast<uint64_t>(m_cfg.verifier_workers));
     o.pushKV("verification_completed", m_verifier.completed.load());
     const auto duration = std::max<int64_t>(1, Now() - m_started);

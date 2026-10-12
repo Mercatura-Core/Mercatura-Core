@@ -38,6 +38,9 @@ class Fixture:
     def __init__(self):
         self.parent = "11" * 32
         self.height = 1
+        self.bits = 0x207fffff
+        self.transactions = []
+        self.witness_commitment = "6a24aa21a9ed" + sha256d(bytes(64)).hex()
         self.submitted = []
         self.headers = {}
         self.active = {}
@@ -76,12 +79,12 @@ class Fixture:
                         result = None  # Schema fixture only; never real validation.
                     else:
                         result = {"version": 0x20000000, "height": fixture.height,
-                                  "previousblockhash": fixture.parent, "bits": "207fffff",
-                                  "target": f"{0x7fffff << 232:064x}",
+                                  "previousblockhash": fixture.parent, "bits": f"{fixture.bits:08x}",
+                                  "target": f"{(fixture.bits & 0x7fffff) << (8 * ((fixture.bits >> 24) - 3)):064x}",
                                   "curtime": int(time.time()), "mintime": int(time.time()) - 1,
-                                  "coinbasevalue": 100000, "coinbaseaux": {}, "transactions": [],
+                                  "coinbasevalue": 100000, "coinbaseaux": {}, "transactions": fixture.transactions,
                                   "sizelimit": 1048576, "sigoplimit": 80000,
-                                  "default_witness_commitment": "6a24aa21a9ed" + sha256d(bytes(64)).hex()}
+                                  "default_witness_commitment": fixture.witness_commitment}
                 elif method == "validateaddress":
                     address = args[0]
                     if address in {"fixture-pq-1", "fixture-pq-2", "fixture-pq-3", "fixture-pq-4"}:
@@ -174,7 +177,7 @@ def run(binary):
                   "rpc_url": f"http://127.0.0.1:{fixture.server.server_port}/",
                   "rpc_user": "fixture", "rpc_password": "fixture-secret",
                   "database": str(root / "pool.sqlite"), "port": port(), "plaintext_regtest": True,
-                  "share_target": "ff" * 32, "refresh_seconds": 1, "lifetime_seconds": 30,
+                  "vardiff": False, "share_target": "ff" * 32, "refresh_seconds": 1, "lifetime_seconds": 30,
                   "payout_cap": 3, "reconcile_seconds": 1, "messages_per_session": 1000,
                   "messages_per_ip": 10000, "warmup": False}
         path = root / "config.json"

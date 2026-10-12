@@ -77,6 +77,20 @@ public:
         OPENSSL_free(p);
         return s;
     }
+    std::string Hex256() const
+    {
+        if (BN_num_bits(m_value.get()) > 256) throw std::overflow_error("integer exceeds 256 bits");
+        unsigned char bytes[32]{};
+        if (BN_bn2binpad(m_value.get(), bytes, 32) != 32) throw std::runtime_error("integer conversion failed");
+        constexpr char digits[]{"0123456789abcdef"};
+        std::string hex;
+        hex.reserve(64);
+        for (unsigned char b : bytes) {
+            hex += digits[b >> 4];
+            hex += digits[b & 15];
+        }
+        return hex;
+    }
     uint64_t Uint64() const
     {
         if (BN_num_bits(m_value.get()) > 64) throw std::overflow_error("integer exceeds uint64");

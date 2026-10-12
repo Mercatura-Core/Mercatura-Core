@@ -4,6 +4,7 @@
 #define BITCOIN_POOL_SERVICE_H
 
 #include <pool/config.h>
+#include <pool/difficulty.h>
 #include <pool/job.h>
 #include <pool/ledger.h>
 #include <pool/protocol.h>
@@ -30,6 +31,8 @@ class Service
         Number work;
         int64_t started{0};
         uint64_t connection{0};
+        Difficulty difficulty;
+        int64_t observed_until{0};
     };
     struct Pending {
         int64_t request;
@@ -38,6 +41,7 @@ class Service
         std::future<Verification> verification;
         int64_t received;
         uint64_t connection;
+        size_t block_bytes;
     };
     Config m_cfg;
     Rpc m_rpc;
@@ -51,6 +55,9 @@ class Service
     int64_t m_reconcile_time{0};
     bool m_healthy{false};
     bool m_stopping{false};
+    bool m_accounting_failed{false};
+    bool m_verifier_failed{false};
+    std::string m_reconcile_cursor;
     std::string m_health;
     std::map<int64_t, Session> m_sessions;
     std::map<std::string, Pending> m_pending;
@@ -60,6 +67,8 @@ class Service
     uint64_t m_stale{0};
     uint64_t m_jobs_issued{0};
     uint64_t m_connections{0};
+    uint64_t m_overload{0};
+    size_t m_pending_block_bytes{0};
     void Refresh();
     void Reconcile();
     Job& GetJob(int64_t session);

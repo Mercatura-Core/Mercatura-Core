@@ -85,7 +85,7 @@ class MercaturaPoolCoordinatorTest(BitcoinTestFramework):
         config = {"network": "regtest", "genesis": node.getblockhash(0),
                   "rpc_url": f"http://127.0.0.1:{url.port}/", "rpc_user": user, "rpc_password": password,
                   "database": str(database), "port": port, "plaintext_regtest": True, "warmup": True,
-                  "share_target": "ff" * 32, "refresh_seconds": 1, "lifetime_seconds": 120,
+                  "vardiff": False, "share_target": "ff" * 32, "refresh_seconds": 1, "lifetime_seconds": 120,
                   "reconcile_seconds": 1}
         configuration = root / "m3-pool.json"
         configuration.write_text(json.dumps(config))

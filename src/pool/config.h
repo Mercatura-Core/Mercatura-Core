@@ -25,7 +25,14 @@ struct Config {
     std::string tls_key;
     bool plaintext_regtest{false};
     bool warmup{false};
-    std::string share_target{"7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
+    std::string share_target{"003fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
+    bool vardiff{true};
+    std::string share_min_target{"0000000000000000000000000000000000000000000000000000000000000001"};
+    std::string share_max_target{"0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"};
+    int64_t share_interval_seconds{150};
+    int64_t vardiff_min_seconds{60};
+    int64_t vardiff_window_seconds{600};
+    size_t reconcile_batch{16};
     unsigned int window_blocks{2};
     size_t payout_cap{1000};
     int64_t refresh_seconds{15};
@@ -33,6 +40,7 @@ struct Config {
     size_t verifier_workers{1};
     size_t verifier_queue{16};
     size_t verifier_memory_mib{160};
+    size_t pending_block_memory_mib{64};
     size_t max_sessions{128};
     size_t max_sessions_per_ip{16};
     size_t messages_per_session{20};

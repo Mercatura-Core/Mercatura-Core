@@ -143,6 +143,9 @@ class FaultPool:
                                     break  # Persist acceptance, deliberately lose the ACK.
                                 if scenario == "duplicate" or duplicate:
                                     error = {"code": 108, "message": "duplicate"}
+                                elif scenario == "internal" and not self.resume:
+                                    error = {"code": 112, "message": "fixture accounting pause"}
+                                    receipt = None
                                 elif scenario in ("stale", "rejected"):
                                     error = {"code": 107 if scenario == "stale" else 109, "message": "fixture refusal"}
                                     receipt = None
@@ -234,7 +237,7 @@ class MercaturaPoolNativeTest(BitcoinTestFramework):
         config = {"network": "regtest", "genesis": genesis, "rpc_url": f"http://127.0.0.1:{url.port}/",
                   "rpc_user": user, "rpc_password": password, "database": str(root / "m4.sqlite"), "port": port,
                   "tls_certificate": str(certificate), "tls_key": str(key), "warmup": True,
-                  "share_target": "ff" * 32, "refresh_seconds": 1, "lifetime_seconds": 120}
+                  "vardiff": False, "share_target": "ff" * 32, "refresh_seconds": 1, "lifetime_seconds": 120}
         configuration = root / "pool.json"
         configuration.write_text(json.dumps(config))
         configuration.chmod(0o600)
@@ -286,7 +289,7 @@ class MercaturaPoolNativeTest(BitcoinTestFramework):
             clients.clear()
 
             invalid_scenarios = ("version", "network", "clock", "out_of_order", "malformed", "oversized", "unknown_notification", "excessive_rate", "invalid_job", "expired_job")
-            for scenario in (*invalid_scenarios, "reused_namespace", "duplicate", "stale", "rejected", "resume", "resume_rejected", "fragmented", "truncated"):
+            for scenario in (*invalid_scenarios, "reused_namespace", "duplicate", "stale", "rejected", "resume", "resume_rejected", "internal", "fragmented", "truncated"):
                 fixture = FaultPool(certificate, key, genesis, job, manifest, scenario)
                 try:
                     observed = result(native(fixture.port, seconds=5 if scenario.startswith("resume") else 3))
@@ -302,7 +305,7 @@ class MercaturaPoolNativeTest(BitcoinTestFramework):
                         assert observed["stale"] > 0
                     elif scenario == "rejected":
                         assert observed["rejected"] > 0
-                    elif scenario == "resume":
+                    elif scenario in ("resume", "internal"):
                         assert fixture.resume
                         assert observed["accepted"] > 0
                         assert observed["connections"] >= 2

@@ -54,6 +54,13 @@ Config Config::Load(const std::string& path)
     str("tls_certificate", cfg.tls_certificate);
     str("tls_key", cfg.tls_key);
     str("share_target", cfg.share_target);
+    str("share_min_target", cfg.share_min_target);
+    str("share_max_target", cfg.share_max_target);
+    boolean("vardiff", cfg.vardiff);
+    number("share_interval_seconds", cfg.share_interval_seconds);
+    number("vardiff_min_seconds", cfg.vardiff_min_seconds);
+    number("vardiff_window_seconds", cfg.vardiff_window_seconds);
+    number("reconcile_batch", cfg.reconcile_batch);
     number("port", cfg.port);
     number("window_blocks", cfg.window_blocks);
     number("payout_cap", cfg.payout_cap);
@@ -62,6 +69,7 @@ Config Config::Load(const std::string& path)
     number("verifier_workers", cfg.verifier_workers);
     number("verifier_queue", cfg.verifier_queue);
     number("verifier_memory_mib", cfg.verifier_memory_mib);
+    number("pending_block_memory_mib", cfg.pending_block_memory_mib);
     number("max_sessions", cfg.max_sessions);
     number("max_sessions_per_ip", cfg.max_sessions_per_ip);
     number("messages_per_session", cfg.messages_per_session);
@@ -92,10 +100,14 @@ void Config::Validate() const
     if (network != "main" && network != "test" && network != "regtest") throw std::invalid_argument("supported networks: main, test, regtest");
     ParseTarget(genesis);
     ParseTarget(share_target);
+    if (ParseTarget(share_target) == 0 || ParseTarget(share_min_target) == 0 || ParseTarget(share_min_target) > ParseTarget(share_max_target)) throw std::invalid_argument("invalid share target bounds");
+    if (vardiff && (ParseTarget(share_target) < ParseTarget(share_min_target) || ParseTarget(share_target) > ParseTarget(share_max_target))) throw std::invalid_argument("initial share target outside VarDiff bounds");
+    if (share_interval_seconds < 30 || share_interval_seconds > 3600 || vardiff_min_seconds < 30 || vardiff_min_seconds > vardiff_window_seconds || vardiff_window_seconds < share_interval_seconds || vardiff_window_seconds > 86400 || reconcile_batch == 0 || reconcile_batch > 128) throw std::invalid_argument("invalid difficulty/reconciliation cadence");
     if (rpc_cookie.empty() == rpc_user.empty() || (!rpc_user.empty() && rpc_password.empty())) throw std::invalid_argument("configure exactly one RPC authentication method");
     if (database.empty() || port == 0 || window_blocks == 0 || window_blocks > 100 || payout_cap == 0 || payout_cap > 1000) throw std::invalid_argument("invalid accounting/listener configuration");
     if (refresh_seconds < 1 || refresh_seconds > 3600 || lifetime_seconds < refresh_seconds || lifetime_seconds > 7200) throw std::invalid_argument("invalid job cadence/lifetime");
     if (verifier_workers == 0 || verifier_workers > 64 || verifier_queue == 0 || verifier_queue > 4096 || verifier_memory_mib < verifier_workers * 160) throw std::invalid_argument("verification memory/queue budget invalid");
+    if (pending_block_memory_mib == 0 || pending_block_memory_mib > 1024) throw std::invalid_argument("invalid pending block memory budget");
     if (max_sessions == 0 || max_sessions > 1024 || max_sessions_per_ip == 0 || max_sessions_per_ip > max_sessions || messages_per_session == 0 || messages_per_ip == 0 || messages_per_session > 10000 || messages_per_ip > 100000) throw std::invalid_argument("invalid session/rate bounds");
     if (max_message_bytes < 512 || max_message_bytes > 65536 || max_output_bytes < 65536 || max_output_bytes > 16 * 1024 * 1024 || heartbeat_seconds < 5 || heartbeat_seconds > 3600 || reconcile_seconds < 1 || reconcile_seconds > 3600 || rpc_timeout_seconds < 1 || rpc_timeout_seconds > 60) throw std::invalid_argument("invalid I/O bounds");
     if (stats_seconds > 86400) throw std::invalid_argument("invalid statistics log cadence");

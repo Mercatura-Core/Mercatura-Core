@@ -748,12 +748,13 @@ SubmissionResult PoolWorkProvider::Submit(const MiningJob& work, const CBlockHea
             ++m_state->stats.duplicates;
             return {true, false, "Pool returned the original accepted receipt"};
         }
-        if (error.code == 110 || error.code == 111 || error.code == 113) {
+        if (error.code == 110 || error.code == 111 || error.code == 112 || error.code == 113) {
             m_replay = saved;
             Disconnect();
             m_retry = Clock::now() + std::chrono::seconds{2};
-            Status("Pool verifier busy; work paused before retrying the share");
-            return {false, false, "Pool verifier busy"};
+            const auto message{error.code == 112 ? "Pool service unavailable; work paused before retrying the share" : "Pool verifier busy; work paused before retrying the share"};
+            Status(message);
+            return {false, false, message};
         }
         std::lock_guard lock{m_state->mutex};
         if (error.code == 107) {

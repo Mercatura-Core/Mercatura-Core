@@ -8,6 +8,7 @@
   "port": 19444,
   "plaintext_regtest": true,
   "warmup": false,
+  "vardiff": false,
   "share_target": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
   "window_blocks": 2,
   "payout_cap": 1000,

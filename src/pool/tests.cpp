@@ -5,6 +5,7 @@
 #include <openssl/ssl.h>
 #include <pool/accounting.h>
 #include <pool/config.h>
+#include <pool/difficulty.h>
 #include <pool/job.h>
 #include <pool/ledger.h>
 #include <pool/protocol.h>
@@ -103,6 +104,92 @@ void Scores()
     }
     auto giant = Number::PowerOfTwo(256) * Number{UINT64_MAX};
     Check(giant / Number{UINT64_MAX} == Number::PowerOfTwo(256), "wide cumulative intermediate");
+}
+void AdaptiveDifficulty()
+{
+    Config cfg;
+    const auto network = arith_uint256{1};
+    const auto initial = ParseTarget(cfg.share_target);
+    const auto score = [](const arith_uint256& t) { return WorkScore(Number::Parse(t.GetHex(), true)); };
+    Check(score(initial) == Number{1024}, "safe initial share probability 1/1024");
+    Check(cfg.payout_cap == 1000, "lifetime identity policy unchanged");
+    Difficulty fast;
+    Check(fast.Next(cfg, initial, network, 0) == initial, "first job starts observation without easing");
+    for (int i = 0; i < 20; ++i)
+        fast.Accepted(Number{1024});
+    Check(fast.Next(cfg, initial, network, 59) == initial, "burst cannot bypass minimum observation window");
+    const auto harder = fast.Next(cfg, initial, network, 60);
+    Check(score(harder) == Number{2048}, "high speed bounded to twofold difficulty increase");
+    Difficulty moderate;
+    moderate.Next(cfg, initial, network, 0);
+    for (int i = 0; i < 4; ++i)
+        moderate.Accepted(Number{1024});
+    Check(moderate.Next(cfg, initial, network, 600) == initial, "target-rate work lies within hysteresis");
+    Difficulty slow;
+    slow.Next(cfg, initial, network, 0);
+    Check(slow.Next(cfg, initial, network, 599) == initial, "zero shares require full timeout window");
+    auto easier = slow.Next(cfg, initial, network, 600);
+    Check(score(easier) == Number{512}, "no-share window eases by at most twofold");
+    for (int64_t now = 1200; now <= 7200; now += 600)
+        easier = slow.Next(cfg, easier, network, now);
+    Check(easier == ParseTarget(cfg.share_max_target), "slow/no-hash miner reaches configured easiest bound");
+    Check(score(easier) == Number{16}, "easiest bound prevents reconnect flood");
+    slow.Reset();
+    Check(slow.Next(cfg, easier, network, 100000) == easier, "reconnect retains target and starts new observation");
+    Difficulty stalled;
+    stalled.Next(cfg, initial, network, 100);
+    Check(stalled.Next(cfg, initial, network, 100000) == initial, "long reactor stall cannot ease difficulty");
+    Check(stalled.Next(cfg, initial, network, 99) == initial, "clock rollback resets safely");
+    Check(BoundTarget(cfg, arith_uint256{}, network) == network, "zero target clamps to network floor");
+    const auto easy_network = ParseTarget(std::string(64, 'f'));
+    Check(BoundTarget(cfg, initial, easy_network) == easy_network, "network floor overrides operator bounds");
+    Check(BoundTarget(cfg, easy_network, network) == ParseTarget(cfg.share_max_target), "legacy easy session bounded on next job");
+    Throws([&] { slow.Accepted(Number::PowerOfTwo(257)); }, "unbounded score refused");
+    Throws([] { Number::PowerOfTwo(256).Hex256(); }, "257-bit target conversion rejected");
+    Check(Number::Parse(std::string(64, 'f'), true).Hex256() == std::string(64, 'f'), "256-bit maximum round trip");
+    // Deterministic accepted-work arrivals for slow CPU, workstation and GPU.
+    for (uint64_t hashrate : {1, 8, 10000}) {
+        Difficulty estimator;
+        auto target = initial;
+        estimator.Next(cfg, target, network, 0);
+        uint64_t accumulated = 0;
+        for (int64_t now = 1; now <= 12000; ++now) {
+            accumulated += hashrate;
+            const auto assigned = score(target).Uint64();
+            while (accumulated >= assigned) {
+                accumulated -= assigned;
+                estimator.Accepted(Number{assigned});
+            }
+            const auto next = estimator.Next(cfg, target, network, now);
+            Check(next >= network && next >= ParseTarget(cfg.share_min_target) && next <= ParseTarget(cfg.share_max_target), "simulation targets bounded");
+            target = next;
+        }
+        const auto expected = hashrate * static_cast<uint64_t>(cfg.share_interval_seconds);
+        Check(score(target).Uint64() >= expected * 3 / 4 && score(target).Uint64() <= expected * 5 / 4, "cohort converges within hysteresis of 150-second work");
+    }
+    std::vector<Share> mixed{{2, Script(2), score(harder)}, {1, Script(1), score(initial)}};
+    const auto window = SelectWindow(mixed, 2, Number{10000});
+    Check(window.weights.at(Script(1)) == Number{1024} && window.weights.at(Script(2)) == Number{2048}, "exact PPLNS weights across target changes");
+    // Full-width products and target conversion at the hardest positive bound.
+    Difficulty extreme;
+    auto tiny = arith_uint256{1};
+    extreme.Next(cfg, tiny, network, 0);
+    for (int i = 0; i < 4; ++i)
+        extreme.Accepted(Number::PowerOfTwo(255));
+    Check(extreme.Next(cfg, tiny, network, 60) == tiny, "wide estimate cannot overflow or exclude block at network floor");
+    Difficulty quantized;
+    quantized.Next(cfg, arith_uint256{4}, network, 0);
+    for (int i = 0; i < 20; ++i)
+        quantized.Accepted(score(arith_uint256{4}));
+    Check(quantized.Next(cfg, arith_uint256{4}, network, 60) == arith_uint256{2}, "very hard targets respect exact twofold expected-work bound");
+    Difficulty overload;
+    overload.Next(cfg, initial, network, 0);
+    overload.Overloaded();
+    Check(overload.Next(cfg, initial, network, 600) == initial, "overload cannot ease difficulty from biased accepted-work sample");
+    for (int i = 0; i < 20; ++i)
+        overload.Accepted(Number{1024});
+    overload.Overloaded();
+    Check(score(overload.Next(cfg, initial, network, 660)) == Number{2048}, "accepted work can harden difficulty during overload");
 }
 void Windows()
 {
@@ -444,6 +531,8 @@ void ServiceLifecycle(const std::string& config_file)
     cfg.refresh_seconds = 1;
     cfg.lifetime_seconds = 3;
     cfg.warmup = true;
+    cfg.max_sessions = 1;
+    cfg.max_sessions_per_ip = 1;
     Service service{cfg};
     int64_t session = 0;
     UniValue hello{UniValue::VOBJ};
@@ -454,6 +543,9 @@ void ServiceLifecycle(const std::string& config_file)
     hello.pushKV("payout", "fixture-pq-1");
     auto connected = service.Handle(session, "127.0.0.1", {1, "hello", hello});
     Check(connected && (*connected)["error"].isNull(), "lifecycle session established");
+    int64_t refused_session = 0;
+    auto capacity = service.Handle(refused_session, "127.0.0.2", {2, "hello", hello});
+    Check(capacity && (*capacity)["error"]["code"].getInt<int>() == CAPACITY && refused_session == 0, "service enforces concurrent session capacity before registration");
     auto job = service.Handle(session, "127.0.0.1", {2, "getjob", UniValue{UniValue::VOBJ}});
     Check(job && (*job)["result"]["warmup"].get_bool(), "job explicitly discloses individual warmup");
     const auto job_id = (*job)["result"]["job_id"].get_str();
@@ -464,6 +556,8 @@ void ServiceLifecycle(const std::string& config_file)
         return service.Handle(session, "127.0.0.1", {request, "submit", params});
     };
     Check(!submit(3, 0) && !submit(4, 1), "two actual hashes queued before reactor completion");
+    auto awaiting = submit(5, 0);
+    Check(awaiting && (*awaiting)["error"]["code"].getInt<int>() == OVERLOAD, "pending duplicate requests retry until durable receipt exists");
     const auto old = session;
     service.Disconnect(session);
     session = 0;
@@ -573,7 +667,7 @@ int main(int argc, char** argv)
         }
     }
     size_t failures = 0;
-    for (const auto& [name, run] : std::vector<std::pair<std::string, std::function<void()>>>{{"work scores", Scores}, {"PPLNS windows", Windows}, {"reward conservation", Rounding}, {"PQ coinbases", Coinbases}, {"SQLite recovery", Persistence}, {"durable registration limits", Registration}, {"protocol and TLS", ProtocolAndTls}, {"native MercaHash verifier", NativeVerifier}}) {
+    for (const auto& [name, run] : std::vector<std::pair<std::string, std::function<void()>>>{{"work scores", Scores}, {"adaptive share difficulty", AdaptiveDifficulty}, {"PPLNS windows", Windows}, {"reward conservation", Rounding}, {"PQ coinbases", Coinbases}, {"SQLite recovery", Persistence}, {"durable registration limits", Registration}, {"protocol and TLS", ProtocolAndTls}, {"native MercaHash verifier", NativeVerifier}}) {
         try {
             run();
             std::cout << "PASS " << name << "\n";

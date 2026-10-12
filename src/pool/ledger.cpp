@@ -14,7 +14,7 @@ namespace pool {
 namespace {
 void CheckSql(sqlite3* db, int result)
 {
-    if (result != SQLITE_OK) throw std::runtime_error(std::string{"SQLite: "} + sqlite3_errmsg(db));
+    if (result != SQLITE_OK) throw DatabaseError(std::string{"SQLite: "} + sqlite3_errmsg(db));
 }
 } // namespace
 struct Ledger::Lock {
@@ -89,10 +89,13 @@ Ledger::Ledger(const std::string& path, const std::string& network, const std::s
              "CREATE INDEX IF NOT EXISTS session_registrations_time ON session_registrations(created);"
              "CREATE TABLE IF NOT EXISTS snapshots(id TEXT PRIMARY KEY,manifest TEXT NOT NULL);"
              "CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,serial INTEGER UNIQUE NOT NULL,session INTEGER NOT NULL REFERENCES sessions(id),snapshot TEXT NOT NULL REFERENCES snapshots(id),parent TEXT NOT NULL,target TEXT NOT NULL,block TEXT NOT NULL,issued INTEGER NOT NULL,expires INTEGER NOT NULL,manifest TEXT NOT NULL);"
+             "CREATE INDEX IF NOT EXISTS jobs_session_serial ON jobs(session,serial);"
              "CREATE TABLE IF NOT EXISTS submissions(work TEXT PRIMARY KEY,job TEXT NOT NULL REFERENCES jobs(id),session INTEGER NOT NULL REFERENCES sessions(id),nonce INTEGER NOT NULL,status TEXT NOT NULL,received INTEGER NOT NULL);"
              "CREATE TABLE IF NOT EXISTS shares(sequence INTEGER PRIMARY KEY AUTOINCREMENT,work TEXT UNIQUE NOT NULL REFERENCES submissions(work),job TEXT NOT NULL REFERENCES jobs(id),session INTEGER NOT NULL REFERENCES sessions(id),script TEXT NOT NULL REFERENCES identities(script),score TEXT NOT NULL,accepted INTEGER NOT NULL);"
              "CREATE INDEX IF NOT EXISTS shares_identity ON shares(script,sequence);"
+             "CREATE INDEX IF NOT EXISTS shares_accepted ON shares(accepted);"
              "CREATE TABLE IF NOT EXISTS candidates(hash TEXT PRIMARY KEY,job TEXT NOT NULL REFERENCES jobs(id),snapshot TEXT NOT NULL REFERENCES snapshots(id),block TEXT NOT NULL,state TEXT NOT NULL,created INTEGER NOT NULL,rpc_result TEXT NOT NULL DEFAULT '',confirmations INTEGER NOT NULL DEFAULT 0,reconciled INTEGER NOT NULL DEFAULT 0,ever_active INTEGER NOT NULL DEFAULT 0);"
+             "CREATE INDEX IF NOT EXISTS candidates_state_hash ON candidates(state,hash);"
              "CREATE TABLE IF NOT EXISTS events(sequence INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL,identity TEXT NOT NULL,detail TEXT NOT NULL,time INTEGER NOT NULL);"
              "PRAGMA user_version=2;");
         for (const auto& [key, value] : std::vector<std::pair<std::string, std::string>>{{"network", network}, {"genesis", genesis}, {"accounting", "1"}, {"policy", policy}}) {
@@ -123,7 +126,7 @@ void Ledger::Exec(const std::string& sql)
     int r = sqlite3_exec(m_db, sql.c_str(), nullptr, nullptr, &error);
     std::string detail = error ? error : "";
     sqlite3_free(error);
-    if (r != SQLITE_OK) throw std::runtime_error("SQLite: " + detail);
+    if (r != SQLITE_OK) throw DatabaseError("SQLite: " + detail);
 }
 void Ledger::Rollback() noexcept { sqlite3_exec(m_db, "ROLLBACK", nullptr, nullptr, nullptr); }
 int64_t Ledger::Counter(const std::string& name)
