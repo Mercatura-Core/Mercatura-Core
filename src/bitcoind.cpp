@@ -119,10 +119,6 @@ static bool ParseArgs(NodeContext& node, int argc, char* argv[])
         return InitError(Untranslated(strprintf("Error parsing command line arguments: %s", error)));
     }
 
-    if (auto error = common::InitConfig(args)) {
-        return InitError(error->message, error->details);
-    }
-
     // Error out when loose non-argument tokens are encountered on command line
     for (int i = 1; i < argc; i++) {
         if (!IsSwitchChar(argv[i][0])) {
@@ -278,6 +274,11 @@ MAIN_FUNCTION
     if (!ParseArgs(node, argc, argv)) return EXIT_FAILURE;
     // Process early info return commands such as -help or -version
     if (ProcessInitCommands(*init, args)) return EXIT_SUCCESS;
+
+    if (auto error = common::InitConfig(args)) {
+        InitError(error->message, error->details);
+        return EXIT_FAILURE;
+    }
 
     // Start application
     if (!AppInit(node) || !Assert(node.shutdown_signal)->wait()) {

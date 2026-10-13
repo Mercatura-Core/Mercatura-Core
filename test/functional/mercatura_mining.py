@@ -4,6 +4,9 @@
 
 """Mercatura native regtest mining functional test."""
 
+from pathlib import Path
+import subprocess
+
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 
@@ -16,6 +19,29 @@ class MercaturaMiningTest(BitcoinTestFramework):
 
     def run_test(self):
         node = self.nodes[0]
+
+        self.log.info("Daemon informational commands do not initialize data or read config")
+        info_dir = Path(self.options.tmpdir) / "early-info"
+        info_dir.mkdir()
+        bad_config = info_dir / "invalid.conf"
+        bad_config.write_text("this-is-not-a-valid-config-line\n", encoding="utf8")
+        missing = info_dir / "missing-datadir"
+        for flag in ("-h", "-help", "-help-debug", "-version"):
+            for datadir in (info_dir, missing):
+                result = subprocess.run(node.binaries.node_argv() + [flag, f"-datadir={datadir}", f"-conf={bad_config}"],
+                                        capture_output=True, text=True, check=False)
+                assert_equal(result.returncode, 0)
+                assert_equal(result.stderr, "")
+                assert "Mercatura Core daemon version" in result.stdout
+                assert not missing.exists()
+                assert_equal(sorted(path.name for path in info_dir.iterdir()), ["invalid.conf"])
+        # Normal startup still validates the directory and configuration.
+        result = subprocess.run(node.binaries.node_argv() + [f"-datadir={missing}"], capture_output=True, text=True, check=False)
+        assert_equal(result.returncode, 1)
+        assert "Specified data directory" in result.stderr
+        result = subprocess.run(node.binaries.node_argv() + [f"-datadir={info_dir}", f"-conf={bad_config}"], capture_output=True, text=True, check=False)
+        assert_equal(result.returncode, 1)
+        assert "Error reading configuration file" in result.stderr
 
         self.log.info("Creating Mercatura PQ mining wallet")
         node.createwallet(wallet_name="miner")

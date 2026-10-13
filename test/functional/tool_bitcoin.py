@@ -14,6 +14,7 @@ from test_framework.util import (
 
 import platform
 import re
+import subprocess
 
 
 class ToolBitcoinTest(BitcoinTestFramework):
@@ -63,10 +64,17 @@ class ToolBitcoinTest(BitcoinTestFramework):
         node = self.nodes[0]
 
         self.log.info("Ensure bitcoin node command invokes bitcoind by default")
-        self.test_args([], [], expect_exe="bitcoind")
+        self.test_args([], [], expect_exe="mercaturad")
 
         self.log.info("Ensure bitcoin -M invokes bitcoind")
-        self.test_args(["-M"], [], expect_exe="bitcoind")
+        self.test_args(["-M"], [], expect_exe="mercaturad")
+
+        self.log.info("Ensure wrapper RPC dispatch matches the supported CLI executable")
+        wrapper = node.binaries.paths.bitcoin_bin
+        for flag in ("-help", "-version"):
+            result = subprocess.run([wrapper, "rpc", flag], capture_output=True, text=True, check=True)
+            assert "Mercatura Core RPC client version" in result.stdout
+            assert_equal(result.stderr, "")
 
         self.log.info("Ensure bitcoin -M does not accept -ipcbind")
         self.test_args(["-M"], ["-ipcbind=unix"], expect_error='Error: Error parsing command line arguments: Invalid parameter -ipcbind=unix')
