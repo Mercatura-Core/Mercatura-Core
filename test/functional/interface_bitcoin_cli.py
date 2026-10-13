@@ -9,6 +9,7 @@ import re
 
 from test_framework.blocktools import COINBASE_MATURITY
 from test_framework.netutil import test_ipv6_local
+from test_framework.messages import COIN
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
@@ -20,11 +21,9 @@ from test_framework.util import (
 )
 import time
 
-# The block reward of coinbaseoutput.nValue (50) BTC/block matures after
-# COINBASE_MATURITY (100) blocks. Therefore, after mining 101 blocks we expect
-# node 0 to have a balance of (BLOCKS - COINBASE_MATURITY) * 50 BTC/block.
+# The first reward matures after COINBASE_MATURITY blocks. Mercatura's live
+# fixed-point subsidy and PQ wallet replace the inherited 50 BTC/key fixture.
 BLOCKS = COINBASE_MATURITY + 1
-BALANCE = (BLOCKS - 100) * 50
 
 JSON_PARSING_ERROR = 'error: Error parsing JSON: foo'
 BLOCKS_VALUE_OF_ZERO = 'error: the first argument (number of blocks to generate, default: 1) must be an integer value greater than zero'
@@ -33,7 +32,7 @@ WALLET_NOT_LOADED = 'Requested wallet does not exist or is not loaded'
 WALLET_NOT_SPECIFIED = (
     "Multiple wallets are loaded. Please select which wallet to use by requesting the RPC "
     "through the /wallet/<walletname> URI path. Or for the CLI, specify the \"-rpcwallet=<walletname>\" "
-    "option before the command (run \"bitcoin-cli -h\" for help or \"bitcoin-cli listwallets\" to see "
+    "option before the command (run \"mercatura-cli -h\" for help or \"mercatura-cli listwallets\" to see "
     "which wallets are currently loaded)."
 )
 
@@ -114,11 +113,25 @@ class TestBitcoinCli(BitcoinTestFramework):
         expected = [["data=test"], 42]
         assert_equal(result, expected)
 
+    def mine_blocks(self, count):
+        # Bound expensive MercaHash RPC work without extending socket timeouts.
+        while count:
+            batch = min(count, 10)
+            if self.is_wallet_compiled():
+                self.generatetoaddress(self.nodes[0], batch, self.mining_address)
+            else:
+                self.generate(self.nodes[0], batch)
+            count -= batch
+
     def run_test(self):
         """Main test logic"""
         self.test_echojson_positional_equals()
 
-        self.generate(self.nodes[0], BLOCKS)
+        if self.is_wallet_compiled():
+            self.nodes[0].createwallet(wallet_name=self.default_wallet_name, load_on_startup=True)
+            self.mining_address = self.nodes[0].getnewaddress()
+            assert self.mining_address.startswith("mcrt1z")
+        self.mine_blocks(BLOCKS)
 
         self.log.info("Compare responses from getblockchaininfo RPC and `bitcoin-cli getblockchaininfo`")
         cli_response = self.nodes[0].cli.getblockchaininfo()
@@ -214,7 +227,6 @@ class TestBitcoinCli(BitcoinTestFramework):
 
         self.log.info("Test -getinfo returns expected network and blockchain info")
         if self.is_wallet_compiled():
-            self.import_deterministic_coinbase_privkeys()
             self.nodes[0].encryptwallet(password)
         cli_get_info_string = self.nodes[0].cli('-getinfo').send_cli()
         cli_get_info = cli_get_info_string_to_dict(cli_get_info_string)
@@ -241,20 +253,19 @@ class TestBitcoinCli(BitcoinTestFramework):
 
         if self.is_wallet_compiled():
             self.log.info("Test -getinfo and bitcoin-cli getwalletinfo return expected wallet info")
-            # Explicitly set the output type in order to have consistent tx vsize / fees
-            # for both legacy and descriptor wallets (disables the change address type detection algorithm)
-            self.restart_node(0, extra_args=["-addresstype=bech32", "-changetype=bech32"])
-            assert_equal(Decimal(cli_get_info['Balance']), BALANCE)
+            self.restart_node(0, extra_args=["-addresstype=bech32m", "-changetype=bech32m"])
+            balance = Decimal(self.nodes[0].getblockstats(1)["subsidy"]) / COIN
+            assert_equal(Decimal(cli_get_info['Balance']), balance)
             assert 'Balances' not in cli_get_info_string
             wallet_info = self.nodes[0].getwalletinfo()
             assert_equal(int(cli_get_info['Keypool size']), wallet_info['keypoolsize'])
             assert_equal(int(cli_get_info['Unlocked until']), wallet_info['unlocked_until'])
-            assert_equal(Decimal(cli_get_info['Min tx relay fee rate (BTC/kvB)']), network_info['relayfee'])
+            assert_equal(Decimal(cli_get_info['Min tx relay fee rate (MCA/kvB)']), network_info['relayfee'])
             assert_equal(self.nodes[0].cli.getwalletinfo(), wallet_info)
 
             # Setup to test -getinfo, -generate, and -rpcwallet= with multiple wallets.
             wallets = [self.default_wallet_name, 'Encrypted', 'secret']
-            amounts = [BALANCE + Decimal('9.999928'), Decimal(9), Decimal(31)]
+            amounts = [None, Decimal('0.09'), Decimal('0.31')]
             self.nodes[0].createwallet(wallet_name=wallets[1])
             self.nodes[0].createwallet(wallet_name=wallets[2])
             w1 = self.nodes[0].get_wallet_rpc(wallets[0])
@@ -263,12 +274,18 @@ class TestBitcoinCli(BitcoinTestFramework):
             rpcwallet2 = f'-rpcwallet={wallets[1]}'
             rpcwallet3 = f'-rpcwallet={wallets[2]}'
             w1.walletpassphrase(password, self.rpc_timeout)
+            # PQ address derivation needs unlocked keys, unlike the inherited
+            # classical keypool fixture. Persist the receiving address first.
+            address2 = w2.getnewaddress()
             w2.encryptwallet(password)
-            w1.sendtoaddress(w2.getnewaddress(), amounts[1])
-            w1.sendtoaddress(w3.getnewaddress(), amounts[2])
+            txid2 = w1.sendtoaddress(address2, amounts[1])
+            txid3 = w1.sendtoaddress(w3.getnewaddress(), amounts[2])
 
-            # Mine a block to confirm; adds a block reward (50 BTC) to the default wallet.
-            self.generate(self.nodes[0], 1)
+            # Confirm and mature the next actual reward; include the exact PQ fees.
+            self.mine_blocks(1)
+            self.nodes[0].syncwithvalidationinterfacequeue()
+            next_reward = Decimal(self.nodes[0].getblockstats(2)["subsidy"]) / COIN
+            amounts[0] = balance + next_reward - amounts[1] - amounts[2] + w1.gettransaction(txid2)["fee"] + w1.gettransaction(txid3)["fee"]
 
             self.log.info("Test -getinfo with multiple wallets and -rpcwallet returns specified wallet balance")
             for i in range(len(wallets)):
@@ -409,7 +426,7 @@ class TestBitcoinCli(BitcoinTestFramework):
             assert_raises_rpc_error(-19, WALLET_NOT_SPECIFIED, self.nodes[0].cli('-generate', 1, 2, 3).echo)
         else:
             self.log.info("*** Wallet not compiled; cli getwalletinfo and -getinfo wallet tests skipped")
-            self.generate(self.nodes[0], 25)  # maintain block parity with the wallet_compiled conditional branch
+            self.mine_blocks(25)  # maintain block parity with the wallet_compiled conditional branch
 
         self.test_netinfo()
 
