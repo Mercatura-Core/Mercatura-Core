@@ -75,7 +75,7 @@ int main(int argc, char** argv)
         if (!seconds || seconds > 60 || !cycles || cycles > 10) throw std::runtime_error{"duration is 1..60 seconds; cycles are 1..10"};
         const auto detected{mining::DetectWorkerLimits()};
         auto budget{detected};
-        // A short, isolated experiment may use the otherwise reserved CPU.
+        // Bound short, isolated experiments to at most 64 usable logical CPUs.
         // This executable never runs a node/wallet, never installs, and never
         // changes production worker selection. Memory bounds remain intact.
         const auto memory{mining::CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), detected.available_memory)};

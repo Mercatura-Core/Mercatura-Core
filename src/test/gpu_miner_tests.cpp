@@ -30,7 +30,7 @@ struct State {
     std::atomic<int32_t> parent{7};
     std::atomic<int32_t> retired_parent{-1};
     std::atomic<unsigned int> submitted{0}, gpu_batches{0}, blocked_hashes{0}, late_batches{0}, authoritative_checks{0};
-    std::atomic<bool> continuous{true};
+    std::atomic<bool> advance_on_submission{true};
     std::atomic<bool> revoked{false}, failing{false}, bad_candidate{false}, target_hits{false}, bad_self_test{false},
         block_batches{false}, entered{false}, release{true}, incomplete{false};
     void Record(const CBlockHeader &header)
@@ -48,12 +48,11 @@ class Provider : public mining::WorkProvider
     explicit Provider(std::shared_ptr<State> value) : state{std::move(value)} {}
     std::optional<mining::MiningJob> GetJob() override
     {
-        if (!state->continuous && state->retired_parent == state->parent)
+        if (state->retired_parent == state->parent)
             return std::nullopt;
         mining::MiningJob job;
         job.header.nVersion = state->parent;
         job.target = state->target_hits ? ~arith_uint256{} : arith_uint256{1};
-        job.continuous = state->continuous;
         return job;
     }
     bool IsCurrent(const mining::MiningJob &job) override
@@ -66,13 +65,13 @@ class Provider : public mining::WorkProvider
         {
             std::lock_guard lock{state->mutex};
             const bool first{state->submitted_parents.emplace(job.header.nVersion).second};
-            if (!job.continuous && !first)
+            if (!first)
                 state->duplicate_solo_submission = true;
             if (state->revoked || job.header.nVersion != state->parent)
                 state->stale_submission = true;
         }
-        if (!job.continuous)
-            state->retired_parent = job.header.nVersion;
+        state->retired_parent = job.header.nVersion;
+        if (state->advance_on_submission) ++state->parent;
         ++state->submitted;
         return {};
     }
@@ -231,6 +230,11 @@ BOOST_AUTO_TEST_CASE(mixed_devices_share_cpu_nonce_allocator_and_refresh)
                                         }};
     BOOST_REQUIRE(controller.Start([state] { return std::make_unique<Provider>(state); }, 2, {true, true, {}, 0, 0}));
     const bool started{Until([&] { return controller.GetStats().cpu_hashes > 20 && state->gpu_batches > 20; })};
+    for (int sample{0}; sample < 20; ++sample) {
+        const auto live{controller.GetStats()};
+        BOOST_REQUIRE_EQUAL(live.devices.size(), 2U);
+        BOOST_CHECK_EQUAL(live.hashes, live.cpu_hashes + live.devices[0].hashes + live.devices[1].hashes);
+    }
     ++state->parent;
     const bool refreshed{Until([&] {
         std::lock_guard lock{state->mutex};
@@ -249,7 +253,29 @@ BOOST_AUTO_TEST_CASE(mixed_devices_share_cpu_nonce_allocator_and_refresh)
     BOOST_CHECK_EQUAL(stats.active_workers, 0U);
     BOOST_CHECK(!stats.busy);
 }
-BOOST_AUTO_TEST_CASE(gpu_only_verifies_and_submits_continuous_shares)
+
+BOOST_AUTO_TEST_CASE(combined_cpu_and_gpu_host_memory_boundary)
+{
+    auto state{std::make_shared<State>()};
+    std::atomic<unsigned int> allocations{0};
+    mining::MiningController controller{Hashes(state), [] { return mining::CalculateWorkerLimits(12, uint64_t{1} << 30); }, {}, Devices,
+        [&](const auto&, unsigned) { ++allocations; return std::make_unique<MockBackend>(state, false); }};
+    BOOST_REQUIRE(controller.Start([state] { return std::make_unique<Provider>(state); }, 3, {true, true, {"opencl:0"}, 0, 0}));
+    controller.Wait();
+    BOOST_CHECK(controller.GetStats().state == mining::MiningState::FAILED);
+    BOOST_CHECK_EQUAL(allocations, 0U); // Three CPU contexts plus one verifier exceed the host budget.
+    BOOST_REQUIRE(controller.Start([state] { return std::make_unique<Provider>(state); }, 2, {true, true, {"opencl:0"}, 0, 0}));
+    const bool started{Until([&] {
+        const auto stats{controller.GetStats()};
+        return stats.cpu_hashes > 0 && stats.devices.size() == 1 && stats.devices.front().hashes > 0;
+    })};
+    controller.RequestStop();
+    controller.Wait();
+    BOOST_CHECK(started);
+    BOOST_CHECK(controller.GetStats().state == mining::MiningState::STOPPED);
+}
+
+BOOST_AUTO_TEST_CASE(gpu_only_verifies_and_submits_solo_jobs)
 {
     auto state{std::make_shared<State>()};
     state->target_hits = true;
@@ -270,7 +296,7 @@ BOOST_AUTO_TEST_CASE(gpu_only_verifies_and_submits_continuous_shares)
 BOOST_AUTO_TEST_CASE(solo_gpu_workers_submit_one_verified_candidate_and_discard_late_batches)
 {
     auto state{std::make_shared<State>()};
-    state->continuous = false;
+    state->advance_on_submission = false;
     state->target_hits = true;
     state->block_batches = true;
     state->release = false;

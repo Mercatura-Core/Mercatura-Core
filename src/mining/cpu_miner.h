@@ -6,6 +6,7 @@
 
 #include <arith_uint256.h>
 #include <mining/gpu_backend.h>
+#include <mining/statistics.h>
 #include <primitives/block.h>
 
 #include <atomic>
@@ -35,15 +36,14 @@ struct WorkerLimits {
 inline constexpr uint64_t WORKER_MEMORY_BYTES{160ULL * 1024 * 1024};
 WorkerLimits CalculateWorkerLimits(unsigned int cpus, std::optional<uint64_t> memory);
 WorkerLimits DetectWorkerLimits();
+unsigned int MaximumCpuWorkers(const WorkerLimits& limits, size_t gpu_verifiers = 0);
 
 // Immutable work: public header and optional public coinbase only, never keys.
 struct MiningJob {
     CBlockHeader header;
     arith_uint256 target;
     CTransactionRef coinbase;
-    // Pool shares do not retire the job or reset its nonce cursor.
-    bool continuous{false};
-    // A transport can revoke work while the coordinator awaits a receipt.
+    // Providers can revoke work on template or connected-tip replacement.
     std::shared_ptr<std::atomic<bool>> valid{};
     std::optional<std::chrono::steady_clock::time_point> deadline{};
 };
@@ -85,6 +85,10 @@ struct MiningStats {
     uint64_t hashes{0};
     double hashes_per_second{0};
     unsigned int active_workers{0};
+    double hashes_per_second_10s{0};
+    double hashes_per_second_60s{0};
+    double hashes_per_second_session{0};
+    std::chrono::milliseconds session_elapsed{0};
     uint64_t cpu_hashes{0};
     double cpu_hashes_per_second{0};
     std::vector<GpuStats> devices;
@@ -141,13 +145,13 @@ private:
     std::thread m_coordinator;
     std::atomic<bool> m_stop{false};
     std::atomic<bool> m_finished{true};
-    std::atomic<uint64_t> m_hashes{0};
     std::atomic<unsigned int> m_active{0};
     mutable std::mutex m_mutex;
     std::condition_variable m_cv;
     std::shared_ptr<Work> m_work;
     std::deque<CBlockHeader> m_solutions;
     MiningStats m_stats;
+    mutable MiningStatistics m_statistics;
     std::mutex m_provider_mutex;
     std::unique_ptr<WorkProvider> m_provider;
 };

@@ -77,6 +77,10 @@ WalletView::WalletView(WalletModel* wallet_model, const PlatformStyle* _platform
     miningPage = new MiningPage(walletModel, this);
     addWidget(miningPage);
     connect(this, &WalletView::setPrivacy, miningPage, &MiningPage::setPrivacy);
+    connect(miningPage, &MiningPage::showRewardAddress, this, [this](const QString& address) {
+        usedReceivingAddressesPage->selectAddress(address);
+        GUIUtil::bringToFront(usedReceivingAddressesPage);
+    });
 
     connect(overviewPage, &OverviewPage::transactionClicked, this, &WalletView::transactionClicked);
     // Clicking on a transaction on the overview pre-selects the transaction on the transaction history page

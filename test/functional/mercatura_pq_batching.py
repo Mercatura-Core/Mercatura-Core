@@ -76,6 +76,8 @@ class MercaturaPQBatchingTest(BitcoinTestFramework):
 
         self.log.info(f"Batch transaction id: {txid}")
         assert txid in node.getrawmempool()
+        # Mempool acceptance precedes asynchronous receiver wallet callbacks.
+        node.syncwithvalidationinterfacequeue()
 
         pending_a = receiver_a.getbalances()["mine"]["untrusted_pending"]
         pending_b = receiver_b.getbalances()["mine"]["untrusted_pending"]
@@ -110,6 +112,7 @@ class MercaturaPQBatchingTest(BitcoinTestFramework):
 
         assert_equal(len(hashes), 1)
         assert txid not in node.getrawmempool()
+        node.syncwithvalidationinterfacequeue()
 
         assert_equal(receiver_a.getbalance(), amount_a)
         assert_equal(receiver_b.getbalance(), amount_b)

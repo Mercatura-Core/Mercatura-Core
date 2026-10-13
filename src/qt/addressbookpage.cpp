@@ -296,6 +296,17 @@ void AddressBookPage::contextualMenu(const QPoint &point)
     }
 }
 
+void AddressBookPage::selectAddress(const QString& address)
+{
+    if (!proxyModel) return;
+    ui->searchLineEdit->setText(address);
+    const auto matches{proxyModel->match(proxyModel->index(0, AddressTableModel::Address), Qt::EditRole, address, 1, Qt::MatchExactly)};
+    if (!matches.isEmpty()) {
+        ui->tableView->selectRow(matches.front().row());
+        ui->tableView->scrollTo(matches.front());
+    }
+}
+
 void AddressBookPage::selectNewAddress(const QModelIndex &parent, int begin, int /*end*/)
 {
     QModelIndex idx = proxyModel->mapFromSource(model->index(begin, AddressTableModel::Address, parent));

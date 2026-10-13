@@ -46,6 +46,8 @@ public:
 
 public Q_SLOTS:
     void done(int retval) override;
+    /** Filter and select an existing receiving address without creating one. */
+    void selectAddress(const QString& address);
 
 private:
     Ui::AddressBookPage *ui;

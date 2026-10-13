@@ -35,7 +35,7 @@ def to_base_units(amount):
     return int(units)
 
 
-class MercaturaPoolCoinbaseTest(BitcoinTestFramework):
+class MercaturaCoinbaseTemplateTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
@@ -147,7 +147,7 @@ class MercaturaPoolCoinbaseTest(BitcoinTestFramework):
             name = f"recipient{index}"
             node.createwallet(wallet_name=name)
             wallet = node.get_wallet_rpc(name)
-            address = wallet.getnewaddress("pool-coinbase")
+            address = wallet.getnewaddress("template-coinbase")
             assert address.startswith("mcrt1z")
             info = wallet.getaddressinfo(address)
             assert_equal(info["ismine"], True)
@@ -263,4 +263,4 @@ class MercaturaPoolCoinbaseTest(BitcoinTestFramework):
 
 
 if __name__ == "__main__":
-    MercaturaPoolCoinbaseTest(__file__).main()
+    MercaturaCoinbaseTemplateTest(__file__).main()

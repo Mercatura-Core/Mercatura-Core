@@ -20,6 +20,12 @@ namespace mining {
 namespace {
 constexpr uint64_t NONCE_CHUNK{256};
 constexpr auto JOB_LIFETIME{std::chrono::seconds{30}};
+uint64_t TotalHashes(const MiningStats& stats)
+{
+    uint64_t hashes{stats.cpu_hashes};
+    for (const auto& device : stats.devices) hashes += device.hashes;
+    return hashes;
+}
 }
 
 std::optional<NonceRange> AllocateNonceRange(std::atomic<uint64_t>& cursor)
@@ -63,15 +69,16 @@ bool MiningController::Start(ProviderFactory factory, unsigned int workers, GpuC
     }
     // A finished coordinator has already joined its workers; reaping it is cheap.
     Wait();
-    m_stop = false;
-    m_finished = false;
-    m_hashes = 0;
-    m_cpu_hashes = 0;
-    m_active = 0;
-    m_ready_workers = 0;
     {
         std::lock_guard lock{m_mutex};
+        // Publish the new session and its counters as one coherent snapshot.
+        m_stop = false;
+        m_finished = false;
+        m_cpu_hashes = 0;
+        m_active = 0;
+        m_ready_workers = 0;
         m_stats = {};
+        m_statistics.Reset(std::chrono::steady_clock::now());
         m_stats.state = MiningState::STARTING;
         m_stats.status = "Preparing mining";
         m_solutions.clear();
@@ -80,6 +87,10 @@ bool MiningController::Start(ProviderFactory factory, unsigned int workers, GpuC
         m_coordinator = std::thread{[this, factory = std::move(factory), workers, hardware = std::move(hardware)] { Run(factory, workers, hardware); }};
     } catch (const std::exception& e) {
         Fail(e.what());
+        {
+            std::lock_guard lock{m_mutex};
+            m_statistics.Finish(std::chrono::steady_clock::now(), TotalHashes(m_stats));
+        }
         m_finished = true;
         return false;
     }
@@ -107,9 +118,15 @@ MiningStats MiningController::GetStats() const
 {
     std::lock_guard lock{m_mutex};
     MiningStats stats{m_stats};
-    stats.busy = !m_finished.load();
-    stats.hashes = m_hashes.load();
     stats.cpu_hashes = m_cpu_hashes.load();
+    const auto measured{m_statistics.Observe(std::chrono::steady_clock::now(), TotalHashes(stats))};
+    stats.busy = !m_finished.load();
+    stats.hashes = measured.hashes;
+    stats.hashes_per_second = measured.live;
+    stats.hashes_per_second_10s = measured.average_10s;
+    stats.hashes_per_second_60s = measured.average_60s;
+    stats.hashes_per_second_session = measured.average_session;
+    stats.session_elapsed = measured.elapsed;
     stats.active_workers = m_active.load();
     return stats;
 }
@@ -159,7 +176,7 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
         // Every GPU verifier owns a separate authoritative 128 MiB CPU context.
         // Include those contexts in the host memory budget even in GPU-only mode.
         const auto host_limits{CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), limits.available_memory)};
-        if (uint64_t{count} + selected.size() > host_limits.maximum) throw std::runtime_error{"Insufficient host memory for CPU workers and GPU candidate verification"};
+        if (selected.size() > host_limits.maximum || count > MaximumCpuWorkers(limits, selected.size())) throw std::runtime_error{"Insufficient host memory for CPU workers and GPU candidate verification"};
         {
             std::lock_guard lock{m_mutex};
             for (const auto& device : selected) m_stats.devices.push_back(GpuStats{device});
@@ -182,7 +199,7 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
             for (size_t i{0}; i < selected.size() && !m_stop; ++i) workers.emplace_back([this, i, hardware] { GpuWorker(i, hardware); });
         }
         auto sampled_at{std::chrono::steady_clock::now()};
-        uint64_t sampled_hashes{0}, sampled_cpu{0};
+        uint64_t sampled_cpu{0};
         std::vector<uint64_t> sampled_devices(selected.size(), 0);
         while (!m_stop) {
             if (m_provider->IsCancelled()) { RequestStop(); break; }
@@ -228,16 +245,14 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
                         ++m_stats.rejected;
                     if (m_stats.state != MiningState::FAILED) m_stats.status = result.message;
                 }
-                if (!work->job.continuous) {
-                    CancelWork();
-                    work.reset();
-                }
+                CancelWork();
+                work.reset();
             }
             bool exhausted{false};
             if (work && work->next_nonce >= NONCE_SPACE && m_active == 0) {
                 std::lock_guard lock{m_mutex};
-                // Headers in the FIFO still belong to this job. Drain them
-                // before installing a new job and its independent nonce cursor.
+                // A pending solution belongs to this job. Submit it before
+                // installing a new job and its independent nonce cursor.
                 exhausted = m_solutions.empty();
             }
             if (!work || exhausted) {
@@ -261,10 +276,10 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
             // check timestamp with the newer completed-work counters.
             const auto sampled_now{std::chrono::steady_clock::now()};
             if (sampled_now - sampled_at >= std::chrono::milliseconds{500}) {
-                const uint64_t hashes{m_hashes.load()};
                 std::lock_guard lock{m_mutex};
-                m_stats.hashes_per_second = (hashes - sampled_hashes) / std::chrono::duration<double>(sampled_now - sampled_at).count();
                 const uint64_t cpu_hashes{m_cpu_hashes.load()};
+                m_stats.cpu_hashes = cpu_hashes;
+                m_statistics.Observe(sampled_now, TotalHashes(m_stats));
                 m_stats.cpu_hashes_per_second = (cpu_hashes - sampled_cpu) / std::chrono::duration<double>(sampled_now - sampled_at).count();
                 sampled_cpu = cpu_hashes;
                 for (size_t i{0}; i < m_stats.devices.size(); ++i) {
@@ -272,7 +287,6 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
                     device.hashes_per_second = device.failed ? 0 : (device.hashes - sampled_devices[i]) / std::chrono::duration<double>(sampled_now - sampled_at).count();
                     sampled_devices[i] = device.hashes;
                 }
-                sampled_hashes = hashes;
                 sampled_at = sampled_now;
             }
             std::unique_lock lock{m_mutex};
@@ -296,6 +310,8 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
         m_provider.reset();
     }
     std::lock_guard lock{m_mutex};
+    m_stats.cpu_hashes = m_cpu_hashes.load();
+    m_statistics.Finish(std::chrono::steady_clock::now(), TotalHashes(m_stats));
     m_stats.hashes_per_second = 0;
     m_stats.cpu_hashes_per_second = 0;
     for (auto& device : m_stats.devices) { device.hashes_per_second = 0; device.memory_bytes = 0; if (!device.failed) device.status = "Stopped"; }
@@ -336,11 +352,10 @@ void MiningController::Worker()
                     if (m_stop || work->cancelled || work->solved || (work->job.valid && !*work->job.valid) || std::chrono::steady_clock::now() >= work->expires) break;
                     header.nNonce = static_cast<uint32_t>(nonce);
                     const auto result{hash(header)};
-                    ++m_hashes;
                     ++m_cpu_hashes;
                     if (UintToArith256(result) <= work->job.target) {
                         ReportCandidate(work, header);
-                        if (!work->job.continuous) break;
+                        break;
                     }
                 }
             }
@@ -359,17 +374,6 @@ void MiningController::Worker()
 }
 void MiningController::ReportCandidate(const std::shared_ptr<Work>& work, const CBlockHeader& header)
 {
-    if (work->job.continuous) {
-        std::unique_lock lock{m_mutex};
-        ++m_stats.solutions;
-        while (!m_stop && !work->cancelled && (!work->job.valid || *work->job.valid) && std::chrono::steady_clock::now() < work->expires && m_solutions.size() >= 64)
-            m_cv.wait_for(lock, std::chrono::milliseconds{100});
-        if (!m_stop && m_work == work && !work->cancelled && (!work->job.valid || *work->job.valid) && std::chrono::steady_clock::now() < work->expires) {
-            m_solutions.push_back(header);
-            m_cv.notify_all();
-        }
-        return;
-    }
     bool expected{false};
     if (work->solved.compare_exchange_strong(expected, true)) {
         std::lock_guard lock{m_mutex};
@@ -438,10 +442,14 @@ void MiningController::GpuWorker(size_t index, GpuConfig hardware)
                         std::memcpy(headers[slot].data(), stream.data(), headers[slot].size());
                     }
                     const auto hashes{backend->Hash(headers, cancelled)};
-                    if (cancelled()) break;
-                    if (hashes.size() != count) throw std::runtime_error{"GPU returned an incomplete hashing batch"};
-                    m_hashes += count;
+                    if (hashes.size() != count) {
+                        if (cancelled()) break;
+                        throw std::runtime_error{"GPU returned an incomplete hashing batch"};
+                    }
+                    // Completed GPU work counts even if a tip change or Stop
+                    // arrived during the batch. Obsolete candidates never submit.
                     { std::lock_guard lock{m_mutex}; m_stats.devices[index].hashes += count; }
+                    if (cancelled()) break;
                     for (size_t slot{0}; slot < count && !cancelled(); ++slot) {
                         const uint256 result{std::span<const unsigned char>{hashes[slot]}};
                         if (UintToArith256(result) > work->job.target) continue;

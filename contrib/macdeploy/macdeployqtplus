@@ -344,14 +344,13 @@ def deployPlugins(appBundleInfo: ApplicationBundleInfo, deploymentInfo: Deployme
     for dirpath, dirnames, filenames in os.walk(deploymentInfo.pluginPath):
         pluginDirectory = os.path.relpath(dirpath, deploymentInfo.pluginPath)
 
-        if pluginDirectory not in ['styles', 'platforms', 'tls']:
+        if pluginDirectory not in ['styles', 'platforms']:
             continue
 
         for pluginName in filenames:
             pluginPath = os.path.join(pluginDirectory, pluginName)
 
-            if pluginName.split('.')[0] not in ['libqminimal', 'libqcocoa', 'libqmacstyle',
-                                              'libqopensslbackend', 'libqsecuretransportbackend']:
+            if pluginName.split('.')[0] not in ['libqminimal', 'libqcocoa', 'libqmacstyle']:
                 continue
 
             plugins.append((pluginDirectory, pluginName))

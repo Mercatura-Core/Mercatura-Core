@@ -1,0 +1,7 @@
+<!-- Copyright (c) 2026 The Mercatura Core developers; MIT license. -->
+<!-- Source for the 256px antialiased mining.png resource. The raster resource
+     avoids requiring an SVG plugin in static Qt builds. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 32 32">
+  <path fill="#000" d="M5 26 L7 28 L23 10 L20 7 Z"/>
+  <path fill="#000" d="M3 7 L11 6 L18 8 L25 12 L28 18 L23 15 L17 12 L10 10 Z"/>
+</svg>

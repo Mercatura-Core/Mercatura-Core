@@ -16,16 +16,6 @@ get_target_property(qt_lib_type Qt6::Core TYPE)
 function(import_plugins target)
   if(qt_lib_type STREQUAL "STATIC_LIBRARY")
     set(plugins Qt6::QMinimalIntegrationPlugin)
-    set(tls_plugins)
-    foreach(backend QTlsBackendOpenSSLPlugin QSchannelBackendPlugin QSecureTransportBackendPlugin)
-      if(TARGET Qt6::${backend})
-        list(APPEND tls_plugins Qt6::${backend})
-      endif()
-    endforeach()
-    if(ENABLE_WALLET AND NOT tls_plugins)
-      message(FATAL_ERROR "Native Qt pool mining requires an operational static TLS backend")
-    endif()
-    list(APPEND plugins ${tls_plugins})
     if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|FreeBSD)$")
       list(APPEND plugins Qt6::QXcbIntegrationPlugin)
     elseif(WIN32)
@@ -192,8 +182,6 @@ if(ENABLE_WALLET)
       miningpage.h
       miningsession.cpp
       miningsession.h
-      poolclient.cpp
-      poolclient.h
       overviewpage.cpp
       overviewpage.h
       paymentserver.cpp

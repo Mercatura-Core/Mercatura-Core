@@ -107,7 +107,6 @@ include(CMakeDependentOption)
 option(BUILD_BITCOIN_BIN "Build bitcoin executable." ON)
 option(BUILD_DAEMON "Build bitcoind executable." ON)
 option(BUILD_GUI "Build bitcoin-qt executable." OFF)
-option(BUILD_POOL_COORDINATOR "Build standalone Mercatura pool coordinator (SQLite, curl, OpenSSL)." OFF)
 option(BUILD_CLI "Build bitcoin-cli executable." ON)
 
 option(BUILD_TESTS "Build test_bitcoin and other unit test executables." ON)
@@ -172,6 +171,7 @@ cmake_dependent_option(BUILD_GUI_TESTS "Build test_bitcoin-qt executable." ON "B
 if(BUILD_GUI)
   set(qt_components Core Gui Widgets LinguistTools)
   if(ENABLE_WALLET)
+    # Existing payment-URI IPC uses QLocalServer/QLocalSocket from Qt Network.
     list(APPEND qt_components Network)
   endif()
   if(WITH_DBUS)

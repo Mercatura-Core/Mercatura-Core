@@ -6,7 +6,6 @@
 
 #ifndef Q_MOC_RUN
 #include <mining/cpu_miner.h>
-#include <qt/poolclient.h>
 #include <qt/walletmodel.h>
 #endif
 
@@ -27,16 +26,9 @@ public:
     explicit MiningSession(interfaces::Node& node, QObject* parent = nullptr, mining::MiningController::DeviceDetector devices = {});
     ~MiningSession();
     bool start(WalletModel* wallet, unsigned int workers, mining::GpuConfig hardware = {});
-    bool startPool(WalletModel* wallet, unsigned int workers, mining::PoolEndpoint endpoint, mining::GpuConfig hardware = {});
     void refreshDevices();
     std::optional<mining::GpuDiscovery> gpuDiscovery() const;
     std::optional<GpuDiscoverySnapshot> gpuDiscoverySnapshot() const;
-    mining::PoolStats poolStats() const { return m_pool_state->Snapshot(); }
-    bool poolMode() const { return m_pool_mode; }
-    void forgetPoolSession()
-    {
-        if (!stats().busy) m_pool_state->ForgetSession();
-    }
     void stop();
     void walletUnloaded(WalletModel* wallet);
     void shutdown();
@@ -60,9 +52,6 @@ private:
     uint64_t m_discovery_revision{0};
     std::thread m_discovery_thread;
     std::atomic<bool> m_discovering{false};
-    bool m_pool_mode{false};
-    mining::PoolEndpoint m_endpoint;
-    const std::shared_ptr<mining::PoolState> m_pool_state{std::make_shared<mining::PoolState>()};
     QTimer* m_timer;
     std::atomic<bool> m_needs_unlock{false};
     std::atomic<bool> m_cancelled{false};

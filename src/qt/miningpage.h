@@ -18,7 +18,6 @@ class QLabel;
 class QPushButton;
 class QSpinBox;
 class QComboBox;
-class QLineEdit;
 class QGroupBox;
 class QListWidget;
 
@@ -29,6 +28,10 @@ public:
     void setSession(MiningSession* session);
     void setClientModel(ClientModel* client);
     void setPrivacy(bool privacy);
+    static QString formatRuntime(uint64_t seconds);
+
+Q_SIGNALS:
+    void showRewardAddress(const QString& address);
 
 private:
     void updateStatus();
@@ -36,16 +39,18 @@ private:
     QPointer<MiningSession> m_session;
     ClientModel* m_client{nullptr};
     mining::WorkerLimits m_limits;
-    QCheckBox* m_automatic;
     QSpinBox* m_workers;
     QPushButton* m_start;
     QPushButton* m_stop;
     QLabel* m_status;
     QLabel* m_hashrate;
+    QLabel* m_statistics;
+    QLabel* m_runtime;
+    QPushButton* m_copy_destination;
+    QPushButton* m_show_destination;
     QLabel* m_active;
     QLabel* m_blocks;
     QLabel* m_destination;
-    QComboBox* m_mode;
     QComboBox* m_hardware;
     QCheckBox* m_all_devices;
     QListWidget* m_devices;
@@ -55,20 +60,6 @@ private:
     QLabel* m_gpu_status;
     QLabel* m_gpu_rates;
     std::optional<uint64_t> m_devices_revision;
-    QGroupBox* m_pool;
-    QLineEdit* m_host;
-    QSpinBox* m_port;
-    QLabel* m_certificate;
-    QLabel* m_connection;
-    QLabel* m_shares;
-    QLabel* m_last_share;
-    QLabel* m_reported;
-    QLabel* m_commitment;
-    QPushButton* m_ca;
-    QPushButton* m_system_ca;
-    QPushButton* m_inspect;
-    QPushButton* m_reset;
-    QString m_ca_file;
     bool m_privacy{false};
 };
 #endif // BITCOIN_QT_MININGPAGE_H

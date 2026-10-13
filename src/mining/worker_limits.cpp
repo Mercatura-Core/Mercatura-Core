@@ -31,11 +31,15 @@ WorkerLimits CalculateWorkerLimits(unsigned int cpus, std::optional<uint64_t> me
         const uint64_t reserve{std::max<uint64_t>(512ULL * 1024 * 1024, *memory / 4)};
         memory_workers = *memory > reserve ? (*memory - reserve) / WORKER_MEMORY_BYTES : 0;
     }
-    const unsigned int cpu_reserve{std::max(1U, limits.logical_cpus / 8)};
-    const unsigned int cpu_workers{limits.logical_cpus > cpu_reserve ? limits.logical_cpus - cpu_reserve : 1};
-    limits.maximum = static_cast<unsigned int>(std::min<uint64_t>(cpu_workers, memory_workers));
+    limits.maximum = static_cast<unsigned int>(std::min<uint64_t>(limits.logical_cpus, memory_workers));
     limits.recommended = std::min(limits.maximum, std::max(1U, limits.logical_cpus / 2));
     return limits;
+}
+
+unsigned int MaximumCpuWorkers(const WorkerLimits& limits, size_t gpu_verifiers)
+{
+    const auto host{CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), limits.available_memory)};
+    return gpu_verifiers < host.maximum ? std::min(limits.maximum, static_cast<unsigned int>(host.maximum - gpu_verifiers)) : 0;
 }
 
 WorkerLimits DetectWorkerLimits()

@@ -2,7 +2,7 @@
 # import vendor SDKs. OpenCL is loaded at runtime; CUDA uses the static runtime.
 option(WITH_CUDA_MINING "Build the optional NVIDIA CUDA MercaHash backend" OFF)
 option(WITH_OPENCL_MINING "Build the optional AMD OpenCL MercaHash backend" OFF)
-target_sources(bitcoin_node PRIVATE gpu_backend.cpp)
+target_sources(bitcoin_node PRIVATE gpu_backend.cpp statistics.cpp)
 if(BUILD_TESTS)
   add_executable(mining-bench mining_bench.cpp)
   target_link_libraries(mining-bench PRIVATE core_interface bitcoin_node bitcoin_crypto univalue)

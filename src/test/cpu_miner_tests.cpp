@@ -86,12 +86,20 @@ BOOST_AUTO_TEST_CASE(hardware_limits)
 {
     using mining::CalculateWorkerLimits;
     const auto large{CalculateWorkerLimits(256, uint64_t{128} << 30)};
-    BOOST_CHECK_EQUAL(large.maximum, 224U);
+    BOOST_CHECK_EQUAL(large.maximum, 256U);
     BOOST_CHECK_EQUAL(large.recommended, 128U);
+    BOOST_CHECK_EQUAL(CalculateWorkerLimits(12, uint64_t{8} << 30).maximum, 12U);
     BOOST_CHECK_EQUAL(CalculateWorkerLimits(16, uint64_t{512} << 20).maximum, 0U);
     BOOST_CHECK_EQUAL(CalculateWorkerLimits(16, uint64_t{1024} << 20).maximum, 3U);
     BOOST_CHECK_EQUAL(CalculateWorkerLimits(64, {}).maximum, 1U);
     BOOST_CHECK_EQUAL(CalculateWorkerLimits(0, uint64_t{8} << 30).recommended, 1U);
+    const auto limited{CalculateWorkerLimits(12, uint64_t{1} << 30)};
+    BOOST_CHECK_EQUAL(mining::MaximumCpuWorkers(limited), 3U);
+    BOOST_CHECK_EQUAL(mining::MaximumCpuWorkers(limited, 1), 2U);
+    BOOST_CHECK_EQUAL(mining::MaximumCpuWorkers(limited, 3), 0U);
+    BOOST_CHECK_EQUAL(mining::MaximumCpuWorkers(limited, 5), 0U);
+    BOOST_CHECK_EQUAL(mining::MaximumCpuWorkers(CalculateWorkerLimits(12, uint64_t{8} << 30), 1), 12U);
+    BOOST_CHECK_EQUAL(mining::MaximumCpuWorkers(CalculateWorkerLimits(12, {}), 1), 0U);
 }
 
 BOOST_AUTO_TEST_CASE(partition_contexts_counters_cancellation_and_repetition)
@@ -137,6 +145,9 @@ BOOST_AUTO_TEST_CASE(partition_contexts_counters_cancellation_and_repetition)
             const auto stats{controller.GetStats()};
             BOOST_CHECK(stats.state == mining::MiningState::STOPPED);
             BOOST_CHECK(!stats.busy);
+            BOOST_CHECK(stats.session_elapsed.count() > 0);
+            BOOST_CHECK_EQUAL(controller.GetStats().session_elapsed.count(), stats.session_elapsed.count());
+            BOOST_CHECK_CLOSE(stats.hashes_per_second_session, stats.hashes / std::chrono::duration<double>(stats.session_elapsed).count(), 10.0);
             BOOST_CHECK_EQUAL(stats.hashes, calls - start_calls);
             BOOST_CHECK_EQUAL(stats.active_workers, 0U);
             BOOST_CHECK_EQUAL(stats.hashes_per_second, 0);
@@ -167,6 +178,36 @@ BOOST_AUTO_TEST_CASE(provider_cancellation_stops_the_session)
     controller.Wait();
     BOOST_CHECK(controller.GetStats().state == mining::MiningState::STOPPED);
     BOOST_CHECK(state->interrupted);
+}
+
+BOOST_AUTO_TEST_CASE(concurrent_snapshots_remain_consistent_across_session_restarts)
+{
+    auto state{std::make_shared<FakeState>()};
+    mining::MiningController controller{[] {
+        return [](const CBlockHeader&) {
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+            return uint256::FromHex(std::string(64, 'f')).value();
+        };
+    }};
+    std::atomic<bool> finish{false}, inconsistent{false};
+    std::thread observer{[&] {
+        while (!finish) {
+            const auto stats{controller.GetStats()};
+            if (stats.hashes != stats.cpu_hashes || (stats.busy && stats.state == mining::MiningState::STOPPED)) inconsistent = true;
+            std::this_thread::sleep_for(std::chrono::microseconds{100});
+        }
+    }};
+    bool started{true}, hashed{true};
+    for (int cycle{0}; cycle < 20; ++cycle) {
+        started &= controller.Start([state] { return std::make_unique<FakeProvider>(state); }, 1);
+        hashed &= Until([&] { return controller.GetStats().hashes > 0; });
+        controller.RequestStop();
+        controller.Wait();
+    }
+    finish = true;
+    observer.join();
+    BOOST_CHECK(started && hashed);
+    BOOST_CHECK(!inconsistent);
 }
 
 BOOST_AUTO_TEST_CASE(worker_and_provider_failure_cleanup)
@@ -279,198 +320,6 @@ BOOST_AUTO_TEST_CASE(submission_does_not_imply_acceptance)
     BOOST_CHECK_EQUAL(controller.GetStats().accepted, 0U);
 }
 
-BOOST_AUTO_TEST_CASE(pool_shares_preserve_cursor_and_workers)
-{
-    struct ContinuousProvider : FakeProvider {
-        using FakeProvider::FakeProvider;
-        std::optional<mining::MiningJob> GetJob() override
-        {
-            auto job{FakeProvider::GetJob()};
-            job->continuous = true;
-            return job;
-        }
-    };
-    auto state{std::make_shared<FakeState>()};
-    std::mutex mutex;
-    std::set<std::pair<int32_t, uint32_t>> seen;
-    std::atomic<bool> duplicate{false};
-    std::atomic<unsigned int> contexts{0};
-    mining::MiningController controller{[&] {
-                                            ++contexts;
-                                            return [&](const CBlockHeader& header) {
-                                                std::lock_guard lock{mutex};
-                                                if (!seen.emplace(header.nVersion, header.nNonce).second) duplicate = true;
-                                                return uint256{};
-                                            };
-                                        },
-                                        [] { return mining::CalculateWorkerLimits(8, uint64_t{8} << 30); }};
-    BOOST_REQUIRE(controller.Start([state] { return std::make_unique<ContinuousProvider>(state); }, 4));
-    BOOST_REQUIRE(Until([&] { return contexts.load() == 4 && state->submissions > 100; }));
-    BOOST_CHECK_EQUAL(state->jobs, 1U);
-    BOOST_CHECK_EQUAL(contexts.load(), 4U);
-    ++state->parent;
-    BOOST_REQUIRE(Until([&] { return state->jobs >= 2; }));
-    controller.RequestStop();
-    controller.Wait();
-    BOOST_CHECK_EQUAL(contexts.load(), 4U);
-    BOOST_CHECK(!duplicate);
-    BOOST_CHECK(!controller.GetStats().busy);
-    BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
-}
-
-BOOST_AUTO_TEST_CASE(pool_transport_revokes_workers_during_a_pending_receipt)
-{
-    struct PendingProvider : FakeProvider {
-        PendingProvider(std::shared_ptr<FakeState> state, std::shared_ptr<std::atomic<bool>> valid,
-                        std::atomic<bool>& entered, std::atomic<bool>& release)
-            : FakeProvider{std::move(state)}, validity{std::move(valid)}, submitting{entered}, released{release} {}
-        std::optional<mining::MiningJob> GetJob() override
-        {
-            if (!*validity) return {};
-            auto job{FakeProvider::GetJob()};
-            job->continuous = true;
-            job->valid = validity;
-            return job;
-        }
-        bool IsCurrent(const mining::MiningJob&) override { return *validity; }
-        mining::SubmissionResult Submit(const mining::MiningJob&, const CBlockHeader&) override
-        {
-            submitting = true;
-            while (!released)
-                std::this_thread::sleep_for(std::chrono::milliseconds{1});
-            return {};
-        }
-        std::shared_ptr<std::atomic<bool>> validity;
-        std::atomic<bool>& submitting;
-        std::atomic<bool>& released;
-    };
-    auto state{std::make_shared<FakeState>()};
-    auto valid{std::make_shared<std::atomic<bool>>(true)};
-    std::atomic<bool> entered{false}, release{false};
-    mining::MiningController controller{[] { return [](const CBlockHeader&) { return uint256{}; }; },
-                                        [] { return mining::CalculateWorkerLimits(8, uint64_t{8} << 30); }};
-    BOOST_REQUIRE(controller.Start([&] { return std::make_unique<PendingProvider>(state, valid, entered, release); }, 2));
-    const bool submitting{Until([&] { return entered.load(); })};
-    *valid = false;
-    const bool revoked{Until([&] { return controller.GetStats().active_workers == 0; })};
-    release = true;
-    controller.RequestStop();
-    controller.Wait();
-    BOOST_CHECK(submitting);
-    BOOST_CHECK(revoked);
-    BOOST_CHECK(!controller.GetStats().busy);
-}
-
-BOOST_AUTO_TEST_CASE(pool_exhaustion_drains_old_job_shares_before_replacement)
-{
-    struct State {
-        std::atomic<unsigned int> submitted{0};
-        std::atomic<bool> entered{false}, release{false}, replaced{false}, mixed{false};
-    } state;
-    struct Provider : mining::WorkProvider {
-        explicit Provider(State& value) : state{value} {}
-        std::optional<mining::MiningJob> GetJob() override
-        {
-            if (++jobs > 2) return {};
-            mining::MiningJob job;
-            job.continuous = true;
-            job.target = arith_uint256{1};
-            job.header.nVersion = jobs;
-            if (jobs > 1) {
-                if (state.submitted != 16) state.mixed = true;
-                state.replaced = true;
-            }
-            return job;
-        }
-        bool IsCurrent(const mining::MiningJob&) override { return true; }
-        mining::SubmissionResult Submit(const mining::MiningJob& job, const CBlockHeader& header) override
-        {
-            state.entered = true;
-            while (!state.release)
-                std::this_thread::sleep_for(std::chrono::milliseconds{1});
-            if (job.header.nVersion != header.nVersion) state.mixed = true;
-            ++state.submitted;
-            return {};
-        }
-        void Interrupt() override { state.release = true; }
-        State& state;
-        unsigned int jobs{0};
-    };
-    mining::MiningController controller{[] { return [](const CBlockHeader&) { return uint256{}; }; },
-                                        [] { return mining::CalculateWorkerLimits(8, uint64_t{8} << 30); },
-                                        [](std::atomic<uint64_t>& cursor) {
-                                            uint64_t expected{0};
-                                            cursor.compare_exchange_strong(expected, mining::NONCE_SPACE - 16);
-                                            return mining::AllocateNonceRange(cursor);
-                                        }};
-    BOOST_REQUIRE(controller.Start([&] { return std::make_unique<Provider>(state); }, 2));
-    const bool entered{Until([&] { return state.entered.load(); })};
-    const bool exhausted{Until([&] { return controller.GetStats().hashes == 16 && controller.GetStats().active_workers == 0; })};
-    state.release = true;
-    const bool replaced{Until([&] { return state.replaced.load(); })};
-    controller.RequestStop();
-    controller.Wait();
-    BOOST_CHECK(entered);
-    BOOST_CHECK(exhausted);
-    BOOST_CHECK(replaced);
-    BOOST_CHECK(!state.mixed);
-}
-
-BOOST_AUTO_TEST_CASE(pool_queue_backpressure_expiry_and_concurrent_stop)
-{
-    struct State {
-        std::atomic<bool> submitted{false}, release{false};
-        std::atomic<unsigned int> attempts{0};
-    } state;
-    struct Provider : mining::WorkProvider {
-        explicit Provider(State& value) : state{value} {}
-        std::optional<mining::MiningJob> GetJob() override
-        {
-            if (given) return {};
-            given = true;
-            mining::MiningJob job;
-            job.continuous = true;
-            job.target = arith_uint256{1};
-            job.deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds{500};
-            return job;
-        }
-        bool IsCurrent(const mining::MiningJob& job) override { return std::chrono::steady_clock::now() < *job.deadline; }
-        mining::SubmissionResult Submit(const mining::MiningJob&, const CBlockHeader&) override
-        {
-            ++state.attempts;
-            state.submitted = true;
-            while (!state.release)
-                std::this_thread::sleep_for(std::chrono::milliseconds{1});
-            return {};
-        }
-        void Interrupt() override { state.release = true; }
-        State& state;
-        bool given{false};
-    };
-    mining::MiningController controller{[] { return [](const CBlockHeader&) { return uint256{}; }; },
-                                        [] { return mining::CalculateWorkerLimits(8, uint64_t{8} << 30); }};
-    BOOST_REQUIRE(controller.Start([&] { return std::make_unique<Provider>(state); }, 2));
-    const bool full{Until([&] { return state.submitted && controller.GetStats().solutions >= 65; })};
-    const auto hashes{controller.GetStats().hashes};
-    std::this_thread::sleep_for(std::chrono::milliseconds{50});
-    BOOST_CHECK(controller.GetStats().hashes <= 67U); // FIFO + in-flight + two blocked workers.
-    BOOST_CHECK(controller.GetStats().hashes - hashes <= 2U);
-    const bool expired{Until([&] { return controller.GetStats().active_workers == 0; })};
-    state.release = true;
-    std::this_thread::sleep_for(std::chrono::milliseconds{150});
-    std::vector<std::thread> stops;
-    for (int i{0}; i < 4; ++i)
-        stops.emplace_back([&] { controller.RequestStop(); });
-    for (auto& stop : stops)
-        stop.join();
-    controller.Wait();
-    BOOST_CHECK(full);
-    BOOST_CHECK(expired);
-    BOOST_CHECK_EQUAL(state.attempts, 1U); // Expired queued headers were discarded.
-    BOOST_CHECK(!controller.GetStats().busy);
-    BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
-}
-
 BOOST_AUTO_TEST_CASE(excessive_worker_count_rejected_before_allocation)
 {
     std::atomic<unsigned int> allocations{0};
@@ -482,6 +331,32 @@ BOOST_AUTO_TEST_CASE(excessive_worker_count_rejected_before_allocation)
     controller.Wait();
     BOOST_CHECK(controller.GetStats().state == mining::MiningState::FAILED);
     BOOST_CHECK_EQUAL(allocations, 0U);
+}
+
+BOOST_AUTO_TEST_CASE(all_twelve_logical_workers_are_allowed_within_memory_budget)
+{
+    auto state{std::make_shared<FakeState>()};
+    std::atomic<unsigned int> contexts{0};
+    mining::MiningController controller{[&] {
+        ++contexts;
+        return [](const CBlockHeader&) {
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+            return uint256::FromHex(std::string(64, 'f')).value();
+        };
+    }, [] { return mining::CalculateWorkerLimits(12, uint64_t{8} << 30); }};
+    BOOST_REQUIRE(controller.Start([state] { return std::make_unique<FakeProvider>(state); }, 13));
+    controller.Wait();
+    BOOST_CHECK(controller.GetStats().state == mining::MiningState::FAILED);
+    BOOST_CHECK_EQUAL(contexts, 0U);
+    const auto failed_elapsed{controller.GetStats().session_elapsed};
+    std::this_thread::sleep_for(std::chrono::milliseconds{10});
+    BOOST_CHECK(controller.GetStats().session_elapsed == failed_elapsed);
+    BOOST_REQUIRE(controller.Start([state] { return std::make_unique<FakeProvider>(state); }, 12));
+    BOOST_REQUIRE(Until([&] { return contexts == 12 && controller.GetStats().active_workers == 12; }));
+    controller.RequestStop();
+    controller.Wait();
+    BOOST_CHECK(controller.GetStats().state == mining::MiningState::STOPPED);
+    BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
 }
 
 BOOST_AUTO_TEST_CASE(authoritative_contexts_are_independent)
@@ -585,7 +460,6 @@ BOOST_AUTO_TEST_CASE(rate_sampling_includes_blocked_submission_time)
         std::optional<mining::MiningJob> GetJob() override
         {
             auto job{FakeProvider::GetJob()};
-            job->continuous = true;
             return job;
         }
         mining::SubmissionResult Submit(const mining::MiningJob&, const CBlockHeader&) override
@@ -612,11 +486,11 @@ BOOST_AUTO_TEST_CASE(rate_sampling_includes_blocked_submission_time)
     }};
     BOOST_REQUIRE(controller.Start([&] { return std::make_unique<Provider>(fake, state); }, 1));
     const bool sampled{Until([&] { return state.blocked.load(); })};
-    const auto rate{controller.GetStats().hashes_per_second};
+    const auto rate{controller.GetStats().hashes_per_second_10s};
     controller.RequestStop();
     controller.Wait();
     BOOST_CHECK(sampled);
-    BOOST_CHECK(rate > 0 && rate < 70); // FIFO bounds completed work to about 67 / 1.8 s.
+    BOOST_CHECK(rate > 0 && rate < 10); // Solo work pauses during submission; blocked time stays in the denominator.
     BOOST_CHECK_EQUAL(controller.GetStats().rejected, 0U);
 }
 BOOST_AUTO_TEST_SUITE_END()

@@ -66,6 +66,12 @@ BOOST_AUTO_TEST_CASE(pq_destination_persistence_and_locked_reuse)
     const auto locked{GetMiningDestination(*api)};
     BOOST_REQUIRE(locked);
     BOOST_CHECK(*locked == *first);
+    BOOST_REQUIRE(api->setAddressBook(*first, "My mining rewards", AddressPurpose::RECEIVE));
+    const auto renamed{GetMiningDestination(*api)};
+    BOOST_REQUIRE(renamed);
+    BOOST_CHECK(*renamed == *first);
+    BOOST_CHECK_EQUAL(api->getAddresses().size(), 1U);
+    BOOST_REQUIRE(api->setAddressBook(*first, MINING_REWARD_LABEL, AddressPurpose::RECEIVE));
     auto other{TestCreateWallet(CreateMockableWalletDatabase(), context, WALLET_FLAG_DESCRIPTORS)};
     auto other_api{interfaces::MakeWallet(context, other)};
     BOOST_REQUIRE(other->EncryptWallet(passphrase));
@@ -210,8 +216,7 @@ BOOST_AUTO_TEST_CASE(native_rewards_maturity_fees_and_pq_spend)
         bool IsCancelled() const override { return remaining == 0 || solo.IsCancelled(); }
     };
     auto mine = [&](unsigned int count, unsigned int workers) {
-        // This bounded integration test temporarily uses both available CPUs;
-        // production Start still uses the actual responsiveness reserve.
+        // Bound the isolated integration test's host memory and CPU budget.
         mining::MiningController controller{{}, [] { return mining::CalculateWorkerLimits(4, 2ULL << 30); }};
         BOOST_REQUIRE(controller.Start([&] { return std::make_unique<BoundedSolo>(interfaces::MakeMining(m_node, false), script, count); }, workers));
         const auto deadline{std::chrono::steady_clock::now() + std::chrono::seconds{180}};

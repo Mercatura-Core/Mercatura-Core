@@ -13,17 +13,11 @@
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QDateTime>
-#include <QDialog>
-#include <QDialogButtonBox>
-#include <QFileDialog>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QLineEdit>
 #include <QListWidget>
-#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSettings>
@@ -49,11 +43,6 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
     outer->addWidget(scroll);
     auto* layout{new QVBoxLayout{content}};
     layout->setContentsMargins(0, 0, 0, 0);
-    m_mode = new QComboBox{this};
-    m_mode->setObjectName(QStringLiteral("miningMode"));
-    m_mode->setAccessibleName(tr("Mining mode"));
-    m_mode->addItems({tr("Solo Mining"), tr("Pool Mining")});
-    layout->addWidget(m_mode);
     auto* group{new QGroupBox{tr("Mining hardware"), this}};
     auto* form{new QFormLayout{group}};
     form->setRowWrapPolicy(QFormLayout::WrapLongRows);
@@ -91,17 +80,13 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
     m_gpu_rates = new QLabel{group}; m_gpu_rates->setTextFormat(Qt::PlainText); m_gpu_rates->setWordWrap(true);
     form->addRow(tr("CPU / GPU statistics"), m_gpu_rates);
 
-    m_automatic = new QCheckBox{tr("Automatic (recommended: %1 workers)").arg(m_limits.recommended), group};
-    m_automatic->setObjectName(QStringLiteral("automaticWorkers"));
-    m_automatic->setChecked(true);
-    form->addRow(tr("CPU workers"), m_automatic);
+    QSettings settings;
     m_workers = new QSpinBox{group};
     m_workers->setObjectName(QStringLiteral("manualWorkers"));
     m_workers->setRange(1, static_cast<int>(std::max(1U, std::min(m_limits.maximum, static_cast<unsigned int>(std::numeric_limits<int>::max())))));
-    m_workers->setValue(std::max(1U, m_limits.recommended));
-    m_workers->setEnabled(false);
-    form->addRow(tr("Manual workers"), m_workers);
-    auto* hardware{new QLabel{tr("%1 logical processors detected; up to %2 workers within the current CPU and memory budget. Each worker needs a private 128 MiB scratchpad plus overhead. Logical processor count does not predict optimal hashing throughput.").arg(m_limits.logical_cpus).arg(m_limits.maximum), group}};
+    m_workers->setValue(std::clamp(settings.value("mining/cpuWorkers", 1).toInt(), 1, m_workers->maximum()));
+    form->addRow(tr("CPU workers"), m_workers);
+    auto* hardware{new QLabel{tr("%1 logical processors detected; up to %2 CPU-only workers within the current CPU and memory budget. Combined mode also reserves host memory for GPU verification. Each worker needs a private 128 MiB scratchpad plus overhead. Logical processor count does not predict optimal hashing throughput.").arg(m_limits.logical_cpus).arg(m_limits.maximum), group}};
     hardware->setWordWrap(true);
     form->addRow(hardware);
     m_destination = new QLabel{tr("Created or reused when mining starts"), group};
@@ -110,10 +95,36 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
     m_destination->setWordWrap(true);
     m_destination->setTextInteractionFlags(Qt::TextSelectableByMouse);
     m_destination->setFont(GUIUtil::fixedPitchFont());
-    form->addRow(tr("PQ reward destination"), m_destination);
+    m_destination->setToolTip(tr("This wallet-owned PQ address receives mining rewards. Show in address book opens receiving addresses. Newly created mining addresses use the label Mercatura mining reward."));
+    auto* destination_row{new QWidget{group}};
+    auto* destination_layout{new QVBoxLayout{destination_row}};
+    destination_layout->setContentsMargins(0, 0, 0, 0);
+    destination_layout->setSpacing(2);
+    destination_layout->addWidget(m_destination);
+    auto* address_actions{new QHBoxLayout};
+    m_copy_destination = new QPushButton{tr("Copy address"), destination_row};
+    m_copy_destination->setObjectName(QStringLiteral("copyMiningDestination"));
+    m_show_destination = new QPushButton{tr("Show in address book"), destination_row};
+    m_show_destination->setObjectName(QStringLiteral("showMiningDestination"));
+    address_actions->addWidget(m_copy_destination);
+    address_actions->addWidget(m_show_destination);
+    address_actions->addStretch();
+    destination_layout->addLayout(address_actions);
+    form->addRow(tr("PQ reward destination"), destination_row);
     m_hashrate = new QLabel{group};
     m_hashrate->setObjectName(QStringLiteral("miningHashrate"));
-    form->addRow(tr("Local hashrate"), m_hashrate);
+    auto font{m_hashrate->font()};
+    font.setBold(true);
+    m_hashrate->setFont(font);
+    m_hashrate->setToolTip(tr("Uses completed CPU and GPU hashes over the last 10 seconds, or elapsed session time while starting."));
+    form->addRow(tr("10-second average"), m_hashrate);
+    m_statistics = new QLabel{group};
+    m_statistics->setObjectName(QStringLiteral("miningSessionStatistics"));
+    m_statistics->setTextFormat(Qt::PlainText);
+    form->addRow(tr("Session statistics"), m_statistics);
+    m_runtime = new QLabel{group};
+    m_runtime->setObjectName(QStringLiteral("miningSessionRuntime"));
+    form->addRow(tr("Session Runtime"), m_runtime);
     m_active = new QLabel{group};
     m_active->setObjectName(QStringLiteral("miningActiveWorkers"));
     form->addRow(tr("Active workers"), m_active);
@@ -126,62 +137,10 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
     m_status->setWordWrap(true);
     form->addRow(tr("Status"), m_status);
     layout->addWidget(group);
-    m_pool = new QGroupBox{tr("Pool configuration and shares"), this};
-    auto* pool_form{new QFormLayout{m_pool}};
-    pool_form->setRowWrapPolicy(QFormLayout::WrapLongRows);
-    QSettings settings;
-    m_host = new QLineEdit{settings.value("mining/poolHost").toString(), m_pool};
-    m_host->setMaxLength(253);
-    m_host->setObjectName(QStringLiteral("poolHost"));
-    m_host->setPlaceholderText(tr("Pool hostname"));
-    pool_form->addRow(tr("Server"), m_host);
-    m_port = new QSpinBox{m_pool};
-    m_port->setRange(1, 65535);
-    m_port->setValue(settings.value("mining/poolPort", 3333).toInt());
-    m_port->setObjectName(QStringLiteral("poolPort"));
-    pool_form->addRow(tr("Port"), m_port);
-    m_ca_file = settings.value("mining/poolCA").toString();
-    m_certificate = new QLabel{m_pool};
-    m_certificate->setTextFormat(Qt::PlainText);
-    m_certificate->setWordWrap(true);
-    pool_form->addRow(tr("TLS"), m_certificate);
-    m_ca = new QPushButton{tr("Select trusted CA certificate…"), m_pool};
-    pool_form->addRow(m_ca);
-    m_system_ca = new QPushButton{tr("Use system trust store only"), m_pool};
-    m_system_ca->setObjectName(QStringLiteral("systemPoolCA"));
-    pool_form->addRow(m_system_ca);
-    m_connection = new QLabel{m_pool};
-    m_connection->setObjectName(QStringLiteral("poolStatus"));
-    m_connection->setTextFormat(Qt::PlainText);
-    m_connection->setWordWrap(true);
-    pool_form->addRow(tr("Connection"), m_connection);
-    m_shares = new QLabel{m_pool};
-    pool_form->addRow(tr("Accepted / rejected / stale shares (pool replies since Start)"), m_shares);
-    m_last_share = new QLabel{m_pool};
-    pool_form->addRow(tr("Last accepted share (local receipt time)"), m_last_share);
-    m_reported = new QLabel{m_pool};
-    m_reported->setTextFormat(Qt::PlainText);
-    m_reported->setWordWrap(true);
-    pool_form->addRow(tr("Reported by pool"), m_reported);
-    m_commitment = new QLabel{m_pool};
-    m_commitment->setTextFormat(Qt::PlainText);
-    m_commitment->setWordWrap(true);
-    m_commitment->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    pool_form->addRow(tr("Checked payout snapshot"), m_commitment);
-    m_inspect = new QPushButton{tr("Inspect payout manifest…"), m_pool};
-    m_inspect->setObjectName(QStringLiteral("inspectPoolManifest"));
-    pool_form->addRow(m_inspect);
-    m_reset = new QPushButton{tr("Forget disconnected pool session"), m_pool};
-    m_reset->setToolTip(tr("Use after the pool loses its session database. The next Start registers a new namespace; previous shares keep their payout address."));
-    pool_form->addRow(m_reset);
-    auto* trust{new QLabel{tr("Mining software and coordinator fees: permanently 0%. Coinbase payouts and commitments are checked against the supplied candidate. Local Core proposal validation is used when its synchronized tip matches; otherwise chain history comes from the coordinator. PPLNS history is supplied by the coordinator. Shares do not guarantee rewards."), m_pool}};
-    trust->setWordWrap(true);
-    pool_form->addRow(trust);
-    layout->addWidget(m_pool);
     for (auto* label : content->findChildren<QLabel*>()) {
         label->setWordWrap(true);
     }
-    for (auto* label : {m_destination, m_certificate, m_connection, m_reported, m_commitment, m_status, m_gpu_status, m_gpu_rates}) {
+    for (auto* label : {m_destination, m_statistics, m_status, m_gpu_status, m_gpu_rates}) {
         auto policy{label->sizePolicy()};
         policy.setHorizontalPolicy(QSizePolicy::Ignored);
         label->setSizePolicy(policy);
@@ -196,7 +155,15 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
     buttons->addStretch();
     outer->addLayout(buttons);
     layout->addStretch();
-    connect(m_automatic, &QCheckBox::toggled, this, [this] { updateStatus(); });
+    connect(m_workers, &QSpinBox::valueChanged, this, [](int count) {
+        QSettings{}.setValue("mining/cpuWorkers", count);
+    });
+    connect(m_copy_destination, &QPushButton::clicked, this, [this] {
+        if (m_copy_destination->isEnabled()) GUIUtil::setClipboard(m_destination->text());
+    });
+    connect(m_show_destination, &QPushButton::clicked, this, [this] {
+        if (m_show_destination->isEnabled()) Q_EMIT showRewardAddress(m_destination->text());
+    });
     connect(m_hardware, &QComboBox::currentIndexChanged, this, [this] { updateStatus(); });
     connect(m_all_devices, &QCheckBox::toggled, this, [this] { updateStatus(); });
     connect(m_devices, &QListWidget::itemChanged, this, [this] { updateStatus(); });
@@ -204,35 +171,9 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
         if (m_session) m_session->refreshDevices();
         updateStatus();
     });
-    connect(m_mode, &QComboBox::currentIndexChanged, this, [this] { updateStatus(); });
-    connect(m_host, &QLineEdit::textChanged, this, [this] { updateStatus(); });
-    connect(m_ca, &QPushButton::clicked, this, [this] {
-        const auto file{QFileDialog::getOpenFileName(this, tr("Select a trusted pool CA certificate"), {}, tr("PEM certificates (*.pem *.crt)"))};
-        if (!file.isEmpty()) m_ca_file = file;
-        updateStatus();
-    });
-    connect(m_system_ca, &QPushButton::clicked, this, [this] { m_ca_file.clear(); updateStatus(); });
-    connect(m_reset, &QPushButton::clicked, this, [this] { if (m_session) m_session->forgetPoolSession(); updateStatus(); });
-    connect(m_inspect, &QPushButton::clicked, this, [this] {
-        if (!m_session) return;
-        const auto stats{m_session->poolStats()};
-        if (!stats.details) return;
-        QDialog dialog{this};
-        dialog.setWindowTitle(tr("Pool payout manifest — coordinator history"));
-        auto* contents{new QVBoxLayout{&dialog}};
-        auto* text{new QPlainTextEdit{&dialog}};
-        text->setReadOnly(true);
-        text->setPlainText(QString::fromStdString(*stats.details));
-        contents->addWidget(text);
-        auto* close{new QDialogButtonBox{QDialogButtonBox::Close, &dialog}};
-        connect(close, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-        contents->addWidget(close);
-        dialog.resize(720, 480);
-        dialog.exec();
-    });
     connect(m_start, &QPushButton::clicked, this, [this] {
         if (m_session) {
-            const unsigned int workers{m_automatic->isChecked() ? 0 : static_cast<unsigned int>(m_workers->value())};
+            const unsigned int workers{static_cast<unsigned int>(m_workers->value())};
             mining::GpuConfig hardware;
             hardware.cpu = m_hardware->currentIndex() != 1;
             hardware.gpu = m_hardware->currentIndex() != 0;
@@ -245,14 +186,7 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
                 }
                 if (hardware.gpu && hardware.devices.empty()) return;
             }
-            if (m_mode->currentIndex() == 1) {
-                QSettings settings;
-                settings.setValue("mining/poolHost", m_host->text());
-                settings.setValue("mining/poolPort", m_port->value());
-                settings.setValue("mining/poolCA", m_ca_file);
-                m_session->startPool(m_wallet, workers, {m_host->text().toStdString(), static_cast<uint16_t>(m_port->value()), m_ca_file.toStdString()}, hardware);
-            } else
-                m_session->start(m_wallet, workers, hardware);
+            m_session->start(m_wallet, workers, hardware);
         }
         updateStatus();
     });
@@ -279,9 +213,7 @@ void MiningPage::updateStatus()
 {
     const mining::MiningStats stats{m_session ? m_session->stats() : mining::MiningStats{}};
     const bool running{stats.busy};
-    const bool pool{m_mode->currentIndex() == 1};
-    const bool syncing{!pool && m_client && Params().GetChainType() != ChainType::REGTEST && m_client->node().isInitialBlockDownload()};
-    const bool endpoint{mining::ValidPoolEndpoint({m_host->text().toStdString(), static_cast<uint16_t>(m_port->value()), m_ca_file.toStdString()})};
+    const bool syncing{m_client && Params().GetChainType() != ChainType::REGTEST && m_client->node().isInitialBlockDownload()};
     const bool use_cpu{m_hardware->currentIndex() != 1};
     const bool use_gpu{m_hardware->currentIndex() != 0};
     const auto discovery{m_session ? m_session->gpuDiscoverySnapshot() : std::optional<MiningSession::GpuDiscoverySnapshot>{}};
@@ -297,10 +229,18 @@ void MiningPage::updateStatus()
         }
         m_devices_revision = discovery->revision;
     }
-    bool gpu_available{false};
+    size_t selected_gpus{0};
     for (int i{0}; i < m_devices->count(); ++i) if ((m_devices->item(i)->flags() & Qt::ItemIsEnabled) &&
-        (m_all_devices->isChecked() || m_devices->item(i)->checkState() == Qt::Checked)) gpu_available = true;
-    m_start->setEnabled(m_wallet && m_session && m_client && !running && !syncing && (!use_cpu || m_limits.maximum > 0) && (!use_gpu || (discovery && gpu_available)) && (!pool || endpoint));
+        (m_all_devices->isChecked() || m_devices->item(i)->checkState() == Qt::Checked)) ++selected_gpus;
+    const bool gpu_available{selected_gpus > 0};
+    const auto maximum{mining::MaximumCpuWorkers(m_limits, use_gpu ? selected_gpus : 0)};
+    const auto host_limits{mining::CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), m_limits.available_memory)};
+    const bool gpu_host_memory{!use_gpu || selected_gpus <= host_limits.maximum};
+    if (!running) {
+        const QSignalBlocker block{m_workers}; // Resource clamping is not a new manual preference.
+        m_workers->setMaximum(static_cast<int>(std::max(1U, std::min(maximum, static_cast<unsigned int>(std::numeric_limits<int>::max())))));
+    }
+    m_start->setEnabled(m_wallet && m_session && m_client && !running && !syncing && (!use_cpu || maximum > 0) && (!use_gpu || (discovery && gpu_available && gpu_host_memory)));
     m_stop->setEnabled(m_session && running && stats.state != mining::MiningState::STOPPING);
     m_hardware->setEnabled(!running);
     m_all_devices->setEnabled(!running && use_gpu);
@@ -319,6 +259,7 @@ void MiningPage::updateStatus()
     else {
         for (const auto& error : discovery->result.errors) gpu_messages << QString::fromStdString(error);
         if (!gpu_available) gpu_messages << tr("Select an available GPU or choose CPU mining.");
+        else if (!gpu_host_memory) gpu_messages << tr("Insufficient host memory for the selected GPU verifiers. Select fewer devices or free memory.");
     }
     m_gpu_status->setText(gpu_messages.join(QStringLiteral("\n")));
     QStringList device_rates{tr("CPU: %1 H/s (%2 hashes)").arg(stats.cpu_hashes_per_second, 0, 'f', 2).arg(qulonglong{stats.cpu_hashes})};
@@ -326,35 +267,21 @@ void MiningPage::updateStatus()
         .arg(QString::fromStdString(device.device.name)).arg(device.hashes_per_second, 0, 'f', 2).arg(qulonglong{device.hashes})
         .arg(qulonglong{device.memory_bytes >> 20}).arg(device.contexts).arg(QString::fromStdString(device.status));
     m_gpu_rates->setText(device_rates.join(QStringLiteral("\n")));
-    m_automatic->setEnabled(!running && use_cpu);
-    m_workers->setEnabled(!running && use_cpu && !m_automatic->isChecked() && m_limits.maximum > 0);
-    m_mode->setEnabled(!running);
-    m_pool->setVisible(pool);
-    m_host->setEnabled(!running);
-    m_port->setEnabled(!running);
-    m_ca->setEnabled(!running);
-    m_system_ca->setEnabled(!running && !m_ca_file.isEmpty());
-    m_reset->setEnabled(m_session && !running);
-    m_certificate->setText(m_ca_file.isEmpty() ? tr("System trust store; certificate and hostname verification required") : tr("System trust store plus selected CA: %1. Hostname verification required.").arg(m_ca_file));
-    const auto pool_stats{m_session ? m_session->poolStats() : mining::PoolStats{}};
-    m_connection->setText(QString::fromStdString(pool_stats.status) + (pool_stats.connected ? (pool_stats.locally_verified ? tr("\nCandidate passed local Core proposal validation.") : tr("\nCandidate chain validity has not been verified by this local node.")) : QString{}));
-    m_shares->setText(QStringLiteral("%1 / %2 / %3").arg(qulonglong{pool_stats.accepted}).arg(qulonglong{pool_stats.rejected}).arg(qulonglong{pool_stats.stale}));
-    m_last_share->setText(pool_stats.last_accepted ? QDateTime::fromSecsSinceEpoch(pool_stats.last_accepted).toLocalTime().toString(Qt::ISODate) : tr("None"));
-    m_reported->setText(QString::fromStdString(pool_stats.reported));
-    m_commitment->setText(m_privacy ? tr("(hidden)") : QString::fromStdString(pool_stats.commitment));
-    m_inspect->setEnabled(m_session && bool(pool_stats.manifest) && !m_privacy);
-    m_hashrate->setText(tr("%1 H/s (%2 hashes)").arg(stats.hashes_per_second, 0, 'f', 2).arg(qulonglong{stats.hashes}));
+    m_workers->setEnabled(!running && use_cpu && maximum > 0);
+    m_hashrate->setText(tr("%1 H/s").arg(stats.hashes_per_second_10s, 0, 'f', 2));
+    m_statistics->setText(tr("60 s: %1 H/s · Session: %2 H/s · %3 hashes")
+        .arg(stats.hashes_per_second_60s, 0, 'f', 2)
+        .arg(stats.hashes_per_second_session, 0, 'f', 2).arg(qulonglong{stats.hashes}));
+    m_runtime->setText(formatRuntime(std::chrono::duration_cast<std::chrono::seconds>(stats.session_elapsed).count()));
     m_active->setText(QString::number(stats.active_workers));
-    m_blocks->setText(pool ? tr("%1 target hits / %2 submission attempts (local)").arg(qulonglong{stats.solutions}).arg(qulonglong{stats.submitted}) : QStringLiteral("%1 / %2 / %3").arg(qulonglong{stats.solutions}).arg(qulonglong{stats.submitted}).arg(qulonglong{stats.accepted}));
+    m_blocks->setText(QStringLiteral("%1 / %2 / %3").arg(qulonglong{stats.solutions}).arg(qulonglong{stats.submitted}).arg(qulonglong{stats.accepted}));
     m_blocks->setToolTip(tr("Not processed: %1; stale or discarded: %2. Processing without observed active-chain acceptance is not counted as accepted.").arg(qulonglong{stats.rejected}).arg(qulonglong{stats.stale}));
     QString status{QString::fromStdString(stats.status)};
     if (!m_wallet || !m_session || !m_client) status = tr("Mining is unavailable until the node and wallet are loaded.");
     else if (!running && stats.state != mining::MiningState::FAILED) {
         if (use_gpu && !gpu_available) status = tr("No selected compatible GPU is available. Choose CPU mining or refresh devices.");
-        else if (use_cpu && m_limits.maximum == 0) status = tr("Insufficient available memory for a mining worker.");
+        else if (!gpu_host_memory || (use_cpu && maximum == 0)) status = tr("Insufficient available memory for the selected CPU workers and GPU verifiers.");
         else if (syncing) status = tr("Waiting for initial block download to complete.");
-        else if (pool && !endpoint)
-            status = tr("Enter a pool hostname and port. TLS is required.");
         else status = tr("Ready. Mining starts only when you press Start Mining.");
     }
     if (m_session && m_session->owner() && m_session->owner() != m_wallet && running) {
@@ -362,4 +289,16 @@ void MiningPage::updateStatus()
     }
     m_status->setText(status);
     m_destination->setText(m_privacy ? tr("(hidden)") : (stats.destination.empty() || (!running && m_session && m_session->owner() != m_wallet)) ? tr("Created or reused when mining starts") : QString::fromStdString(stats.destination));
+    const bool own_destination{!m_privacy && m_wallet && m_session && m_session->owner() == m_wallet && !stats.destination.empty()};
+    m_copy_destination->setEnabled(own_destination);
+    m_show_destination->setEnabled(own_destination);
+}
+
+QString MiningPage::formatRuntime(uint64_t seconds)
+{
+    const auto time{QStringLiteral("%1:%2:%3")
+        .arg(qulonglong{(seconds / 3600) % 24}, 2, 10, QLatin1Char{'0'})
+        .arg(qulonglong{(seconds / 60) % 60}, 2, 10, QLatin1Char{'0'})
+        .arg(qulonglong{seconds % 60}, 2, 10, QLatin1Char{'0'})};
+    return seconds < 86400 ? time : tr("%1 d %2").arg(qulonglong{seconds / 86400}).arg(time);
 }

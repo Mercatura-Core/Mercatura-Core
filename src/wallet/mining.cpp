@@ -11,8 +11,15 @@
 namespace wallet {
 util::Result<CTxDestination> GetMiningDestination(interfaces::Wallet& wallet)
 {
-    for (const auto& address : wallet.getAddresses()) {
+    const auto addresses{wallet.getAddresses()};
+    for (const auto& address : addresses) {
         if (address.name == MINING_REWARD_LABEL && address.is_mine &&
+            std::holds_alternative<WitnessV2MercaturaPQ>(address.dest) && wallet.isSpendable(address.dest)) return address.dest;
+    }
+    // Reuse an eligible receiving address even if its mining label was edited.
+    // Preserve the user's label and never repurpose sending/change addresses.
+    for (const auto& address : addresses) {
+        if (address.purpose == AddressPurpose::RECEIVE && address.is_mine &&
             std::holds_alternative<WitnessV2MercaturaPQ>(address.dest) && wallet.isSpendable(address.dest)) return address.dest;
     }
     if (wallet.isLocked()) return util::Error{Untranslated("Unlock this wallet once to create its native PQ mining reward address, then start mining again")};

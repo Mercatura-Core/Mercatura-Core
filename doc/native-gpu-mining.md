@@ -1,16 +1,14 @@
 # Native NVIDIA and AMD mining (M5 development)
 
-GPU hashing extends the M4 `MiningController`, `WorkProvider`, Solo and native
-pool paths. Mining starts only on an explicit Start action. Software fees,
+GPU hashing uses the native `MiningController`, `WorkProvider` and Solo provider. Mining starts only on an explicit Start action. Software fees,
 developer fees and automatic donations remain 0%. No consensus rules, wallet
-signing operations, pool protocol, accounting, payout construction or blockchain
-databases are changed. P2Pool remains M6.
+signing operations, payout construction or blockchain databases are changed.
 
 ## Hardware and backend selection
 
 The Mining page offers CPU, GPU, and CPU + GPU. Automatic GPU selection uses all
 compatible NVIDIA and AMD devices; manual checkboxes support either vendor,
-mixed vendors and multiple devices. CPU worker settings retain M4 semantics.
+mixed vendors and multiple devices. CPU workers are selected manually within the detected CPU and memory limits.
 Device discovery and initialization run outside the Qt thread. Start settings
 are fixed for the session; Stop is asynchronous and shutdown joins workers
 before node and wallet teardown.
@@ -191,10 +189,10 @@ validation. The optional file contains one canonical 80-byte header per line,
 encoded as 160 hexadecimal characters; each is compared against `HashV1`.
 
 Before either vendor is release-ready, execute parity on each intended device,
-then Solo/Pool and mixed CPU/NVIDIA/AMD mining, concurrent multi-device work,
+then Solo and mixed CPU/NVIDIA/AMD mining, concurrent multi-device work,
 nonce/extranonce exhaustion, tip/job changes, stale work, Stop/Start, wallet
 lock/unload, shutdown, memory pressure, sustained mining, thermal/power behavior
 and driver faults. Qualify Solo blocks through independent peers and native PQ
-payout ownership, difficulty changes and reorganizations. Pool beta still needs
-real accepted shares/blocks and correct native payouts. No actual GPU execution
-or release qualification is inferred from compilation or software mocks.
+payout ownership, difficulty changes and reorganizations.
+No actual GPU execution or release qualification is inferred from compilation
+or software mocks.

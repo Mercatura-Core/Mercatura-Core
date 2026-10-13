@@ -7,7 +7,7 @@ $(package)_sha256_hash=$(qt_details_qtbase_sha256_hash)
 ifneq ($(host),$(build))
 $(package)_dependencies := native_$(package)
 endif
-$(package)_linux_dependencies := freetype fontconfig libxcb libxkbcommon libxcb_util libxcb_util_cursor libxcb_util_render libxcb_util_keysyms libxcb_util_image libxcb_util_wm openssl
+$(package)_linux_dependencies := freetype fontconfig libxcb libxkbcommon libxcb_util libxcb_util_cursor libxcb_util_render libxcb_util_keysyms libxcb_util_image libxcb_util_wm
 $(package)_freebsd_dependencies := $($(package)_linux_dependencies)
 $(package)_patches_path := $(qt_details_patches_path)
 $(package)_patches := cocoa_compat.patch
@@ -140,13 +140,13 @@ $(package)_config_opts += -no-feature-qtplugininfo
 endif
 
 $(package)_config_opts_darwin := -no-dbus
-$(package)_config_opts_darwin += -securetransport -no-openssl -no-schannel
+$(package)_config_opts_darwin += -no-securetransport -no-openssl -no-schannel
 $(package)_config_opts_darwin += -no-feature-printsupport
 $(package)_config_opts_darwin += -no-feature-freetype
 $(package)_config_opts_darwin += -no-pkg-config
 
 $(package)_config_opts_linux := -fontconfig
-$(package)_config_opts_linux += -openssl-linked -no-schannel -no-securetransport
+$(package)_config_opts_linux += -no-openssl -no-schannel -no-securetransport
 $(package)_config_opts_linux += -no-feature-process
 $(package)_config_opts_linux += -no-feature-xlib
 $(package)_config_opts_linux += -no-xcb-xlib
@@ -159,7 +159,7 @@ endif
 $(package)_config_opts_freebsd := $$($(package)_config_opts_linux)
 
 $(package)_config_opts_mingw32 := -no-dbus
-$(package)_config_opts_mingw32 += -schannel -no-openssl -no-securetransport
+$(package)_config_opts_mingw32 += -no-schannel -no-openssl -no-securetransport
 $(package)_config_opts_mingw32 += -no-feature-freetype
 $(package)_config_opts_mingw32 += -no-pkg-config
 $(package)_config_opts_mingw32 += -no-stack-clash-protection

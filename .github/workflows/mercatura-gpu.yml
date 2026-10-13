@@ -2,9 +2,9 @@ name: Mercatura M5 GPU compile and software validation
 on:
   workflow_dispatch:
   pull_request:
-    paths: ['src/pool/**', 'src/qt/poolclient*', 'src/mining/**', 'src/qt/mining*', 'src/test/*gpu*', 'src/CMakeLists.txt', 'src/test/CMakeLists.txt', 'vcpkg.json', '.github/workflows/mercatura-gpu.yml']
+    paths: ['src/mining/**', 'src/qt/mining*', 'src/test/*gpu*', 'src/CMakeLists.txt', 'src/test/CMakeLists.txt', 'vcpkg.json', '.github/workflows/mercatura-gpu.yml']
   push:
-    branches: [feature/qt-gpu-mining, feature/qt-mining-release-hardening, feature/qt-solo-release-qualification]
+    branches: [feature/qt-gpu-mining, feature/qt-mining-release-hardening, feature/qt-solo-release-qualification, feature/m73-solo-refinement]
 permissions:
   contents: read
 concurrency:
@@ -24,21 +24,21 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y build-essential cmake ninja-build python3 clang \
-            libboost-dev libevent-dev libsqlite3-dev libssl-dev qt6-base-dev \
+            libboost-dev libevent-dev libsqlite3-dev qt6-base-dev \
             qt6-tools-dev qt6-tools-dev-tools ocl-icd-opencl-dev
       - name: Configure and build
         run: |
           cmake -S . -B work/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_GUI=ON -DENABLE_IPC=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=OFF \
             -DWITH_OPENCL_MINING=${{ matrix.amd }}
-          cmake --build work/build -j4 --target bitcoin-qt test_bitcoin test_mining-qt test_poolclient-qt
-      - name: Software and M4 regression gates (no hardware claim)
+          cmake --build work/build -j4 --target bitcoin-qt test_bitcoin test_mining-qt
+      - name: Software and Solo regression gates (no hardware claim)
         run: |
           clang -x cl -cl-std=CL1.2 -DMH_OPENCL -Werror -fsyntax-only src/mining/mercahash_gpu.h
           clang -x cl -cl-std=CL1.2 -DMH_OPENCL -target spir64-unknown-unknown -emit-llvm -c src/mining/mercahash_gpu.h -o work/mercahash-opencl.bc
-          work/build/bin/test_bitcoin --run_test=cpu_miner_tests,gpu_miner_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,mining_tests_wallet,mining_tests_solo
+          work/build/bin/test_bitcoin --run_test=cpu_miner_tests,mining_statistics_tests,gpu_miner_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,mining_tests_wallet,mining_tests_solo
+          work/build/bin/test_bitcoin --run_test=crypto_tests/mercahash_v1_vectors
           QT_QPA_PLATFORM=offscreen work/build/bin/test_mining-qt
-          work/build/bin/test_poolclient-qt
       - name: AMD checker reports hardware validation unavailable
         if: matrix.amd == 'ON'
         run: |

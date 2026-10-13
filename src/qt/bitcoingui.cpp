@@ -283,8 +283,8 @@ void BitcoinGUI::createActions()
     historyAction->setShortcut(QKeySequence(QStringLiteral("Alt+4")));
     tabGroup->addAction(historyAction);
 
-    miningAction = new QAction(platformStyle->SingleColorIcon(":/icons/overview"), tr("&Mining"), this);
-    miningAction->setStatusTip(tr("Native CPU solo mining"));
+    miningAction = new QAction(platformStyle->SingleColorIcon(":/icons/mining"), tr("&Mining"), this);
+    miningAction->setStatusTip(tr("Native CPU and GPU solo mining"));
     miningAction->setToolTip(miningAction->statusTip());
     miningAction->setCheckable(true);
     miningAction->setShortcut(QKeySequence(QStringLiteral("Alt+5")));
@@ -1335,7 +1335,7 @@ void BitcoinGUI::changeEvent(QEvent *e)
         sendCoinsAction->setIcon(platformStyle->SingleColorIcon(QStringLiteral(":/icons/send")));
         receiveCoinsAction->setIcon(platformStyle->SingleColorIcon(QStringLiteral(":/icons/receiving_addresses")));
         historyAction->setIcon(platformStyle->SingleColorIcon(QStringLiteral(":/icons/history")));
-        miningAction->setIcon(platformStyle->SingleColorIcon(QStringLiteral(":/icons/overview")));
+        miningAction->setIcon(platformStyle->SingleColorIcon(QStringLiteral(":/icons/mining")));
     }
 
     QMainWindow::changeEvent(e);

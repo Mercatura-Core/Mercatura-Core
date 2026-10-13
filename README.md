@@ -492,7 +492,7 @@ RPC should normally remain bound to localhost unless the operator has a specific
 ## Mining
 
 The M5 development branch adds optional NVIDIA CUDA and AMD OpenCL backends to
-native Qt Solo/Pool mining, including mixed CPU/GPU and multiple devices. See
+native Qt Solo Mining, including mixed CPU/GPU and multiple devices. See
 [native GPU mining](doc/native-gpu-mining.md) for build options, compatibility,
 validation limits and hardware qualification requirements. GPU options default
 to OFF; this development work is not a qualified GPU mining release.

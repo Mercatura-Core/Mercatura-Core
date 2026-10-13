@@ -34,15 +34,6 @@ bool MiningSession::start(WalletModel* wallet, unsigned int workers, mining::Gpu
 {
     if (stats().busy) return false;
     m_hardware = std::move(hardware);
-    m_pool_mode = false;
-    return startMode(wallet, workers);
-}
-bool MiningSession::startPool(WalletModel* wallet, unsigned int workers, mining::PoolEndpoint endpoint, mining::GpuConfig hardware)
-{
-    if (stats().busy || !mining::ValidPoolEndpoint(endpoint)) return false;
-    m_hardware = std::move(hardware);
-    m_pool_mode = true;
-    m_endpoint = std::move(endpoint);
     return startMode(wallet, workers);
 }
 bool MiningSession::startMode(WalletModel* wallet, unsigned int workers)
@@ -72,13 +63,6 @@ bool MiningSession::startMode(WalletModel* wallet, unsigned int workers)
             if (!destination) {
                 m_needs_unlock = !m_cancelled && !*cancelled && selected->isLocked();
                 throw std::runtime_error{util::ErrorString(destination).original};
-            }
-            if (m_pool_mode) {
-                auto* context{m_node.context()};
-                return std::make_unique<mining::PoolWorkProvider>(m_endpoint,
-                                                                  ChainTypeToString(Params().GetChainType()), Params().GenesisBlock().GetHash().GetHex(),
-                                                                  EncodeDestination(*destination), GetScriptForDestination(*destination), Params().GetConsensus(),
-                                                                  m_pool_state, cancelled, std::move(unload), context ? interfaces::MakeMining(*context, /*wait_loaded=*/false) : nullptr);
             }
             auto* context{m_node.context()};
             if (!context) throw std::runtime_error{"Native mining requires an in-process Core node"};

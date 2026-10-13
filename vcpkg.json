@@ -17,7 +17,6 @@
     "qt": {
       "description": "Build GUI, Qt 6",
       "dependencies": [
-        "boost-multiprecision",
         {
           "name": "qtbase",
           "default-features": false,
@@ -49,12 +48,6 @@
       "description": "Enable ZMQ notifications",
       "dependencies": [
         "zeromq"
-      ]
-    },
-    "pool-client-tests": {
-      "description": "Authoritative M3 fixtures for the native Qt pool-client tests",
-      "dependencies": [
-        "openssl"
       ]
     },
     "gpu-amd": {

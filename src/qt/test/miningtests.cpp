@@ -17,7 +17,13 @@
 #include <wallet/wallet.h>
 #include <wallet/walletdb.h>
 
+#include <qt/addressbookpage.h>
+#include <qt/addresstablemodel.h>
 #include <QApplication>
+#include <QCheckBox>
+#include <QClipboard>
+#include <QSignalSpy>
+#include <QTableView>
 #include <QComboBox>
 #include <QLabel>
 #include <QLineEdit>
@@ -39,6 +45,55 @@ Q_DECLARE_METATYPE(wallet::AddressPurpose)
 class MiningTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void manualWorkersPersistAndRuntimeFormatting()
+    {
+        QSettings settings;
+        settings.setValue("mining/cpuWorkers", 100000);
+        {
+            MiningPage page{nullptr};
+            auto* workers{page.findChild<QSpinBox*>("manualWorkers")};
+            QVERIFY(workers);
+            QCOMPARE(workers->value(), workers->maximum());
+            workers->setValue(1);
+        }
+        MiningPage reopened{nullptr};
+        QCOMPARE(reopened.findChild<QSpinBox*>("manualWorkers")->value(), 1);
+        settings.setValue("mining/cpuWorkers", -4);
+        MiningPage clamped{nullptr};
+        QCOMPARE(clamped.findChild<QSpinBox*>("manualWorkers")->value(), 1);
+        settings.remove("mining/cpuWorkers");
+        QCOMPARE(MiningPage::formatRuntime(0), QString{"00:00:00"});
+        QCOMPARE(MiningPage::formatRuntime(3661), QString{"01:01:01"});
+        QCOMPARE(MiningPage::formatRuntime(86400), QString{"1 d 00:00:00"});
+        QCOMPARE(MiningPage::formatRuntime(100 * 86400 + 3661), QString{"100 d 01:01:01"});
+    }
+
+    void pickaxeFollowsPaletteAtHighDpi()
+    {
+        std::unique_ptr<const PlatformStyle> style{PlatformStyle::instantiate("other")};
+        const auto previous{QApplication::palette()};
+        for (const auto color : {QColor{Qt::black}, QColor{Qt::white}}) {
+            auto palette{previous};
+            palette.setColor(QPalette::WindowText, color);
+            QApplication::setPalette(palette);
+            const auto icon{style->SingleColorIcon(":/icons/mining")};
+            QVERIFY(!icon.isNull());
+            for (const auto size : {24, 48, 96}) {
+                const auto pixels{icon.pixmap(size, size).toImage()};
+                QVERIFY(!pixels.isNull());
+                bool found{false};
+                for (int x{0}; x < pixels.width(); ++x)
+                    for (int y{0}; y < pixels.height(); ++y)
+                        if (pixels.pixelColor(x, y).alpha() > 200) {
+                            QCOMPARE(pixels.pixelColor(x, y).rgb(), color.rgb());
+                            found = true;
+                        }
+                QVERIFY(found);
+            }
+        }
+        QApplication::setPalette(previous);
+    }
+
     void missingWalletUnlockCancellationAndNodeShutdown()
     {
         TestingSetup setup{ChainType::REGTEST};
@@ -137,7 +192,7 @@ private Q_SLOTS:
         QCOMPARE(scans.load(), 3U);
     }
 
-    void poolWalletAndPageLifecycle()
+    void soloWalletAndPageLifecycle()
     {
         TestingSetup setup{ChainType::REGTEST};
         setup.m_node.notifications->setChainstateLoaded(true);
@@ -148,7 +203,7 @@ private Q_SLOTS:
         auto wallet{wallet::TestCreateWallet(wallet::CreateMockableWalletDatabase(), context, wallet::WALLET_FLAG_DESCRIPTORS)};
         QVERIFY(wallet::AddWallet(context, wallet));
         SecureString passphrase;
-        passphrase.assign("qt-pool-creation-passphrase");
+        passphrase.assign("qt-solo-creation-passphrase");
         QVERIFY(wallet->EncryptWallet(passphrase));
         OptionsModel options{*node};
         bilingual_str error;
@@ -162,13 +217,12 @@ private Q_SLOTS:
         MiningPage page{&model};
         page.setClientModel(&client);
         page.setSession(&session);
-        auto* mode{page.findChild<QComboBox*>("miningMode")};
-        auto* host{page.findChild<QLineEdit*>("poolHost")};
-        auto* port{page.findChild<QSpinBox*>("poolPort")};
         auto* start{page.findChild<QPushButton*>("startMining")};
         auto* stop{page.findChild<QPushButton*>("stopMining")};
-        QVERIFY(mode && host && port && start && stop);
-        QCOMPARE(mode->currentIndex(), 0);
+        QVERIFY(start && stop);
+        QVERIFY(!page.findChild<QComboBox*>("miningMode"));
+        QVERIFY(!page.findChild<QCheckBox*>("automaticWorkers"));
+        QVERIFY(!page.findChild<QLineEdit*>("poolHost"));
         auto* hardware{page.findChild<QComboBox*>("miningHardware")};
         QVERIFY(hardware); QCOMPARE(hardware->currentIndex(), 0);
         QTRY_VERIFY_WITH_TIMEOUT(session.gpuDiscovery().has_value(), 10000);
@@ -178,8 +232,6 @@ private Q_SLOTS:
         if (!compatible) QVERIFY(!start->isEnabled());
         hardware->setCurrentIndex(0);
         QVERIFY(!session.stats().busy);
-        mode->setCurrentIndex(1);
-        host->clear();
         page.resize(640, 480);
         page.show();
         QCoreApplication::processEvents();
@@ -189,19 +241,14 @@ private Q_SLOTS:
         QCOMPARE(scroll->horizontalScrollBar()->maximum(), 0);
         QVERIFY(page.rect().contains(start->mapTo(&page, QPoint{0, 0})));
         QVERIFY(page.rect().contains(stop->mapTo(&page, QPoint{0, 0})));
-        QVERIFY(!mode->accessibleName().isEmpty());
         if (const auto directory{qEnvironmentVariable("MERCATURA_UI_CAPTURE")}; !directory.isEmpty()) {
-            QVERIFY(page.grab().save(directory + "/pool-page.png"));
+            QVERIFY(page.grab().save(directory + "/solo-page.png"));
         }
-        QVERIFY(!start->isEnabled());
-        host->setText("127.0.0.1");
-        port->setValue(1);
         QVERIFY(start->isEnabled());
         start->click();
         QTRY_VERIFY_WITH_TIMEOUT(!session.stats().destination.empty(), 30000);
         QCOMPARE(unlocks, 1U);
-        QVERIFY(session.poolMode());
-        QTRY_VERIFY_WITH_TIMEOUT(session.stats().status.find("Pool disconnected") != std::string::npos, 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(session.stats().hashes > 0, 30000);
         QVERIFY(session.stats().destination.starts_with("mcrt1z"));
         QTRY_VERIFY_WITH_TIMEOUT(wallet->IsLocked(), 10000);
         const auto address{session.stats().destination};
@@ -209,18 +256,32 @@ private Q_SLOTS:
         QCoreApplication::processEvents();
         QVERIFY(scroll->widget()->minimumSizeHint().width() <= scroll->viewport()->width());
         QCOMPARE(scroll->horizontalScrollBar()->maximum(), 0);
+        auto* copy{page.findChild<QPushButton*>("copyMiningDestination")};
+        auto* show{page.findChild<QPushButton*>("showMiningDestination")};
+        QVERIFY(copy && show && copy->isEnabled() && show->isEnabled());
+        copy->click();
+        QCOMPARE(QApplication::clipboard()->text(), QString::fromStdString(address));
+        QSignalSpy requested{&page, &MiningPage::showRewardAddress};
+        show->click();
+        QCOMPARE(requested.count(), 1);
+        QCOMPARE(requested.front().front().toString(), QString::fromStdString(address));
+        AddressBookPage book{style.get(), AddressBookPage::ForEditing, AddressBookPage::ReceivingTab};
+        book.setModel(model.getAddressTableModel());
+        book.selectAddress(QString::fromStdString(address));
+        auto* table{book.findChild<QTableView*>("tableView")};
+        QVERIFY(table);
+        QCOMPARE(table->selectionModel()->selectedRows(AddressTableModel::Address).size(), 1);
+        QCOMPARE(table->selectionModel()->selectedRows(AddressTableModel::Address).front().data(Qt::EditRole).toString(), QString::fromStdString(address));
         page.setPrivacy(true);
         QCOMPARE(page.findChild<QLabel*>("miningDestination")->text(), QString{"(hidden)"});
-        QVERIFY(!page.findChild<QPushButton*>("inspectPoolManifest")->isEnabled());
+        QVERIFY(!page.findChild<QPushButton*>("copyMiningDestination")->isEnabled());
+        QVERIFY(!page.findChild<QPushButton*>("showMiningDestination")->isEnabled());
         page.setPrivacy(false);
-        QVERIFY(!mode->isEnabled());
         QVERIFY(!hardware->isEnabled());
-        QVERIFY(!host->isEnabled());
         stop->click();
         QTRY_VERIFY_WITH_TIMEOUT(!session.stats().busy, 10000);
         QCOMPARE(session.stats().active_workers, 0U);
-        QVERIFY(!session.poolStats().connected);
-        QVERIFY(session.startPool(&model, 1, {"127.0.0.1", 1, {}}));
+        QVERIFY(session.start(&model, 1));
         QTRY_VERIFY_WITH_TIMEOUT(session.stats().destination == address, 10000);
         QCOMPARE(unlocks, 1U);
         QVERIFY(wallet->IsLocked());
@@ -229,7 +290,7 @@ private Q_SLOTS:
         QTRY_VERIFY_WITH_TIMEOUT(!session.stats().busy, 10000);
         QTRY_VERIFY_WITH_TIMEOUT(!session.owner(), 10000);
         QVERIFY(wallet::AddWallet(context, wallet));
-        QVERIFY(session.startPool(&model, 1, {"127.0.0.1", 1, {}}));
+        QVERIFY(session.start(&model, 1));
         QTRY_VERIFY_WITH_TIMEOUT(session.stats().destination == address, 10000);
         QCOMPARE(unlocks, 1U);
         session.shutdown();

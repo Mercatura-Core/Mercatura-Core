@@ -102,7 +102,7 @@
         "WITH_ZMQ": "OFF",
         "VCPKG_INSTALL_OPTIONS": "--clean-after-build",
         "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON",
-        "VCPKG_MANIFEST_FEATURES": "qt;wallet;tests;pool-client-tests;gpu-amd"
+        "VCPKG_MANIFEST_FEATURES": "qt;wallet;tests;gpu-amd"
       }
     },
     {
@@ -121,7 +121,7 @@
         "WITH_ZMQ": "OFF",
         "VCPKG_INSTALL_OPTIONS": "--clean-after-build",
         "VCPKG_MANIFEST_NO_DEFAULT_FEATURES": "ON",
-        "VCPKG_MANIFEST_FEATURES": "qt;wallet;tests;pool-client-tests;gpu-amd"
+        "VCPKG_MANIFEST_FEATURES": "qt;wallet;tests;gpu-amd"
       }
     }
   ]
