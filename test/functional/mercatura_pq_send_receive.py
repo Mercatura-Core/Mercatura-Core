@@ -80,6 +80,8 @@ class MercaturaPQSendReceiveTest(BitcoinTestFramework):
 
         mempool = node.getrawmempool()
         assert txid in mempool
+        # Admission is synchronous; receiver wallet callbacks run on the queue.
+        node.syncwithvalidationinterfacequeue()
 
         unconfirmed = receiver.getbalances()["mine"]["untrusted_pending"]
         self.log.info(f"Receiver unconfirmed balance: {unconfirmed}")
@@ -95,6 +97,7 @@ class MercaturaPQSendReceiveTest(BitcoinTestFramework):
         assert_equal(len(confirm_hashes), 1)
         assert_equal(node.getblockcount(), 102)
         assert txid not in node.getrawmempool()
+        node.syncwithvalidationinterfacequeue()
 
         receiver_balance = receiver.getbalance()
         self.log.info(f"Receiver confirmed balance: {receiver_balance}")

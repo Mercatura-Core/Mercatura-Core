@@ -5,6 +5,7 @@
 """Mercatura native reindex persistence and spendability functional test."""
 
 from decimal import Decimal
+import time
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
@@ -96,12 +97,28 @@ class MercaturaReindexTest(BitcoinTestFramework):
         assert_equal(receiver_balance_before, Decimal("1.00"))
 
         self.log.info("Restarting Mercatura node with -reindex")
-        self.restart_node(
-            0,
-            extra_args=["-reindex"],
-        )
+        self.stop_node(0)
+        node.start(extra_args=["-reindex"])
+        # RPC readiness and completion of 102 memory-hard block validations are
+        # different milestones. Keep the original 60-second stall limit while
+        # giving this explicit import the same 300-second bound as native Solo
+        # qualification. Other startup and RPC timeouts remain unchanged.
+        node.wait_for_rpc_connection(wait_for_import=False)
+        last_height = -1
+        last_progress = time.monotonic()
 
-        node = self.nodes[0]
+        def import_finished():
+            nonlocal last_height, last_progress
+            height = node.getblockcount()
+            now = time.monotonic()
+            assert last_height <= height <= height_before
+            if height > last_height:
+                last_height = height
+                last_progress = now
+            assert now - last_progress < 60 * self.options.timeout_factor, "Reindex stopped making progress for 60 seconds"
+            return height == height_before and node.getmempoolinfo()["loaded"]
+
+        self.wait_until(import_finished, timeout=300)
 
         assert "sender" in node.listwallets()
         assert "receiver" in node.listwallets()
