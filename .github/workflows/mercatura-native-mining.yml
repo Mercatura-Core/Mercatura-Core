@@ -12,7 +12,9 @@ permissions:
   contents: read
 concurrency:
   group: mercatura-native-mining-${{ github.ref }}
-  cancel-in-progress: true
+  # Let branch builds finish expensive dependencies and save their binary cache.
+  # A newer branch push waits; outdated pull-request runs can still be cancelled.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 defaults:
   run:
     shell: bash
