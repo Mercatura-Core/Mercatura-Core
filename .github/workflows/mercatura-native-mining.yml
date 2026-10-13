@@ -103,7 +103,13 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ${{ steps.vcpkg-cache-path.outputs.path }}
-          key: native-qt-vcpkg-v1-${{ matrix.preset }}-${{ steps.vcpkg-cache-path.outputs.image }}-${{ hashFiles('vcpkg*.json', 'CMakePresets.json', 'contrib/vcpkg-ports/**') }}
+          # Cache entries are immutable. A run-specific suffix lets a successful
+          # build replace an earlier partial snapshot with completed packages.
+          key: native-qt-vcpkg-v1-${{ matrix.preset }}-${{ steps.vcpkg-cache-path.outputs.image }}-${{ hashFiles('vcpkg*.json', 'CMakePresets.json', 'contrib/vcpkg-ports/**') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            native-qt-vcpkg-v1-${{ matrix.preset }}-${{ steps.vcpkg-cache-path.outputs.image }}-${{ hashFiles('vcpkg*.json', 'CMakePresets.json', 'contrib/vcpkg-ports/**') }}
+            native-qt-vcpkg-v1-${{ matrix.preset }}-${{ steps.vcpkg-cache-path.outputs.image }}-
+          # vcpkg validates each restored binary package's ABI before reuse.
       - name: Configure native MSVC Qt and AMD backend
         env:
           M73_PRESET: ${{ matrix.preset }}
@@ -120,6 +126,9 @@ jobs:
             -DENABLE_IPC=OFF -DWITH_ZMQ=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=OFF `
             -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Build native MSVC Qt and AMD targets
+        run: |
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
           cmake --build work/build --config Release --parallel 4 --target bitcoin-qt test_bitcoin test_mining-qt mercatura-gpu-check
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Native Solo lifecycle and real hashing
