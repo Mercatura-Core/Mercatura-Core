@@ -257,6 +257,7 @@ class MercaturaPQManyInputSelectionTest(BitcoinTestFramework):
         #
         # Receiver should see the broadcast transaction as pending.
         #
+        node.syncwithvalidationinterfacequeue()
         pending = receiver.getbalances()[
             "mine"
         ]["untrusted_pending"]

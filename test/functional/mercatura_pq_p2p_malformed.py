@@ -332,6 +332,7 @@ class MercaturaPQP2PMalformedTest(BitcoinTestFramework):
         )
 
         assert valid_txid in node.getrawmempool()
+        node.syncwithvalidationinterfacequeue()
 
         pending = receiver.getbalances()[
             "mine"

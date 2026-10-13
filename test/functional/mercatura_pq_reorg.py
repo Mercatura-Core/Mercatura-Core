@@ -113,6 +113,7 @@ class MercaturaPQReorgTest(BitcoinTestFramework):
 
         assert txid in node0.getrawmempool()
 
+        node0.syncwithvalidationinterfacequeue()
         balances = receiver.getbalances()["mine"]
 
         assert_equal(balances["trusted"], Decimal("0.00"))

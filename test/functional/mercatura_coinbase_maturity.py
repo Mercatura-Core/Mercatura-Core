@@ -184,6 +184,7 @@ class MercaturaCoinbaseMaturityTest(BitcoinTestFramework):
         )
 
         assert txid in node.getrawmempool()
+        node.syncwithvalidationinterfacequeue()
 
         pending = receiver.getbalances()["mine"]["untrusted_pending"]
 

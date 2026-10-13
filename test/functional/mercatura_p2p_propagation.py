@@ -104,6 +104,8 @@ class MercaturaP2PPropagationTest(BitcoinTestFramework):
         )
 
         assert txid in node1.getrawmempool()
+        # Peer admission precedes the receiver wallet's queued notification.
+        node1.syncwithvalidationinterfacequeue()
 
         pending = receiver.getbalances()["mine"]["untrusted_pending"]
 
@@ -155,6 +157,7 @@ class MercaturaP2PPropagationTest(BitcoinTestFramework):
         )
 
         assert txid not in node0.getrawmempool()
+        node1.syncwithvalidationinterfacequeue()
 
         assert_equal(
             receiver.getbalance(),

@@ -93,6 +93,7 @@ class MercaturaPQPSBTTest(BitcoinTestFramework):
         txid = node.sendrawtransaction(rawtx)
 
         assert txid in node.getrawmempool()
+        node.syncwithvalidationinterfacequeue()
 
         pending = receiver.getbalances()["mine"]["untrusted_pending"]
         assert_equal(pending, amount)

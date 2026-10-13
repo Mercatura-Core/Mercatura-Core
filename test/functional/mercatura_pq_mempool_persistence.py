@@ -108,6 +108,7 @@ class MercaturaPQMempoolPersistenceTest(BitcoinTestFramework):
 
         assert entry_before["vsize"] > 0
 
+        node.syncwithvalidationinterfacequeue()
         receiver_balances = receiver.getbalances()
 
         assert_equal(
@@ -171,6 +172,7 @@ class MercaturaPQMempoolPersistenceTest(BitcoinTestFramework):
             entry_before["vsize"],
         )
 
+        node.syncwithvalidationinterfacequeue()
         receiver_balances_after = receiver.getbalances()
 
         assert_equal(
