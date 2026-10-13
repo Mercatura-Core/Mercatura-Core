@@ -36,6 +36,7 @@
 #include <QTest>
 
 #include <functional>
+#include <limits>
 
 const std::function<void(const std::string&)> G_TEST_LOG_FUN{};
 const std::function<std::vector<const char*>()> G_TEST_COMMAND_LINE_ARGUMENTS{};
@@ -45,6 +46,90 @@ Q_DECLARE_METATYPE(wallet::AddressPurpose)
 class MiningTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void hardwareAwareManualWorkerSelection()
+    {
+        QSettings settings;
+        settings.remove("mining/cpuWorkers");
+        unsigned int cpus{192};
+        uint64_t memory{uint64_t{256} << 30};
+        const auto limits{[&] { return mining::CalculateWorkerLimits(cpus, memory); }};
+        {
+            MiningPage page{nullptr, nullptr, limits};
+            auto* workers{page.findChild<QSpinBox*>("manualWorkers")};
+            QVERIFY(workers);
+            QVERIFY(!page.findChild<QCheckBox*>("automaticWorkers"));
+            QCOMPARE(workers->minimum(), 1);
+            for (const unsigned int count : {8U, 12U, 16U, 32U, 64U, 192U}) {
+                cpus = count;
+                page.setPrivacy(false); // Refresh the same idle page, without restarting it.
+                QCOMPARE(workers->maximum(), static_cast<int>(count));
+                workers->setValue(count);
+                QCOMPARE(workers->value(), static_cast<int>(count));
+                QCOMPARE(settings.value("mining/cpuWorkers").toInt(), static_cast<int>(count));
+            }
+            cpus = 4;
+            page.setPrivacy(false);
+            QCOMPARE(workers->maximum(), 4);
+            QCOMPARE(workers->value(), 4);
+            QCOMPARE(settings.value("mining/cpuWorkers").toInt(), 192); // A clamp is not a manual preference change.
+            memory = uint64_t{512} << 20;
+            page.setPrivacy(false);
+            QCOMPARE(workers->value(), 1);
+            QVERIFY(!workers->isEnabled());
+            QVERIFY(!page.findChild<QPushButton*>("startMining")->isEnabled());
+        }
+        memory = uint64_t{256} << 30;
+        cpus = 64;
+        {
+            MiningPage reopened{nullptr, nullptr, limits};
+            auto* workers{reopened.findChild<QSpinBox*>("manualWorkers")};
+            QCOMPARE(workers->value(), 64); // Persisted 192 is safely clamped after changed hardware.
+            workers->setValue(7);
+        }
+        {
+            MiningPage reopened{nullptr, nullptr, limits};
+            QCOMPARE(reopened.findChild<QSpinBox*>("manualWorkers")->value(), 7);
+        }
+        cpus = std::numeric_limits<unsigned int>::max();
+        memory = std::numeric_limits<uint64_t>::max();
+        settings.setValue("mining/cpuWorkers", qulonglong{std::numeric_limits<unsigned int>::max()});
+        MiningPage extreme{nullptr, nullptr, limits};
+        QCOMPARE(extreme.findChild<QSpinBox*>("manualWorkers")->maximum(), std::numeric_limits<int>::max());
+        QCOMPARE(extreme.findChild<QSpinBox*>("manualWorkers")->value(), std::numeric_limits<int>::max());
+        settings.remove("mining/cpuWorkers");
+    }
+
+    void combinedWorkerSelectionReservesHostVerifiers()
+    {
+        TestingSetup setup{ChainType::REGTEST};
+        auto node{interfaces::MakeNode(setup.m_node)};
+        MiningSession session{*node, nullptr, [] {
+            mining::GpuDiscovery result;
+            mining::GpuDevice device{mining::GpuVendor::AMD_OPENCL};
+            device.id = "opencl:0";
+            device.name = "Simulated AMD";
+            device.supported = true;
+            result.devices.push_back(std::move(device));
+            return result;
+        }};
+        QSettings{}.setValue("mining/cpuWorkers", 3);
+        MiningPage page{nullptr, nullptr, [] { return mining::CalculateWorkerLimits(12, uint64_t{1} << 30); }};
+        page.setSession(&session);
+        auto* workers{page.findChild<QSpinBox*>("manualWorkers")};
+        auto* hardware{page.findChild<QComboBox*>("miningHardware")};
+        QCOMPARE(workers->maximum(), 3);
+        QTRY_COMPARE(page.findChild<QListWidget*>("gpuDevices")->count(), 1);
+        QVERIFY(page.findChild<QCheckBox*>("automaticGpuDevices")->isChecked());
+        hardware->setCurrentIndex(2);
+        QCOMPARE(workers->maximum(), 2);
+        QCOMPARE(workers->value(), 2);
+        QCOMPARE(QSettings{}.value("mining/cpuWorkers").toInt(), 3);
+        QVERIFY(!session.stats().busy); // Device discovery and page loading never mine.
+        hardware->setCurrentIndex(0);
+        QCOMPARE(workers->maximum(), 3);
+        QSettings{}.remove("mining/cpuWorkers");
+    }
+
     void manualWorkersPersistAndRuntimeFormatting()
     {
         QSettings settings;

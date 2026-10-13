@@ -37,6 +37,9 @@ inline constexpr uint64_t WORKER_MEMORY_BYTES{160ULL * 1024 * 1024};
 WorkerLimits CalculateWorkerLimits(unsigned int cpus, std::optional<uint64_t> memory);
 WorkerLimits DetectWorkerLimits();
 unsigned int MaximumCpuWorkers(const WorkerLimits& limits, size_t gpu_verifiers = 0);
+// File-reader seam for deterministic Linux namespace/cgroup/resource tests.
+using ResourceFileReader = std::function<std::string(const std::string&)>;
+WorkerLimits ReadLinuxWorkerLimits(unsigned int cpus, std::optional<unsigned int> affinity_cpus, const ResourceFileReader& read);
 
 // Immutable work: public header and optional public coinbase only, never keys.
 struct MiningJob {

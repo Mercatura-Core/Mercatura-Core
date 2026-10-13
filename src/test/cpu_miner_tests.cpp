@@ -359,6 +359,37 @@ BOOST_AUTO_TEST_CASE(all_twelve_logical_workers_are_allowed_within_memory_budget
     BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
 }
 
+BOOST_AUTO_TEST_CASE(resource_changes_are_revalidated_before_worker_allocation)
+{
+    auto state{std::make_shared<FakeState>()};
+    std::atomic<unsigned int> contexts{0};
+    unsigned int cpus{4};
+    mining::MiningController controller{[&] {
+        ++contexts;
+        return [](const CBlockHeader&) {
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+            return uint256::FromHex(std::string(64, 'f')).value();
+        };
+    }, [&] { return mining::CalculateWorkerLimits(cpus, uint64_t{8} << 30); }};
+    BOOST_REQUIRE(controller.Start([state] { return std::make_unique<FakeProvider>(state); }, 4));
+    BOOST_REQUIRE(Until([&] { return controller.GetStats().active_workers == 4; }));
+    controller.RequestStop();
+    controller.Wait();
+    BOOST_CHECK_EQUAL(contexts, 4U);
+    cpus = 2;
+    BOOST_REQUIRE(controller.Start([state] { return std::make_unique<FakeProvider>(state); }, 4));
+    controller.Wait();
+    BOOST_CHECK(controller.GetStats().state == mining::MiningState::FAILED);
+    BOOST_CHECK_EQUAL(contexts, 4U); // Rejected before constructing another context.
+    BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
+    BOOST_REQUIRE(controller.Start([state] { return std::make_unique<FakeProvider>(state); }, 2));
+    BOOST_REQUIRE(Until([&] { return controller.GetStats().active_workers == 2; }));
+    controller.RequestStop();
+    controller.Wait();
+    BOOST_CHECK_EQUAL(contexts, 6U);
+    BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
+}
+
 BOOST_AUTO_TEST_CASE(authoritative_contexts_are_independent)
 {
     std::array<unsigned char, 80> bytes;

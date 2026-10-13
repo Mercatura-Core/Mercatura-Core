@@ -30,8 +30,8 @@
 #include <array>
 #include <limits>
 
-MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
-    : QWidget{parent}, m_wallet{wallet}, m_limits{mining::DetectWorkerLimits()}
+MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningController::LimitDetector limits)
+    : QWidget{parent}, m_wallet{wallet}, m_detect_limits{limits ? std::move(limits) : mining::MiningController::LimitDetector{mining::DetectWorkerLimits}}, m_limits{m_detect_limits()}
 {
     setObjectName(QStringLiteral("miningPage"));
     auto* outer{new QVBoxLayout{this}};
@@ -84,11 +84,13 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
     m_workers = new QSpinBox{group};
     m_workers->setObjectName(QStringLiteral("manualWorkers"));
     m_workers->setRange(1, static_cast<int>(std::max(1U, std::min(m_limits.maximum, static_cast<unsigned int>(std::numeric_limits<int>::max())))));
-    m_workers->setValue(std::clamp(settings.value("mining/cpuWorkers", 1).toInt(), 1, m_workers->maximum()));
+    bool valid_setting{false};
+    const auto saved{settings.value("mining/cpuWorkers", 1).toLongLong(&valid_setting)};
+    m_workers->setValue(static_cast<int>(std::clamp<qlonglong>(valid_setting ? saved : 1, 1, m_workers->maximum())));
     form->addRow(tr("CPU workers"), m_workers);
-    auto* hardware{new QLabel{tr("%1 logical processors detected; up to %2 CPU-only workers within the current CPU and memory budget. Combined mode also reserves host memory for GPU verification. Each worker needs a private 128 MiB scratchpad plus overhead. Logical processor count does not predict optimal hashing throughput.").arg(m_limits.logical_cpus).arg(m_limits.maximum), group}};
-    hardware->setWordWrap(true);
-    form->addRow(hardware);
+    m_hardware_limits = new QLabel{group};
+    m_hardware_limits->setWordWrap(true);
+    form->addRow(m_hardware_limits);
     m_destination = new QLabel{tr("Created or reused when mining starts"), group};
     m_destination->setObjectName(QStringLiteral("miningDestination"));
     m_destination->setTextFormat(Qt::PlainText);
@@ -172,6 +174,8 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent)
         updateStatus();
     });
     connect(m_start, &QPushButton::clicked, this, [this] {
+        updateStatus(); // Recheck and clamp current resources before reading the selection.
+        if (!m_start->isEnabled()) return;
         if (m_session) {
             const unsigned int workers{static_cast<unsigned int>(m_workers->value())};
             mining::GpuConfig hardware;
@@ -213,6 +217,8 @@ void MiningPage::updateStatus()
 {
     const mining::MiningStats stats{m_session ? m_session->stats() : mining::MiningStats{}};
     const bool running{stats.busy};
+    if (!running) m_limits = m_detect_limits();
+    m_hardware_limits->setText(tr("%1 logical processors detected; up to %2 CPU-only workers within the current CPU and memory budget. Combined mode also reserves host memory for GPU verification. Each worker needs a private 128 MiB scratchpad plus overhead. Logical processor count does not predict optimal hashing throughput.").arg(m_limits.logical_cpus).arg(m_limits.maximum));
     const bool syncing{m_client && Params().GetChainType() != ChainType::REGTEST && m_client->node().isInitialBlockDownload()};
     const bool use_cpu{m_hardware->currentIndex() != 1};
     const bool use_gpu{m_hardware->currentIndex() != 0};

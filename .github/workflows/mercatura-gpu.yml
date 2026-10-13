@@ -36,7 +36,7 @@ jobs:
         run: |
           clang -x cl -cl-std=CL1.2 -DMH_OPENCL -Werror -fsyntax-only src/mining/mercahash_gpu.h
           clang -x cl -cl-std=CL1.2 -DMH_OPENCL -target spir64-unknown-unknown -emit-llvm -c src/mining/mercahash_gpu.h -o work/mercahash-opencl.bc
-          work/build/bin/test_bitcoin --run_test=cpu_miner_tests,mining_statistics_tests,gpu_miner_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,mining_tests_wallet,mining_tests_solo
+          work/build/bin/test_bitcoin --run_test=worker_limits_tests,cpu_miner_tests,mining_statistics_tests,gpu_miner_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,mining_tests_wallet,mining_tests_solo
           work/build/bin/test_bitcoin --run_test=crypto_tests/mercahash_v1_vectors
           QT_QPA_PLATFORM=offscreen work/build/bin/test_mining-qt
       - name: AMD checker reports hardware validation unavailable

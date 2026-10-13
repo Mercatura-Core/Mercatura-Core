@@ -57,15 +57,21 @@ Worker budget
 CPU workers are always selected manually in Qt, from 1 to the supported maximum.
 The last selection is saved in Qt settings and restored with clamping when the
 page reopens. All usable logical CPUs are allowed when memory permits; there is
-no reserved-core deduction. On a 12-thread CPU, the CPU limit is 12. The controller
-uses the same detector and rechecks limits at Start; changed resources can still
-make Start fail safely.
+no reserved-core deduction or fixed worker ceiling. A 12-thread CPU permits 12
+workers when memory permits; a 192-thread CPU permits 192 under the same rule.
+The idle page refreshes limits and clamps the displayed selection before Start.
+The controller independently rechecks the same detector before allocating worker
+contexts, so changes during startup can still make Start fail safely.
 
-Available concurrency uses hardware information, Linux CPU affinity/cgroup v2
-quotas, Windows processor groups or macOS logical CPU information. Available
-memory uses Linux MemAvailable and cgroup v2 ancestor limits, Windows available
-physical memory or macOS free/inactive pages. Linux cgroup v1 and Windows job
-object limits are not currently detected.
+Available concurrency uses hardware information, dynamically sized Linux CPU
+affinity masks, cpusets and cgroup v1/v2 ancestor CPU quotas, Windows process
+processor groups/affinity/default CPU sets and job CPU caps, or macOS logical CPU
+information. Linux cgroup mounts and namespace roots are discovered through
+process mount metadata. Available memory uses Linux MemAvailable, cgroup v1/v2
+ancestor remaining memory and process address-space headroom, Windows available
+physical memory and job per-process commit headroom, or macOS free/inactive pages.
+Windows shared job memory and macOS process resource restrictions still require
+additional platform qualification.
 
 Each CPU worker is budgeted at 160 MiB (128 MiB scratchpad plus overhead). The
 memory reserve is the greater of 512 MiB or one quarter of available memory.

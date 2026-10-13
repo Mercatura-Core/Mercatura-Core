@@ -24,7 +24,7 @@ class QListWidget;
 class MiningPage : public QWidget {
     Q_OBJECT
 public:
-    explicit MiningPage(WalletModel* wallet, QWidget* parent = nullptr);
+    explicit MiningPage(WalletModel* wallet, QWidget* parent = nullptr, mining::MiningController::LimitDetector limits = {});
     void setSession(MiningSession* session);
     void setClientModel(ClientModel* client);
     void setPrivacy(bool privacy);
@@ -38,7 +38,9 @@ private:
     WalletModel* const m_wallet;
     QPointer<MiningSession> m_session;
     ClientModel* m_client{nullptr};
+    const mining::MiningController::LimitDetector m_detect_limits;
     mining::WorkerLimits m_limits;
+    QLabel* m_hardware_limits;
     QSpinBox* m_workers;
     QPushButton* m_start;
     QPushButton* m_stop;

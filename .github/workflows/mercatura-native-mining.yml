@@ -38,7 +38,7 @@ jobs:
             test_bitcoin test_mining-qt mercatura-gpu-check
       - name: Focused Solo and native regression matrix
         run: |
-          work/build/bin/test_bitcoin --run_test=cpu_miner_tests,mining_statistics_tests,gpu_miner_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,mining_tests_wallet,mining_tests_solo
+          work/build/bin/test_bitcoin --run_test=worker_limits_tests,cpu_miner_tests,mining_statistics_tests,gpu_miner_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,mining_tests_wallet,mining_tests_solo
           work/build/bin/test_bitcoin --run_test=crypto_tests/mercahash_v1_vectors
           QT_QPA_PLATFORM=offscreen work/build/bin/test_mining-qt
           QT_QPA_PLATFORM=offscreen QT_SCALE_FACTOR=2 work/build/bin/test_mining-qt soloWalletAndPageLifecycle
