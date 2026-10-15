@@ -171,7 +171,9 @@ BOOST_AUTO_TEST_CASE(passphrase_transaction_failures)
 {
     for (const auto fault : {EncryptionFault::BEGIN, EncryptionFault::COMMIT}) {
         for (const bool locked : {false, true}) {
-            const auto path = m_path_root / fs::u8path(std::to_string(static_cast<int>(fault)) + (locked ? "-locked" : "-unlocked"));
+            const auto path = m_path_root / (fault == EncryptionFault::BEGIN
+                ? (locked ? "begin-locked" : "begin-unlocked")
+                : (locked ? "commit-locked" : "commit-unlocked"));
             auto database = std::make_unique<EncryptionFaultDatabase>(OpenEncryptionDatabase(path));
             auto& control = database->control;
             CWallet wallet{m_node.chain.get(), "transaction-failure", std::move(database)};
