@@ -4,6 +4,7 @@
 
 #include <test/data/blockfilters.json.h>
 #include <test/util/common.h>
+#include <test/util/setup_common.h>
 
 #include <blockfilter.h>
 #include <core_io.h>
@@ -127,7 +128,7 @@ BOOST_AUTO_TEST_CASE(blockfilter_basic_test)
     BOOST_CHECK(default_ctor_block_filter_1.GetEncodedFilter() == default_ctor_block_filter_2.GetEncodedFilter());
 }
 
-BOOST_AUTO_TEST_CASE(blockfilters_json_test)
+BOOST_FIXTURE_TEST_CASE(blockfilters_json_test, BasicTestingSetup)
 {
     UniValue json;
     if (!json.read(json_tests::blockfilters) || !json.isArray()) {
