@@ -360,7 +360,7 @@ struct WitnessChainSetup : TestingSetup {
 };
 } // namespace
 
-BOOST_FIXTURE_TEST_SUITE(witness_resource_chain_tests, WitnessChainSetup)
+BOOST_FIXTURE_TEST_SUITE(witness_resource_tests_chain, WitnessChainSetup)
 
 BOOST_AUTO_TEST_CASE(mainnet_connection_templates_disk_and_reindex)
 {
@@ -610,7 +610,7 @@ struct WitnessNetSetup : TestingSetup {
 };
 } // namespace
 
-BOOST_FIXTURE_TEST_SUITE(witness_resource_net_tests, WitnessNetSetup)
+BOOST_FIXTURE_TEST_SUITE(witness_resource_tests_net, WitnessNetSetup)
 
 BOOST_AUTO_TEST_CASE(ordinary_block_ingestion)
 {

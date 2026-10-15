@@ -62,7 +62,7 @@ Use an out-of-tree build with the daemon, CLI, wallet and `test_bitcoin` targets
 Run memory-intensive tests serially. With `BUILD` pointing to that build directory:
 
 ```sh
-"$BUILD/bin/test_bitcoin" --run_test=witness_resource_tests,witness_resource_chain_tests,witness_resource_net_tests
+"$BUILD/bin/test_bitcoin" --run_test=witness_resource_tests,witness_resource_tests_chain,witness_resource_tests_net
 "$BUILD/bin/test_bitcoin" --run_test=serialize_tests,transaction_tests,txvalidation_tests,validation_block_tests,script_tests,block_capacity_tests,blockchunk_tests,blockencodings_tests,mempool_tests,miner_tests,txindex_tests,txospenderindex_tests,psbt_wallet_tests
 python3 "$BUILD/test/functional/test_runner.py" --jobs=1 mercatura_witness_resource.py mercatura_block_capacity.py mercatura_reindex.py wallet_mercatura_pq.py mercatura_pq_auth_commitments.py mercatura_pq_invalid_auth.py mercatura_classical_ownership_shutdown.py mercatura_pq_psbt.py mercatura_pq_reorg.py mercatura_pq_mempool_persistence.py
 ```
