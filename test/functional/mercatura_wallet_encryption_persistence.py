@@ -5,6 +5,7 @@
 
 """Native PQ encryption/passphrase persistence with SQLite faults and restarts."""
 
+from contextlib import closing
 from decimal import Decimal
 import sqlite3
 
@@ -48,7 +49,8 @@ class WalletEncryptionPersistenceTest(BitcoinTestFramework):
         # daemon is stopped. No fault switch or RPC is added to production.
         node = self.nodes[0]
         self.stop_node(0)
-        with sqlite3.connect(node.wallets_path / name / "wallet.dat") as database:
+        # The connection's context manager handles the transaction, not closing.
+        with closing(sqlite3.connect(node.wallets_path / name / "wallet.dat")) as database, database:
             if enabled:
                 database.execute("""CREATE TRIGGER fail_master_key BEFORE INSERT ON main
                     WHEN substr(NEW.key, 1, 5) = X'046d6b6579'
