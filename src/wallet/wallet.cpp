@@ -825,35 +825,51 @@ bool CWallet::Unlock(const SecureString& strWalletPassphrase)
     return false;
 }
 
-bool CWallet::ChangeWalletPassphrase(const SecureString& strOldWalletPassphrase, const SecureString& strNewWalletPassphrase)
+bool CWallet::ChangeWalletPassphrase(const SecureString& strOldWalletPassphrase, const SecureString& strNewWalletPassphrase, bilingual_str* error)
 {
-    bool fWasLocked = IsLocked();
+    LOCK2(m_relock_mutex, cs_wallet);
+    if (error) *error = {};
+    const bool was_locked{IsLocked()};
+    // In particular, a failed write must not leave a previously locked wallet
+    // unlocked with its decrypted PQ seed still available.
+    struct Relock {
+        CWallet& wallet;
+        bool required;
+        ~Relock() { if (required) wallet.Lock(); }
+    } relock{*this, was_locked};
+    Lock();
 
-    {
-        LOCK2(m_relock_mutex, cs_wallet);
-        Lock();
+    auto fail = [&](const char* message) {
+        WalletLogPrintf("%s\n", message);
+        if (error) *error = Untranslated(message);
+        return false;
+    };
 
-        CKeyingMaterial plain_master_key;
-        for (auto& [master_key_id, master_key] : mapMasterKeys)
-        {
-            if (!DecryptMasterKey(strOldWalletPassphrase, master_key, plain_master_key)) {
-                return false;
-            }
-            if (Unlock(plain_master_key))
-            {
-                if (!EncryptMasterKey(strNewWalletPassphrase, plain_master_key, master_key)) {
-                    return false;
-                }
-                WalletLogPrintf("Wallet passphrase changed to an nDeriveIterations of %i\n", master_key.nDeriveIterations);
+    CKeyingMaterial plain_master_key;
+    for (auto& [master_key_id, master_key] : mapMasterKeys) {
+        if (!DecryptMasterKey(strOldWalletPassphrase, master_key, plain_master_key)) return false;
+        if (!Unlock(plain_master_key)) continue;
 
-                WalletBatch(GetDatabase()).WriteMasterKey(master_key_id, master_key);
-                if (fWasLocked)
-                    Lock();
-                return true;
-            }
+        CMasterKey replacement{master_key};
+        if (!EncryptMasterKey(strNewWalletPassphrase, plain_master_key, replacement)) {
+            return fail("Error: Could not encrypt the replacement wallet master key.");
         }
+        WalletBatch batch{GetDatabase()};
+        if (!batch.TxnBegin()) return fail("Error: Could not begin wallet passphrase database transaction.");
+        if (!batch.WriteMasterKey(master_key_id, replacement)) {
+            // Do not continue with an unknown persistence outcome. SQLite can
+            // recover the old passphrase only when rollback is confirmed.
+            Assert(batch.TxnAbort());
+            return fail("Error: Could not write the replacement wallet master key.");
+        }
+        if (!batch.TxnCommit()) {
+            Assert(batch.TxnAbort());
+            return fail("Error: Could not commit wallet passphrase database transaction.");
+        }
+        master_key = std::move(replacement);
+        WalletLogPrintf("Wallet passphrase changed to an nDeriveIterations of %i\n", master_key.nDeriveIterations);
+        return true;
     }
-
     return false;
 }
 

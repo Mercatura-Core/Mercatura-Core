@@ -156,7 +156,9 @@ RPCHelpMan walletpassphrasechange()
         throw JSONRPCError(RPC_INVALID_PARAMETER, "passphrase cannot be empty");
     }
 
-    if (!pwallet->ChangeWalletPassphrase(strOldWalletPass, strNewWalletPass)) {
+    bilingual_str error;
+    if (!pwallet->ChangeWalletPassphrase(strOldWalletPass, strNewWalletPass, &error)) {
+        if (!error.empty()) throw JSONRPCError(RPC_DATABASE_ERROR, error.original);
         // Check if the old passphrase had a null character (see #27067 for details)
         if (strOldWalletPass.find('\0') == std::string::npos) {
             throw JSONRPCError(RPC_WALLET_PASSPHRASE_INCORRECT, "Error: The wallet passphrase entered was incorrect.");

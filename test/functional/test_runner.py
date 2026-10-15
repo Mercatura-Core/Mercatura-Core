@@ -124,6 +124,7 @@ MERCATURA_SCRIPTS = [
     'mercatura_three_node_pq.py',
     'mercatura_wallet_backup_restore.py',
     'mercatura_wallet_encryption.py',
+    'mercatura_wallet_encryption_persistence.py',
     'mercatura_wallet_historical_recovery.py',
     'mercatura_wallet_persistence.py',
 ]

@@ -695,7 +695,8 @@ public:
     RecursiveMutex m_relock_mutex;
 
     bool Unlock(const SecureString& strWalletPassphrase);
-    bool ChangeWalletPassphrase(const SecureString& strOldWalletPassphrase, const SecureString& strNewWalletPassphrase);
+    /** A nonempty error distinguishes persistence failure from an incorrect old passphrase. */
+    bool ChangeWalletPassphrase(const SecureString& strOldWalletPassphrase, const SecureString& strNewWalletPassphrase, bilingual_str* error = nullptr);
     bool EncryptWallet(const SecureString& strWalletPassphrase);
 
     unsigned int ComputeTimeSmart(const CWalletTx& wtx, bool rescanning_old_block) const;
