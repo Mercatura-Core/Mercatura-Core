@@ -452,7 +452,8 @@ BOOST_AUTO_TEST_CASE(mainnet_connection_templates_disk_and_reindex)
     over_spend.vin.back().scriptWitness.stack.emplace_back();
     auto over = make_block({over_spend});
     BOOST_CHECK_EXCEPTION(proposal(over), UniValue, [](const UniValue& error) {
-        return error.find_value("code").getInt<int>() == -22;
+        const auto& code = error.find_value("code");
+        return code.isNum() && code.getValStr() == "-22";
     });
     {
         LOCK(cs_main);
@@ -642,7 +643,8 @@ BOOST_AUTO_TEST_CASE(ordinary_block_ingestion)
     auto over = ResourceBlock(4097);
     over.hashPrevBlock = Params().GenesisBlock().GetHash();
     BOOST_CHECK_EXCEPTION(submit(over), UniValue, [](const UniValue& error) {
-        return error.find_value("code").getInt<int>() == -22;
+        const auto& code = error.find_value("code");
+        return code.isNum() && code.getValStr() == "-22";
     });
     {
         ASSERT_DEBUG_LOG("bad-blk-witness-items");
