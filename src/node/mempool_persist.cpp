@@ -88,7 +88,10 @@ bool LoadMempool(CTxMemPool& pool, const fs::path& load_path, Chainstate& active
             CTransactionRef tx;
             int64_t nTime;
             int64_t nFeeDelta;
-            file >> TX_WITH_WITNESS(tx);
+            // Stored transactions may predate a reorg to a smaller capacity.
+            // Decode under the absolute network envelope; admission below is contextual.
+            auto witness_budget = WitnessParseBudget::ForInspection(active_chainstate.m_chainman.GetConsensus());
+            file >> WitnessParseParams{&witness_budget}(TX_WITH_WITNESS(tx));
             file >> nTime;
             file >> nFeeDelta;
 

@@ -92,7 +92,8 @@ static RPCHelpMan sendrawtransaction()
             const CAmount max_burn_amount = request.params[2].isNull() ? 0 : AmountFromValue(request.params[2]);
 
             CMutableTransaction mtx;
-            if (!DecodeHexTx(mtx, request.params[0].get_str())) {
+            const auto witness_budget = EnsureAnyChainman(request.context).GetMempoolWitnessParseBudget();
+            if (!DecodeHexTx(mtx, request.params[0].get_str(), false, true, &witness_budget)) {
                 throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed. Make sure the tx has at least one input.");
             }
 
@@ -327,9 +328,10 @@ static RPCHelpMan testmempoolaccept()
 
             std::vector<CTransactionRef> txns;
             txns.reserve(raw_transactions.size());
+            const auto witness_budget = EnsureAnyChainman(request.context).GetMempoolWitnessParseBudget();
             for (const auto& rawtx : raw_transactions.getValues()) {
                 CMutableTransaction mtx;
-                if (!DecodeHexTx(mtx, rawtx.get_str())) {
+                if (!DecodeHexTx(mtx, rawtx.get_str(), false, true, &witness_budget)) {
                     throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
                                        "TX decode failed: " + rawtx.get_str() + " Make sure the tx has at least one input.");
                 }
@@ -1367,9 +1369,10 @@ static RPCHelpMan submitpackage()
 
             std::vector<CTransactionRef> txns;
             txns.reserve(raw_transactions.size());
+            const auto witness_budget = EnsureAnyChainman(request.context).GetMempoolWitnessParseBudget();
             for (const auto& rawtx : raw_transactions.getValues()) {
                 CMutableTransaction mtx;
-                if (!DecodeHexTx(mtx, rawtx.get_str())) {
+                if (!DecodeHexTx(mtx, rawtx.get_str(), false, true, &witness_budget)) {
                     throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
                                        "TX decode failed: " + rawtx.get_str() + " Make sure the tx has at least one input.");
                 }

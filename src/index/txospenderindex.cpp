@@ -150,7 +150,10 @@ util::Expected<TxoSpender, std::string> TxoSpenderIndex::ReadTransaction(const C
     try {
         file >> header;
         file.seek(tx_pos.nTxOffset, SEEK_CUR);
-        file >> TX_WITH_WITNESS(spender.tx);
+        const auto height = m_chainstate->m_chainman.GetWitnessParseHeight(header);
+        if (!height) throw std::ios_base::failure("unknown-block-parent");
+        auto budget = WitnessParseBudget::ForBlock(m_chainstate->m_chainman.GetConsensus(), *height);
+        file >> WitnessParseParams{&budget}(TX_WITH_WITNESS(spender.tx));
         spender.block_hash = header.GetHash();
         return spender;
     } catch (const std::exception& e) {

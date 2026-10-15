@@ -9,6 +9,7 @@
 #include <util/result.h>
 
 #include <functional>
+#include <optional>
 #include <string>
 
 class CBlock;
@@ -16,6 +17,7 @@ class CBlockHeader;
 class CScript;
 class CTransaction;
 struct CMutableTransaction;
+struct WitnessParseBudget;
 class SigningProvider;
 class uint256;
 class UniValue;
@@ -33,8 +35,10 @@ enum class TxVerbosity {
 
 CScript ParseScript(const std::string& s);
 std::string ScriptToAsmStr(const CScript& script, bool fAttemptSighashDecode = false);
-[[nodiscard]] bool DecodeHexTx(CMutableTransaction& tx, const std::string& hex_tx, bool try_no_witness = false, bool try_witness = true);
-[[nodiscard]] bool DecodeHexBlk(CBlock&, const std::string& strHexBlk);
+[[nodiscard]] bool DecodeHexTx(CMutableTransaction& tx, const std::string& hex_tx, bool try_no_witness = false, bool try_witness = true,
+    const WitnessParseBudget* witness_budget = nullptr);
+[[nodiscard]] bool DecodeHexBlk(CBlock&, const std::string& strHexBlk,
+    const std::function<std::optional<int>(const CBlockHeader&)>& height_lookup = {});
 bool DecodeHexBlockHeader(CBlockHeader&, const std::string& hex_header);
 
 [[nodiscard]] util::Result<int> SighashFromStr(const std::string& sighash);

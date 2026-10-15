@@ -508,7 +508,8 @@ public:
     void UnlinkPrunedFiles(const std::set<int>& setFilesToPrune) const;
 
     /** Functions for disk access for blocks */
-    bool ReadBlock(CBlock& block, const FlatFilePos& pos, const std::optional<uint256>& expected_hash) const;
+    bool ReadBlock(CBlock& block, const FlatFilePos& pos, const std::optional<uint256>& expected_hash,
+                   std::optional<int> height = std::nullopt) const;
     bool ReadBlock(CBlock& block, const CBlockIndex& index) const;
 
     /** Read only the serialized block size stored in the blk*.dat record header. */

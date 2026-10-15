@@ -451,7 +451,8 @@ static bool rest_block(const std::any& context,
     case RESTResponseFormat::JSON: {
         if (tx_verbosity) {
             CBlock block{};
-            SpanReader{*block_data} >> TX_WITH_WITNESS(block);
+            auto witness_budget = WitnessParseBudget::ForBlock(chainman.GetConsensus(), pblockindex->nHeight);
+            SpanReader{*block_data} >> WitnessParseParams{&witness_budget}(TX_WITH_WITNESS(block));
             UniValue objBlock = blockToJSON(chainman.m_blockman, block, *tip, *pblockindex, *tx_verbosity, chainman.GetConsensus().powLimit);
             std::string strJSON = objBlock.write() + "\n";
             req->WriteHeader("Content-Type", "application/json");

@@ -6,6 +6,7 @@
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
 #include <wallet/walletdb.h>
+#include <chainparams.h>
 
 #include <common/system.h>
 #include <key_io.h>
@@ -1063,7 +1064,8 @@ static DBErrors LoadTxRecords(CWallet* pwallet, DatabaseBatch& batch, bool& any_
                 result = DBErrors::CORRUPT;
                 return false;
             }
-            value >> wtx;
+            auto witness_budget = WitnessParseBudget::ForInspection(Params().GetConsensus());
+            value >> WitnessParseParams{&witness_budget}(wtx);
             if (wtx.GetHash() != hash)
                 return false;
 

@@ -864,7 +864,8 @@ static RPCHelpMan getblock()
     }
 
     CBlock block{};
-    SpanReader{block_data} >> TX_WITH_WITNESS(block);
+    auto witness_budget = WitnessParseBudget::ForBlock(chainman.GetConsensus(), pblockindex->nHeight);
+    SpanReader{block_data} >> WitnessParseParams{&witness_budget}(TX_WITH_WITNESS(block));
 
     TxVerbosity tx_verbosity;
     if (verbosity == 1) {

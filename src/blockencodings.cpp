@@ -56,7 +56,8 @@ uint64_t CBlockHeaderAndShortTxIDs::GetShortID(const Wtxid& wtxid) const
  * in a vector and iterate over the vector directly. This allows optimal
  * CPU caching behaviour, at a cost of only 40 bytes per transaction.
  */
-ReadStatus PartiallyDownloadedBlock::InitData(const CBlockHeaderAndShortTxIDs& cmpctblock, const std::vector<std::pair<Wtxid, CTransactionRef>>& extra_txn)
+ReadStatus PartiallyDownloadedBlock::InitData(const CBlockHeaderAndShortTxIDs& cmpctblock, const std::vector<std::pair<Wtxid, CTransactionRef>>& extra_txn,
+                                             std::optional<uint64_t> witness_item_limit)
 {
     LogDebug(BCLog::CMPCTBLOCK, "Initializing PartiallyDownloadedBlock for block %s using a cmpctblock of %u bytes\n", cmpctblock.header.GetHash().ToString(), GetSerializeSize(cmpctblock));
     if (cmpctblock.header.IsNull() || (cmpctblock.shorttxids.empty() && cmpctblock.prefilledtxn.empty()))
@@ -65,6 +66,7 @@ ReadStatus PartiallyDownloadedBlock::InitData(const CBlockHeaderAndShortTxIDs& c
         return READ_STATUS_INVALID;
 
     if (!header.IsNull() || !txn_available.empty()) return READ_STATUS_INVALID;
+    m_witness_item_limit = witness_item_limit;
 
     header = cmpctblock.header;
     txn_available.resize(cmpctblock.BlockTxCount());
@@ -177,7 +179,23 @@ ReadStatus PartiallyDownloadedBlock::InitData(const CBlockHeaderAndShortTxIDs& c
 
     LogDebug(BCLog::CMPCTBLOCK, "Initialized PartiallyDownloadedBlock for block %s using a cmpctblock of %u bytes\n", cmpctblock.header.GetHash().ToString(), GetSerializeSize(cmpctblock));
 
+    if (!WitnessItemsRemaining()) return READ_STATUS_FAILED;
     return READ_STATUS_OK;
+}
+
+std::optional<uint64_t> PartiallyDownloadedBlock::WitnessItemsRemaining() const
+{
+    uint64_t remaining{m_witness_item_limit.value_or(std::numeric_limits<uint64_t>::max())};
+    if (!m_witness_item_limit) return remaining;
+    for (const auto& tx : txn_available) {
+        if (!tx) continue;
+        for (const auto& input : tx->vin) {
+            const auto& stack = input.scriptWitness.stack;
+            if (Consensus::WitnessStackViolation(stack) || stack.size() > remaining) return std::nullopt;
+            remaining -= stack.size();
+        }
+    }
+    return remaining;
 }
 
 bool PartiallyDownloadedBlock::IsTxAvailable(size_t index) const
@@ -219,6 +237,16 @@ ReadStatus PartiallyDownloadedBlock::FillBlock(CBlock& block, const std::vector<
     IsBlockMutatedFn check_mutated{m_check_block_mutated_mock ? m_check_block_mutated_mock : IsBlockMutated};
     if (check_mutated(/*block=*/block, /*check_witness_root=*/segwit_active)) {
         return READ_STATUS_FAILED; // Possible Short ID collision
+    }
+    if (m_witness_item_limit) {
+        uint64_t remaining{*m_witness_item_limit};
+        for (const auto& tx : block.vtx) {
+            for (const auto& input : tx->vin) {
+                const auto& stack = input.scriptWitness.stack;
+                if (Consensus::WitnessStackViolation(stack) || stack.size() > remaining) return READ_STATUS_FAILED;
+                remaining -= stack.size();
+            }
+        }
     }
 
     if (LogAcceptCategory(BCLog::CMPCTBLOCK, BCLog::Level::Debug)) {

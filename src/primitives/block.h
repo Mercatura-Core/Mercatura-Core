@@ -94,7 +94,9 @@ public:
 
     SERIALIZE_METHODS(CBlock, obj)
     {
+        WitnessParseGuard witness_guard{GetWitnessParseBudget(s)};
         READWRITE(AsBase<CBlockHeader>(obj), obj.vtx);
+        witness_guard.Commit();
     }
 
     void SetNull()
@@ -108,6 +110,26 @@ public:
 
     std::string ToString() const;
 };
+
+/** Header-first ingestion. Unknown parents are deferred before witness allocation.
+ * Legacy networks keep their exact decoder. Each invocation owns a fresh budget. */
+template <typename Stream, typename HeightLookup>
+void ReadBlockWithWitnessLimits(Stream& stream, CBlock& block, const Consensus::Params& consensus, HeightLookup height_lookup)
+{
+    if (consensus.nWitnessResourceHeight < 0) {
+        stream >> TX_WITH_WITNESS(block);
+        return;
+    }
+    CBlockHeader header;
+    stream >> header;
+    const std::optional<int> height = height_lookup(header);
+    if (!height) throw std::ios_base::failure("unknown-block-parent");
+    auto budget = WitnessParseBudget::ForBlock(consensus, *height);
+    const WitnessParseParams witness_params{&budget};
+    ParamsStream bounded{stream, witness_params};
+    block = CBlock{header};
+    bounded >> TX_WITH_WITNESS(block.vtx);
+}
 
 /** Describes a place in the block chain to another node such that if the
  * other node doesn't have the same branch, it can find a recent common trunk.

@@ -4869,7 +4869,11 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
 
         try {
             AutoFile block_stream{completed_file.release()};
-            block_stream >> TX_WITH_WITNESS(*pblock);
+            ReadBlockWithWitnessLimits(block_stream, *pblock, m_chainman.GetConsensus(),
+                [&](const CBlockHeader& header) {
+                    if (header.GetHash() != expected_hash) throw std::ios_base::failure("chunked block hash mismatch");
+                    return m_chainman.GetWitnessParseHeight(header);
+                });
 
             if (static_cast<uint64_t>(block_stream.tell()) !=
                 expected_total_size) {
@@ -5453,7 +5457,8 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
         if (m_chainman.IsInitialBlockDownload()) return;
 
         CTransactionRef ptx;
-        vRecv >> TX_WITH_WITNESS(ptx);
+        auto tx_budget = m_chainman.GetMempoolWitnessParseBudget();
+        vRecv >> WitnessParseParams{&tx_budget}(TX_WITH_WITNESS(ptx));
 
         const Txid& txid = ptx->GetHash();
         const Wtxid& wtxid = ptx->GetWitnessHash();
@@ -5530,7 +5535,21 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
         }
 
         CBlockHeaderAndShortTxIDs cmpctblock;
-        vRecv >> cmpctblock;
+        auto compact_budget = WitnessParseBudget::ForInspection(m_chainman.GetConsensus());
+        if (m_chainman.GetConsensus().nWitnessResourceHeight >= 0) {
+            CBlockHeader header;
+            SpanReader{std::span<const std::byte>{vRecv.data(), vRecv.size()}} >> header;
+            const auto height = m_chainman.GetWitnessParseHeight(header);
+            if (!height) {
+                if (!m_chainman.IsInitialBlockDownload()) {
+                    LOCK(cs_main);
+                    MaybeSendGetHeaders(pfrom, GetLocator(m_chainman.m_best_header), peer);
+                }
+                return;
+            }
+            compact_budget = WitnessParseBudget::ForBlock(m_chainman.GetConsensus(), *height);
+        }
+        vRecv >> WitnessParseParams{&compact_budget}(cmpctblock);
 
         bool received_new_header = false;
         const auto blockhash = cmpctblock.header.GetHash();
@@ -5646,7 +5665,9 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
                 }
 
                 PartiallyDownloadedBlock& partialBlock = *(*queuedBlockIt)->partialBlock;
-                ReadStatus status = partialBlock.InitData(cmpctblock, vExtraTxnForCompact);
+                ReadStatus status = partialBlock.InitData(cmpctblock, vExtraTxnForCompact,
+                    Consensus::WitnessLimitsActive(m_chainman.GetConsensus(), pindex->nHeight)
+                        ? std::optional{Consensus::GetMaxBlockWitnessItems(pindex->nHeight)} : std::nullopt);
                 if (status == READ_STATUS_INVALID) {
                     RemoveBlockRequest(pindex->GetBlockHash(), pfrom.GetId()); // Reset in-flight state in case Misbehaving does not result in a disconnect
                     Misbehaving(peer, "invalid compact block");
@@ -5697,7 +5718,9 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
                 // Optimistically try to reconstruct anyway since we might be
                 // able to without any round trips.
                 PartiallyDownloadedBlock tempBlock(&m_mempool);
-                ReadStatus status = tempBlock.InitData(cmpctblock, vExtraTxnForCompact);
+                ReadStatus status = tempBlock.InitData(cmpctblock, vExtraTxnForCompact,
+                    Consensus::WitnessLimitsActive(m_chainman.GetConsensus(), pindex->nHeight)
+                        ? std::optional{Consensus::GetMaxBlockWitnessItems(pindex->nHeight)} : std::nullopt);
                 if (status != READ_STATUS_OK) {
                     // TODO: don't ignore failures
                     return;
@@ -5778,7 +5801,32 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
         }
 
         BlockTransactions resp;
-        vRecv >> resp;
+        if (m_chainman.GetConsensus().nWitnessResourceHeight >= 0) {
+            // Resolve the outstanding reconstruction before allocating missing witnesses.
+            vRecv >> resp.blockhash;
+            auto budget = WitnessParseBudget::ForInspection(m_chainman.GetConsensus());
+            {
+                LOCK(cs_main);
+                const auto* index = m_chainman.m_blockman.LookupBlockIndex(resp.blockhash);
+                if (!index) return;
+                budget = WitnessParseBudget::ForBlock(m_chainman.GetConsensus(), index->nHeight);
+                bool requested{false};
+                const auto range = mapBlocksInFlight.equal_range(resp.blockhash);
+                for (auto it = range.first; it != range.second; ++it) {
+                    if (it->second.first == pfrom.GetId() && it->second.second->partialBlock) {
+                        const auto remaining = it->second.second->partialBlock->WitnessItemsRemaining();
+                        if (!remaining) return;
+                        budget.remaining = *remaining;
+                        requested = true;
+                        break;
+                    }
+                }
+                if (!requested) return;
+            }
+            vRecv >> WitnessParseParams{&budget}(TX_WITH_WITNESS(resp.txn));
+        } else {
+            vRecv >> resp;
+        }
 
         return ProcessCompactBlockTxns(pfrom, peer, resp);
     }
@@ -5833,7 +5881,19 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
         }
 
         std::shared_ptr<CBlock> pblock = std::make_shared<CBlock>();
-        vRecv >> TX_WITH_WITNESS(*pblock);
+        if (m_chainman.GetConsensus().nWitnessResourceHeight >= 0) {
+            CBlockHeader header;
+            SpanReader{std::span<const std::byte>{vRecv.data(), vRecv.size()}} >> header;
+            if (!m_chainman.GetWitnessParseHeight(header)) {
+                if (!m_chainman.IsInitialBlockDownload()) {
+                    LOCK(cs_main);
+                    MaybeSendGetHeaders(pfrom, GetLocator(m_chainman.m_best_header), peer);
+                }
+                return;
+            }
+        }
+        ReadBlockWithWitnessLimits(vRecv, *pblock, m_chainman.GetConsensus(),
+            [this](const CBlockHeader& header) { return m_chainman.GetWitnessParseHeight(header); });
 
         LogDebug(BCLog::NET, "received block %s peer=%d\n", pblock->GetHash().ToString(), pfrom.GetId());
 

@@ -620,6 +620,9 @@ bool PSBTInputSignedAndVerified(const PartiallySignedTransaction& psbt, unsigned
         Params().GetConsensus().hashGenesisBlock
     };
 
+    if (Params().GetConsensus().nWitnessResourceHeight == 0 &&
+        Consensus::WitnessStackViolation(input.final_script_witness.stack)) return false;
+
     if (txdata) {
         return VerifyScript(
             input.final_script_sig,
@@ -964,6 +967,14 @@ bool FinalizeAndExtractPSBT(PartiallySignedTransaction& psbtx, CMutableTransacti
         result.vin[i].scriptSig = psbtx.inputs[i].final_script_sig;
         result.vin[i].scriptWitness = psbtx.inputs[i].final_script_witness;
     }
+    if (Params().GetConsensus().nWitnessResourceHeight == 0) {
+        uint64_t remaining{Consensus::MAX_BLOCK_WITNESS_ITEMS - 1};
+        for (const auto& input : result.vin) {
+            const auto& stack = input.scriptWitness.stack;
+            if (Consensus::WitnessStackViolation(stack) || stack.size() > remaining) return false;
+            remaining -= stack.size();
+        }
+    }
     return true;
 }
 
@@ -1006,7 +1017,8 @@ bool DecodeRawPSBT(PartiallySignedTransaction& psbt, std::span<const std::byte> 
 {
     SpanReader ss_data{tx_data};
     try {
-        ss_data >> psbt;
+        auto budget = WitnessParseBudget::ForInspection(Params().GetConsensus());
+        ss_data >> WitnessParseParams{&budget}(psbt);
         if (!ss_data.empty()) {
             error = "extra data after PSBT";
             return false;

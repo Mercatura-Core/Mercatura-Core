@@ -107,7 +107,10 @@ bool TxIndex::FindTx(const Txid& tx_hash, uint256& block_hash, CTransactionRef& 
     try {
         file >> header;
         file.seek(postx.nTxOffset, SEEK_CUR);
-        file >> TX_WITH_WITNESS(tx);
+        const auto height = m_chainstate->m_chainman.GetWitnessParseHeight(header);
+        if (!height) throw std::ios_base::failure("unknown-block-parent");
+        auto budget = WitnessParseBudget::ForBlock(m_chainstate->m_chainman.GetConsensus(), *height);
+        file >> WitnessParseParams{&budget}(TX_WITH_WITNESS(tx));
     } catch (const std::exception& e) {
         LogError("Deserialize or I/O error - %s", e.what());
         return false;

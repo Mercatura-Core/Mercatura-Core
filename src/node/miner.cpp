@@ -14,6 +14,7 @@
 #include <consensus/consensus.h>
 #include <consensus/merkle.h>
 #include <consensus/tx_verify.h>
+#include <consensus/tx_check.h>
 #include <consensus/validation.h>
 #include <deploymentstatus.h>
 #include <logging.h>
@@ -144,6 +145,8 @@ uint64_t GetBlockTemplateMaxCapacityBytes(
 
 void BlockAssembler::resetBlock()
 {
+    nBlockWitnessItems = 1; // Reserve the witness commitment's coinbase item.
+    nBlockMaxWitnessItems = std::numeric_limits<uint64_t>::max();
     // Reserve serialized space for the fixed-size block header, transaction
     // count, and coinbase transaction.
     nBlockCapacityBytes = *Assert(m_options.block_reserved_size);
@@ -177,6 +180,9 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
         GetBlockTemplateMaxCapacityBytes(
             nHeight,
             m_options);
+    if (Consensus::WitnessLimitsActive(chainparams.GetConsensus(), nHeight)) {
+        nBlockMaxWitnessItems = Consensus::GetMaxBlockWitnessItems(nHeight);
+    }
 
     pblock->nVersion = m_chainstate.m_chainman.m_versionbitscache.ComputeBlockVersion(pindexPrev, chainparams.GetConsensus());
     // -regtest only: allow overriding block.nVersion with
@@ -291,8 +297,9 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     return std::move(pblocktemplate);
 }
 
-bool BlockAssembler::TestChunkBlockLimits(uint64_t chunk_capacity_bytes, int64_t chunk_sigops_cost) const
+bool BlockAssembler::TestChunkBlockLimits(uint64_t chunk_capacity_bytes, int64_t chunk_sigops_cost, uint64_t chunk_witness_items) const
 {
+    if (chunk_witness_items > nBlockMaxWitnessItems - nBlockWitnessItems) return false;
     if (nBlockCapacityBytes + chunk_capacity_bytes >= nBlockMaxCapacityBytes) {
         return false;
     }
@@ -320,6 +327,7 @@ void BlockAssembler::AddToBlock(const CTxMemPoolEntry& entry)
     pblocktemplate->vTxFees.push_back(entry.GetFee());
     pblocktemplate->vTxSigOpsCost.push_back(entry.GetSigOpCost());
     nBlockCapacityBytes += GetTransactionCapacityBytes(entry.GetTx());
+    nBlockWitnessItems += GetTransactionWitnessItems(entry.GetTx());
     ++nBlockTx;
     nBlockSigOpsCost += entry.GetSigOpCost();
     nFees += entry.GetFee();
@@ -357,12 +365,19 @@ void BlockAssembler::addChunks()
 
         int64_t chunk_sig_ops = 0;
         uint64_t chunk_capacity_bytes = 0;
+        uint64_t chunk_witness_items = 0;
         for (const auto& tx : selected_transactions) {
             chunk_sig_ops += tx.get().GetSigOpCost();
             chunk_capacity_bytes += GetTransactionCapacityBytes(tx.get().GetTx());
+            const uint64_t items{GetTransactionWitnessItems(tx.get().GetTx())};
+            if (items > std::numeric_limits<uint64_t>::max() - chunk_witness_items) {
+                chunk_witness_items = std::numeric_limits<uint64_t>::max();
+            } else {
+                chunk_witness_items += items;
+            }
         }
 
-        if (!TestChunkBlockLimits(chunk_capacity_bytes, chunk_sig_ops) || !TestChunkTransactions(selected_transactions)) {
+        if (!TestChunkBlockLimits(chunk_capacity_bytes, chunk_sig_ops, chunk_witness_items) || !TestChunkTransactions(selected_transactions)) {
             // This chunk won't fit, so we skip it and will try the next best one.
             m_mempool->SkipBuilderChunk();
             ++nConsecutiveFailed;

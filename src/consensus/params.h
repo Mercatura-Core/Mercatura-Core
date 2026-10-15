@@ -83,6 +83,9 @@ struct BIP9Deployment {
  */
 struct Params {
     uint256 hashGenesisBlock;
+    /** Witness resource rules: negative disables; mainnet activates from genesis.
+     * No CLI override. A future testnet deployment requires an explicit consensus change. */
+    int nWitnessResourceHeight{-1};
     /**
      * Hashes of blocks that
      * - are known to be consensus valid, and

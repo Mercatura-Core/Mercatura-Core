@@ -8,6 +8,7 @@
 
 #include <attributes.h>
 #include <consensus/amount.h>
+#include <consensus/witness_limits.h>
 #include <primitives/transaction_identifier.h> // IWYU pragma: export
 #include <script/script.h>
 #include <serialize.h>
@@ -200,6 +201,7 @@ static constexpr TransactionSerParams TX_NO_WITNESS{.allow_witness = false};
 template<typename Stream, typename TxType>
 void UnserializeTransaction(TxType& tx, Stream& s, const TransactionSerParams& params)
 {
+    WitnessParseGuard witness_guard{GetWitnessParseBudget(s)};
     const bool fAllowWitness = params.allow_witness;
 
     s >> tx.version;
@@ -223,7 +225,7 @@ void UnserializeTransaction(TxType& tx, Stream& s, const TransactionSerParams& p
         /* The witness flag is present, and we support witnesses. */
         flags ^= 1;
         for (size_t i = 0; i < tx.vin.size(); i++) {
-            s >> tx.vin[i].scriptWitness.stack;
+            s >> Using<WitnessStackFormatter>(tx.vin[i].scriptWitness.stack);
         }
         if (!tx.HasWitness()) {
             /* It's illegal to encode witnesses when all witness stacks are empty. */
@@ -235,6 +237,7 @@ void UnserializeTransaction(TxType& tx, Stream& s, const TransactionSerParams& p
         throw std::ios_base::failure("Unknown transaction optional data");
     }
     s >> tx.nLockTime;
+    witness_guard.Commit();
 }
 
 template<typename Stream, typename TxType>

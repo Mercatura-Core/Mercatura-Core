@@ -14,6 +14,7 @@
 #include <util/feefrac.h>
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 
@@ -66,6 +67,8 @@ private:
     // Information on the current status of the block
     uint64_t nBlockCapacityBytes;
     uint64_t nBlockMaxCapacityBytes;
+    uint64_t nBlockWitnessItems{1};
+    uint64_t nBlockMaxWitnessItems{std::numeric_limits<uint64_t>::max()};
     uint64_t nBlockTx;
     uint64_t nBlockSigOpsCost;
     CAmount nFees;
@@ -117,7 +120,7 @@ private:
 
     // helper functions for addChunks()
     /** Test if a new chunk would "fit" in the block */
-    bool TestChunkBlockLimits(uint64_t chunk_capacity_bytes, int64_t chunk_sigops_cost) const;
+    bool TestChunkBlockLimits(uint64_t chunk_capacity_bytes, int64_t chunk_sigops_cost, uint64_t chunk_witness_items) const;
     /** Perform locktime checks on each transaction in a chunk:
       * This check should always succeed, and is here
       * only as an extra check in case of a bug */

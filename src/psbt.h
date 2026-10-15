@@ -637,7 +637,7 @@ struct PSBTInput
                     } else if (key.size() != 1) {
                         throw std::ios_base::failure("Final scriptWitness key is more than one byte type");
                     }
-                    UnserializeFromVector(s, final_script_witness.stack);
+                    UnserializeFromVector(s, Using<WitnessStackFormatter>(final_script_witness.stack));
                     break;
                 }
                 case PSBT_IN_RIPEMD160:
@@ -1272,6 +1272,7 @@ struct PartiallySignedTransaction
     template <typename Stream>
     inline void Unserialize(Stream& s) {
         // Read the magic bytes
+        WitnessParseGuard witness_guard{GetWitnessParseBudget(s)};
         uint8_t magic[5];
         s >> magic;
         if (!std::equal(magic, magic + 5, PSBT_MAGIC_BYTES)) {
@@ -1442,6 +1443,7 @@ struct PartiallySignedTransaction
         if (outputs.size() != tx->vout.size()) {
             throw std::ios_base::failure("Outputs provided does not match the number of outputs in transaction.");
         }
+        witness_guard.Commit();
     }
 
     template <typename Stream>

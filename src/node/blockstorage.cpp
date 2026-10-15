@@ -1100,7 +1100,8 @@ bool BlockManager::WriteBlockUndo(const CBlockUndo& blockundo, BlockValidationSt
     return true;
 }
 
-bool BlockManager::ReadBlock(CBlock& block, const FlatFilePos& pos, const std::optional<uint256>& expected_hash) const
+bool BlockManager::ReadBlock(CBlock& block, const FlatFilePos& pos, const std::optional<uint256>& expected_hash,
+                             std::optional<int> height) const
 {
     block.SetNull();
 
@@ -1145,7 +1146,15 @@ bool BlockManager::ReadBlock(CBlock& block, const FlatFilePos& pos, const std::o
             return false;
         }
 
-        block_stream >> TX_WITH_WITNESS(block);
+        ReadBlockWithWitnessLimits(block_stream, block, GetConsensus(), [&](const CBlockHeader& header) -> std::optional<int> {
+            if (expected_hash && header.GetHash() != *expected_hash) throw std::ios_base::failure("block hash mismatch");
+            if (height) return height;
+            if (header.GetHash() == GetConsensus().hashGenesisBlock) return 0;
+            LOCK(cs_main);
+            const auto* parent = LookupBlockIndex(header.hashPrevBlock);
+            if (!parent) return std::nullopt;
+            return parent->nHeight + 1;
+        });
 
         if (block_stream.GetPos() != block_size) {
             LogError(
@@ -1196,7 +1205,7 @@ bool BlockManager::ReadBlock(CBlock& block, const FlatFilePos& pos, const std::o
 bool BlockManager::ReadBlock(CBlock& block, const CBlockIndex& index) const
 {
     const FlatFilePos block_pos{WITH_LOCK(cs_main, return index.GetBlockPos())};
-    return ReadBlock(block, block_pos, index.GetBlockHash());
+    return ReadBlock(block, block_pos, index.GetBlockHash(), index.nHeight);
 }
 
 BlockManager::ReadRawBlockSizeResult BlockManager::ReadRawBlockSize(const FlatFilePos& pos) const

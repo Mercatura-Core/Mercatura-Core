@@ -1141,6 +1141,19 @@ public:
         }
     }
 
+    //! Look up optional parameters through nested parameter streams.
+    template <typename P>
+    const P* GetParamsPtr() const
+    {
+        if constexpr (std::is_same_v<Params, P>) {
+            return &m_params;
+        } else if constexpr (requires { m_substream.template GetParamsPtr<P>(); }) {
+            return m_substream.template GetParamsPtr<P>();
+        } else {
+            return nullptr;
+        }
+    }
+
     //! Get reference to underlying stream.
     auto& GetStream()
     {

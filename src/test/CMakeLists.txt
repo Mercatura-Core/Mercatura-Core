@@ -39,6 +39,7 @@ add_executable(test_bitcoin
   crypto_tests.cpp
   cpu_miner_tests.cpp
   worker_limits_tests.cpp
+  witness_resource_tests.cpp
   mining_statistics_tests.cpp
   gpu_miner_tests.cpp
   mercahash_gpu_tests.cpp

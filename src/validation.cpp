@@ -818,6 +818,16 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
         return false; // state filled in by CheckTransaction
     }
 
+    const int witness_height{m_active_chainstate.m_chain.Height() + 1};
+    if (Consensus::WitnessLimitsActive(m_active_chainstate.m_chainman.GetConsensus(), witness_height)) {
+        if (!CheckTransactionWitnessResources(tx, state)) return false;
+        const uint64_t limit{Consensus::GetMaxBlockWitnessItems(witness_height)};
+        if (GetTransactionWitnessItems(tx) > limit - 1) {
+            // Contextual eligibility can change at a capacity boundary or reorg.
+            return state.Invalid(TxValidationResult::TX_MEMPOOL_POLICY, "tx-witness-budget");
+        }
+    }
+
     // Coinbase is only valid in a block, not as a loose transaction
     if (tx.IsCoinBase())
         return state.Invalid(TxValidationResult::TX_CONSENSUS, "coinbase");
@@ -2339,6 +2349,25 @@ script_verify_flags GetBlockScriptFlags(const CBlockIndex& block_index, const Ch
 }
 
 
+static bool CheckWitnessMalleation(const CBlock& block, bool expect_witness_commitment, BlockValidationState& state);
+
+std::optional<int> ChainstateManager::GetWitnessParseHeight(const CBlockHeader& header) const
+{
+    if (header.GetHash() == GetConsensus().hashGenesisBlock) return 0;
+    LOCK(cs_main);
+    const auto* parent = m_blockman.LookupBlockIndex(header.hashPrevBlock);
+    if (!parent) return std::nullopt;
+    return parent->nHeight + 1;
+}
+
+WitnessParseBudget ChainstateManager::GetMempoolWitnessParseBudget() const
+{
+    LOCK(cs_main);
+    auto budget = WitnessParseBudget::ForBlock(GetConsensus(), ActiveChain().Height() + 1);
+    if (budget.enabled) --budget.remaining; // Coinbase witness in any containing block.
+    return budget;
+}
+
 static bool CheckBlockCapacity(const CBlock& block, BlockValidationState& state, int64_t height)
 {
     if (!IsBlockWithinCapacity(block, height)) {
@@ -2395,6 +2424,13 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         }
         LogError("%s: Consensus::CheckBlock: %s\n", __func__, state.ToString());
         return false;
+    }
+
+    if (Consensus::WitnessLimitsActive(params.GetConsensus(), pindex->nHeight)) {
+        // Authenticate before witness-dependent permanent rejection, including
+        // direct connection and -reindex-chainstate. Resource checks stay outside caches.
+        if (!CheckWitnessMalleation(block, DeploymentActiveAfter(pindex->pprev, m_chainman, Consensus::DEPLOYMENT_SEGWIT), state) ||
+            !CheckBlockWitnessResources(block, state, params.GetConsensus(), pindex->nHeight)) return false;
     }
 
     // Re-enforce Mercatura's height-dependent block-capacity rule here.
@@ -4385,6 +4421,8 @@ static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& stat
         return false;
     }
 
+    if (!CheckBlockWitnessResources(block, state, chainman.GetConsensus(), nHeight)) return false;
+
     // After the coinbase witness reserved value and commitment are verified,
     // enforce Mercatura's height-dependent serialized-byte capacity. This
     // must remain after CheckWitnessMalleation(): otherwise mutable coinbase
@@ -5470,7 +5508,8 @@ void ChainstateManager::LoadExternalBlockFile(
                         }
 
                         pblock = std::make_shared<CBlock>();
-                        blkdat >> TX_WITH_WITNESS(*pblock);
+                        ReadBlockWithWitnessLimits(blkdat, *pblock, GetConsensus(),
+                            [this](const CBlockHeader& header) { return GetWitnessParseHeight(header); });
 
                         if (blkdat.GetPos() != nBlockEnd) {
                             throw std::ios_base::failure{

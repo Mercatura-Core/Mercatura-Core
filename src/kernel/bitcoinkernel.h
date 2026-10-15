@@ -500,6 +500,13 @@ typedef uint8_t btck_ChainType;
 /**
  * @brief Create a new transaction from the serialized data.
  *
+ * This network-neutral constructor is a decoding interface for caller-trusted
+ * data, not an untrusted network ingress validator. It preserves legacy witness
+ * decoding and can allocate witness descriptors before consensus validation.
+ * Embedders must bound and validate untrusted serialized witnesses using the
+ * applicable network rules before calling it. Creating an object does not
+ * establish consensus validity.
+ *
  * @param[in] raw_transaction     Serialized transaction.
  * @param[in] raw_transaction_len Length of the serialized transaction.
  * @return                        The transaction, or null on error.
@@ -1218,6 +1225,12 @@ BITCOINKERNEL_API btck_Block* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_read(
 
 /**
  * @brief Parse a serialized raw block into a new block object.
+ *
+ * This network-neutral constructor accepts caller-trusted serialized data and
+ * does not apply a height-dependent witness allocation budget. Embedders must
+ * resolve network/height context and bound untrusted witnesses before calling
+ * it. Processing through a chainstate manager performs independent consensus
+ * validation; it cannot undo allocations made by this constructor.
  *
  * @param[in] raw_block     Serialized block.
  * @param[in] raw_block_len Length of the serialized block.

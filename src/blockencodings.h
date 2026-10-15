@@ -66,7 +66,9 @@ public:
 
     SERIALIZE_METHODS(BlockTransactions, obj)
     {
+        WitnessParseGuard witness_guard{GetWitnessParseBudget(s)};
         READWRITE(obj.blockhash, TX_WITH_WITNESS(Using<VectorFormatter<TransactionCompression>>(obj.txn)));
+        witness_guard.Commit();
     }
 };
 
@@ -135,6 +137,7 @@ protected:
     std::vector<CTransactionRef> txn_available;
     size_t prefilled_count = 0, mempool_count = 0, extra_count = 0;
     const CTxMemPool* pool;
+    std::optional<uint64_t> m_witness_item_limit;
 public:
     CBlockHeader header;
 
@@ -145,7 +148,10 @@ public:
     explicit PartiallyDownloadedBlock(CTxMemPool* poolIn) : pool(poolIn) {}
 
     // extra_txn is a list of extra transactions to look at, in <witness hash, reference> form
-    ReadStatus InitData(const CBlockHeaderAndShortTxIDs& cmpctblock, const std::vector<std::pair<Wtxid, CTransactionRef>>& extra_txn);
+    ReadStatus InitData(const CBlockHeaderAndShortTxIDs& cmpctblock, const std::vector<std::pair<Wtxid, CTransactionRef>>& extra_txn,
+                        std::optional<uint64_t> witness_item_limit = std::nullopt);
+    /** Remaining allowance includes cached, prefilled and extra-pool transactions. */
+    std::optional<uint64_t> WitnessItemsRemaining() const;
     bool IsTxAvailable(size_t index) const;
     // segwit_active enforces witness mutation checks just before reporting a healthy status
     ReadStatus FillBlock(CBlock& block, const std::vector<CTransactionRef>& vtx_missing, bool segwit_active);

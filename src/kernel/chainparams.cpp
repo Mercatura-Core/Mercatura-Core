@@ -88,6 +88,7 @@ class CMainParams : public CChainParams {
 public:
     CMainParams() {
         m_chain_type = ChainType::MAIN;
+        consensus.nWitnessResourceHeight = 0;
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
         // Mercatura has no inherited Bitcoin historical script exceptions.

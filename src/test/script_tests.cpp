@@ -2354,6 +2354,17 @@ BOOST_AUTO_TEST_CASE(mercatura_pq_witness_v2_end_to_end)
             public_key.end()),
     };
 
+    // A real ML-DSA witness must round-trip through the mainnet resource
+    // decoder before exercising the existing authorization/mutation vectors.
+    DataStream resource_wire;
+    resource_wire << TX_WITH_WITNESS(tx);
+    auto resource_budget = WitnessParseBudget::ForBlock(Params().GetConsensus(), 1);
+    CMutableTransaction resource_decoded;
+    resource_wire >> WitnessParseParams{&resource_budget}(TX_WITH_WITNESS(resource_decoded));
+    BOOST_CHECK(resource_budget.enabled);
+    BOOST_CHECK_EQUAL(resource_budget.remaining, 4094);
+    tx = std::move(resource_decoded);
+
     MutableTransactionSignatureChecker checker{
         &tx,
         1,

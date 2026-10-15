@@ -34,6 +34,10 @@ namespace ipc {
 namespace capnp {
 //! Construct a ParamStream wrapping a data stream with serialization parameters
 //! needed to pass transaction objects between bitcoin processes.
+//! This is a trusted local IPC boundary (inherited descriptors or explicitly
+//! configured Unix sockets), not a P2P decoder. Socket access must be restricted
+//! to trusted clients. The network-neutral wrapper retains legacy decoding;
+//! consensus checks still apply when a received object is processed by Core.
 //! In the future, more params may be added here to serialize other objects that
 //! require serialization parameters. Params should just be chosen to serialize
 //! objects completely and ensure that serializing and deserializing objects

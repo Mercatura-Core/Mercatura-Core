@@ -7,6 +7,49 @@
 #include <consensus/amount.h>
 #include <primitives/transaction.h>
 #include <consensus/validation.h>
+#include <primitives/block.h>
+
+#include <limits>
+
+bool CheckTransactionWitnessResources(const CTransaction& tx, TxValidationState& state)
+{
+    for (const auto& input : tx.vin) {
+        if (const char* reason = Consensus::WitnessStackViolation(input.scriptWitness.stack)) {
+            return state.Invalid(TxValidationResult::TX_WITNESS_MUTATED, reason);
+        }
+    }
+    return true;
+}
+
+uint64_t GetTransactionWitnessItems(const CTransaction& tx)
+{
+    uint64_t count{0};
+    for (const auto& input : tx.vin) {
+        const uint64_t size{input.scriptWitness.stack.size()};
+        if (size > std::numeric_limits<uint64_t>::max() - count) return std::numeric_limits<uint64_t>::max();
+        count += size;
+    }
+    return count;
+}
+
+bool CheckBlockWitnessResources(const CBlock& block, BlockValidationState& state,
+                                const Consensus::Params& params, int64_t height)
+{
+    if (!Consensus::WitnessLimitsActive(params, height)) return true;
+    uint64_t remaining{Consensus::GetMaxBlockWitnessItems(height)};
+    for (const auto& tx : block.vtx) {
+        TxValidationState tx_state;
+        if (!CheckTransactionWitnessResources(*tx, tx_state)) {
+            return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, tx_state.GetRejectReason());
+        }
+        for (const auto& input : tx->vin) {
+            const uint64_t count{input.scriptWitness.stack.size()};
+            if (count > remaining) return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-witness-items");
+            remaining -= count;
+        }
+    }
+    return true;
+}
 
 bool CheckTransaction(const CTransaction& tx, TxValidationState& state)
 {

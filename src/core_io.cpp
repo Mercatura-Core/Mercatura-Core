@@ -6,6 +6,7 @@
 
 #include <addresstype.h>
 #include <coins.h>
+#include <chainparams.h>
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
 #include <consensus/validation.h>
@@ -153,7 +154,8 @@ static bool CheckTxScriptsSanity(const CMutableTransaction& tx)
     return true;
 }
 
-static bool DecodeTx(CMutableTransaction& tx, const std::vector<unsigned char>& tx_data, bool try_no_witness, bool try_witness)
+static bool DecodeTx(CMutableTransaction& tx, const std::vector<unsigned char>& tx_data, bool try_no_witness, bool try_witness,
+                     const WitnessParseBudget* witness_budget)
 {
     // General strategy:
     // - Decode both with extended serialization (which interprets the 0x0001 tag as a marker for
@@ -176,7 +178,8 @@ static bool DecodeTx(CMutableTransaction& tx, const std::vector<unsigned char>& 
     if (try_witness) {
         SpanReader ssData{tx_data};
         try {
-            ssData >> TX_WITH_WITNESS(tx_extended);
+            auto budget = witness_budget ? *witness_budget : WitnessParseBudget::ForInspection(Params().GetConsensus());
+            ssData >> WitnessParseParams{&budget}(TX_WITH_WITNESS(tx_extended));
             if (ssData.empty()) ok_extended = true;
         } catch (const std::exception&) {
             // Fall through.
@@ -224,14 +227,15 @@ static bool DecodeTx(CMutableTransaction& tx, const std::vector<unsigned char>& 
     return false;
 }
 
-bool DecodeHexTx(CMutableTransaction& tx, const std::string& hex_tx, bool try_no_witness, bool try_witness)
+bool DecodeHexTx(CMutableTransaction& tx, const std::string& hex_tx, bool try_no_witness, bool try_witness,
+                 const WitnessParseBudget* witness_budget)
 {
     if (!IsHex(hex_tx)) {
         return false;
     }
 
     std::vector<unsigned char> txData(ParseHex(hex_tx));
-    return DecodeTx(tx, txData, try_no_witness, try_witness);
+    return DecodeTx(tx, txData, try_no_witness, try_witness, witness_budget);
 }
 
 bool DecodeHexBlockHeader(CBlockHeader& header, const std::string& hex_header)
@@ -247,14 +251,21 @@ bool DecodeHexBlockHeader(CBlockHeader& header, const std::string& hex_header)
     return true;
 }
 
-bool DecodeHexBlk(CBlock& block, const std::string& strHexBlk)
+bool DecodeHexBlk(CBlock& block, const std::string& strHexBlk,
+    const std::function<std::optional<int>(const CBlockHeader&)>& height_lookup)
 {
     if (!IsHex(strHexBlk))
         return false;
 
     std::vector<unsigned char> blockData(ParseHex(strHexBlk));
     try {
-        SpanReader{blockData} >> TX_WITH_WITNESS(block);
+        SpanReader stream{blockData};
+        if (height_lookup) {
+            ReadBlockWithWitnessLimits(stream, block, Params().GetConsensus(), height_lookup);
+        } else {
+            auto budget = WitnessParseBudget::ForInspection(Params().GetConsensus());
+            stream >> WitnessParseParams{&budget}(TX_WITH_WITNESS(block));
+        }
     }
     catch (const std::exception&) {
         return false;
