@@ -899,13 +899,14 @@ bool DescriptorScriptPubKeyMan::CheckDecryptionKey(const CKeyingMaterial& master
     return true;
 }
 
-bool DescriptorScriptPubKeyMan::Encrypt(const CKeyingMaterial& master_key, WalletBatch* batch)
+bool DescriptorScriptPubKeyMan::Encrypt(const CKeyingMaterial& master_key, WalletBatch* batch, std::function<void()>* apply)
 {
     LOCK(cs_desc_man);
     if (!m_map_crypted_keys.empty()) {
         return false;
     }
 
+    CryptedKeyMap encrypted_keys;
     for (const KeyMap::value_type& key_in : m_map_keys)
     {
         const CKey &key = key_in.second;
@@ -915,10 +916,21 @@ bool DescriptorScriptPubKeyMan::Encrypt(const CKeyingMaterial& master_key, Walle
         if (!EncryptSecret(master_key, secret, pubkey.GetHash(), crypted_secret)) {
             return false;
         }
-        m_map_crypted_keys[pubkey.GetID()] = make_pair(pubkey, crypted_secret);
-        batch->WriteCryptedDescriptorKey(GetID(), pubkey, crypted_secret);
+        encrypted_keys.emplace(pubkey.GetID(), make_pair(pubkey, crypted_secret));
+        if (!batch->WriteCryptedDescriptorKey(GetID(), pubkey, crypted_secret)) return false;
     }
-    m_map_keys.clear();
+    // The deferred callback owns ciphertext only. Original private keys remain
+    // valid until commit; publishing then swaps maps without allocating.
+    auto publish = [this, keys = std::move(encrypted_keys)]() mutable {
+        LOCK(cs_desc_man);
+        m_map_crypted_keys.swap(keys);
+        m_map_keys.clear();
+    };
+    if (apply) {
+        *apply = std::move(publish);
+    } else {
+        publish();
+    }
     return true;
 }
 

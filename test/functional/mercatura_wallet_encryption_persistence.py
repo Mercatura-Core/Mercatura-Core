@@ -3,7 +3,7 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://opensource.org/license/mit/.
 
-"""Native PQ passphrase persistence with real SQLite write failures and restarts."""
+"""Native PQ encryption/passphrase persistence with SQLite faults and restarts."""
 
 from decimal import Decimal
 import sqlite3
@@ -112,6 +112,46 @@ class WalletEncryptionPersistenceTest(BitcoinTestFramework):
         self.mine(1, destination)
         assert source.gettransaction(txid)["confirmations"] > 0
         assert_equal(receiver.getbalance(), Decimal("1.00"))
+
+        self.log.info("Rejected initial-encryption writes must retain the plaintext wallet and its funds")
+        node.createwallet("initial", load_on_startup=True)
+        initial = node.get_wallet_rpc("initial")
+        initial_address = initial.getnewaddress()
+        funding_txid = receiver.sendtoaddress(initial_address, Decimal("0.40"))
+        self.mine(1, destination)
+        assert initial.gettransaction(funding_txid)["confirmations"] > 0
+        assert_equal(initial.getbalance(), Decimal("0.40"))
+        initial_expected = self.snapshot(initial)
+        initial = self.fail_master_key_writes("initial", enabled=True)
+        assert_raises_rpc_error(-16, "persist wallet encryption master key", initial.encryptwallet, OLD)
+        assert "unlocked_until" not in initial.getwalletinfo()
+        assert_equal(self.snapshot(initial), initial_expected)
+        assert_equal(initial.getaddressinfo(initial_address)["ismine"], True)
+        after_failure_address = initial.getnewaddress()
+        assert after_failure_address.startswith("mcrt1z")
+        self.restart_node(0)
+        initial = node.get_wallet_rpc("initial")
+        assert "unlocked_until" not in initial.getwalletinfo()
+        assert_equal(self.snapshot(initial), initial_expected)
+        assert_equal(initial.getaddressinfo(after_failure_address)["ismine"], True)
+
+        self.log.info("Retry encryption, restart, and spend the preserved native PQ output")
+        initial = self.fail_master_key_writes("initial", enabled=False)
+        initial.encryptwallet(OLD)
+        self.check_passphrases(initial, OLD, NEW)
+        assert_equal(self.snapshot(initial), initial_expected)
+        self.restart_node(0)
+        initial = node.get_wallet_rpc("initial")
+        self.check_passphrases(initial, OLD, NEW)
+        assert_equal(self.snapshot(initial), initial_expected)
+        initial.walletpassphrase(OLD, 60)
+        initial_spend = initial.sendtoaddress(destination, Decimal("0.10"))
+        initial.walletlock()
+        self.mine(1, destination)
+        details = initial.gettransaction(initial_spend)
+        assert details["confirmations"] > 0
+        assert_equal(initial.getbalance(), Decimal("0.30") + details["fee"])
+        assert initial.gettransaction(funding_txid)["confirmations"] > 0
 
 
 if __name__ == "__main__":

@@ -1008,127 +1008,102 @@ void CWallet::AddToSpends(const CWalletTx& wtx)
         AddToSpends(txin.prevout, wtx.GetHash());
 }
 
-bool CWallet::EncryptWallet(const SecureString& strWalletPassphrase)
+bool CWallet::EncryptWallet(const SecureString& strWalletPassphrase, bilingual_str* error)
 {
-    // Only descriptor wallets can be encrypted
+    LOCK2(m_relock_mutex, cs_wallet);
     Assert(IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS));
+    if (error) *error = {};
+    if (HasEncryptionKeys()) return false;
 
-    if (HasEncryptionKeys())
+    auto fail = [&](const char* message) {
+        WalletLogPrintf("%s\n", message);
+        if (error) *error = Untranslated(message);
         return false;
+    };
 
-    CKeyingMaterial plain_master_key;
-
-    plain_master_key.resize(WALLET_CRYPTO_KEY_SIZE);
+    CKeyingMaterial plain_master_key(WALLET_CRYPTO_KEY_SIZE);
     GetStrongRandBytes(plain_master_key);
-
     CMasterKey master_key;
-
     master_key.vchSalt.resize(WALLET_CRYPTO_SALT_SIZE);
     GetStrongRandBytes(master_key.vchSalt);
-
-    if (!EncryptMasterKey(strWalletPassphrase, plain_master_key, master_key)) {
-        return false;
-    }
+    if (!EncryptMasterKey(strWalletPassphrase, plain_master_key, master_key)) return false;
     WalletLogPrintf("Encrypting Wallet with an nDeriveIterations of %i\n", master_key.nDeriveIterations);
 
+    const unsigned int master_key_id{nMasterKeyMaxID + 1};
+    // Allocate the map node and publication callbacks before commit. No live
+    // encryption metadata or private-key map is changed by preparation.
+    std::map<unsigned int, CMasterKey> pending_master_key{{master_key_id, master_key}};
+    std::vector<std::function<void()>> publish_keys;
+    publish_keys.reserve(m_spk_managers.size());
+    std::optional<MercaturaPQCryptedSeed> new_pq_crypted_seed;
     {
-        LOCK2(m_relock_mutex, cs_wallet);
-        mapMasterKeys[++nMasterKeyMaxID] = master_key;
-        WalletBatch* encrypted_batch = new WalletBatch(GetDatabase());
-        if (!encrypted_batch->TxnBegin()) {
-            delete encrypted_batch;
-            encrypted_batch = nullptr;
-            return false;
+        WalletBatch encrypted_batch{GetDatabase()};
+        if (!encrypted_batch.TxnBegin()) return fail("Error: Could not begin wallet encryption database transaction.");
+        auto abort = [&](const char* message) {
+            // If rollback is unconfirmed, disk state is unknown. Fail closed
+            // instead of continuing with potentially inconsistent live keys.
+            Assert(encrypted_batch.TxnAbort());
+            return fail(message);
+        };
+        if (!encrypted_batch.WriteMasterKey(master_key_id, master_key)) {
+            return abort("Error: Could not persist wallet encryption master key.");
         }
-        encrypted_batch->WriteMasterKey(
-            nMasterKeyMaxID,
-            master_key);
-
-        std::optional<MercaturaPQCryptedSeed>
-            new_pq_crypted_seed;
-
         if (m_mercatura_pq_state.has_value()) {
-            if (m_mercatura_pq_master_seed.size() !=
-                    MERCATURA_PQ_WALLET_MASTER_SEED_SIZE ||
-                m_mercatura_pq_crypted_seed
-                    .IsStructurallyValid()) {
-                encrypted_batch->TxnAbort();
-                delete encrypted_batch;
-                encrypted_batch = nullptr;
-                return false;
+            if (m_mercatura_pq_master_seed.size() != MERCATURA_PQ_WALLET_MASTER_SEED_SIZE ||
+                m_mercatura_pq_crypted_seed.IsStructurallyValid()) {
+                return abort("Error: Invalid plaintext PQ wallet state for encryption.");
             }
-
             MercaturaPQCryptedSeed crypted_seed;
-
-            if (!EncryptMercaturaPQMasterSeedV1(
-                    plain_master_key,
-                    m_mercatura_pq_master_seed,
-                    crypted_seed) ||
-                !encrypted_batch
-                     ->WriteMercaturaPQCryptedSeed(
-                         crypted_seed) ||
-                !encrypted_batch
-                     ->EraseMercaturaPQSeed()) {
-                encrypted_batch->TxnAbort();
-                delete encrypted_batch;
-                encrypted_batch = nullptr;
-                return false;
+            if (!EncryptMercaturaPQMasterSeedV1(plain_master_key, m_mercatura_pq_master_seed, crypted_seed) ||
+                !encrypted_batch.WriteMercaturaPQCryptedSeed(crypted_seed) ||
+                !encrypted_batch.EraseMercaturaPQSeed()) {
+                return abort("Error: Could not persist encrypted PQ wallet seed.");
             }
-
-            new_pq_crypted_seed =
-                std::move(crypted_seed);
+            new_pq_crypted_seed = std::move(crypted_seed);
         }
-
-        for (const auto& spk_man_pair : m_spk_managers) {
-            auto spk_man = spk_man_pair.second.get();
-            if (!spk_man->Encrypt(plain_master_key, encrypted_batch)) {
-                encrypted_batch->TxnAbort();
-                delete encrypted_batch;
-                encrypted_batch = nullptr;
-                // We now probably have half of our keys encrypted in memory, and half not...
-                // die and let the user reload the unencrypted wallet.
-                assert(false);
+        for (const auto& [id, spk_man] : m_spk_managers) {
+            std::function<void()> publish;
+            if (!spk_man->Encrypt(plain_master_key, &encrypted_batch, &publish)) {
+                return abort("Error: Could not persist encrypted descriptor keys.");
             }
+            publish_keys.push_back(std::move(publish));
         }
+        if (!encrypted_batch.TxnCommit()) return abort("Error: Could not commit wallet encryption database transaction.");
+    }
 
-        if (!encrypted_batch->TxnCommit()) {
-            delete encrypted_batch;
-            encrypted_batch = nullptr;
-            // We now have keys encrypted in memory, but not on disk...
-            // die to avoid confusion and let the user reload the unencrypted wallet.
-            assert(false);
-        }
-
-        delete encrypted_batch;
-        encrypted_batch = nullptr;
-
-        if (new_pq_crypted_seed.has_value()) {
-            m_mercatura_pq_crypted_seed =
-                std::move(*new_pq_crypted_seed);
-
-            if (!m_mercatura_pq_master_seed.empty()) {
-                memory_cleanse(
-                    m_mercatura_pq_master_seed.data(),
-                    m_mercatura_pq_master_seed.size());
-                m_mercatura_pq_master_seed.clear();
-            }
-        }
-
+    // SQLite has committed the complete transition. Publish under cs_wallet;
+    // map-node transfer and ciphertext-map swaps do not allocate new key maps.
+    mapMasterKeys.merge(pending_master_key);
+    nMasterKeyMaxID = master_key_id;
+    for (auto& publish : publish_keys) publish();
+    if (new_pq_crypted_seed) m_mercatura_pq_crypted_seed = std::move(*new_pq_crypted_seed);
+    struct Relock {
+        CWallet& wallet;
+        bool required{true};
+        ~Relock() { if (required) wallet.Lock(); }
+    } relock{*this};
+    Lock();
+    if (!Unlock(strWalletPassphrase)) {
+        return fail("Error: Wallet encryption was committed, but verification failed. The wallet is encrypted and locked; reload it before use.");
+    }
+    try {
+        // Preserve the inherited descriptor-seed rotation after encryption.
+        if (!IsWalletFlagSet(WALLET_FLAG_BLANK_WALLET)) SetupDescriptorScriptPubKeyMans();
+    } catch (...) {
         Lock();
-        Unlock(strWalletPassphrase);
+        // Descriptor setup publishes live managers during its transaction. A
+        // failure here requires reload, not continued use of partial managers.
+        Assert(false && "Wallet encryption committed but descriptor setup failed; reload the wallet");
+    }
+    Lock();
+    relock.required = false;
 
-        // Make new descriptors with a new seed
-        if (!IsWalletFlagSet(WALLET_FLAG_BLANK_WALLET)) {
-            SetupDescriptorScriptPubKeyMans();
-        }
-        Lock();
-
-        // Need to completely rewrite the wallet file; if we don't, the database might keep
-        // bits of the unencrypted private key in slack space in the database file.
-        GetDatabase().Rewrite();
+    // VACUUM is outside the encryption transaction. A failure cannot undo the
+    // committed encrypted state or guarantee removal of old plaintext slack.
+    if (!GetDatabase().Rewrite()) {
+        return fail("Error: Wallet encryption was committed, but database rewrite failed. The wallet is encrypted and locked; plaintext remnants may remain in the database file.");
     }
     NotifyStatusChanged(this);
-
     return true;
 }
 

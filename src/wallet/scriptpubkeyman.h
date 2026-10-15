@@ -90,7 +90,9 @@ public:
 
     //! Check that the given decryption key is valid for this ScriptPubKeyMan, i.e. it decrypts all of the keys handled by it.
     virtual bool CheckDecryptionKey(const CKeyingMaterial& master_key) { return false; }
-    virtual bool Encrypt(const CKeyingMaterial& master_key, WalletBatch* batch) { return false; }
+    /** If apply is supplied, leave live keys unchanged and return a publication
+     * callback for the caller to invoke only after its database commit. */
+    virtual bool Encrypt(const CKeyingMaterial& master_key, WalletBatch* batch, std::function<void()>* apply = nullptr) { return false; }
 
     virtual util::Result<CTxDestination> GetReservedDestination(const OutputType type, bool internal, int64_t& index) { return util::Error{Untranslated("Not supported")}; }
     virtual void KeepDestination(int64_t index, const OutputType& type) {}
@@ -341,7 +343,7 @@ public:
     bool IsMine(const CScript& script) const override;
 
     bool CheckDecryptionKey(const CKeyingMaterial& master_key) override;
-    bool Encrypt(const CKeyingMaterial& master_key, WalletBatch* batch) override;
+    bool Encrypt(const CKeyingMaterial& master_key, WalletBatch* batch, std::function<void()>* apply = nullptr) override;
 
     util::Result<CTxDestination> GetReservedDestination(OutputType type, bool internal, int64_t& index) override;
     void ReturnDestination(int64_t index, bool internal, const CTxDestination& addr) override;

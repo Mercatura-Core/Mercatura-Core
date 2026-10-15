@@ -276,8 +276,9 @@ RPCHelpMan encryptwallet()
         throw JSONRPCError(RPC_INVALID_PARAMETER, "passphrase cannot be empty");
     }
 
-    if (!pwallet->EncryptWallet(strWalletPass)) {
-        throw JSONRPCError(RPC_WALLET_ENCRYPTION_FAILED, "Error: Failed to encrypt the wallet.");
+    bilingual_str error;
+    if (!pwallet->EncryptWallet(strWalletPass, &error)) {
+        throw JSONRPCError(RPC_WALLET_ENCRYPTION_FAILED, error.empty() ? "Error: Failed to encrypt the wallet." : error.original);
     }
 
     return "wallet encrypted; The keypool has been flushed and a new HD seed was generated. You need to make a new backup with the backupwallet RPC.";

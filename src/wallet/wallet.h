@@ -697,7 +697,9 @@ public:
     bool Unlock(const SecureString& strWalletPassphrase);
     /** A nonempty error distinguishes persistence failure from an incorrect old passphrase. */
     bool ChangeWalletPassphrase(const SecureString& strOldWalletPassphrase, const SecureString& strNewWalletPassphrase, bilingual_str* error = nullptr);
-    bool EncryptWallet(const SecureString& strWalletPassphrase);
+    /** On post-commit cleanup failure the wallet remains encrypted and locked;
+     * error describes that durable state instead of promising rollback. */
+    bool EncryptWallet(const SecureString& strWalletPassphrase, bilingual_str* error = nullptr);
 
     unsigned int ComputeTimeSmart(const CWalletTx& wtx, bool rescanning_old_block) const;
 

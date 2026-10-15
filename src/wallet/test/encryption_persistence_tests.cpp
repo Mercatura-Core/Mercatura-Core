@@ -5,6 +5,7 @@
 #include <wallet/wallet.h>
 
 #include <interfaces/chain.h>
+#include <key_io.h>
 #include <rpc/protocol.h>
 #include <rpc/request.h>
 #include <rpc/server.h>
@@ -14,6 +15,7 @@
 #include <wallet/context.h>
 #include <wallet/rpc/wallet.h>
 #include <wallet/test/wallet_test_fixture.h>
+#include <wallet/test/util.h>
 #include <wallet/walletdb.h>
 
 #include <boost/test/unit_test.hpp>
@@ -117,6 +119,72 @@ std::unique_ptr<WalletDatabase> OpenEncryptionDatabase(const fs::path& path)
 
 const SecureString OLD_PASSPHRASE{"old-pq-encryption-test-passphrase"};
 const SecureString NEW_PASSPHRASE{"new-pq-encryption-test-passphrase"};
+
+void CheckInitialEncryptionFailure(const fs::path& path, interfaces::Chain* chain, EncryptionFault fault, const std::string& record = {})
+{
+    auto database = std::make_unique<EncryptionFaultDatabase>(OpenEncryptionDatabase(path));
+    auto& control = database->control;
+    auto wallet = std::make_unique<CWallet>(chain, "initial-failure", std::move(database));
+    CKeyingMaterial original_seed;
+    {
+        LOCK(wallet->cs_wallet);
+        wallet->SetWalletFlag(WALLET_FLAG_DESCRIPTORS | WALLET_FLAG_BLANK_WALLET | WALLET_FLAG_LAST_HARDENED_XPUB_CACHED);
+        BOOST_REQUIRE(wallet->InitializeMercaturaPQWallet());
+        BOOST_REQUIRE(wallet->WithMercaturaPQMasterSeed([&](const CKeyingMaterial& seed) { original_seed = seed; return true; }));
+    }
+    const auto receive = wallet->GetNewMercaturaPQDestination(false);
+    const auto change = wallet->GetNewMercaturaPQDestination(true);
+    BOOST_REQUIRE(receive);
+    BOOST_REQUIRE(change);
+    CKey key;
+    key.MakeNewKey(true);
+    auto* descriptor = CreateDescriptor(*wallet, "wpkh(" + EncodeSecret(key) + ")", true);
+    WITH_LOCK(wallet->cs_wallet, wallet->SetWalletFlag(WALLET_FLAG_BLANK_WALLET));
+    control.fault = fault;
+    control.record = record;
+    bilingual_str encryption_error;
+    BOOST_CHECK(!wallet->EncryptWallet(OLD_PASSPHRASE, &encryption_error));
+    BOOST_CHECK(!encryption_error.empty());
+    BOOST_CHECK_EQUAL(control.hits, 1U);
+    {
+        LOCK(wallet->cs_wallet);
+        BOOST_CHECK(!wallet->HasEncryptionKeys());
+        BOOST_CHECK_EQUAL(wallet->nMasterKeyMaxID, 0U);
+        BOOST_CHECK(!wallet->HaveCryptedKeys());
+        BOOST_CHECK(wallet->HasMercaturaPQPlaintextSeed());
+        BOOST_CHECK(wallet->WithMercaturaPQMasterSeed([&](const CKeyingMaterial& seed) { return seed == original_seed; }));
+        BOOST_CHECK_EQUAL(wallet->GetMercaturaPQKeyLocatorCount(), 2U);
+        BOOST_CHECK(wallet->IsMine(*receive));
+        BOOST_CHECK(wallet->IsMine(*change));
+        LOCK(descriptor->cs_desc_man);
+        BOOST_CHECK(descriptor->GetKey(key.GetPubKey().GetID()).has_value());
+        BOOST_CHECK(!descriptor->HaveCryptedKeys());
+    }
+    {
+        auto batch = wallet->GetDatabase().MakeBatch();
+        BOOST_CHECK(!batch->Exists(std::make_pair(DBKeys::MASTER_KEY, 1U)));
+        BOOST_CHECK(batch->Exists(DBKeys::MERCATURA_PQ_SEED));
+        BOOST_CHECK(!batch->Exists(DBKeys::MERCATURA_PQ_CRYPTED_SEED));
+    }
+    wallet.reset();
+    CWallet reloaded{chain, "reloaded", OpenEncryptionDatabase(path)};
+    bilingual_str error;
+    std::vector<bilingual_str> warnings;
+    BOOST_REQUIRE(reloaded.PopulateWalletFromDB(error, warnings) == DBErrors::LOAD_OK);
+    {
+        LOCK(reloaded.cs_wallet);
+        BOOST_CHECK(!reloaded.HasEncryptionKeys());
+        BOOST_CHECK(reloaded.WithMercaturaPQMasterSeed([&](const CKeyingMaterial& seed) { return seed == original_seed; }));
+        BOOST_CHECK_EQUAL(reloaded.GetMercaturaPQKeyLocatorCount(), 2U);
+        BOOST_CHECK(reloaded.IsMine(*receive));
+        BOOST_CHECK(reloaded.IsMine(*change));
+    }
+    // A confirmed rollback must leave a wallet that can be encrypted normally.
+    BOOST_REQUIRE(reloaded.EncryptWallet(NEW_PASSPHRASE));
+    BOOST_CHECK(reloaded.IsLocked());
+    BOOST_REQUIRE(reloaded.Unlock(NEW_PASSPHRASE));
+    reloaded.Lock();
+}
 
 } // namespace
 
@@ -251,6 +319,106 @@ BOOST_AUTO_TEST_CASE(passphrase_rpc_failure_and_success)
     BOOST_CHECK(!reloaded.Unlock(OLD_PASSPHRASE));
     BOOST_CHECK(reloaded.Unlock(NEW_PASSPHRASE));
     reloaded.Lock();
+}
+
+BOOST_AUTO_TEST_CASE(initial_encryption_begin_failure)
+{
+    CheckInitialEncryptionFailure(m_path_root / "begin", m_node.chain.get(), EncryptionFault::BEGIN);
+}
+
+BOOST_AUTO_TEST_CASE(initial_encryption_master_key_write_failure)
+{
+    CheckInitialEncryptionFailure(m_path_root / "master-write", m_node.chain.get(), EncryptionFault::WRITE, DBKeys::MASTER_KEY);
+}
+
+BOOST_AUTO_TEST_CASE(initial_encryption_commit_failure)
+{
+    CheckInitialEncryptionFailure(m_path_root / "commit", m_node.chain.get(), EncryptionFault::COMMIT);
+}
+
+BOOST_AUTO_TEST_CASE(initial_encryption_seed_and_descriptor_failures)
+{
+    for (const auto& [fault, record] : std::vector<std::pair<EncryptionFault, std::string>>{
+             {EncryptionFault::WRITE, DBKeys::MERCATURA_PQ_CRYPTED_SEED},
+             {EncryptionFault::ERASE, DBKeys::MERCATURA_PQ_SEED},
+             {EncryptionFault::WRITE, DBKeys::WALLETDESCRIPTORCKEY},
+             {EncryptionFault::ERASE, DBKeys::WALLETDESCRIPTORKEY}}) {
+        CheckInitialEncryptionFailure(m_path_root / fs::u8path(record), m_node.chain.get(), fault, record);
+    }
+}
+
+BOOST_AUTO_TEST_CASE(initial_encryption_rewrite_failure)
+{
+    const auto path = m_path_root / "rewrite";
+    auto database = std::make_unique<EncryptionFaultDatabase>(OpenEncryptionDatabase(path));
+    auto& control = database->control;
+    auto wallet = std::make_unique<CWallet>(m_node.chain.get(), "rewrite", std::move(database));
+    {
+        LOCK(wallet->cs_wallet);
+        wallet->SetWalletFlag(WALLET_FLAG_DESCRIPTORS | WALLET_FLAG_BLANK_WALLET | WALLET_FLAG_LAST_HARDENED_XPUB_CACHED);
+        BOOST_REQUIRE(wallet->InitializeMercaturaPQWallet());
+    }
+    control.fault = EncryptionFault::REWRITE;
+    bilingual_str encryption_error;
+    BOOST_CHECK(!wallet->EncryptWallet(OLD_PASSPHRASE, &encryption_error));
+    BOOST_CHECK(encryption_error.original.find("encryption was committed") != std::string::npos);
+    BOOST_CHECK(encryption_error.original.find("encrypted and locked") != std::string::npos);
+    BOOST_CHECK_EQUAL(control.hits, 1U);
+    BOOST_CHECK(wallet->HasEncryptionKeys());
+    BOOST_CHECK(wallet->IsLocked());
+    BOOST_REQUIRE(wallet->Unlock(OLD_PASSPHRASE));
+    wallet->Lock();
+    wallet.reset();
+    CWallet reloaded{m_node.chain.get(), "reloaded", OpenEncryptionDatabase(path)};
+    bilingual_str error;
+    std::vector<bilingual_str> warnings;
+    BOOST_REQUIRE(reloaded.PopulateWalletFromDB(error, warnings) == DBErrors::LOAD_OK);
+    BOOST_CHECK(reloaded.HasEncryptionKeys());
+    BOOST_CHECK(reloaded.IsLocked());
+    BOOST_CHECK(reloaded.Unlock(OLD_PASSPHRASE));
+    reloaded.Lock();
+}
+
+BOOST_AUTO_TEST_CASE(initial_encryption_rpc_failure_reporting)
+{
+    const auto path = m_path_root / "initial-rpc";
+    auto database = std::make_unique<EncryptionFaultDatabase>(OpenEncryptionDatabase(path));
+    auto& control = database->control;
+    auto wallet = std::make_shared<CWallet>(m_node.chain.get(), "initial-rpc", std::move(database));
+    {
+        LOCK(wallet->cs_wallet);
+        wallet->SetWalletFlag(WALLET_FLAG_DESCRIPTORS | WALLET_FLAG_BLANK_WALLET | WALLET_FLAG_LAST_HARDENED_XPUB_CACHED);
+        BOOST_REQUIRE(wallet->InitializeMercaturaPQWallet());
+    }
+    WalletContext context;
+    context.chain = m_node.chain.get();
+    context.args = m_node.args;
+    BOOST_REQUIRE(AddWallet(context, wallet));
+    JSONRPCRequest request;
+    request.context = &context;
+    request.strMethod = "encryptwallet";
+    request.params = UniValue{UniValue::VARR};
+    request.params.push_back(std::string{OLD_PASSPHRASE.begin(), OLD_PASSPHRASE.end()});
+    if (RPCIsInWarmup(nullptr)) SetRPCWarmupFinished();
+    CRPCTable rpc;
+    for (const auto& command : GetWalletRPCCommands()) rpc.appendCommand(command.name, &command);
+    auto is_encryption_error = [](const UniValue& response) {
+        const UniValue& code = response.find_value("code");
+        return code.isNum() && code.getInt<int>() == RPC_WALLET_ENCRYPTION_FAILED;
+    };
+    control.fault = EncryptionFault::WRITE;
+    control.record = DBKeys::MASTER_KEY;
+    BOOST_CHECK_EXCEPTION(rpc.execute(request), UniValue, is_encryption_error);
+    BOOST_CHECK(!wallet->HasEncryptionKeys());
+    control.fault = EncryptionFault::REWRITE;
+    control.record.clear();
+    BOOST_CHECK_EXCEPTION(rpc.execute(request), UniValue, [&](const UniValue& response) {
+        return is_encryption_error(response) && response.find_value("message").get_str().find("encryption was committed") != std::string::npos;
+    });
+    BOOST_CHECK(wallet->HasEncryptionKeys());
+    BOOST_CHECK(wallet->IsLocked());
+    BOOST_CHECK(wallet->Unlock(OLD_PASSPHRASE));
+    wallet->Lock();
 }
 
 BOOST_AUTO_TEST_SUITE_END()
