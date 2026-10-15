@@ -328,6 +328,7 @@ public:
                 m_last_range_ends.emplace(desc_spkm->GetID(), desc_spkm->GetEndRange());
             }
         }
+        AddMercaturaPQScriptPubKeys();
     }
 
     void UpdateIfNeeded()
@@ -342,6 +343,7 @@ public:
                 m_last_range_ends.at(desc_spkm->GetID()) = current_range_end;
             }
         }
+        AddMercaturaPQScriptPubKeys();
     }
 
     std::optional<bool> MatchesBlock(const uint256& block_hash) const
@@ -358,7 +360,21 @@ private:
       * take possible keypool top-ups into account.
       */
     std::map<uint256, int32_t> m_last_range_ends;
+    size_t m_last_pq_key_count{0};
     GCSFilter::ElementSet m_filter_set;
+
+    void AddMercaturaPQScriptPubKeys()
+    {
+        LOCK(m_wallet.cs_wallet);
+        const size_t count{m_wallet.GetMercaturaPQKeyLocatorCount()};
+        if (count == m_last_pq_key_count) return;
+        // Committed PQ ownership records are append-only. Refresh after new
+        // receive/change destinations are registered, including while scanning.
+        for (const auto& script : m_wallet.GetMercaturaPQScriptPubKeys()) {
+            m_filter_set.emplace(script.begin(), script.end());
+        }
+        m_last_pq_key_count = count;
+    }
 
     void AddScriptPubKeys(const DescriptorScriptPubKeyMan* desc_spkm, int32_t last_range_end = 0)
     {
@@ -4824,6 +4840,18 @@ size_t CWallet::GetMercaturaPQKeyLocatorCount() const
     AssertLockHeld(cs_wallet);
 
     return m_mercatura_pq_key_locators.size();
+}
+
+std::vector<CScript> CWallet::GetMercaturaPQScriptPubKeys() const
+{
+    AssertLockHeld(cs_wallet);
+    std::vector<CScript> scripts;
+    scripts.reserve(m_mercatura_pq_key_locators.size());
+    for (const auto& entry : m_mercatura_pq_key_locators) {
+        scripts.push_back(GetScriptForDestination(WitnessV2MercaturaPQ{
+            uint256{std::span<const unsigned char>{entry.first}}}));
+    }
+    return scripts;
 }
 
 bool CWallet::ValidateMercaturaPQKeyLocators() const

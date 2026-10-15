@@ -113,6 +113,7 @@ MERCATURA_SCRIPTS = [
     'mercatura_pq_package.py',
     'mercatura_pq_prevout_amount.py',
     'mercatura_pq_psbt.py',
+    'mercatura_pq_rescan.py',
     'mercatura_pq_rbf.py',
     'mercatura_pq_reorg.py',
     'mercatura_pq_send_receive.py',

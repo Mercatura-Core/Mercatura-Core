@@ -555,6 +555,10 @@ public:
     size_t GetMercaturaPQKeyLocatorCount() const
         EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
+    /** All registered PQ ownership scripts, available without unlocking or deriving keys. */
+    std::vector<CScript> GetMercaturaPQScriptPubKeys() const
+        EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
     bool ValidateMercaturaPQKeyLocators() const
         EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 

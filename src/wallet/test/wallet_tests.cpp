@@ -16,6 +16,8 @@
 #include <vector>
 
 #include <addresstype.h>
+#include <blockfilter.h>
+#include <index/blockfilterindex.h>
 #include <interfaces/chain.h>
 #include <key_io.h>
 #include <node/blockstorage.h>
@@ -25,6 +27,7 @@
 #include <script/solver.h>
 #include <test/util/common.h>
 #include <test/util/logging.h>
+#include <test/util/mining.h>
 #include <test/util/random.h>
 #include <test/util/setup_common.h>
 #include <util/translation.h>
@@ -207,6 +210,61 @@ BOOST_FIXTURE_TEST_CASE(scan_for_wallet_transactions, TestChain100Setup)
         BOOST_CHECK(!result.last_scanned_height);
         BOOST_CHECK_EQUAL(GetBalance(wallet).m_mine_immature, 0);
     }
+}
+
+BOOST_FIXTURE_TEST_CASE(mercatura_pq_fast_rescan, RegTestingSetup)
+{
+    CWallet wallet{m_node.chain.get(), "pq-rescan", CreateMockableWalletDatabase()};
+    {
+        LOCK(wallet.cs_wallet);
+        wallet.SetWalletFlag(WALLET_FLAG_DESCRIPTORS);
+        BOOST_REQUIRE(wallet.InitializeMercaturaPQWallet());
+    }
+    // PQ receive/change ownership is independent of descriptor managers.
+    BOOST_CHECK(wallet.GetAllScriptPubKeyMans().empty());
+    auto receive = wallet.GetNewMercaturaPQDestination(/*internal=*/false);
+    auto change = wallet.GetNewMercaturaPQDestination(/*internal=*/true);
+    BOOST_REQUIRE(receive);
+    BOOST_REQUIRE(change);
+    const std::vector<CScript> scripts{GetScriptForDestination(*receive), GetScriptForDestination(*change)};
+    CAmount expected_credit{0};
+    std::vector<uint256> blocks;
+    for (const auto& script : scripts) {
+        node::BlockAssembler::Options options;
+        options.coinbase_output_script = script;
+        options.include_dummy_extranonce = true;
+        auto block = PrepareBlock(m_node, options);
+        expected_credit += block->vtx[0]->vout[0].nValue;
+        BOOST_REQUIRE(!MineBlock(m_node, block).IsNull());
+        blocks.push_back(block->GetHash());
+    }
+    BOOST_REQUIRE(InitBlockFilterIndex([&] { return interfaces::MakeChain(m_node); },
+        BlockFilterType::BASIC, 1 << 20, /*f_memory=*/true, /*f_wipe=*/true));
+    auto cleanup = [](BlockFilterIndex* index) {
+        index->Interrupt();
+        index->Stop();
+        DestroyBlockFilterIndex(BlockFilterType::BASIC);
+    };
+    std::unique_ptr<BlockFilterIndex, decltype(cleanup)> index{GetBlockFilterIndex(BlockFilterType::BASIC), cleanup};
+    BOOST_REQUIRE(index->Init());
+    index->Sync();
+    BOOST_REQUIRE(index->BlockUntilSyncedToCurrentChain());
+    GCSFilter::ElementSet candidates;
+    for (const auto& script : scripts) candidates.emplace(script.begin(), script.end());
+    for (const auto& hash : blocks) {
+        const auto matches = m_node.chain->blockFilterMatchesAny(BlockFilterType::BASIC, hash, candidates);
+        BOOST_REQUIRE(matches.has_value());
+        BOOST_CHECK(*matches);
+    }
+    WITH_LOCK(wallet.cs_wallet, wallet.SetLastBlockProcessed(2, blocks.back()));
+    WalletRescanReserver reserver{wallet};
+    BOOST_REQUIRE(reserver.reserve());
+    const auto result = wallet.ScanForWalletTransactions(blocks.front(), /*start_height=*/1,
+        /*max_height=*/2, reserver, /*fUpdate=*/true, /*save_progress=*/false);
+    BOOST_CHECK_EQUAL(result.status, CWallet::ScanResult::SUCCESS);
+    BOOST_CHECK_EQUAL(result.last_scanned_height.value_or(-1), 2);
+    BOOST_CHECK_EQUAL(WITH_LOCK(wallet.cs_wallet, return wallet.mapWallet.size()), 2U);
+    BOOST_CHECK_EQUAL(GetBalance(wallet).m_mine_immature, expected_credit);
 }
 
 // This test verifies that wallet settings can be added and removed
