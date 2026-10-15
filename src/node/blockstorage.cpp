@@ -1147,7 +1147,10 @@ bool BlockManager::ReadBlock(CBlock& block, const FlatFilePos& pos, const std::o
         }
 
         ReadBlockWithWitnessLimits(block_stream, block, GetConsensus(), [&](const CBlockHeader& header) -> std::optional<int> {
-            if (expected_hash && header.GetHash() != *expected_hash) throw std::ios_base::failure("block hash mismatch");
+            if (expected_hash && header.GetHash() != *expected_hash) {
+                throw std::ios_base::failure(strprintf("GetHash() doesn't match index (%s != %s)",
+                    header.GetHash().ToString(), expected_hash->ToString()));
+            }
             if (height) return height;
             if (header.GetHash() == GetConsensus().hashGenesisBlock) return 0;
             LOCK(cs_main);
