@@ -4263,11 +4263,37 @@ void ChainstateManager::GenerateCoinbaseCommitment(CBlock& block, const CBlockIn
 bool HasValidProofOfWork(
     std::span<const CBlockHeader> headers,
     const Consensus::Params& consensusParams,
-    PoWHashContext& pow_context)
+    PoWHashContext& pow_context,
+    const BlockManager& blockman)
 {
+    AssertLockNotHeld(cs_main);
     return std::ranges::all_of(
         headers,
         [&](const CBlockHeader& header) {
+            {
+                LOCK(cs_main);
+                const CBlockIndex* index{blockman.LookupBlockIndex(header.GetHash())};
+                // Mere index presence (including unresolved parent entries) is
+                // not proof of validation. TREE records admission-time PoW,
+                // even if the block body was later marked invalid. Reusing
+                // that PoW does not bypass AcceptBlockHeader's invalid check.
+                if (index && (index->nStatus & BLOCK_VALID_MASK) >= BLOCK_VALID_TREE) {
+                    const CBlockHeader known{index->GetBlockHeader()};
+                    // SHA256d is only the lookup key here, never a substitute
+                    // for MercaHash. Match all canonical header fields before
+                    // reusing the indexed header's previously verified PoW.
+                    if (header.nVersion == known.nVersion &&
+                        header.hashPrevBlock == known.hashPrevBlock &&
+                        header.hashMerkleRoot == known.hashMerkleRoot &&
+                        header.nTime == known.nTime &&
+                        header.nBits == known.nBits &&
+                        header.nNonce == known.nNonce) {
+                        return true;
+                    }
+                }
+            }
+            // Do memory-hard work outside cs_main. The caller must serialize
+            // its context (the network path uses g_msgproc_mutex).
             return CheckProofOfWork(
                 header,
                 consensusParams,

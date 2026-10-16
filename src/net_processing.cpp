@@ -2932,10 +2932,15 @@ bool PeerManagerImpl::CheckHeadersPoW(const std::vector<CBlockHeader>& headers, 
 
     // Verify actual MercaHash-v1 proof of work before these headers are used
     // by the low-work headers synchronization machinery.
-    if (!HasValidProofOfWork(
+    const uint64_t hashes_before{m_pow_hash_context.HashesComputed()};
+    const bool valid{HasValidProofOfWork(
             headers,
             m_chainparams.GetConsensus(),
-            m_pow_hash_context)) {
+            m_pow_hash_context,
+            m_chainman.m_blockman)};
+    LogDebug(BCLog::NET, "headers proof-of-work: checked=%u total=%u peer=%d\n",
+             m_pow_hash_context.HashesComputed() - hashes_before, headers.size(), peer.m_id);
+    if (!valid) {
         Misbehaving(peer, "header with invalid proof of work");
         return false;
     }

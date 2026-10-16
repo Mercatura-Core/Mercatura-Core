@@ -61,8 +61,12 @@ public:
 
     uint256 GetHash(const CBlockHeader& header);
 
+    /** Number of completed memory-hard hashes (caller must serialize access). */
+    uint64_t HashesComputed() const { return m_hashes_computed; }
+
 private:
     std::vector<unsigned char> m_scratchpad;
+    uint64_t m_hashes_computed{0};
 };
 
 /**

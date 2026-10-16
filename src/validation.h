@@ -448,11 +448,16 @@ BlockValidationState TestBlockValidity(
     bool check_pow,
     bool check_merkle_root) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
-/** Check that the proof of work on each blockheader matches the value in nBits */
+/** Check each header's PoW, reusing an exact TREE-validated block-index entry.
+ * blockman must belong to consensusParams' chain. Prechecks do not populate any
+ * cache; normal admission remains responsible for indexing validated headers.
+ * Do not hold cs_main or share pow_context concurrently with another caller.
+ */
 bool HasValidProofOfWork(
     std::span<const CBlockHeader> headers,
     const Consensus::Params& consensusParams,
-    PoWHashContext& pow_context);
+    PoWHashContext& pow_context,
+    const node::BlockManager& blockman);
 
 /** Check if a block has been mutated (with respect to its merkle root and witness commitments). */
 bool IsBlockMutated(const CBlock& block, bool check_witness_root);

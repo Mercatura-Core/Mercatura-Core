@@ -291,9 +291,11 @@ uint256 PoWHashContext::GetHash(
         m_scratchpad.size() ==
         mercahash::SCRATCHPAD_BYTES);
 
-    return GetPoWHash(
+    const uint256 hash{GetPoWHash(
         header,
-        m_scratchpad);
+        m_scratchpad)};
+    ++m_hashes_computed;
+    return hash;
 }
 
 bool CheckProofOfWork(
