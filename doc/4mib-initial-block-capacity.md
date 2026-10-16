@@ -1,9 +1,11 @@
-# Experimental 4 MiB initial block capacity
+# Mercatura 4 MiB Initial Block Capacity
 
-This feature branch is a pre-mainnet consensus experiment. It is not mainnet
-release approval and must not be merged into the development branch without
-separate consensus/release review. The feature branch is
-`feature/4mib-initial-block-cap`; its implementation target is 4 MiB.
+The Mercatura 4 MiB Initial Block Capacity is the selected mainnet consensus
+specification. It is implemented for mainnet and regtest on
+`feature/4mib-initial-block-cap`. Merge, deployment and full release
+qualification are separate milestones; this document does not claim that
+those milestones are complete. Separate consensus and release review remains
+required before mainnet release.
 Existing mainnet binaries with the old 1 MiB launch rule are incompatible with
 larger launch-era blocks.
 
@@ -36,8 +38,8 @@ There is no command-line consensus override.
 Mainnet retains witness resource enforcement from genesis: 1,003 items per input,
 33,554,432 bytes per item, and floor(capacity / 256) aggregate items per block.
 The launch aggregate budget is therefore 16,384. Regtest retains its existing
-witness-resource activation setting; this experiment does not activate a second
-consensus change there. Native PQ cryptography, sigop costs, standard transaction
+witness-resource activation setting; this capacity change does not activate a
+second consensus change there. Native PQ cryptography, sigop costs, standard transaction
 weight (400,000 WU), fees and the 1 MB stripped-transaction ceiling are unchanged.
 Remaining inherited weight-derived output-index and minimum-transaction bounds
 are either context-free proof defaults or bounded by that unchanged individual
@@ -186,7 +188,7 @@ Construction/connection/submission observations are well below the 150-second
 production interval on this local machine, but do not establish a WAN
 propagation budget or stale-block rate.
 
-A separate temporary single-thread microbenchmark, linked against this final
+A separate single-thread microbenchmark, linked against this final
 optimized `libbitcoin_crypto.a`, verified the same valid native ML-DSA-65
 signature/digest repeatedly: 384 verifications in 0.049368 seconds and 784 in
 0.101170 seconds (exit zero). This measures the portable verification primitive
@@ -201,7 +203,7 @@ existing registered test sources; the new Python regression is registered in
 the default `MERCATURA_SCRIPTS` list. Platform builds, public-testnet history
 replay, hostile/slow-peer/WAN testing and future-capacity operational
 qualification remain separate release checks. GitHub Actions is deliberately
-not monitored for this experimental branch.
+not monitored for this feature branch.
 
 ## Changed-file inventory
 
