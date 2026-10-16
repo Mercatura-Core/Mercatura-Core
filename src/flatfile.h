@@ -6,6 +6,8 @@
 #ifndef BITCOIN_FLATFILE_H
 #define BITCOIN_FLATFILE_H
 
+#include <cstdio>
+#include <functional>
 #include <string>
 
 #include <serialize.h>
@@ -44,6 +46,7 @@ private:
     const fs::path m_dir;
     const char* const m_prefix;
     const size_t m_chunk_size;
+    const std::function<bool(FILE*, const fs::path&)> m_file_commit;
 
 public:
     /**
@@ -52,8 +55,10 @@ public:
      * @param dir The base directory that all files live in.
      * @param prefix A short prefix given to all file names.
      * @param chunk_size Disk space is pre-allocated in multiples of this amount.
+     * @param file_commit Optional FileCommit replacement for deterministic I/O failure tests.
      */
-    FlatFileSeq(fs::path dir, const char* prefix, size_t chunk_size);
+    FlatFileSeq(fs::path dir, const char* prefix, size_t chunk_size,
+                std::function<bool(FILE*, const fs::path&)> file_commit = {});
 
     /** Get the name of the file at the given position. */
     fs::path FileName(const FlatFilePos& pos) const;

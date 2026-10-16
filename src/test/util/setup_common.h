@@ -49,6 +49,10 @@ extern const std::function<std::string()> G_TEST_GET_FULL_NAME;
 /** Register common test args. Shared across binaries that rely on the test framework. */
 void SetupCommonTestArgs(ArgsManager& argsman);
 
+namespace kernel {
+struct BlockManagerOpts;
+} // namespace kernel
+
 struct TestOpts {
     std::vector<const char*> extra_args{};
     bool coins_db_in_memory{true};
@@ -56,6 +60,7 @@ struct TestOpts {
     bool setup_net{true};
     bool setup_validation_interface{true};
     bool min_validation_cache{false}; // Equivalent of -maxsigcachebytes=0
+    std::function<void(kernel::BlockManagerOpts&)> blockman_opts{};
 };
 
 /** Basic testing setup.

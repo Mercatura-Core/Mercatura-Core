@@ -2866,9 +2866,13 @@ bool Chainstate::FlushStateToDisk(
     try {
     {
         bool fFlushForPrune = false;
+        bool checked_for_pruning = false;
 
         CoinsCacheSizeState cache_state = GetCoinsCacheSizeState();
         LOCK(m_blockman.cs_LastBlockFile);
+        if (m_blockman.m_blockfile_flush_failed) {
+            return FatalError(m_chainman.GetNotifications(), state, _("Block or undo file synchronization previously failed."));
+        }
         if (m_blockman.IsPruneMode() && (m_blockman.m_check_for_pruning || nManualPruneHeight > 0) && m_chainman.m_blockman.m_blockfiles_indexed) {
             // make sure we don't prune above any of the prune locks bestblocks
             // pruning is height-based
@@ -2900,12 +2904,13 @@ bool Chainstate::FlushStateToDisk(
                 LOG_TIME_MILLIS_WITH_CATEGORY("find files to prune", BCLog::BENCH);
 
                 m_blockman.FindFilesToPrune(setFilesToPrune, last_prune, *this, m_chainman);
-                m_blockman.m_check_for_pruning = false;
+                checked_for_pruning = true;
             }
             if (!setFilesToPrune.empty()) {
                 fFlushForPrune = true;
                 if (!m_blockman.m_have_pruned) {
-                    m_blockman.m_block_tree_db->WriteFlag("prunedblockfiles", true);
+                    // Prune selection already changed the in-memory index.
+                    // Keep its invariants consistent, but defer the DB flag.
                     m_blockman.m_have_pruned = true;
                 }
             }
@@ -2933,11 +2938,17 @@ bool Chainstate::FlushStateToDisk(
                 LOG_TIME_MILLIS_WITH_CATEGORY("write block and undo data to disk", BCLog::BENCH);
 
                 // First make sure all block and undo data is flushed to disk.
-                // TODO: Handle return error, or add detailed comment why it is
-                // safe to not return an error upon failure.
                 if (!m_blockman.FlushChainstateBlockFile(m_chain.Height())) {
-                    LogWarning("%s: Failed to flush block file.\n", __func__);
+                    return FatalError(m_chainman.GetNotifications(), state, _("Failed to flush block and undo files."));
                 }
+            }
+
+            // The pruning flag is metadata too: publish it only after the
+            // required block/undo synchronization has succeeded. Repeat this
+            // for an already-pruned in-memory index in case an earlier call
+            // stopped before persisting its flag.
+            if (m_blockman.m_have_pruned) {
+                m_blockman.m_block_tree_db->WriteFlag("prunedblockfiles", true);
             }
 
             // Then update all block file information (which may refer to block and undo files).
@@ -2974,6 +2985,7 @@ bool Chainstate::FlushStateToDisk(
             }
         }
 
+        if (checked_for_pruning) m_blockman.m_check_for_pruning = false;
         if (should_write || m_next_write == NodeClock::time_point::max()) {
             constexpr auto range{DATABASE_WRITE_INTERVAL_MAX - DATABASE_WRITE_INTERVAL_MIN};
             m_next_write = FastRandomContext().rand_uniform_delay(NodeClock::now() + DATABASE_WRITE_INTERVAL_MIN, range);
@@ -4768,7 +4780,9 @@ bool ChainstateManager::AcceptBlock(
     // the block files may be pruned, so we can just call this on one
     // chainstate (particularly if we haven't implemented pruning with
     // background validation yet).
-    ActiveChainstate().FlushStateToDisk(state, FlushStateMode::NONE);
+    if (!ActiveChainstate().FlushStateToDisk(state, FlushStateMode::NONE)) {
+        return false;
+    }
 
     CheckBlockIndex();
 
@@ -6536,7 +6550,11 @@ SnapshotCompletionResult ChainstateManager::MaybeValidateSnapshot(Chainstate& va
     };
 
     CCoinsViewDB& validated_coins_db = validated_cs.CoinsDB();
-    validated_cs.ForceFlushStateToDisk();
+    // Snapshot decisions require a successfully synchronized coins database.
+    BlockValidationState state;
+    if (!validated_cs.FlushStateToDisk(state, FlushStateMode::FORCE_SYNC)) {
+        return SnapshotCompletionResult::STATS_FAILED;
+    }
 
     const auto& maybe_au_data = m_options.chainparams.AssumeutxoForHeight(validated_cs.m_chain.Height());
     if (!maybe_au_data) {

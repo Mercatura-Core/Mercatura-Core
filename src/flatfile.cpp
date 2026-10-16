@@ -11,10 +11,12 @@
 
 #include <stdexcept>
 
-FlatFileSeq::FlatFileSeq(fs::path dir, const char* prefix, size_t chunk_size) :
+FlatFileSeq::FlatFileSeq(fs::path dir, const char* prefix, size_t chunk_size,
+                         std::function<bool(FILE*, const fs::path&)> file_commit) :
     m_dir(std::move(dir)),
     m_prefix(prefix),
-    m_chunk_size(chunk_size)
+    m_chunk_size(chunk_size),
+    m_file_commit(std::move(file_commit))
 {
     if (chunk_size == 0) {
         throw std::invalid_argument("chunk_size must be positive");
@@ -98,7 +100,7 @@ bool FlatFileSeq::Flush(const FlatFilePos& pos, bool finalize) const
         }
         return false;
     }
-    if (!FileCommit(file)) {
+    if (!(m_file_commit ? m_file_commit(file, FileName(pos)) : FileCommit(file))) {
         LogError("%s: failed to commit file %d\n", __func__, pos.nFile);
         if (fclose(file) != 0) {
             LogError("Failed to close file %d", pos.nFile);

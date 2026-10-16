@@ -10,6 +10,8 @@
 #include <util/fs.h>
 
 #include <cstdint>
+#include <cstdio>
+#include <functional>
 
 class CChainParams;
 
@@ -29,6 +31,8 @@ struct BlockManagerOpts {
     const fs::path blocks_dir;
     Notifications& notifications;
     DBParams block_tree_db_params;
+    //! Instance-local FileCommit replacement for storage fault-injection tests; empty in production.
+    std::function<bool(FILE*, const fs::path&)> file_commit{};
 };
 
 } // namespace kernel

@@ -295,6 +295,12 @@ private:
 
     RecursiveMutex cs_LastBlockFile;
 
+    /** A failed synchronization is fatal for this BlockManager instance. In-memory
+     * pruning and file cursors may already have changed. In particular, shutdown
+     * must not retry persistence using a newer cursor and bypass a failed file.
+     * Only a fresh BlockManager, loading durable metadata, may resume writes. */
+    bool m_blockfile_flush_failed GUARDED_BY(cs_LastBlockFile){false};
+
     //! Since assumedvalid chainstates may be syncing a range of the chain that is very
     //! far away from the normal/background validation process, we should segment blockfiles
     //! for assumed chainstates. Otherwise, we might have wildly different height ranges
