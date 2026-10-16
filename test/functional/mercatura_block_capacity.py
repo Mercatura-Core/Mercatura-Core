@@ -2,207 +2,135 @@
 # Copyright (c) 2026 The Mercatura developers
 # Distributed under the MIT software license.
 
-"""Mercatura native block-capacity enforcement functional test."""
+"""Exact 4 MiB regtest capacity, native chunk relay and persisted large blocks.
 
-from test_framework.blocktools import (
-    create_block,
-    create_coinbase,
-    create_tx_with_script,
-)
-from test_framework.messages import (
-    CBlock,
-    CTxOut,
-    from_hex,
-)
-from test_framework.script import (
-    CScript,
-    OP_RETURN,
-    OP_TRUE,
-)
+Synthetic padding is deliberate here; real ML-DSA workload measurements live in
+mercatura_pq_capacity.py. Each stripped transaction stays below 1 MB.
+"""
+
+from test_framework.blocktools import add_witness_commitment, create_block, create_coinbase, create_tx_with_script
+from test_framework.messages import CBlock, CTxOut, from_hex
+from test_framework.script import CScript, OP_RETURN, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 
-
-INITIAL_CAPACITY = 1_048_576
+INITIAL_CAPACITY = 4_194_304
 
 
 class MercaturaBlockCapacityTest(BitcoinTestFramework):
     def set_test_params(self):
-        self.num_nodes = 1
+        self.num_nodes = 2
         self.setup_clean_chain = True
         self.uses_wallet = False
+        self.rpc_timeout = 180
+        self.extra_args = [["-debug=net", "-checkblockindex=1"] for _ in range(2)]
 
-    def mine_op_true_blocks(self, count):
-        """Mine mature anyone-can-spend Mercatura coinbases."""
-        hashes = []
-
-        while count > 0:
-            batch = min(count, 10)
-            hashes.extend(
-                self.generatetodescriptor(
-                    self.nodes[0],
-                    batch,
-                    "raw(51)",
-                )
-            )
-            count -= batch
-
-        return hashes
-
-    def solve_mercatura_block(self, node, block):
-        """Solve one custom block using mercaturad's MercaHash-v1 solver."""
-        solved = node.solvemercaturablock(
-            block.serialize().hex()
-        )
-
-        block.nNonce = solved["nonce"]
-
-    def current_parent(self):
-        node = self.nodes[0]
-
-        best_hash = node.getbestblockhash()
-        header = node.getblockheader(best_hash)
-
-        return (
-            int(best_hash, 16),
-            node.getblockcount() + 1,
-            header["time"] + 1,
-        )
-
-    def make_padded_spend(self, prev_tx, target_size):
-        """Create a consensus-valid OP_TRUE spend padded with OP_RETURN outputs."""
-        tx = create_tx_with_script(
-            prev_tx,
-            0,
-            amount=prev_tx.vout[0].nValue,
-            output_script=CScript([OP_TRUE]),
-        )
-
-        # Use many moderate-sized OP_RETURN outputs rather than one giant script.
-        payload = bytes([0x42]) * 8_000
-
-        while len(tx.serialize_with_witness()) < target_size:
-            tx.vout.append(
-                CTxOut(
-                    0,
-                    CScript([OP_RETURN, payload]),
-                )
-            )
-
+    @staticmethod
+    def padded_spend(prev_tx, size):
+        tx = create_tx_with_script(prev_tx, 0, amount=prev_tx.vout[0].nValue, output_script=CScript([OP_TRUE]))
+        tx.vout.append(CTxOut(0, CScript([OP_RETURN, bytes(100_000)])))
+        payload_size = 100_000 + size - len(tx.serialize())
+        assert payload_size > 65_535  # Stable pushdata and CompactSize widths.
+        tx.vout[-1].scriptPubKey = CScript([OP_RETURN, bytes(payload_size)])
+        assert_equal(len(tx.serialize()), size)
+        assert len(tx.serialize_without_witness()) < 1_000_000
         return tx
 
-    def make_block(self, prev_hash, height, ntime, tx):
-        coinbase = create_coinbase(
-            height,
-            script_pubkey=CScript([OP_TRUE]),
-            nValue=0,
-        )
-
-        block = create_block(
-            prev_hash,
-            coinbase,
-            ntime,
-            txlist=[tx],
-        )
-
-        self.solve_mercatura_block(
-            self.nodes[0],
-            block,
-        )
-
+    def exact_block(self, prev_tx, target):
+        node = self.nodes[0]
+        template = node.getblocktemplate({"rules": ["segwit"]})
+        assert_equal(template["sizelimit"], INITIAL_CAPACITY)
+        txs = []
+        # At most 900 kB per transaction; transaction count stays below 253.
+        for _ in range((target + 899_999) // 900_000 - 1):
+            txs.append(self.padded_spend(prev_tx, 900_000))
+            prev_tx = txs[-1]
+        txs.append(self.padded_spend(prev_tx, 100_000))
+        cb = create_coinbase(template["height"], script_pubkey=CScript([OP_TRUE]), nValue=0)
+        block = create_block(coinbase=cb, tmpl=template, txlist=txs)
+        add_witness_commitment(block)
+        remainder = target - len(block.serialize())
+        block.vtx[-1] = self.padded_spend(prev_tx, 100_000 + remainder)
+        block.vtx[0].vout.pop()  # Recompute commitment after changing the last tx.
+        add_witness_commitment(block)
+        assert_equal(len(block.serialize()), target)
+        block.nNonce = node.solvemercaturablock(block.serialize().hex())["nonce"]
         return block
 
     def run_test(self):
-        node = self.nodes[0]
+        node, peer = self.nodes
+        mined = []
+        for _ in range(10):
+            mined.extend(self.generatetodescriptor(node, 10, "raw(51)"))
+        mined.extend(self.generatetodescriptor(node, 1, "raw(51)"))
+        self.sync_blocks()
+        funding = from_hex(CBlock(), node.getblock(mined[0], 0)).vtx[0]
+        accepted_sizes = [1_100_000, 4_000_001, INITIAL_CAPACITY - 1, INITIAL_CAPACITY]
+        accepted_hashes = []
+        for size in accepted_sizes:
+            block = self.exact_block(funding, size)
+            raw = block.serialize().hex()
+            assert_equal(node.getblocktemplate({"mode": "proposal", "data": raw, "rules": ["segwit"]}), None)
+            if size > 4_000_000:
+                with peer.assert_debug_log(["completed inbound Mercatura chunk transfer"]):
+                    assert_equal(node.submitblock(raw), None)
+                    self.sync_blocks(timeout=180)
+            else:
+                assert_equal(node.submitblock(raw), None)
+                self.sync_blocks()
+            assert_equal(peer.getbestblockhash(), block.hash_hex)
+            assert_equal(peer.getblock(block.hash_hex)["size"], size)
+            assert_equal(len(bytes.fromhex(peer.getblock(block.hash_hex, 0))), size)
+            self.log.info("Accepted and relayed exact serialized block size: %d", size)
+            accepted_hashes.append(block.hash_hex)
+            funding = block.vtx[-1]
 
-        self.log.info("Mining 101 mature Mercatura OP_TRUE blocks")
-        mined = self.mine_op_true_blocks(101)
-
-        first_coinbase = from_hex(
-            CBlock(),
-            node.getblock(mined[0], 0),
-        ).vtx[0]
-
-        second_coinbase = from_hex(
-            CBlock(),
-            node.getblock(mined[1], 0),
-        ).vtx[0]
-
-        #
-        # Valid block comfortably below the 1 MiB launch cap.
-        #
-        self.log.info("Building block below Mercatura launch capacity")
-
-        under_tx = self.make_padded_spend(
-            first_coinbase,
-            900_000,
-        )
-
-        prev_hash, height, ntime = self.current_parent()
-
-        under_block = self.make_block(
-            prev_hash,
-            height,
-            ntime,
-            under_tx,
-        )
-
-        under_size = len(under_block.serialize(with_witness=True))
-
-        self.log.info(f"Below-cap serialized block size: {under_size}")
-
-        assert under_size < INITIAL_CAPACITY
-
-        result = node.submitblock(
-            under_block.serialize().hex()
-        )
-
-        assert_equal(result, None)
-        assert_equal(
-            node.getbestblockhash(),
-            under_block.hash_hex,
-        )
-
-        #
-        # Validly constructed block above the 1 MiB launch cap.
-        #
-        self.log.info("Building block above Mercatura launch capacity")
-
-        over_tx = self.make_padded_spend(
-            second_coinbase,
-            1_060_000,
-        )
-
-        prev_hash, height, ntime = self.current_parent()
-
-        over_block = self.make_block(
-            prev_hash,
-            height,
-            ntime,
-            over_tx,
-        )
-
-        over_size = len(over_block.serialize(with_witness=True))
-
-        self.log.info(f"Above-cap serialized block size: {over_size}")
-
-        assert over_size > INITIAL_CAPACITY
-
-        tip_before_rejection = node.getbestblockhash()
-
-        result = node.submitblock(
-            over_block.serialize().hex()
-        )
-
-        self.log.info(f"Above-cap rejection result: {result}")
-
-        assert result is not None
-        assert_equal(
-            node.getbestblockhash(),
-            tip_before_rejection,
-        )
-
-        self.log.info("Mercatura native block-capacity enforcement passed")
+        over = self.exact_block(funding, INITIAL_CAPACITY + 1)
+        tip = node.getbestblockhash()
+        # All other construction/commitment/PoW requirements match accepted blocks.
+        assert_equal(node.submitblock(over.serialize().hex()), "bad-blk-capacity")
+        assert_equal(node.getbestblockhash(), tip)
+        self.log.info("Rejected exact serialized block size: %d (bad-blk-capacity)", len(over.serialize()))
+        # A same-parent control removes one padding byte, proving that the
+        # rejected construction did not also hide an invalid funding/spend path.
+        control = self.exact_block(funding, INITIAL_CAPACITY)
+        assert_equal(control.hashPrevBlock, over.hashPrevBlock)
+        assert_equal(node.submitblock(control.serialize().hex()), None)
+        self.sync_blocks(timeout=180)
+        accepted_hashes.append(control.hash_hex)
+        funding = control.vtx[-1]
+        # A 65,536-transaction block fits the ordinary message envelope but
+        # exceeds BIP152's 16-bit count. It must fall back to a full BLOCK, and
+        # its authenticated proofs must not hit the inherited 16,666-tx bound.
+        tiny = []
+        for _ in range(65_535):
+            funding = create_tx_with_script(funding, 0, amount=funding.vout[0].nValue, output_script=CScript([OP_TRUE]))
+            tiny.append(funding)
+        template = node.getblocktemplate({"rules": ["segwit"]})
+        cb = create_coinbase(template["height"], script_pubkey=CScript([OP_TRUE]), nValue=0)
+        many = create_block(coinbase=cb, tmpl=template, txlist=tiny)
+        add_witness_commitment(many)
+        many.nNonce = node.solvemercaturablock(many.serialize().hex())["nonce"]
+        assert len(many.serialize()) < 4_000_000
+        with peer.assert_debug_log(["received: block"]):
+            assert_equal(node.submitblock(many.serialize().hex()), None)
+            self.sync_blocks(timeout=180)
+        proof = node.gettxoutproof([tiny[-1].txid_hex], many.hash_hex)
+        assert_equal(node.verifytxoutproof(proof), [tiny[-1].txid_hex])
+        assert_equal(peer.verifytxoutproof(proof), [tiny[-1].txid_hex])
+        tip = many.hash_hex
+        self.log.info("Verified RPC proof from a block containing %d transactions", len(many.vtx))
+        stats = node.gettxoutsetinfo()["hash_serialized_3"]
+        self.restart_node(0)
+        assert_equal(node.getbestblockhash(), tip)
+        assert_equal(node.gettxoutsetinfo()["hash_serialized_3"], stats)
+        self.stop_node(0)
+        node.start(extra_args=self.extra_args[0] + ["-reindex"])
+        node.wait_for_rpc_connection(wait_for_import=False)
+        self.wait_until(lambda: node.getbestblockhash() == tip and node.getmempoolinfo()["loaded"], timeout=600)
+        assert_equal(node.gettxoutsetinfo()["hash_serialized_3"], stats)
+        for block_hash in accepted_hashes:
+            assert_equal(node.getblock(block_hash, 0), peer.getblock(block_hash, 0))
 
 
 if __name__ == "__main__":

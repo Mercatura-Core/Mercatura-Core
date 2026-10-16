@@ -149,6 +149,7 @@ void ApplyArgsManOptions(const ArgsManager& gArgs, BlockAssembler::Options& opti
  * the miner's optional local -blockmaxsize setting.
  */
 uint64_t GetBlockTemplateMaxCapacityBytes(
+    const Consensus::Params& params,
     int height,
     const BlockAssembler::Options& options);
 

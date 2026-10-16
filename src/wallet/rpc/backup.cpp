@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <chain.h>
+#include <chainparams.h>
 #include <clientversion.h>
 #include <core_io.h>
 #include <hash.h>
@@ -63,13 +64,21 @@ RPCHelpMan importprunedfunds()
     //Search partial merkle tree in proof for our transaction and index in valid block
     std::vector<Txid> vMatch;
     std::vector<unsigned int> vIndex;
-    if (merkleBlock.txn.ExtractMatches(vMatch, vIndex) != merkleBlock.header.hashMerkleRoot) {
+    LOCK(pwallet->cs_wallet);
+    int height{0};
+    const bool found = pwallet->chain().findAncestorByHash(
+        pwallet->GetLastBlockHash(), merkleBlock.header.GetHash(), FoundBlock().height(height));
+
+    // Height comes from the wallet's authenticated active-chain ancestry.
+    const auto max_transactions = static_cast<unsigned int>(
+        found ? GetMaxBlockCapacityBytes(Params().GetConsensus(), height) /
+            (MIN_TRANSACTION_WEIGHT / WITNESS_SCALE_FACTOR)
+              : MAX_BLOCK_WEIGHT / MIN_TRANSACTION_WEIGHT);
+    if (merkleBlock.txn.ExtractMatches(vMatch, vIndex, max_transactions) != merkleBlock.header.hashMerkleRoot) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Something wrong with merkleblock");
     }
 
-    LOCK(pwallet->cs_wallet);
-    int height;
-    if (!pwallet->chain().findAncestorByHash(pwallet->GetLastBlockHash(), merkleBlock.header.GetHash(), FoundBlock().height(height))) {
+    if (!found) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found in chain");
     }
 

@@ -89,6 +89,7 @@ TEST_FRAMEWORK_UNIT_TESTS = 'feature_framework_unit_tests.py'
 # compatibility tests through explicit selection or --extended.
 MERCATURA_SCRIPTS = [
     'mercatura_block_capacity.py',
+    'mercatura_pq_capacity.py',
     'mercatura_witness_resource.py',
     'mercatura_chain_reorg.py',
     'mercatura_classical_ownership_shutdown.py',

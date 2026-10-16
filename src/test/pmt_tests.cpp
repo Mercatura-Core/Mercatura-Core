@@ -125,4 +125,27 @@ BOOST_AUTO_TEST_CASE(pmt_malleability)
     BOOST_CHECK(tree.ExtractMatches(vTxid, vIndex).IsNull());
 }
 
+BOOST_AUTO_TEST_CASE(pmt_authenticated_large_block_limit)
+{
+    constexpr unsigned int count{20'000};
+    std::vector<Txid> txids;
+    std::vector<uint256> hashes;
+    for (unsigned int i{0}; i < count; ++i) {
+        hashes.emplace_back(i + 1);
+        txids.push_back(Txid::FromUint256(hashes.back()));
+    }
+    std::vector<bool> selected(count, false);
+    selected.back() = true;
+    std::vector<Txid> matches;
+    std::vector<unsigned int> indices;
+    CPartialMerkleTree tree{txids, selected};
+    BOOST_CHECK(tree.ExtractMatches(matches, indices).IsNull());
+    BOOST_CHECK(tree.ExtractMatches(matches, indices, count - 1).IsNull());
+    BOOST_CHECK(tree.ExtractMatches(matches, indices, count) == ComputeMerkleRoot(hashes));
+    BOOST_REQUIRE_EQUAL(matches.size(), 1);
+    BOOST_CHECK(matches[0] == txids.back());
+    BOOST_REQUIRE_EQUAL(indices.size(), 1);
+    BOOST_CHECK_EQUAL(indices[0], count - 1);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -151,13 +151,16 @@ static RPCHelpMan verifytxoutproof()
 
             std::vector<Txid> vMatch;
             std::vector<unsigned int> vIndex;
-            if (merkleBlock.txn.ExtractMatches(vMatch, vIndex) != merkleBlock.header.hashMerkleRoot)
-                return res;
-
             ChainstateManager& chainman = EnsureAnyChainman(request.context);
             LOCK(cs_main);
 
             const CBlockIndex* pindex = chainman.m_blockman.LookupBlockIndex(merkleBlock.header.GetHash());
+            // Only the accepted index may enlarge the proof's transaction bound.
+            const unsigned int max_transactions{pindex && chainman.ActiveChain().Contains(pindex)
+                ? pindex->nTx : static_cast<unsigned int>(MAX_BLOCK_WEIGHT / MIN_TRANSACTION_WEIGHT)};
+            if (merkleBlock.txn.ExtractMatches(vMatch, vIndex, max_transactions) != merkleBlock.header.hashMerkleRoot)
+                return res;
+
             if (!pindex || !chainman.ActiveChain().Contains(pindex) || pindex->nTx == 0) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found in chain");
             }

@@ -18,9 +18,9 @@ inline constexpr uint64_t MAX_WITNESS_ITEM_BYTES{33'554'432};
 inline constexpr uint64_t WITNESS_ITEM_CAPACITY_DIVISOR{256};
 static_assert(MAX_WITNESS_ITEM_BYTES == MAX_SIZE);
 
-constexpr uint64_t GetMaxBlockWitnessItems(int64_t height)
+constexpr uint64_t GetMaxBlockWitnessItems(const Params& params, int64_t height)
 {
-    return GetMaxBlockCapacityBytes(height) / WITNESS_ITEM_CAPACITY_DIVISOR;
+    return GetMaxBlockCapacityBytes(params, height) / WITNESS_ITEM_CAPACITY_DIVISOR;
 }
 inline constexpr uint64_t MAX_BLOCK_WITNESS_ITEMS{
     MERCATURA_MAX_BLOCK_CAPACITY_BYTES / WITNESS_ITEM_CAPACITY_DIVISOR};
@@ -48,7 +48,7 @@ struct WitnessParseBudget {
 
     static WitnessParseBudget ForBlock(const Consensus::Params& params, int64_t height)
     {
-        return {Consensus::WitnessLimitsActive(params, height), Consensus::GetMaxBlockWitnessItems(height)};
+        return {Consensus::WitnessLimitsActive(params, height), Consensus::GetMaxBlockWitnessItems(params, height)};
     }
     static WitnessParseBudget ForInspection(const Consensus::Params& params)
     {

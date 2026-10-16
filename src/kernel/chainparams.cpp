@@ -88,6 +88,7 @@ class CMainParams : public CChainParams {
 public:
     CMainParams() {
         m_chain_type = ChainType::MAIN;
+        consensus.nInitialBlockCapacityBytes = MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES;
         consensus.nWitnessResourceHeight = 0;
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
@@ -538,6 +539,7 @@ public:
     explicit CRegTestParams(const RegTestOptions& opts)
     {
         m_chain_type = ChainType::REGTEST;
+        consensus.nInitialBlockCapacityBytes = MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES;
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
         consensus.BIP34Height = 1; // Always active unless overridden

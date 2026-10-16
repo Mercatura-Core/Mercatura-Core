@@ -3,7 +3,11 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <chain.h>
+#include <chainparams.h>
+#include <test/util/setup_common.h>
 #include <node/blockstorage.h>
+#include <node/miner.h>
+#include <consensus/witness_limits.h>
 #include <consensus/consensus.h>
 #include <consensus/validation.h>
 #include <primitives/block.h>
@@ -20,38 +24,39 @@ BOOST_AUTO_TEST_SUITE(block_capacity_tests)
 
 BOOST_AUTO_TEST_CASE(block_capacity_constants)
 {
-    BOOST_CHECK_EQUAL(MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES, 1'048'576ULL);
+    BOOST_CHECK_EQUAL(MERCATURA_LEGACY_INITIAL_BLOCK_CAPACITY_BYTES, 1'048'576ULL);
     BOOST_CHECK_EQUAL(MERCATURA_BLOCK_CAPACITY_DOUBLING_INTERVAL, 1'051'200ULL);
-    BOOST_CHECK_EQUAL(MERCATURA_BLOCK_CAPACITY_MAX_DOUBLINGS, 10ULL);
+    BOOST_CHECK_EQUAL(MERCATURA_BLOCK_CAPACITY_MAX_DOUBLINGS, 8ULL);
+    BOOST_CHECK_EQUAL(MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES, 4'194'304ULL);
     BOOST_CHECK_EQUAL(MERCATURA_MAX_BLOCK_CAPACITY_BYTES, 1'073'741'824ULL);
 }
 
 BOOST_AUTO_TEST_CASE(initial_capacity)
 {
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(0), 1'048'576ULL);
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(1), 1'048'576ULL);
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(1'051'199), 1'048'576ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 0), 1'048'576ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 1), 1'048'576ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 1'051'199), 1'048'576ULL);
 }
 
 BOOST_AUTO_TEST_CASE(first_doubling_boundary)
 {
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(1'051'199), 1'048'576ULL);
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(1'051'200), 2'097'152ULL);
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(1'051'201), 2'097'152ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 1'051'199), 1'048'576ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 1'051'200), 2'097'152ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 1'051'201), 2'097'152ULL);
 }
 
 BOOST_AUTO_TEST_CASE(later_doubling_boundaries)
 {
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(2'102'399), 2'097'152ULL);
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(2'102'400), 4'194'304ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 2'102'399), 2'097'152ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 2'102'400), 4'194'304ULL);
 
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(3'153'600), 8'388'608ULL);
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(4'204'800), 16'777'216ULL);
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(5'256'000), 33'554'432ULL);
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(6'307'200), 67'108'864ULL);
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(7'358'400), 134'217'728ULL);
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(8'409'600), 268'435'456ULL);
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(9'460'800), 536'870'912ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 3'153'600), 8'388'608ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 4'204'800), 16'777'216ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 5'256'000), 33'554'432ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 6'307'200), 67'108'864ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 7'358'400), 134'217'728ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 8'409'600), 268'435'456ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 9'460'800), 536'870'912ULL);
 }
 
 BOOST_AUTO_TEST_CASE(first_several_doubling_boundaries_exact)
@@ -63,42 +68,42 @@ BOOST_AUTO_TEST_CASE(first_several_doubling_boundaries_exact)
                 doubling)};
 
         const uint64_t before{
-            MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES <<
+            MERCATURA_LEGACY_INITIAL_BLOCK_CAPACITY_BYTES <<
             (doubling - 1)};
 
         const uint64_t after{
-            MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES <<
+            MERCATURA_LEGACY_INITIAL_BLOCK_CAPACITY_BYTES <<
             doubling};
 
         BOOST_CHECK_EQUAL(
-            GetMaxBlockCapacityBytes(boundary - 1),
+            GetMaxBlockCapacityBytes(Consensus::Params{}, boundary - 1),
             before);
 
         BOOST_CHECK_EQUAL(
-            GetMaxBlockCapacityBytes(boundary),
+            GetMaxBlockCapacityBytes(Consensus::Params{}, boundary),
             after);
 
         BOOST_CHECK_EQUAL(
-            GetMaxBlockCapacityBytes(boundary + 1),
+            GetMaxBlockCapacityBytes(Consensus::Params{}, boundary + 1),
             after);
     }
 }
 
 BOOST_AUTO_TEST_CASE(maximum_capacity_boundary)
 {
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(10'511'999), 536'870'912ULL);
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(10'512'000), 1'073'741'824ULL);
-    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(10'512'001), 1'073'741'824ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 10'511'999), 536'870'912ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 10'512'000), 1'073'741'824ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(Consensus::Params{}, 10'512'001), 1'073'741'824ULL);
 }
 
 BOOST_AUTO_TEST_CASE(maximum_capacity_saturates)
 {
     BOOST_CHECK_EQUAL(
-        GetMaxBlockCapacityBytes(11'563'200),
+        GetMaxBlockCapacityBytes(Consensus::Params{}, 11'563'200),
         1'073'741'824ULL);
 
     BOOST_CHECK_EQUAL(
-        GetMaxBlockCapacityBytes(std::numeric_limits<int64_t>::max()),
+        GetMaxBlockCapacityBytes(Consensus::Params{}, std::numeric_limits<int64_t>::max()),
         1'073'741'824ULL);
 }
 
@@ -266,15 +271,15 @@ BOOST_AUTO_TEST_CASE(block_capacity_predicate_changes_at_boundary)
 
     BOOST_REQUIRE_GT(
         capacity,
-        MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES);
+        MERCATURA_LEGACY_INITIAL_BLOCK_CAPACITY_BYTES);
 
     BOOST_REQUIRE_LE(
         capacity,
-        MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES * 2);
+        MERCATURA_LEGACY_INITIAL_BLOCK_CAPACITY_BYTES * 2);
 
-    BOOST_CHECK(!IsBlockWithinCapacity(block, 1'051'199));
-    BOOST_CHECK(IsBlockWithinCapacity(block, 1'051'200));
-    BOOST_CHECK(IsBlockWithinCapacity(block, 1'051'201));
+    BOOST_CHECK(!IsBlockWithinCapacity(block, Consensus::Params{}, 1'051'199));
+    BOOST_CHECK(IsBlockWithinCapacity(block, Consensus::Params{}, 1'051'200));
+    BOOST_CHECK(IsBlockWithinCapacity(block, Consensus::Params{}, 1'051'201));
 }
 
 
@@ -305,11 +310,11 @@ BOOST_AUTO_TEST_CASE(capacity_reorg_uses_winning_branch_height)
 
     BOOST_REQUIRE_GT(
         capacity,
-        MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES);
+        MERCATURA_LEGACY_INITIAL_BLOCK_CAPACITY_BYTES);
 
     BOOST_REQUIRE_LE(
         capacity,
-        MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES * 2);
+        MERCATURA_LEGACY_INITIAL_BLOCK_CAPACITY_BYTES * 2);
 
     // Construct a fork immediately below the first capacity doubling.
     //
@@ -358,13 +363,13 @@ BOOST_AUTO_TEST_CASE(capacity_reorg_uses_winning_branch_height)
 
     BOOST_CHECK(
         IsBlockWithinCapacity(
-            block,
+            block, Consensus::Params{},
             active_chain.Height()));
 
     BOOST_CHECK_EQUAL(
-        GetMaxBlockCapacityBytes(
+        GetMaxBlockCapacityBytes(Consensus::Params{},
             active_chain.Height()),
-        MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES * 2);
+        MERCATURA_LEGACY_INITIAL_BLOCK_CAPACITY_BYTES * 2);
 
     // Simulate the chain-selection result after the higher-work B branch wins.
     // Capacity must immediately follow the winning branch's actual height;
@@ -380,15 +385,44 @@ BOOST_AUTO_TEST_CASE(capacity_reorg_uses_winning_branch_height)
         &branch_b_1);
 
     BOOST_CHECK_EQUAL(
-        GetMaxBlockCapacityBytes(
+        GetMaxBlockCapacityBytes(Consensus::Params{},
             active_chain.Height()),
-        MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES);
+        MERCATURA_LEGACY_INITIAL_BLOCK_CAPACITY_BYTES);
 
     BOOST_CHECK(
         !IsBlockWithinCapacity(
-            block,
+            block, Consensus::Params{},
             active_chain.Height()));
 }
 
+
+BOOST_FIXTURE_TEST_CASE(network_capacity_schedules, BasicTestingSetup)
+{
+    for (const auto network : {ChainType::MAIN, ChainType::REGTEST, ChainType::TESTNET, ChainType::TESTNET4, ChainType::SIGNET}) {
+        const auto chain = CreateChainParams(m_args, network);
+        const auto& consensus = chain->GetConsensus();
+        const bool proposed{network == ChainType::MAIN || network == ChainType::REGTEST};
+        const uint64_t initial{proposed ? 4'194'304ULL : 1'048'576ULL};
+        const int doublings{proposed ? 8 : 10};
+        BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, -1), initial);
+        BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, 0), initial);
+        for (int n{1}; n <= doublings; ++n) {
+            const int64_t boundary{n * int64_t{1'051'200}};
+            BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, boundary - 1), initial << (n - 1));
+            BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, boundary), initial << n);
+            BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, boundary + 1), initial << n);
+        }
+        for (const int64_t height : {int64_t{doublings + 1} * 1'051'200, std::numeric_limits<int64_t>::max()}) {
+            BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, height), 1'073'741'824ULL);
+        }
+        BOOST_CHECK_EQUAL(Consensus::GetMaxBlockWitnessItems(consensus, 0), initial / 256);
+        node::BlockAssembler::Options options;
+        BOOST_CHECK_EQUAL(node::GetBlockTemplateMaxCapacityBytes(consensus, 1, options), initial);
+        options.nBlockMaxSize = 4'000'000;
+        BOOST_CHECK_EQUAL(node::GetBlockTemplateMaxCapacityBytes(consensus, 1, options), std::min(initial, uint64_t{4'000'000}));
+        options.nBlockMaxSize = 16'777'216;
+        BOOST_CHECK_EQUAL(node::GetBlockTemplateMaxCapacityBytes(consensus, 1, options), initial);
+    }
+}
 
 BOOST_AUTO_TEST_SUITE_END()

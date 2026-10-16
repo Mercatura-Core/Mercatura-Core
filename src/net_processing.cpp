@@ -2222,8 +2222,8 @@ void PeerManagerImpl::NewPoWValidBlock(const CBlockIndex *pindex, const std::sha
     // serialized as one CMPCTBLOCK; they are announced normally and fetched
     // through BLKMETA + sequential BLKCHUNK messages.
     std::shared_ptr<const CBlockHeaderAndShortTxIDs> pcmpctblock;
-    if (GetBlockCapacityBytes(*pblock) <=
-        MAX_MONOLITHIC_BLOCK_MESSAGE_BYTES) {
+    if (GetBlockCapacityBytes(*pblock) <= MAX_MONOLITHIC_BLOCK_MESSAGE_BYTES &&
+        pblock->vtx.size() <= CBlockHeaderAndShortTxIDs::MAX_TRANSACTIONS) {
         pcmpctblock =
             std::make_shared<const CBlockHeaderAndShortTxIDs>(
                 *pblock,
@@ -2547,7 +2547,7 @@ void PeerManagerImpl::ProcessGetBlockData(CNode& pfrom, Peer& peer, const CInv& 
             m_chainman.ActiveChain().Height() + 1
         };
         const uint64_t relay_block_capacity{
-            GetMaxBlockCapacityBytes(next_block_height)
+            GetMaxBlockCapacityBytes(m_chainman.GetConsensus(), next_block_height)
         };
         const std::chrono::seconds relay_block_interval{
             m_chainparams.GetConsensus().nPowTargetSpacing
@@ -2608,7 +2608,7 @@ void PeerManagerImpl::ProcessGetBlockData(CNode& pfrom, Peer& peer, const CInv& 
 
         const uint64_t serialized_block_size{raw_block_size.value()};
         const uint64_t consensus_capacity{
-            GetMaxBlockCapacityBytes(block_height)
+            GetMaxBlockCapacityBytes(m_chainman.GetConsensus(), block_height)
         };
 
         if (serialized_block_size > consensus_capacity) {
@@ -2628,11 +2628,10 @@ void PeerManagerImpl::ProcessGetBlockData(CNode& pfrom, Peer& peer, const CInv& 
             // Compact and filtered block representations remain bounded
             // legacy protocols. Large Mercatura blocks are never served
             // through CMPCTBLOCK, MERKLEBLOCK, or BLOCKTXN.
-            if (inv.IsMsgCmpctBlk() ||
-                inv.IsMsgFilteredBlk()) {
+            if (inv.IsMsgFilteredBlk()) {
                 LogDebug(
                     BCLog::NET,
-                    "Peer requested monolithic compact/filtered representation of oversized Mercatura block %s (%u bytes), %s\n",
+                    "Peer requested monolithic filtered representation of oversized Mercatura block %s (%u bytes), %s\n",
                     inv.hash.ToString(),
                     serialized_block_size,
                     pfrom.DisconnectMsg(fLogIPs));
@@ -2642,12 +2641,13 @@ void PeerManagerImpl::ProcessGetBlockData(CNode& pfrom, Peer& peer, const CInv& 
 
             // Mercatura chunk transport always carries the exact
             // witness-inclusive serialization stored in blk*.dat. A peer
-            // requesting a future large block must therefore request the
-            // witness form explicitly.
-            if (!inv.IsMsgWitnessBlk()) {
+            // requesting a large block must request witness data, explicitly
+            // or via compact-v2. Header-first fetch cannot know the size yet,
+            // so a compact request may need this bounded full-block fallback.
+            if (!inv.IsMsgWitnessBlk() && !inv.IsMsgCmpctBlk()) {
                 LogDebug(
                     BCLog::NET,
-                    "Peer requested oversized non-witness block %s; large Mercatura blocks require MSG_WITNESS_BLOCK, %s\n",
+                    "Peer requested oversized non-witness block %s; large Mercatura blocks require witness or compact-v2 requests, %s\n",
                     inv.hash.ToString(),
                     pfrom.DisconnectMsg(fLogIPs));
                 pfrom.fDisconnect = true;
@@ -2767,7 +2767,8 @@ void PeerManagerImpl::ProcessGetBlockData(CNode& pfrom, Peer& peer, const CInv& 
             // they won't have a useful mempool to match against a compact block,
             // and we don't feel like constructing the object for them, so
             // instead we respond with the full, non-compact block.
-            if (can_direct_fetch && pindex->nHeight >= tip->nHeight - MAX_CMPCTBLOCK_DEPTH) {
+            if (can_direct_fetch && pindex->nTx <= CBlockHeaderAndShortTxIDs::MAX_TRANSACTIONS &&
+                pindex->nHeight >= tip->nHeight - MAX_CMPCTBLOCK_DEPTH) {
                 if (a_recent_compact_block && a_recent_compact_block->header.GetHash() == inv.hash) {
                     MakeAndPushMessage(pfrom, NetMsgType::CMPCTBLOCK, *a_recent_compact_block);
                 } else {
@@ -4623,7 +4624,7 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
         }
 
         const uint64_t consensus_capacity{
-            GetMaxBlockCapacityBytes(pindex->nHeight)
+            GetMaxBlockCapacityBytes(m_chainman.GetConsensus(), pindex->nHeight)
         };
 
         if (meta.total_size > consensus_capacity) {
@@ -5672,7 +5673,7 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
                 PartiallyDownloadedBlock& partialBlock = *(*queuedBlockIt)->partialBlock;
                 ReadStatus status = partialBlock.InitData(cmpctblock, vExtraTxnForCompact,
                     Consensus::WitnessLimitsActive(m_chainman.GetConsensus(), pindex->nHeight)
-                        ? std::optional{Consensus::GetMaxBlockWitnessItems(pindex->nHeight)} : std::nullopt);
+                        ? std::optional{Consensus::GetMaxBlockWitnessItems(m_chainman.GetConsensus(), pindex->nHeight)} : std::nullopt);
                 if (status == READ_STATUS_INVALID) {
                     RemoveBlockRequest(pindex->GetBlockHash(), pfrom.GetId()); // Reset in-flight state in case Misbehaving does not result in a disconnect
                     Misbehaving(peer, "invalid compact block");
@@ -5725,7 +5726,7 @@ void PeerManagerImpl::ProcessMessage(Peer& peer, CNode& pfrom, const std::string
                 PartiallyDownloadedBlock tempBlock(&m_mempool);
                 ReadStatus status = tempBlock.InitData(cmpctblock, vExtraTxnForCompact,
                     Consensus::WitnessLimitsActive(m_chainman.GetConsensus(), pindex->nHeight)
-                        ? std::optional{Consensus::GetMaxBlockWitnessItems(pindex->nHeight)} : std::nullopt);
+                        ? std::optional{Consensus::GetMaxBlockWitnessItems(m_chainman.GetConsensus(), pindex->nHeight)} : std::nullopt);
                 if (status != READ_STATUS_OK) {
                     // TODO: don't ignore failures
                     return;
@@ -6939,8 +6940,8 @@ bool PeerManagerImpl::SendMessages(CNode& node)
                     };
 
                     if (raw_block_size &&
-                        raw_block_size.value() <=
-                            MAX_MONOLITHIC_BLOCK_MESSAGE_BYTES) {
+                        raw_block_size.value() <= MAX_MONOLITHIC_BLOCK_MESSAGE_BYTES &&
+                        pBestIndex->nTx <= CBlockHeaderAndShortTxIDs::MAX_TRANSACTIONS) {
                         LogDebug(
                             BCLog::NET,
                             "%s sending header-and-ids %s to peer=%d\n",

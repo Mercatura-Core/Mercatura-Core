@@ -11,6 +11,7 @@
 
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <limits>
 #include <map>
 #include <vector>
@@ -83,6 +84,8 @@ struct BIP9Deployment {
  */
 struct Params {
     uint256 hashGenesisBlock;
+    /** Serialized-byte capacity at genesis; public test networks retain 1 MiB. */
+    uint64_t nInitialBlockCapacityBytes{1ULL << 20};
     /** Witness resource rules: negative disables; mainnet activates from genesis.
      * No CLI override. A future testnet deployment requires an explicit consensus change. */
     int nWitnessResourceHeight{-1};

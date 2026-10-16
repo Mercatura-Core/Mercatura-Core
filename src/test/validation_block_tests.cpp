@@ -1379,6 +1379,11 @@ BOOST_AUTO_TEST_CASE(mercatura_launch_capacity_just_below_limit_accepted)
 
     block.vtx.push_back(
         MakeTransactionRef(std::move(large_tx)));
+    // Keep each stripped transaction below its unchanged 1 MB limit while
+    // exercising the network's full 4 MiB block-capacity boundary.
+    for (uint32_t i{2}; i < 5; ++i) {
+        block.vtx.push_back(MakeTransactionRef(MakePaddingSpend(i, LARGE_SCRIPT_BYTES)));
+    }
 
     block.vtx.push_back(
         MakeTransactionRef(std::move(adjustable_tx)));
@@ -1451,6 +1456,11 @@ BOOST_AUTO_TEST_CASE(mercatura_launch_capacity_just_below_limit_accepted)
             parent->nHeight,
             false},
         /*possible_overwrite=*/false);
+
+    for (uint32_t i{2}; i < 5; ++i) {
+        view.AddCoin(COutPoint{funding_txid, i},
+            Coin{CTxOut{INPUT_VALUE, CScript{} << OP_TRUE}, parent->nHeight, false}, false);
+    }
 
     BlockValidationState state;
 
@@ -1576,6 +1586,11 @@ BOOST_AUTO_TEST_CASE(mercatura_launch_capacity_exact_limit_accepted)
 
     block.vtx.push_back(
         MakeTransactionRef(std::move(large_tx)));
+    // Keep each stripped transaction below its unchanged 1 MB limit while
+    // exercising the network's full 4 MiB block-capacity boundary.
+    for (uint32_t i{2}; i < 5; ++i) {
+        block.vtx.push_back(MakeTransactionRef(MakePaddingSpend(i, LARGE_SCRIPT_BYTES)));
+    }
 
     block.vtx.push_back(
         MakeTransactionRef(std::move(adjustable_tx)));
@@ -1648,6 +1663,11 @@ BOOST_AUTO_TEST_CASE(mercatura_launch_capacity_exact_limit_accepted)
             parent->nHeight,
             false},
         /*possible_overwrite=*/false);
+
+    for (uint32_t i{2}; i < 5; ++i) {
+        view.AddCoin(COutPoint{funding_txid, i},
+            Coin{CTxOut{INPUT_VALUE, CScript{} << OP_TRUE}, parent->nHeight, false}, false);
+    }
 
     BlockValidationState state;
 
@@ -1773,6 +1793,11 @@ BOOST_AUTO_TEST_CASE(mercatura_launch_capacity_one_byte_over_rejected)
 
     block.vtx.push_back(
         MakeTransactionRef(std::move(large_tx)));
+    // Keep each stripped transaction below its unchanged 1 MB limit while
+    // exercising the network's full 4 MiB block-capacity boundary.
+    for (uint32_t i{2}; i < 5; ++i) {
+        block.vtx.push_back(MakeTransactionRef(MakePaddingSpend(i, LARGE_SCRIPT_BYTES)));
+    }
 
     block.vtx.push_back(
         MakeTransactionRef(std::move(adjustable_tx)));
@@ -1845,6 +1870,11 @@ BOOST_AUTO_TEST_CASE(mercatura_launch_capacity_one_byte_over_rejected)
             parent->nHeight,
             false},
         /*possible_overwrite=*/false);
+
+    for (uint32_t i{2}; i < 5; ++i) {
+        view.AddCoin(COutPoint{funding_txid, i},
+            Coin{CTxOut{INPUT_VALUE, CScript{} << OP_TRUE}, parent->nHeight, false}, false);
+    }
 
     BlockValidationState state;
 

@@ -161,9 +161,9 @@ static inline uint64_t GetBlockCapacityBytes(const CBlock& block)
     return ::GetSerializeSize(TX_WITH_WITNESS(block));
 }
 
-static inline bool IsBlockWithinCapacity(const CBlock& block, int64_t height)
+static inline bool IsBlockWithinCapacity(const CBlock& block, const Consensus::Params& params, int64_t height)
 {
-    return GetBlockCapacityBytes(block) <= GetMaxBlockCapacityBytes(height);
+    return GetBlockCapacityBytes(block) <= GetMaxBlockCapacityBytes(params, height);
 }
 
 /** Compute at which vout of the block's coinbase transaction the witness commitment occurs, or -1 if not found */

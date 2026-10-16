@@ -127,6 +127,7 @@ void ApplyArgsManOptions(const ArgsManager& args, BlockAssembler::Options& optio
 }
 
 uint64_t GetBlockTemplateMaxCapacityBytes(
+    const Consensus::Params& params,
     int height,
     const BlockAssembler::Options& options)
 {
@@ -134,7 +135,7 @@ uint64_t GetBlockTemplateMaxCapacityBytes(
         ClampOptions(options)
     };
     const uint64_t consensus_capacity{
-        GetMaxBlockCapacityBytes(height)
+        GetMaxBlockCapacityBytes(params, height)
     };
 
     return std::min<uint64_t>(
@@ -178,10 +179,11 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
 
     nBlockMaxCapacityBytes =
         GetBlockTemplateMaxCapacityBytes(
+            chainparams.GetConsensus(),
             nHeight,
             m_options);
     if (Consensus::WitnessLimitsActive(chainparams.GetConsensus(), nHeight)) {
-        nBlockMaxWitnessItems = Consensus::GetMaxBlockWitnessItems(nHeight);
+        nBlockMaxWitnessItems = Consensus::GetMaxBlockWitnessItems(chainparams.GetConsensus(), nHeight);
     }
 
     pblock->nVersion = m_chainstate.m_chainman.m_versionbitscache.ComputeBlockVersion(pindexPrev, chainparams.GetConsensus());

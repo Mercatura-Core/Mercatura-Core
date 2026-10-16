@@ -821,7 +821,7 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     const int witness_height{m_active_chainstate.m_chain.Height() + 1};
     if (Consensus::WitnessLimitsActive(m_active_chainstate.m_chainman.GetConsensus(), witness_height)) {
         if (!CheckTransactionWitnessResources(tx, state)) return false;
-        const uint64_t limit{Consensus::GetMaxBlockWitnessItems(witness_height)};
+        const uint64_t limit{Consensus::GetMaxBlockWitnessItems(m_active_chainstate.m_chainman.GetConsensus(), witness_height)};
         if (GetTransactionWitnessItems(tx) > limit - 1) {
             // Contextual eligibility can change at a capacity boundary or reorg.
             return state.Invalid(TxValidationResult::TX_MEMPOOL_POLICY, "tx-witness-budget");
@@ -2368,9 +2368,9 @@ WitnessParseBudget ChainstateManager::GetMempoolWitnessParseBudget() const
     return budget;
 }
 
-static bool CheckBlockCapacity(const CBlock& block, BlockValidationState& state, int64_t height)
+static bool CheckBlockCapacity(const CBlock& block, BlockValidationState& state, const Consensus::Params& params, int64_t height)
 {
-    if (!IsBlockWithinCapacity(block, height)) {
+    if (!IsBlockWithinCapacity(block, params, height)) {
         return state.Invalid(
             BlockValidationResult::BLOCK_CONSENSUS,
             "bad-blk-capacity",
@@ -2436,7 +2436,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
     // Re-enforce Mercatura's height-dependent block-capacity rule here.
     // ConnectBlock() does not invoke ContextualCheckBlock(), notably during
     // -reindex-chainstate, so this consensus rule must not exist only there.
-    if (!CheckBlockCapacity(block, state, pindex->nHeight)) {
+    if (!CheckBlockCapacity(block, state, params.GetConsensus(), pindex->nHeight)) {
         LogError("%s: block capacity check failed: %s\n", __func__, state.ToString());
         return false;
     }
@@ -4465,7 +4465,7 @@ static bool ContextualCheckBlock(const CBlock& block, BlockValidationState& stat
     // enforce Mercatura's height-dependent serialized-byte capacity. This
     // must remain after CheckWitnessMalleation(): otherwise mutable coinbase
     // witness data could affect a permanent block-validity decision.
-    if (!CheckBlockCapacity(block, state, nHeight)) {
+    if (!CheckBlockCapacity(block, state, chainman.GetConsensus(), nHeight)) {
         return false;
     }
 

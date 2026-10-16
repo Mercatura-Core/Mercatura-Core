@@ -81,13 +81,13 @@ BOOST_AUTO_TEST_CASE(network_and_schedule)
         BOOST_CHECK_EQUAL(WitnessParseBudget::ForInspection(params->GetConsensus()).enabled, network == ChainType::MAIN);
     }
     const std::pair<int64_t, uint64_t> boundaries[] = {
-        {0, 4096}, {1'051'200, 8192}, {2'102'400, 16384}, {4'204'800, 65536},
-        {6'307'200, 262144}, {7'358'400, 524288}, {10'512'000, 4194304}};
+        {0, 16384}, {1'051'200, 32768}, {2'102'400, 65536}, {4'204'800, 262144},
+        {6'307'200, 1048576}, {7'358'400, 2097152}, {8'409'600, 4194304}};
     for (const auto& [height, limit] : boundaries) {
-        BOOST_CHECK_EQUAL(Consensus::GetMaxBlockWitnessItems(height), limit);
-        if (height) BOOST_CHECK_EQUAL(Consensus::GetMaxBlockWitnessItems(height - 1), limit / 2);
+        BOOST_CHECK_EQUAL(Consensus::GetMaxBlockWitnessItems(Params().GetConsensus(), height), limit);
+        if (height) BOOST_CHECK_EQUAL(Consensus::GetMaxBlockWitnessItems(Params().GetConsensus(), height - 1), limit / 2);
     }
-    BOOST_CHECK_EQUAL(Consensus::GetMaxBlockWitnessItems(std::numeric_limits<int64_t>::max()), 4194304);
+    BOOST_CHECK_EQUAL(Consensus::GetMaxBlockWitnessItems(Params().GetConsensus(), std::numeric_limits<int64_t>::max()), 4194304);
     auto future = Params().GetConsensus();
     future.nWitnessResourceHeight = 500;
     BOOST_CHECK(!WitnessParseBudget::ForInspection(future).enabled);
@@ -110,7 +110,7 @@ BOOST_AUTO_TEST_CASE(input_count_and_preallocation)
     BOOST_CHECK_EXCEPTION(prefix >> WitnessParseParams{&budget}(Using<WitnessStackFormatter>(stack)),
         std::ios_base::failure, [](const auto& e) { return Reason(e, "bad-witness-stack-count"); });
     BOOST_CHECK_EQUAL(stack.capacity(), 0);
-    BOOST_CHECK_EQUAL(budget.remaining, 4096);
+    BOOST_CHECK_EQUAL(budget.remaining, 16384);
 
     DataStream noncanonical;
     noncanonical << uint8_t{253} << uint16_t{1};
@@ -121,20 +121,20 @@ BOOST_AUTO_TEST_CASE(input_count_and_preallocation)
 
 BOOST_AUTO_TEST_CASE(aggregate_roundtrip_and_rollback)
 {
-    for (const size_t total : {4095, 4096, 4097}) {
+    for (const size_t total : {16383, 16384, 16385}) {
         const auto block = ResourceBlock(total);
         BlockValidationState state;
-        BOOST_CHECK_EQUAL(CheckBlockWitnessResources(block, state, Params().GetConsensus(), 1), total <= 4096);
-        if (total > 4096) BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-blk-witness-items");
+        BOOST_CHECK_EQUAL(CheckBlockWitnessResources(block, state, Params().GetConsensus(), 1), total <= 16384);
+        if (total > 16384) BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-blk-witness-items");
 
         DataStream stream;
         stream << TX_WITH_WITNESS(block);
         const std::vector<std::byte> bytes{stream.begin(), stream.end()};
         CBlock decoded;
         auto budget = WitnessParseBudget::ForBlock(Params().GetConsensus(), 1);
-        if (total <= 4096) {
+        if (total <= 16384) {
             stream >> WitnessParseParams{&budget}(TX_WITH_WITNESS(decoded));
-            BOOST_CHECK_EQUAL(budget.remaining, 4096 - total);
+            BOOST_CHECK_EQUAL(budget.remaining, 16384 - total);
             BOOST_CHECK(stream.empty());
             DataStream again;
             again << TX_WITH_WITNESS(decoded);
@@ -142,31 +142,31 @@ BOOST_AUTO_TEST_CASE(aggregate_roundtrip_and_rollback)
         } else {
             BOOST_CHECK_EXCEPTION(stream >> WitnessParseParams{&budget}(TX_WITH_WITNESS(decoded)),
                 std::ios_base::failure, [](const auto& e) { return Reason(e, "bad-blk-witness-items"); });
-            BOOST_CHECK_EQUAL(budget.remaining, 4096); // Includes successful preceding coinbase parsing.
+            BOOST_CHECK_EQUAL(budget.remaining, 16384); // Includes successful preceding coinbase parsing.
             DataStream retry{bytes};
             auto larger = WitnessParseBudget::ForBlock(Params().GetConsensus(), 1'051'200);
             retry >> WitnessParseParams{&larger}(TX_WITH_WITNESS(decoded));
-            BOOST_CHECK_EQUAL(larger.remaining, 8192 - total);
+            BOOST_CHECK_EQUAL(larger.remaining, 32768 - total);
         }
     }
 
     // Multiple occurrences of the same reference are charged separately.
-    auto block = ResourceBlock(2001);
+    auto block = ResourceBlock(8001);
     block.vtx.push_back(block.vtx[1]);
     block.vtx.push_back(block.vtx[1]);
     BlockValidationState state;
     BOOST_CHECK(!CheckBlockWitnessResources(block, state, Params().GetConsensus(), 1));
 
     // Also prove that the parse budget spans separate transactions.
-    block = ResourceBlock(2001);
-    block.vtx.push_back(MakeTransactionRef(WitnessTx({1003, 1003, 90})));
+    block = ResourceBlock(8001);
+    block.vtx.push_back(MakeTransactionRef(WitnessTx(std::vector<size_t>(9, 1003))));
     DataStream wire;
     wire << TX_WITH_WITNESS(block);
     auto budget = WitnessParseBudget::ForBlock(Params().GetConsensus(), 1);
     CBlock decoded;
     BOOST_CHECK_EXCEPTION(wire >> WitnessParseParams{&budget}(TX_WITH_WITNESS(decoded)),
         std::ios_base::failure, [](const auto& e) { return Reason(e, "bad-blk-witness-items"); });
-    BOOST_CHECK_EQUAL(budget.remaining, 4096);
+    BOOST_CHECK_EQUAL(budget.remaining, 16384);
 }
 
 BOOST_AUTO_TEST_CASE(header_first_and_legacy_history)
@@ -211,14 +211,13 @@ BOOST_AUTO_TEST_CASE(item_size_large)
     auto failed_budget = WitnessParseBudget::ForBlock(Params().GetConsensus(), 1);
     BOOST_CHECK_EXCEPTION(prefix >> WitnessParseParams{&failed_budget}(Using<WitnessStackFormatter>(decoded)),
         std::ios_base::failure, [](const auto& e) { return Reason(e, "size too large"); });
-    BOOST_CHECK_EQUAL(failed_budget.remaining, 4096);
+    BOOST_CHECK_EQUAL(failed_budget.remaining, 16384);
 }
 
 BOOST_AUTO_TEST_CASE(chunked_file_decoding)
 {
-    // Synthetic 4 MiB-capacity height: exercise the completed chunk-file
-    // decoder without mining millions of blocks or changing network rules.
-    constexpr int height{2'102'400};
+    // Exercise the completed chunk-file decoder at the real 4 MiB launch cap.
+    constexpr int height{0};
     for (const size_t total : {16384, 16385}) {
         auto block = ResourceBlock(total);
         CMutableTransaction tx{*block.vtx[1]};
@@ -227,7 +226,7 @@ BOOST_AUTO_TEST_CASE(chunked_file_decoding)
         DataStream wire;
         wire << TX_WITH_WITNESS(block);
         BOOST_REQUIRE(wire.size() > MAX_BLOCK_SERIALIZED_SIZE);
-        BOOST_REQUIRE(wire.size() <= GetMaxBlockCapacityBytes(height));
+        BOOST_REQUIRE(wire.size() <= GetMaxBlockCapacityBytes(Params().GetConsensus(), height));
         MercaturaBlockMeta meta;
         meta.block_hash = block.GetHash();
         meta.total_size = wire.size();
@@ -399,16 +398,16 @@ BOOST_AUTO_TEST_CASE(mainnet_connection_templates_disk_and_reindex)
     // A real on-chain, matured unknown-version output funds all subsequent spends.
     CMutableTransaction funding;
     funding.vin.emplace_back(COutPoint{first_coinbase->GetHash(), 0});
-    const CAmount amount{first_coinbase->vout[0].nValue / 6};
-    for (int i{0}; i < 6; ++i) funding.vout.emplace_back(amount, unknown);
+    const CAmount amount{first_coinbase->vout[0].nValue / 18};
+    for (int i{0}; i < 18; ++i) funding.vout.emplace_back(amount, unknown);
     auto funding_block = make_block({funding});
     solve(funding_block);
     BOOST_REQUIRE(chainman.ProcessNewBlock(std::make_shared<const CBlock>(funding_block), true, true, nullptr));
     BOOST_REQUIRE_EQUAL(chainman.ActiveChain().Height(), 101);
 
-    // Templates must skip the fifth count-heavy transaction, even though bytes fit.
+    // Templates must skip the 17th count-heavy transaction, even though bytes fit.
     std::vector<CMutableTransaction> template_spends;
-    for (uint32_t i{0}; i < 5; ++i) {
+    for (uint32_t i{0}; i < 17; ++i) {
         auto spend = WitnessTx({1003});
         spend.vin[0].prevout = COutPoint{funding.GetHash(), i};
         spend.vout[0].nValue = amount - 10000;
@@ -419,13 +418,15 @@ BOOST_AUTO_TEST_CASE(mainnet_connection_templates_disk_and_reindex)
     auto templ = node::BlockAssembler{chainman.ActiveChainstate(), m_node.mempool.get(), options}.CreateNewBlock();
     uint64_t template_items{0};
     for (const auto& tx : templ->block.vtx) template_items += GetTransactionWitnessItems(*tx);
-    BOOST_CHECK_EQUAL(template_items, 4013);
-    BOOST_CHECK_EQUAL(templ->block.vtx.size(), 5);
+    BOOST_CHECK_EQUAL(template_items, 16049);
+    BOOST_CHECK_EQUAL(templ->block.vtx.size(), 17);
 
-    auto spend = WitnessTx({1003, 1003, 1003, 1003, 83});
-    for (uint32_t i{0}; i < 5; ++i) spend.vin[i].prevout = COutPoint{funding.GetHash(), i};
-    spend.vout[0].nValue = 5 * amount - 10000;
-    auto valid = make_block({spend}); // Exactly 4,096 including coinbase.
+    std::vector<size_t> counts(16, 1003);
+    counts.push_back(335);
+    auto spend = WitnessTx(counts);
+    for (uint32_t i{0}; i < 17; ++i) spend.vin[i].prevout = COutPoint{funding.GetHash(), i};
+    spend.vout[0].nValue = 17 * amount - 10000;
+    auto valid = make_block({spend}); // Exactly 16,384 including coinbase.
     // Exercise the actual proposal RPC, with its contextual raw-block decoder.
     m_node.mining = interfaces::MakeMining(m_node, /*wait_loaded=*/false);
     auto proposal = [&](const CBlock& block) {
@@ -488,11 +489,13 @@ BOOST_AUTO_TEST_CASE(mainnet_connection_templates_disk_and_reindex)
 
     // Exercise the real CMPCTBLOCK/BLOCKTXN handlers. Coinbase is prefilled,
     // one 1,003-item transaction is in the mempool, and the missing transaction
-    // consumes the remaining 3,092 items. An unauthenticated alternate witness
-    // with 3,093 items must fail during parsing, before reconstruction/validation.
-    auto newly_supplied = WitnessTx({1003, 1003, 1003, 83});
-    for (uint32_t i{0}; i < 4; ++i) newly_supplied.vin[i].prevout = COutPoint{funding.GetHash(), i + 1};
-    newly_supplied.vout[0].nValue = 4 * amount - 10000;
+    // consumes the remaining 15,380 items. An unauthenticated alternate witness
+    // with 15,381 items must fail during parsing, before reconstruction/validation.
+    auto missing_counts = counts;
+    missing_counts.erase(missing_counts.begin());
+    auto newly_supplied = WitnessTx(missing_counts);
+    for (uint32_t i{0}; i < 16; ++i) newly_supplied.vin[i].prevout = COutPoint{funding.GetHash(), i + 1};
+    newly_supplied.vout[0].nValue = 16 * amount - 10000;
     auto mixed = make_block({template_spends[0], newly_supplied});
     solve(mixed);
     {
@@ -528,13 +531,13 @@ BOOST_AUTO_TEST_CASE(mainnet_connection_templates_disk_and_reindex)
     CBlockHeaderAndShortTxIDs compact{valid, 0};
     PartiallyDownloadedBlock partial{m_node.mempool.get()};
     const std::vector<std::pair<Wtxid, CTransactionRef>> extra{{valid.vtx[1]->GetWitnessHash(), valid.vtx[1]}};
-    BOOST_REQUIRE(partial.InitData(compact, extra, 4096) == READ_STATUS_OK);
+    BOOST_REQUIRE(partial.InitData(compact, extra, 16384) == READ_STATUS_OK);
     BOOST_REQUIRE(partial.WitnessItemsRemaining().has_value());
     BOOST_CHECK_EQUAL(*partial.WitnessItemsRemaining(), 0);
     CBlock reconstructed;
     BOOST_CHECK(partial.FillBlock(reconstructed, {}, true) == READ_STATUS_OK);
     PartiallyDownloadedBlock missing{m_node.mempool.get()};
-    BOOST_REQUIRE(missing.InitData(compact, {}, 4096) == READ_STATUS_OK);
+    BOOST_REQUIRE(missing.InitData(compact, {}, 16384) == READ_STATUS_OK);
     BOOST_REQUIRE(missing.WitnessItemsRemaining().has_value());
     auto missing_budget = WitnessParseBudget::ForBlock(Params().GetConsensus(), 102);
     missing_budget.remaining = *missing.WitnessItemsRemaining();
@@ -567,7 +570,7 @@ BOOST_AUTO_TEST_CASE(mainnet_connection_templates_disk_and_reindex)
     const CBlockIndex* index{WITH_LOCK(cs_main, return chainman.ActiveChain().Tip())};
     BOOST_REQUIRE(chainman.m_blockman.ReadBlock(disk, *index));
     BOOST_CHECK(disk.GetHash() == expected_tip);
-    BOOST_CHECK_EQUAL(GetTransactionWitnessItems(*disk.vtx[1]), 4095);
+    BOOST_CHECK_EQUAL(GetTransactionWitnessItems(*disk.vtx[1]), 16383);
 
     // Level four disconnects/reconnects real blocks, exercising direct ConnectBlock.
     {
@@ -640,7 +643,7 @@ BOOST_AUTO_TEST_CASE(ordinary_block_ingestion)
 
     // Neither an uncommitted over-budget body nor an unknown-parent body may
     // poison the indexed parent. The message handler must reject before validation.
-    auto over = ResourceBlock(4097);
+    auto over = ResourceBlock(16385);
     over.hashPrevBlock = Params().GenesisBlock().GetHash();
     BOOST_CHECK_EXCEPTION(submit(over), UniValue, [](const UniValue& error) {
         const auto& code = error.find_value("code");

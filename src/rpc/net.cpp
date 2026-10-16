@@ -607,7 +607,7 @@ static RPCHelpMan getnettotals()
             return chainman.ActiveChain().Height() + 1)
     };
     const uint64_t relay_block_capacity{
-        GetMaxBlockCapacityBytes(next_block_height)
+        GetMaxBlockCapacityBytes(chainman.GetConsensus(), next_block_height)
     };
     const std::chrono::seconds relay_block_interval{
         Params().GetConsensus().nPowTargetSpacing

@@ -1097,6 +1097,7 @@ static RPCHelpMan getblocktemplate()
     const int64_t nSizeLimit{
         static_cast<int64_t>(
             GetBlockTemplateMaxCapacityBytes(
+                chainman.GetConsensus(),
                 pindexPrev->nHeight + 1,
                 assembler_options))
     };

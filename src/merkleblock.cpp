@@ -149,13 +149,13 @@ CPartialMerkleTree::CPartialMerkleTree(const std::vector<Txid> &vTxid, const std
 
 CPartialMerkleTree::CPartialMerkleTree() : nTransactions(0), fBad(true) {}
 
-uint256 CPartialMerkleTree::ExtractMatches(std::vector<Txid> &vMatch, std::vector<unsigned int> &vnIndex) {
+uint256 CPartialMerkleTree::ExtractMatches(std::vector<Txid> &vMatch, std::vector<unsigned int> &vnIndex, unsigned int max_transactions) {
     vMatch.clear();
     // An empty set will not work
     if (nTransactions == 0)
         return uint256();
     // check for excessively high numbers of transactions
-    if (nTransactions > MAX_BLOCK_WEIGHT / MIN_TRANSACTION_WEIGHT)
+    if (nTransactions > max_transactions)
         return uint256();
     // there can never be more hashes provided than one for every txid
     if (vHash.size() > nTransactions)

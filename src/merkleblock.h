@@ -7,6 +7,7 @@
 #define BITCOIN_MERKLEBLOCK_H
 
 #include <common/bloom.h>
+#include <consensus/consensus.h>
 #include <primitives/block.h>
 #include <primitives/transaction_identifier.h>
 #include <serialize.h>
@@ -107,7 +108,10 @@ public:
      * and their respective indices within the partial tree.
      * returns the merkle root, or 0 in case of failure
      */
-    uint256 ExtractMatches(std::vector<Txid> &vMatch, std::vector<unsigned int> &vnIndex);
+    // A higher limit may only come from authenticated block-index/chain context.
+    // Context-free callers retain the inherited anti-DoS limit.
+    uint256 ExtractMatches(std::vector<Txid> &vMatch, std::vector<unsigned int> &vnIndex,
+                           unsigned int max_transactions = MAX_BLOCK_WEIGHT / MIN_TRANSACTION_WEIGHT);
 
     /** Get number of transactions the merkle proof is indicating for cross-reference with
      * local blockchain knowledge.

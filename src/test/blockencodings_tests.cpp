@@ -436,4 +436,28 @@ BOOST_AUTO_TEST_CASE(TransactionsRequestDeserializationOverflowTest) {
     }
 }
 
+BOOST_AUTO_TEST_CASE(compact_block_transaction_count_limit)
+{
+    for (const size_t count : {size_t{65'535}, size_t{65'536}}) {
+        CMutableTransaction tx;
+        tx.vin.resize(1);
+        tx.vout.resize(1);
+        CBlock block;
+        block.nBits = 1;
+        block.vtx.resize(count, MakeTransactionRef(tx));
+        CBlockHeaderAndShortTxIDs compact{block, 0};
+        DataStream stream;
+        stream << compact;
+        CBlockHeaderAndShortTxIDs decoded;
+        if (count == CBlockHeaderAndShortTxIDs::MAX_TRANSACTIONS) {
+            BOOST_CHECK_NO_THROW(stream >> decoded);
+            BOOST_CHECK_EQUAL(decoded.BlockTxCount(), count);
+        } else {
+            BOOST_CHECK_THROW(stream >> decoded, std::ios_base::failure);
+            PartiallyDownloadedBlock partial{nullptr};
+            BOOST_CHECK(partial.InitData(compact, {}) == READ_STATUS_INVALID);
+        }
+    }
+}
+
 BOOST_AUTO_TEST_SUITE_END()

@@ -103,6 +103,9 @@ protected:
 
 public:
     static constexpr int SHORTTXIDS_LENGTH = 6;
+    // BIP152's inherited differential indexes are 16 bits. Larger blocks
+    // must use full-block/chunk transport, not a wider compact-block format.
+    static constexpr size_t MAX_TRANSACTIONS{std::numeric_limits<uint16_t>::max()};
 
     CBlockHeader header;
 
@@ -124,7 +127,7 @@ public:
     {
         READWRITE(obj.header, obj.nonce, Using<VectorFormatter<CustomUintFormatter<SHORTTXIDS_LENGTH>>>(obj.shorttxids), obj.prefilledtxn);
         if (ser_action.ForRead()) {
-            if (obj.BlockTxCount() > std::numeric_limits<uint16_t>::max()) {
+            if (obj.BlockTxCount() > MAX_TRANSACTIONS) {
                 throw std::ios_base::failure("indexes overflowed 16 bits");
             }
             obj.FillShortTxIDSelector();

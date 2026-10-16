@@ -36,7 +36,7 @@ bool CheckBlockWitnessResources(const CBlock& block, BlockValidationState& state
                                 const Consensus::Params& params, int64_t height)
 {
     if (!Consensus::WitnessLimitsActive(params, height)) return true;
-    uint64_t remaining{Consensus::GetMaxBlockWitnessItems(height)};
+    uint64_t remaining{Consensus::GetMaxBlockWitnessItems(params, height)};
     for (const auto& tx : block.vtx) {
         TxValidationState tx_state;
         if (!CheckTransactionWitnessResources(*tx, tx_state)) {

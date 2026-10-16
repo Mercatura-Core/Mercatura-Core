@@ -6,6 +6,9 @@
 #ifndef BITCOIN_CONSENSUS_CONSENSUS_H
 #define BITCOIN_CONSENSUS_CONSENSUS_H
 
+#include <consensus/params.h>
+
+#include <algorithm>
 #include <cstdint>
 #include <cstdlib>
 
@@ -28,35 +31,30 @@ static const int COINBASE_MATURITY = 100;
 
 static const int WITNESS_SCALE_FACTOR = 4;
 
-/**
- * Mercatura consensus block-capacity schedule.
- *
- * Capacity begins at 1 MiB and doubles every 1,051,200 block heights.
- * Height 1,051,200 is therefore the first block with a 2 MiB capacity.
- * After ten doublings the capacity is permanently capped at 1024 MiB.
- *
- * These values are serialized bytes, not BIP141 weight units.
+/** Mercatura full-serialized-byte capacity, without a witness discount.
+ * Mainnet/regtest start at 4 MiB and reach 1024 MiB after eight doublings.
+ * Public-testnet/signet retain 1 MiB and ten doublings. The absolute ceiling
+ * is independent of the initial capacity, preventing an accidental 4 GiB cap.
  */
-static constexpr uint64_t MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES{1ULL << 20};
+static constexpr uint64_t MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES{4ULL << 20};
+static constexpr uint64_t MERCATURA_LEGACY_INITIAL_BLOCK_CAPACITY_BYTES{1ULL << 20};
 static constexpr uint64_t MERCATURA_BLOCK_CAPACITY_DOUBLING_INTERVAL{1'051'200};
-static constexpr uint64_t MERCATURA_BLOCK_CAPACITY_MAX_DOUBLINGS{10};
-static constexpr uint64_t MERCATURA_MAX_BLOCK_CAPACITY_BYTES{
-    MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES << MERCATURA_BLOCK_CAPACITY_MAX_DOUBLINGS};
+static constexpr uint64_t MERCATURA_BLOCK_CAPACITY_MAX_DOUBLINGS{8};
+static constexpr uint64_t MERCATURA_LEGACY_BLOCK_CAPACITY_MAX_DOUBLINGS{10};
+static constexpr uint64_t MERCATURA_MAX_BLOCK_CAPACITY_BYTES{1ULL << 30};
+static_assert((MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES << MERCATURA_BLOCK_CAPACITY_MAX_DOUBLINGS) == MERCATURA_MAX_BLOCK_CAPACITY_BYTES);
 
-constexpr uint64_t GetMaxBlockCapacityBytes(int64_t height)
+constexpr uint64_t GetMaxBlockCapacityBytes(const Consensus::Params& params, int64_t height)
 {
-    if (height <= 0) {
-        return MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES;
+    uint64_t capacity{std::min(params.nInitialBlockCapacityBytes, MERCATURA_MAX_BLOCK_CAPACITY_BYTES)};
+    // At most ten iterations for either configured schedule, even at INT64_MAX.
+    const uint64_t doublings{height > 0 ? std::min<uint64_t>(
+        static_cast<uint64_t>(height) / MERCATURA_BLOCK_CAPACITY_DOUBLING_INTERVAL,
+        MERCATURA_LEGACY_BLOCK_CAPACITY_MAX_DOUBLINGS) : 0};
+    for (uint64_t i{0}; i < doublings && capacity < MERCATURA_MAX_BLOCK_CAPACITY_BYTES; ++i) {
+        capacity = std::min(capacity * 2, MERCATURA_MAX_BLOCK_CAPACITY_BYTES);
     }
-
-    uint64_t doublings{
-        static_cast<uint64_t>(height) / MERCATURA_BLOCK_CAPACITY_DOUBLING_INTERVAL};
-
-    if (doublings > MERCATURA_BLOCK_CAPACITY_MAX_DOUBLINGS) {
-        doublings = MERCATURA_BLOCK_CAPACITY_MAX_DOUBLINGS;
-    }
-
-    return MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES << doublings;
+    return capacity;
 }
 
 static const size_t MIN_TRANSACTION_WEIGHT = WITNESS_SCALE_FACTOR * 60; // 60 is the lower bound for the size of a valid serialized CTransaction
