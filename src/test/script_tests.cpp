@@ -2362,7 +2362,8 @@ BOOST_AUTO_TEST_CASE(mercatura_pq_witness_v2_end_to_end)
     CMutableTransaction resource_decoded;
     resource_wire >> WitnessParseParams{&resource_budget}(TX_WITH_WITNESS(resource_decoded));
     BOOST_CHECK(resource_budget.enabled);
-    BOOST_CHECK_EQUAL(resource_budget.remaining, 4094);
+    BOOST_CHECK_EQUAL(resource_budget.remaining,
+                      Consensus::GetMaxBlockWitnessItems(Params().GetConsensus(), 1) - 2);
     tx = std::move(resource_decoded);
 
     MutableTransactionSignatureChecker checker{

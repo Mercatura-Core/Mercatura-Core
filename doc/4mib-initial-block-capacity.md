@@ -2,8 +2,8 @@
 
 This feature branch is a pre-mainnet consensus experiment. It is not mainnet
 release approval and must not be merged into the development branch without
-separate consensus/release review. The temporary branch name remains
-`feature/8mib-initial-block-cap`; its implementation target is now 4 MiB.
+separate consensus/release review. The feature branch is
+`feature/4mib-initial-block-cap`; its implementation target is 4 MiB.
 Existing mainnet binaries with the old 1 MiB launch rule are incompatible with
 larger launch-era blocks.
 
