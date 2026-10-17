@@ -1,0 +1,268 @@
+# Copyright (c) 2026 The Mercatura Core developers
+# Distributed under the MIT software license, see the accompanying file COPYING.
+name: Public testnet release qualification (no publication)
+on:
+  workflow_dispatch:
+  push:
+    branches: [release/v0.1.2-testnet-gpu]
+permissions:
+  contents: read
+concurrency:
+  group: testnet-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  linux:
+    name: Linux x86_64 CUDA + OpenCL release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+      - name: Negative release gate regressions
+        run: python3 contrib/release/test_release.py
+      - name: Install supported host compiler, Qt, QR and OpenCL SDK
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y g++-13 cmake ninja-build python3 clang \
+            libboost-dev libevent-dev libsqlite3-dev qt6-base-dev qt6-tools-dev qt6-tools-dev-tools \
+            libqrencode-dev ocl-icd-opencl-dev patchelf
+          curl --fail --location --output /tmp/cuda-keyring.deb \
+            https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb
+          sudo dpkg -i /tmp/cuda-keyring.deb
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y cuda-nvcc-12-8 cuda-cuobjdump-12-8
+      - name: Configure both production backends and public-testnet GUI
+        run: |
+          mkdir -p work/artifacts
+          cmake -S . -B work/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=gcc-13 -DCMAKE_CXX_COMPILER=g++-13 \
+            -DCUDAToolkit_ROOT=/usr/local/cuda-12.8 -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.8/bin/nvcc \
+            '-DCMAKE_CUDA_ARCHITECTURES=75-real;75-virtual;86-real' \
+            -DWITH_CUDA_MINING=ON -DWITH_OPENCL_MINING=ON \
+            -DMERCATURA_PUBLIC_TESTNET_RELEASE=ON -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+            -DBUILD_GUI=ON -DBUILD_DAEMON=ON -DBUILD_CLI=ON -DENABLE_WALLET=ON \
+            -DBUILD_TESTS=ON -DBUILD_GUI_TESTS=ON -DWITH_QRENCODE=ON \
+            -DENABLE_IPC=OFF -DWITH_ZMQ=OFF -DWITH_DBUS=OFF
+      - name: Build Qt, daemon, CLI, tests and real GPU checker
+        run: cmake --build work/build --parallel 4
+      - name: Core, PQ wallet, CPU/GPU software and Qt mining tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          ctest --test-dir work/build --output-on-failure -j3 -E '^test_bitcoin-qt$'
+          work/build/bin/test_bitcoin --run_test=crypto_tests/mercahash_v1_vectors
+          work/build/bin/test_mining-qt
+          clang -x cl -cl-std=CL1.2 -DMH_OPENCL -Werror -fsyntax-only src/mining/mercahash_gpu.h
+          clang -x cl -cl-std=CL1.2 -DMH_OPENCL -target spir64-unknown-unknown -emit-llvm -c src/mining/mercahash_gpu.h -o work/artifacts/opencl.bc
+          python3 work/build/test/functional/test_runner.py --jobs=3
+      - name: Fail-closed capabilities and bundle
+        run: |
+          python3 contrib/release/qualify.py linux work/build work/artifacts/linux-build.json
+          python3 contrib/release/package-linux.py work/build work/artifacts
+          # Test the archive after extraction, independently of the build paths.
+          mkdir work/extracted
+          tar -xzf work/artifacts/Mercatura-Core-v0.1.2-testnet-linux-x86_64.tar.gz -C work/extracted
+          work/extracted/Mercatura-Core-v0.1.2-testnet/bin/mercaturad -version
+          QT_QPA_PLATFORM=offscreen work/extracted/Mercatura-Core-v0.1.2-testnet/bin/mercatura-qt -version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qualified-linux
+          path: |
+            work/artifacts/Mercatura-Core-v0.1.2-testnet-linux-x86_64.tar.gz
+            work/artifacts/linux-build.json
+            work/artifacts/linux-contents.txt
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evidence-linux
+          path: |
+            work/build/CMakeCache.txt
+            work/build/Testing/Temporary/
+            work/build/test/tmp/
+            work/artifacts/*.json
+          retention-days: 30
+
+  windows:
+    name: Windows x64 VS2022 CUDA + OpenCL release
+    runs-on: windows-2022
+    timeout-minutes: 360
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+      - name: Select VS2022 and install exact supported C++ toolset
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = & $vswhere -latest -version '[17.0,18.0)' -property installationPath
+          if (!$vs) { throw 'Visual Studio 2022 is required' }
+          $installer = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/setup.exe"
+          $result = Start-Process $installer -Wait -PassThru -ArgumentList @('modify', '--installPath', "`"$vs`"", '--add', 'Microsoft.VisualStudio.Component.VC.14.40.17.10.x86.x64', '--quiet', '--norestart')
+          if ($result.ExitCode -notin @(0, 3010)) { throw "VS toolset installation: $($result.ExitCode)" }
+          Import-Module "$vs/Common7/Tools/Microsoft.VisualStudio.DevShell.dll"
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64 -vcvars_ver=14.40'
+          if ($env:VCToolsVersion -notlike '14.40.*') { throw "Wrong MSVC: $env:VCToolsVersion" }
+          # Persist the selected compiler environment for dumpbin and all steps.
+          Get-ChildItem Env: | Where-Object Name -In @('PATH', 'INCLUDE', 'LIB', 'LIBPATH', 'VSINSTALLDIR', 'VCINSTALLDIR', 'VCToolsInstallDir', 'VCToolsVersion', 'WindowsSdkDir', 'WindowsSDKVersion') | ForEach-Object { "$($_.Name)=$($_.Value)" >> $env:GITHUB_ENV }
+          choco install nsis --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install CUDA 12.8 compiler, static runtime, inspection tools and VS integration
+        uses: Jimver/cuda-toolkit@b6fc3a9f3f15256d9d94ffe1254f9c5a2565cde6 # v0.2.30
+        id: cuda
+        with:
+          cuda: '12.8.1'
+          method: network
+          sub-packages: '["nvcc", "cudart", "cuobjdump", "visual_studio_integration"]'
+          use-github-cache: false
+      - name: Cache completed vcpkg packages
+        uses: actions/cache@v5
+        with:
+          path: ~/AppData/Local/vcpkg/archives
+          key: release-vs2022-1440-${{ runner.os }}-${{ hashFiles('vcpkg*.json', 'contrib/vcpkg-ports/**') }}-${{ github.run_id }}
+          restore-keys: release-vs2022-1440-${{ runner.os }}-${{ hashFiles('vcpkg*.json', 'contrib/vcpkg-ports/**') }}-
+      - name: Configure dual backends with supported MSVC (no MinGW)
+        env:
+          CUDA_PATH: ${{ steps.cuda.outputs.CUDA_PATH }}
+        run: |
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
+          "CUDA_PATH=$env:CUDA_PATH" >> $env:GITHUB_ENV
+          New-Item -ItemType Directory -Force work/artifacts | Out-Null
+          cmake -B work/build --preset vs2022-gpu `
+            '-DCMAKE_CUDA_ARCHITECTURES=75-real;75-virtual;86-real' `
+            -DCMAKE_EXE_LINKER_FLAGS=/MAP -DCMAKE_COMPILE_WARNING_AS_ERROR=ON `
+            -DMERCATURA_PUBLIC_TESTNET_RELEASE=ON -DWITH_CUDA_MINING=ON -DWITH_OPENCL_MINING=ON `
+            -DBUILD_GUI=ON -DBUILD_DAEMON=ON -DBUILD_CLI=ON -DENABLE_WALLET=ON `
+            -DBUILD_TESTS=ON -DBUILD_GUI_TESTS=ON -DWITH_QRENCODE=ON `
+            -DENABLE_IPC=OFF -DWITH_ZMQ=OFF -DWITH_DBUS=OFF
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build release including real CUDA device objects
+        run: |
+          cmake --build work/build --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Core, PQ wallet, CPU/GPU software and Qt mining tests
+        run: |
+          ctest --test-dir work/build -C Release --output-on-failure -j3 -E '^test_bitcoin-qt$'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & work/build/bin/Release/test_bitcoin.exe --run_test=crypto_tests/mercahash_v1_vectors
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python work/build/test/functional/test_runner.py --jobs=3
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Fail-closed capabilities, portable ZIP and installer round trip
+        run: |
+          python contrib/release/qualify.py windows work/build work/artifacts/windows-build.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./contrib/release/package-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qualified-windows
+          path: |
+            work/artifacts/Mercatura-Core-v0.1.2-testnet-win64.zip
+            work/artifacts/Mercatura-Core-v0.1.2-testnet-win64-setup.exe
+            work/artifacts/windows-build.json
+            work/artifacts/windows-contents.txt
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evidence-windows
+          path: |
+            work/build/CMakeCache.txt
+            work/build/Testing/Temporary/
+            work/build/bin/Release/*.map
+            work/artifacts/*.json
+          retention-days: 30
+
+  macos:
+    name: macOS ARM64 CPU-only release
+    runs-on: macos-15
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Qt, QR and CPU build dependencies
+        run: brew install cmake boost pkgconf libevent ninja qt@6 qrencode
+      - name: Configure explicit CPU-only public-testnet build
+        run: |
+          mkdir -p work/artifacts
+          cmake -S . -B work/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6)" -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DMERCATURA_PUBLIC_TESTNET_RELEASE=ON -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+            -DWITH_CUDA_MINING=OFF -DWITH_OPENCL_MINING=OFF \
+            -DBUILD_GUI=ON -DBUILD_DAEMON=ON -DBUILD_CLI=ON -DENABLE_WALLET=ON \
+            -DBUILD_TESTS=ON -DBUILD_GUI_TESTS=ON -DWITH_QRENCODE=ON \
+            -DENABLE_IPC=OFF -DWITH_ZMQ=OFF -DWITH_DBUS=OFF
+      - name: Build and test native CPU, PQ wallet and Qt mining
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          cmake --build work/build --parallel 3
+          ctest --test-dir work/build --output-on-failure -j3 -E '^test_bitcoin-qt$'
+          work/build/bin/test_bitcoin --run_test=crypto_tests/mercahash_v1_vectors
+          work/build/bin/test_mining-qt
+          python3 work/build/test/functional/test_runner.py --jobs=3
+      - name: Build and inspect actual macOS app ZIP
+        run: |
+          python3 contrib/release/qualify.py macos work/build work/artifacts/macos-build.json
+          cmake --build work/build --target deploy --parallel 3
+          mv work/build/mercatura-macos-app.zip work/artifacts/Mercatura-Core-v0.1.2-testnet-macos-arm64.zip
+          mkdir work/extracted
+          ditto -x -k work/artifacts/Mercatura-Core-v0.1.2-testnet-macos-arm64.zip work/extracted
+          app='work/extracted/Mercatura Core.app'
+          test "$(lipo -archs "$app/Contents/MacOS/Mercatura-Qt")" = arm64
+          "$app/Contents/MacOS/Mercatura-Qt" -version
+          # Fail if the bundle still requires the runner's Homebrew installation.
+          find "$app" -type f -print0 | while IFS= read -r -d '' file; do
+            if file "$file" | grep -q 'Mach-O'; then
+              if otool -L "$file" | tail -n +2 | grep -E '/opt/homebrew|/usr/local/Cellar'; then exit 1; fi
+            fi
+          done
+          cp doc/release-notes/release-notes-0.1.2-testnet.md "$app/Contents/Resources/RELEASE-NOTES.md"
+          cp doc/release-v0.1.2-testnet.md "$app/Contents/Resources/BUILD-AND-BETA.md"
+          cp COPYING "$app/Contents/Resources/COPYING.txt"
+          cp work/artifacts/macos-build.json "$app/Contents/Resources/build.json"
+          ditto -c -k --sequesterRsrc --keepParent "$app" work/artifacts/Mercatura-Core-v0.1.2-testnet-macos-arm64.zip
+          find "$app" -type f | sort > work/artifacts/macos-contents.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qualified-macos
+          path: |
+            work/artifacts/Mercatura-Core-v0.1.2-testnet-macos-arm64.zip
+            work/artifacts/macos-build.json
+            work/artifacts/macos-contents.txt
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evidence-macos
+          path: |
+            work/build/CMakeCache.txt
+            work/build/Testing/Temporary/
+            work/artifacts/*.json
+          retention-days: 30
+
+  assemble:
+    name: Verify all four assets and SHA256SUMS (approval required to publish)
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: qualified-*
+          merge-multiple: true
+          path: qualified
+      - name: Enforce single source and complete assets
+        run: |
+          python3 contrib/release/assemble.py qualified
+          cd qualified
+          sha256sum --check SHA256SUMS
+          cat SHA256SUMS >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Mercatura-Core-v0.1.2-testnet-review-bundle
+          path: qualified/
+          if-no-files-found: error
+          retention-days: 30
