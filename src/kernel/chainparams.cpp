@@ -375,13 +375,13 @@ public:
                 .height = 90'000,
                 .hash_serialized = AssumeutxoHash{uint256{"784fb5e98241de66fdd429f4392155c9e7db5c017148e66e8fdbc95746f8b9b5"}},
                 .m_chain_tx_count = 11347043,
-                .blockhash = uint256::FromHex("0000000002ebe8bcda020e0dd6ccfbdfac531d2f6a81457191b99fc2df2dbe3b").value(),
+                .blockhash = uint256{std::array<unsigned char, 32>{0x3b, 0xbe, 0x2d, 0xdf, 0xc2, 0x9f, 0xb9, 0x91, 0x71, 0x45, 0x81, 0x6a, 0x2f, 0x1d, 0x53, 0xac, 0xdf, 0xfb, 0xcc, 0xd6, 0x0d, 0x0e, 0x02, 0xda, 0xbc, 0xe8, 0xeb, 0x02, 0x00, 0x00, 0x00, 0x00}},
             },
             {
                 .height = 120'000,
                 .hash_serialized = AssumeutxoHash{uint256{"10b05d05ad468d0971162e1b222a4aa66caca89da2bb2a93f8f37fb29c4794b0"}},
                 .m_chain_tx_count = 14141057,
-                .blockhash = uint256::FromHex("000000000bd2317e51b3c5794981c35ba894ce27d3e772d5c39ecd9cbce01dc8").value(),
+                .blockhash = uint256{std::array<unsigned char, 32>{0xc8, 0x1d, 0xe0, 0xbc, 0x9c, 0xcd, 0x9e, 0xc3, 0xd5, 0x72, 0xe7, 0xd3, 0x27, 0xce, 0x94, 0xa8, 0x5b, 0xc3, 0x81, 0x49, 0x79, 0xc5, 0xb3, 0x51, 0x7e, 0x31, 0xd2, 0x0b, 0x00, 0x00, 0x00, 0x00}},
             }
         };
 
@@ -637,21 +637,21 @@ public:
                 .height = 110,
                 .hash_serialized = AssumeutxoHash{uint256{"4016f03e76f4de1e1b3c4970e4ad7b92c784d983ef6d1c4f0e06d59046da459d"}},
                 .m_chain_tx_count = 111,
-                .blockhash = uint256::FromHex("a93c6a7c01bc0579fa889ac4ad9edc94f7e72ded62bcdced0a60ba207d662bf2").value(),
+                .blockhash = uint256{std::array<unsigned char, 32>{0xf2, 0x2b, 0x66, 0x7d, 0x20, 0xba, 0x60, 0x0a, 0xed, 0xdc, 0xbc, 0x62, 0xed, 0x2d, 0xe7, 0xf7, 0x94, 0xdc, 0x9e, 0xad, 0xc4, 0x9a, 0x88, 0xfa, 0x79, 0x05, 0xbc, 0x01, 0x7c, 0x6a, 0x3c, 0xa9}},
             },
             {
                 // For use by fuzz target src/test/fuzz/utxo_snapshot.cpp
                 .height = 200,
                 .hash_serialized = AssumeutxoHash{uint256{"64cfad77e81e7202c3d4317d203ac2966a0192e35ebc8616f86ef5db2a1b2de4"}},
                 .m_chain_tx_count = 201,
-                .blockhash = uint256::FromHex("698eecd82cf1c0f3df8b1c5bddf1c8344cbf4a1afa15f9b738c186af8357eded").value(),
+                .blockhash = uint256{std::array<unsigned char, 32>{0xed, 0xed, 0x57, 0x83, 0xaf, 0x86, 0xc1, 0x38, 0xb7, 0xf9, 0x15, 0xfa, 0x1a, 0x4a, 0xbf, 0x4c, 0x34, 0xc8, 0xf1, 0xdd, 0x5b, 0x1c, 0x8b, 0xdf, 0xf3, 0xc0, 0xf1, 0x2c, 0xd8, 0xec, 0x8e, 0x69}},
             },
             {
                 // For use by test/functional/feature_assumeutxo.py and test/functional/tool_bitcoin_chainstate.py
                 .height = 299,
                 .hash_serialized = AssumeutxoHash{uint256{"3107f9526723c6861e03083a1ef98e0c589609482be75645430561f98f281609"}},
                 .m_chain_tx_count = 334,
-                .blockhash = uint256::FromHex("330cdfb964ded1fc551172d7b1abbe4370e9f9af4d65731459712efe181b0ba4").value(),
+                .blockhash = uint256{std::array<unsigned char, 32>{0xa4, 0x0b, 0x1b, 0x18, 0xfe, 0x2e, 0x71, 0x59, 0x14, 0x73, 0x65, 0x4d, 0xaf, 0xf9, 0xe9, 0x70, 0x43, 0xbe, 0xab, 0xb1, 0xd7, 0x72, 0x11, 0x55, 0xfc, 0xd1, 0xde, 0x64, 0xb9, 0xdf, 0x0c, 0x33}},
             },
         };
 
