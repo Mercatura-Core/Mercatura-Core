@@ -296,7 +296,7 @@ Public testnet resources:
 
 - Website: https://mercaturacore.com
 - Explorer: https://explorer.mercaturacore.com/?network=testnet
-- Mercatura Core release: https://github.com/Mercatura-Core/Mercatura-Core/releases/tag/v0.1.0-testnet1
+- Mercatura Core release: https://github.com/Mercatura-Core/Mercatura-Core/releases
 - MercaMiner release: https://github.com/Mercatura-Core/MercaMiner/releases/tag/v0.1.0-testnet2
 
 **Testnet MCA is for testing only and has no monetary value.**
