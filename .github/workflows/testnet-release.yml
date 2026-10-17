@@ -116,11 +116,12 @@ jobs:
           method: network
           sub-packages: '["nvcc", "cudart", "cuobjdump", "visual_studio_integration"]'
           use-github-cache: false
-      - name: Cache completed vcpkg packages
-        uses: actions/cache@v5
+      - name: Restore completed vcpkg packages
+        id: vcpkg-cache
+        uses: actions/cache/restore@v5
         with:
           path: ~/AppData/Local/vcpkg/archives
-          key: release-vs2022-1440-${{ runner.os }}-${{ hashFiles('vcpkg*.json', 'contrib/vcpkg-ports/**') }}-${{ github.run_id }}
+          key: release-vs2022-1440-${{ runner.os }}-${{ hashFiles('vcpkg*.json', 'contrib/vcpkg-ports/**') }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: release-vs2022-1440-${{ runner.os }}-${{ hashFiles('vcpkg*.json', 'contrib/vcpkg-ports/**') }}-
       - name: Configure dual backends with supported MSVC (no MinGW)
         env:
@@ -174,6 +175,13 @@ jobs:
             work/build/bin/Release/*.map
             work/artifacts/*.json
           retention-days: 30
+
+      - name: Retain completed dependencies after later build or test failure
+        if: always() && steps.vcpkg-cache.outcome == 'success' && steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/AppData/Local/vcpkg/archives
+          key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
 
   macos:
     name: macOS ARM64 CPU-only release
