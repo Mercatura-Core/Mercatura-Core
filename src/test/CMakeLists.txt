@@ -87,6 +87,7 @@ add_executable(test_bitcoin
   policyestimator_tests.cpp
   pool_tests.cpp
   block_capacity_tests.cpp
+  testnet_capacity_tests.cpp
   blockchunk_tests.cpp
   pow_tests.cpp
   prevector_tests.cpp

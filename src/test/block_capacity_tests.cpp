@@ -401,16 +401,19 @@ BOOST_FIXTURE_TEST_CASE(network_capacity_schedules, BasicTestingSetup)
     for (const auto network : {ChainType::MAIN, ChainType::REGTEST, ChainType::TESTNET, ChainType::TESTNET4, ChainType::SIGNET}) {
         const auto chain = CreateChainParams(m_args, network);
         const auto& consensus = chain->GetConsensus();
-        const bool proposed{network == ChainType::MAIN || network == ChainType::REGTEST};
-        const uint64_t initial{proposed ? 4'194'304ULL : 1'048'576ULL};
-        const int doublings{proposed ? 8 : 10};
+        const bool from_genesis{network == ChainType::MAIN || network == ChainType::REGTEST};
+        const bool upgraded{from_genesis || network == ChainType::TESTNET};
+        const uint64_t initial{from_genesis ? 4'194'304ULL : 1'048'576ULL};
+        const uint64_t doubling_base{upgraded ? 4'194'304ULL : 1'048'576ULL};
+        const int doublings{upgraded ? 8 : 10};
+        BOOST_CHECK_EQUAL(consensus.nBlockCapacity4MiBHeight.has_value(), network == ChainType::TESTNET);
         BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, -1), initial);
         BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, 0), initial);
         for (int n{1}; n <= doublings; ++n) {
             const int64_t boundary{n * int64_t{1'051'200}};
-            BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, boundary - 1), initial << (n - 1));
-            BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, boundary), initial << n);
-            BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, boundary + 1), initial << n);
+            BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, boundary - 1), doubling_base << (n - 1));
+            BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, boundary), doubling_base << n);
+            BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, boundary + 1), doubling_base << n);
         }
         for (const int64_t height : {int64_t{doublings + 1} * 1'051'200, std::numeric_limits<int64_t>::max()}) {
             BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, height), 1'073'741'824ULL);
@@ -422,6 +425,33 @@ BOOST_FIXTURE_TEST_CASE(network_capacity_schedules, BasicTestingSetup)
         BOOST_CHECK_EQUAL(node::GetBlockTemplateMaxCapacityBytes(consensus, 1, options), std::min(initial, uint64_t{4'000'000}));
         options.nBlockMaxSize = 16'777'216;
         BOOST_CHECK_EQUAL(node::GetBlockTemplateMaxCapacityBytes(consensus, 1, options), initial);
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE(public_testnet_activation_and_reorg, BasicTestingSetup)
+{
+    const auto chain = CreateChainParams(m_args, ChainType::TESTNET);
+    const auto& consensus = chain->GetConsensus();
+    BOOST_REQUIRE(consensus.nBlockCapacity4MiBHeight.has_value());
+    BOOST_CHECK_EQUAL(*consensus.nBlockCapacity4MiBHeight, 8'000);
+    node::BlockAssembler::Options options;
+    // Simulated winning-branch changes revisit both sides without a cached budget.
+    for (const int height : {0, 7'999, 8'000, 8'001, 7'999, 8'001, 8'000, 7'999}) {
+        const uint64_t expected{height < 8'000 ? 1'048'576ULL : 4'194'304ULL};
+        BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, height), expected);
+        BOOST_CHECK_EQUAL(node::GetBlockTemplateMaxCapacityBytes(consensus, height, options), expected);
+        BOOST_CHECK_EQUAL(Consensus::GetMaxBlockWitnessItems(consensus, height), expected / 256);
+        BOOST_CHECK(!Consensus::WitnessLimitsActive(consensus, height));
+        BOOST_CHECK(!WitnessParseBudget::ForBlock(consensus, height).enabled);
+    }
+    // The clock is not restarted at 8,000: the old absolute boundary still applies.
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, 1'051'199), 4'194'304ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, 1'051'200), 8'388'608ULL);
+    BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, 1'059'200), 8'388'608ULL);
+    // Before activation the entire available historical range is byte-identical.
+    const Consensus::Params historical{};
+    for (int height{0}; height < 8'000; ++height) {
+        BOOST_CHECK_EQUAL(GetMaxBlockCapacityBytes(consensus, height), GetMaxBlockCapacityBytes(historical, height));
     }
 }
 

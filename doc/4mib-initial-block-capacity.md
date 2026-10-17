@@ -1,7 +1,8 @@
 # Mercatura 4 MiB Initial Block Capacity
 
 The Mercatura 4 MiB Initial Block Capacity is the selected mainnet consensus
-specification. It is implemented for mainnet and regtest on
+specification. Mainnet and regtest use it from genesis; public testnet activates
+it at height 8,000. The implementation is on
 `feature/4mib-initial-block-cap`. Merge, deployment and full release
 qualification are separate milestones; this document does not claim that
 those milestones are complete. Separate consensus and release review remains
@@ -26,14 +27,44 @@ no witness discount. The interval is exactly 1,051,200 block heights.
 | 7 | 7,358,400 | 536,870,912 |
 | 8 | 8,409,600 | 1,073,741,824 |
 
-The last value is the absolute maximum at all later heights. Public testnet,
-testnet4 and signet retain their original 1 MiB initial capacity, ten doublings
-and the same 1 GiB maximum. Genesis blocks and network identities are unchanged.
+The last value is the absolute maximum at all later heights. Signet and dormant
+testnet4 retain their original 1 MiB initial capacity, ten doublings and the same
+1 GiB maximum. Genesis blocks and network identities are unchanged.
 
-`Consensus::Params::nInitialBlockCapacityBytes` selects the network schedule.
+### Public-testnet activation
+
+Public testnet preserves its historical 1 MiB rule at heights 0 through 7,999.
+At height **8,000**, the capacity becomes **4,194,304 full serialized bytes**.
+Height 8,001 also permits 4 MiB. This is a hard fork: operators must upgrade
+before activation to follow valid larger blocks. Implementation on the feature
+branch does not mean that public-testnet nodes have been deployed or upgraded.
+
+The doubling clock remains absolute: at height 1,051,200 the public-testnet
+capacity becomes 8 MiB, at 2,102,400 it becomes 16 MiB, and at 8,409,600 it reaches
+the permanent 1 GiB ceiling. There is no new boundary at 8,000 + 1,051,200.
+Mainnet and regtest have **no capacity activation height**: they start at 4 MiB
+at height zero. Only public testnet sets `nBlockCapacity4MiBHeight`, fixed in
+chain parameters to 8,000; it is neither a command-line nor a runtime setting.
+
+Public-testnet witness-resource enforcement remains disabled before and after
+8,000 (`nWitnessResourceHeight == -1`). Its computed item allowance changes
+from 4,096 to 16,384, but this capacity change does not activate the mainnet
+per-input or aggregate witness-resource rules. Existing generic serialization,
+script authorization, sigop, fee and transport protections remain in force.
+This difference from mainnet requires separate review before any future
+public-testnet witness-resource activation.
+
+`Consensus::Params::nInitialBlockCapacityBytes` and the optional public-testnet
+`nBlockCapacity4MiBHeight` select the network schedule.
 Every capacity calculation takes consensus parameters explicitly, including
 validation, miner/template policy, witness budgets and chain-aware P2P limits.
-There is no command-line consensus override.
+There is no command-line consensus override. All callers use the child's or
+stored header's actual height. Thus template capacity changes for the child of
+7,999 without restart, and follows the winning branch back below activation
+after a reorganization. Outbound historical-block serving uses that block's
+height rather than the current tip. Ordinary wallet and Qt CPU-miner features
+are available before 8,000: the Core template/validation boundary constrains
+their blocks to the historical capacity until activation.
 
 Mainnet retains witness resource enforcement from genesis: 1,003 items per input,
 33,554,432 bytes per item, and floor(capacity / 256) aggregate items per block.
@@ -234,3 +265,128 @@ not monitored for this feature branch.
 - `test/functional/mercatura_block_capacity.py`
 - `test/functional/mercatura_pq_capacity.py`
 - `test/functional/test_runner.py`
+
+## Public-testnet activation qualification
+
+The fixed-height change adds only the public-testnet parameter and the shared
+capacity selection. Validation (including direct ConnectBlock during
+reindex-chainstate), templates/GBT, witness budgets, authenticated wallet proofs,
+P2P metadata admission and historical serving already use that shared helper.
+No PoW, DGW, emission, address, port, magic, genesis, database or wallet-key
+format is changed by this activation patch.
+
+The stable `main` tip was compared read-only with the verified feature baseline.
+Its commits absent from `v0.1` are merge commits, with no unique non-merge
+commits. The public-testnet chain parameters are unchanged apart from the new
+capacity activation field. The PQ interpreter and emission controller match
+stable main; the PoW wrapper difference counts calls without changing hash
+results. Existing mainnet-only witness protections remain gated off on public
+testnet. Wallet recovery/encryption fixes, storage durability, header replay
+hardening and Qt CPU mining are software changes inherited from development,
+not deferred to height 8,000. No merge from `main` was performed.
+
+Permanent coverage includes:
+
+- `block_capacity_tests`: all 8,000 historical heights compared with the old
+  schedule, 7,999/8,000/8,001, absolute doubling boundaries, saturation, witness
+  activation remaining disabled, and mainnet/regtest/signet/testnet4 schedules.
+- `testnet_capacity_tests`: bounded synthetic ancestry using actual testnet
+  parameters, full contextual validation and direct ConnectBlock, exact-limit
+  acceptance and plus-one rejection, actual ML-DSA signatures and corrupted
+  signature rejection, and template/validation changes when selected branch
+  height crosses activation in both directions. Cryptographic PoW is explicitly
+  omitted in this synthetic boundary fixture; all body/UTXO/commitment checks
+  remain active. Exact-size blocks use synthetic padding alongside a real PQ
+  spend. This does not simulate work-based fork selection.
+- The same C++ fixture drives the actual requested BLKMETA/BLKCHUNK handler:
+  4 MiB metadata is rejected at 7,999, accepted at 8,000 and 8,001, and rejected
+  when returning to 7,999; an admitted first chunk requests the next chunk.
+- `mercatura_testnet_capacity.py`: isolated real public-testnet genesis node,
+  1 MiB GBT before activation, valid empty proposal, actual PQ wallet signing,
+  pre-activation oversize proposal rejection, restart/reindex, identity and
+  wallet persistence. Supplied signing prevouts are synthetic and not broadcast.
+- Existing native 4 MiB capacity/PQ tests provide full two-node regtest chunk
+  propagation, exact-size blocks, real funded PQ receipts and reindex; native
+  reorganization tests exercise actual work-based branch switching separately.
+
+No historical public-testnet archive or RPC source was identified in this
+workspace or supplied by the operator. Real public-testnet history replay and
+end-to-end two-node public-testnet activation/reorganization with real PoW
+therefore remain unverified deployment-qualification items. Synthetic ancestry
+and regtest results are not represented as historical public-testnet replay.
+Existing public-testnet nodes, wallets, explorer and chain data are untouched.
+
+### Local activation results
+
+Expected runtime before execution was 15–20 minutes for the strict rebuild and
+5–10 minutes for the focused regressions. The Linux build completed with
+`-O2 -g` and warnings treated as errors; its wall span was approximately
+14 minutes 33 seconds, including corrections to the newly added fixture's use
+of non-copyable block indexes, reference-based SetTip API, and value-initialized
+consensus parameters. No production fix or warning suppression was needed.
+The final incremental build and all final test commands exited zero.
+
+```sh
+export LD_LIBRARY_PATH=/tmp/r00e-deps/usr/lib/x86_64-linux-gnu
+/tmp/r00e-deps/usr/bin/cmake -S /workspace/Mercatura-Core -B /tmp/r00e-build
+/tmp/r00e-deps/usr/bin/cmake --build /tmp/r00e-build \
+  --target bitcoind bitcoin-cli test_bitcoin -j4
+/tmp/r00e-deps/usr/bin/ctest --test-dir /tmp/r00e-build -j4 --output-on-failure \
+  -R '^(block_capacity_tests|testnet_capacity_tests|script_tests|witness_resource_tests|witness_resource_tests_chain|witness_resource_tests_net|blockencodings_tests|blockchunk_tests|headers_replay_tests|blockstorage_durability_tests|miner_tests|pmt_tests|blockfilter_tests|wallet_crypto_tests|psbt_wallet_tests|cpu_miner_tests)$'
+/tmp/r00e-build/bin/test_bitcoin \
+  --run_test='validation_block_tests/mercatura_launch_capacity*' --report_level=detailed
+python3 /tmp/r00e-build/test/functional/test_runner.py --jobs=4 --nocleanup \
+  --tmpdirprefix=/tmp/testnet-4mib/native mercatura_testnet_capacity.py \
+  mercatura_testnet_identity.py mercatura_network_identity.py \
+  mercatura_block_capacity.py mercatura_pq_capacity.py \
+  mercatura_witness_resource.py mercatura_chain_reorg.py mercatura_dgw.py \
+  mercatura_wallet_persistence.py mercatura_reindex.py
+```
+
+All **16 CTest suites / 116 cases** passed in **98.30 seconds**. The three
+additional direct ConnectBlock boundary cases passed all 32 assertions.
+The new testnet boundary/P2P fixture passed 16,190 assertions, including its
+synthetic ancestry setup. All **ten native functional scripts** passed in
+**269 seconds runner time**, **382 seconds including cache preparation**.
+The new public-testnet functional test took three seconds in this group and
+one second when isolated. The first invocation could not locate the newly
+added script in the existing build tree; ordinary CMake reconfiguration
+refreshed the generated test links and the retry passed. A fresh CI checkout
+configures after all test sources exist.
+
+| Native regression | Seconds | Result |
+| --- | ---: | --- |
+| `mercatura_testnet_capacity.py` | 3 | Passed |
+| `mercatura_testnet_identity.py` | 2 | Passed |
+| `mercatura_network_identity.py` | 11 | Passed |
+| `mercatura_block_capacity.py` | 208 | Passed |
+| `mercatura_pq_capacity.py` | 187 | Passed |
+| `mercatura_witness_resource.py` | 27 | Passed |
+| `mercatura_chain_reorg.py` | 36 | Passed |
+| `mercatura_dgw.py` | 239 | Passed |
+| `mercatura_wallet_persistence.py` | 88 | Passed |
+| `mercatura_reindex.py` | 116 | Passed |
+
+The real-PQ workloads again produced 2,040,236-byte and 4,165,211-byte blocks,
+with 384 and 784 PQ inputs. This run qualifies functionality under parallel
+load; the earlier isolated benchmark table remains the performance record.
+Full-project Python Ruff checks and mypy on 359 files passed. Repository test
+naming, file names/permissions, includes, include guards, locale dependence
+and circular dependency checks passed, along with unstaged/staged whitespace
+checks. New tests are registered in CMake and the default Mercatura runner.
+No broad inherited Bitcoin functional suite was run. GitHub Actions was not
+monitored. Historical replay, real-PoW public-testnet boundary propagation and
+fork-choice testing, supported-platform qualification and deployment remain
+separate release checks.
+
+Activation-patch files:
+
+- `src/consensus/params.h`
+- `src/consensus/consensus.h`
+- `src/kernel/chainparams.cpp`
+- `src/test/block_capacity_tests.cpp`
+- `src/test/testnet_capacity_tests.cpp`
+- `src/test/CMakeLists.txt`
+- `test/functional/mercatura_testnet_capacity.py`
+- `test/functional/test_runner.py`
+- `doc/4mib-initial-block-capacity.md`

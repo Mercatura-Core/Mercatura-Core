@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <limits>
 #include <map>
+#include <optional>
 #include <vector>
 
 namespace Consensus {
@@ -84,8 +85,10 @@ struct BIP9Deployment {
  */
 struct Params {
     uint256 hashGenesisBlock;
-    /** Serialized-byte capacity at genesis; public test networks retain 1 MiB. */
+    /** Serialized-byte capacity at genesis; public testnet starts at 1 MiB. */
     uint64_t nInitialBlockCapacityBytes{1ULL << 20};
+    /** Public-testnet-only switch to the 4 MiB base. No height on other networks. */
+    std::optional<int> nBlockCapacity4MiBHeight;
     /** Witness resource rules: negative disables; mainnet activates from genesis.
      * No CLI override. A future testnet deployment requires an explicit consensus change. */
     int nWitnessResourceHeight{-1};

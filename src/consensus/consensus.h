@@ -33,7 +33,9 @@ static const int WITNESS_SCALE_FACTOR = 4;
 
 /** Mercatura full-serialized-byte capacity, without a witness discount.
  * Mainnet/regtest start at 4 MiB and reach 1024 MiB after eight doublings.
- * Public-testnet/signet retain 1 MiB and ten doublings. The absolute ceiling
+ * Public testnet switches from the legacy base at its fixed activation height;
+ * doubling boundaries always use absolute height. Signet/testnet4 retain 1 MiB.
+ * The absolute ceiling
  * is independent of the initial capacity, preventing an accidental 4 GiB cap.
  */
 static constexpr uint64_t MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES{4ULL << 20};
@@ -46,7 +48,9 @@ static_assert((MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES << MERCATURA_BLOCK_CAPACIT
 
 constexpr uint64_t GetMaxBlockCapacityBytes(const Consensus::Params& params, int64_t height)
 {
-    uint64_t capacity{std::min(params.nInitialBlockCapacityBytes, MERCATURA_MAX_BLOCK_CAPACITY_BYTES)};
+    const uint64_t initial{params.nBlockCapacity4MiBHeight && height >= *params.nBlockCapacity4MiBHeight
+        ? MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES : params.nInitialBlockCapacityBytes};
+    uint64_t capacity{std::min(initial, MERCATURA_MAX_BLOCK_CAPACITY_BYTES)};
     // At most ten iterations for either configured schedule, even at INT64_MAX.
     const uint64_t doublings{height > 0 ? std::min<uint64_t>(
         static_cast<uint64_t>(height) / MERCATURA_BLOCK_CAPACITY_DOUBLING_INTERVAL,
