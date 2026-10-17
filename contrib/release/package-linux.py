@@ -15,6 +15,17 @@ from qualify import require, run
 SYSTEM = re.compile(r'^(ld-linux|lib(c\.|m\.|pthread\.|dl\.|rt\.|resolv\.|util\.|nss_|anl\.|BrokenLocale\.|GL|EGL|GLES|glapi|drm|gbm|cuda\.|nvidia|OpenCL\.))')
 
 
+def package_owner(source):
+    # ldd can report /lib while merged-/usr package records use /usr/lib.
+    # Try both spellings, retaining support for records using the original path.
+    for path in dict.fromkeys([source, source.resolve()]):
+        result = subprocess.run(['dpkg-query', '-S', str(path)], text=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        if result.returncode == 0:
+            return result.stdout.split(': ', 1)[0].strip()
+    raise RuntimeError(f'Cannot identify the distribution package for {source}')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('build', type=Path)
@@ -66,7 +77,7 @@ def main():
             dest = stage / 'lib' / source.name
             shutil.copy(source, dest)
             pending.append(dest)
-            owner = run('dpkg-query', '-S', str(source)).split(': ', 1)[0]
+            owner = package_owner(source)
             packages.add(owner)
     for package in sorted(packages):
         copyright_file = Path('/usr/share/doc') / package.split(':')[0] / 'copyright'
