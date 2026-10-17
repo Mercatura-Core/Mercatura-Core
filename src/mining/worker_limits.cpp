@@ -252,9 +252,16 @@ WorkerLimits DetectWorkerLimits()
         if (group_count == 1 && GetProcessAffinityMask(GetCurrentProcess(), &process_mask, &system_mask) && process_mask)
             cpus = std::min(cpus, static_cast<unsigned int>(std::popcount(process_mask)));
     }
-    ULONG set_count{0};
-    GetProcessDefaultCpuSets(GetCurrentProcess(), nullptr, 0, &set_count);
-    if (set_count) cpus = std::min(cpus, static_cast<unsigned int>(set_count));
+    // Resolve at runtime because some MinGW SDKs omit this Windows 10 API.
+    using GetProcessDefaultCpuSetsFn = BOOL(WINAPI*)(HANDLE, PULONG, ULONG, PULONG);
+    if (const HMODULE kernel32{GetModuleHandleW(L"kernel32.dll")}) {
+        const auto get_cpu_sets{reinterpret_cast<GetProcessDefaultCpuSetsFn>(GetProcAddress(kernel32, "GetProcessDefaultCpuSets"))};
+        ULONG set_count{0};
+        if (get_cpu_sets && (get_cpu_sets(GetCurrentProcess(), nullptr, 0, &set_count) ||
+                             GetLastError() == ERROR_INSUFFICIENT_BUFFER) && set_count) {
+            cpus = std::min(cpus, static_cast<unsigned int>(set_count));
+        }
+    }
     JOBOBJECT_CPU_RATE_CONTROL_INFORMATION rate{};
     if (QueryInformationJobObject(nullptr, JobObjectCpuRateControlInformation, &rate, sizeof(rate), nullptr) &&
         (rate.ControlFlags & JOB_OBJECT_CPU_RATE_CONTROL_ENABLE)) {
