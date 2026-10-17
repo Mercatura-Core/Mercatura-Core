@@ -476,9 +476,12 @@ void TestGUI(interfaces::Node& node)
                 *pq_funding_destination));
     }
 
-    desc_wallet->SetLastBlockProcessed(
-        WITH_LOCK(test.m_node.chainman->GetMutex(), return test.m_node.chainman->ActiveChain().Height()),
-        WITH_LOCK(test.m_node.chainman->GetMutex(), return test.m_node.chainman->ActiveChain().Tip()->GetBlockHash()));
+    {
+        LOCK2(desc_wallet->cs_wallet, test.m_node.chainman->GetMutex());
+        desc_wallet->SetLastBlockProcessed(
+            test.m_node.chainman->ActiveChain().Height(),
+            test.m_node.chainman->ActiveChain().Tip()->GetBlockHash());
+    }
     SyncUpWallet(desc_wallet, node);
 
     TestGUI(node, desc_wallet);
