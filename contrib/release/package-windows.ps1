@@ -34,7 +34,7 @@ Get-ChildItem "$Build/vcpkg_installed/x64-windows/share" -Directory | ForEach-Ob
 foreach ($name in @('mercaturad', 'mercatura-cli')) {
     $version = & "$stage/$name.exe" -version
     Check-Exit
-    if ($version -notmatch 'v0.1.2') { throw 'Packaged version mismatch' }
+    if (($version -join "`n") -notmatch 'v0.1.2') { throw 'Packaged version mismatch' }
 }
 # Fail on non-system imported DLLs absent from the distribution. dumpbin must
 # run in the selected VS2022 environment. Windows API-set DLLs are OS supplied.
