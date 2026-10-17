@@ -219,7 +219,6 @@ jobs:
           ditto -x -k work/artifacts/Mercatura-Core-v0.1.2-testnet-macos-arm64.zip work/extracted
           app='work/extracted/Mercatura Core.app'
           test "$(lipo -archs "$app/Contents/MacOS/Mercatura-Qt")" = arm64
-          "$app/Contents/MacOS/Mercatura-Qt" -version
           # Fail if the bundle still requires the runner's Homebrew installation.
           find "$app" -type f -print0 | while IFS= read -r -d '' file; do
             if file "$file" | grep -q 'Mach-O'; then
@@ -230,6 +229,11 @@ jobs:
           cp doc/release-v0.1.2-testnet.md "$app/Contents/Resources/BUILD-AND-BETA.md"
           cp COPYING "$app/Contents/Resources/COPYING.txt"
           cp work/artifacts/macos-build.json "$app/Contents/Resources/build.json"
+          # macdeployqtplus signs before these resources are added. Reseal the
+          # finished bundle without a Developer ID or notarization claim.
+          codesign --deep --force --sign - "$app"
+          codesign --verify --deep --strict "$app"
+          "$app/Contents/MacOS/Mercatura-Qt" -version
           ditto -c -k --sequesterRsrc --keepParent "$app" work/artifacts/Mercatura-Core-v0.1.2-testnet-macos-arm64.zip
           find "$app" -type f | sort > work/artifacts/macos-contents.txt
       - uses: actions/upload-artifact@v4

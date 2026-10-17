@@ -30,7 +30,7 @@ No workflow has release-write permissions or a publication/tag step.
 | --- | --- | --- |
 | Windows x64 | Windows 2022 runner, VS2022 v143 **14.40**, CUDA **12.8.1**, vcpkg pinned baseline; CUDA + OpenCL **ON**; dynamic Qt with QR/wallet | Included Qt/plugins and redistributable runtime DLLs; system NVIDIA driver and/or AMD full-profile OpenCL 1.2 driver |
 | Linux x86_64 | Ubuntu **24.04**, GCC **13**, CUDA **12.8**, system OpenCL SDK; CUDA + OpenCL **ON**; Qt6/QR/wallet | Bundled application libraries/plugins, Ubuntu 24.04-compatible glibc and graphics stack; system GPU driver/ICD |
-| macOS ARM64 | macOS 15 runner, native Apple Clang and Homebrew Qt6/QR; CUDA/OpenCL explicitly **OFF** | Bundled CPU-only `.app`; unsigned/not notarized unless separately qualified |
+| macOS ARM64 | macOS 15 runner, native Apple Clang and Homebrew Qt6/QR; CUDA/OpenCL explicitly **OFF** | Bundled CPU-only `.app`; ad hoc signed; not Developer ID signed or notarized |
 
 The JSON evidence records runner image, actual CUDA version, compiler/cache
 configuration and source SHA. Retain CMake caches, CTest logs and runner logs for
@@ -52,6 +52,8 @@ shortcut and its uninstaller removes only listed package files, never wallet
 or blockchain directories. Linux bundles dependencies with relative RPATHs,
 checks dependencies and versions, extracts the archive and checks startup.
 macOS rebuilds the app from the same SHA and rejects residual Homebrew links.
+After inserting release resources, it reseals and verifies the final bundle with
+an ad hoc signature; this is not Developer ID signing or notarization.
 
 The public-testnet build lock applies to the **GUI**, as in the baseline.
 Daemon/CLI preserve existing network flags: specify `-testnet` for public testnet.
