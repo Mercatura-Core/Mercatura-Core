@@ -255,7 +255,7 @@ WorkerLimits DetectWorkerLimits()
     // Resolve at runtime because some MinGW SDKs omit this Windows 10 API.
     using GetProcessDefaultCpuSetsFn = BOOL(WINAPI*)(HANDLE, PULONG, ULONG, PULONG);
     if (const HMODULE kernel32{GetModuleHandleW(L"kernel32.dll")}) {
-        const auto get_cpu_sets{reinterpret_cast<GetProcessDefaultCpuSetsFn>(GetProcAddress(kernel32, "GetProcessDefaultCpuSets"))};
+        const auto get_cpu_sets{std::bit_cast<GetProcessDefaultCpuSetsFn>(GetProcAddress(kernel32, "GetProcessDefaultCpuSets"))};
         ULONG set_count{0};
         if (get_cpu_sets && (get_cpu_sets(GetCurrentProcess(), nullptr, 0, &set_count) ||
                              GetLastError() == ERROR_INSUFFICIENT_BUFFER) && set_count) {
