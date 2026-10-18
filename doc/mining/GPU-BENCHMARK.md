@@ -190,13 +190,16 @@ pageable host transfers, are stream intervals rather than pure DMA bandwidth.
 
 ## Output and profiling
 
-JSON schema version 1 reports source commit, configured CUDA architectures,
+JSON schema version 1 reports source revision, configured CUDA architectures,
 driver/runtime API versions, device and memory information, requested/actual
 contexts, setup/verification/warmup times, completed counts and wall-clock rates,
 batch latency, optional device phase totals, and static kernel resources.
 `cuda_execution_errors: 0` accompanies successful results only. Exceptions produce
 `{"schema_version":1,"status":"error","error":"..."}` and a nonzero exit.
-No successful performance result is emitted for a failed run.
+No successful performance result is emitted for a failed run. `source_revision`
+uses Core's build-time Git revision generator: a 12-digit commit with a possible
+`-dirty` suffix, an exact clean tag, or `unknown` without Git metadata. It refreshes
+on incremental builds instead of retaining the CMake configure-time revision.
 
 `registers_per_thread`, `local_bytes_per_thread`, static shared bytes and maximum
 active 32-thread blocks per SM come from CUDA resource/occupancy APIs. Local bytes

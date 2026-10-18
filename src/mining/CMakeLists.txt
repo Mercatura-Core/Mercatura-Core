@@ -127,13 +127,10 @@ if(BUILD_GPU_BENCH)
   add_executable(mercatura-gpu-bench ../bench/mercahash_gpu_bench.cpp)
   target_compile_definitions(mercatura-gpu-bench PRIVATE MERCATURA_CUDA)
   target_link_libraries(mercatura-gpu-bench PRIVATE core_interface mercatura_gpu_bench_support)
-  execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-    OUTPUT_VARIABLE gpu_bench_commit OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-  if(NOT gpu_bench_commit)
-    set(gpu_bench_commit "unknown")
-  endif()
+  # Reuse Core's build-time revision generator so incremental builds cannot
+  # retain the commit that happened to be checked out at CMake configure time.
+  add_dependencies(mercatura-gpu-bench generate_build_info)
   string(REPLACE ";" "," gpu_bench_architectures "${CMAKE_CUDA_ARCHITECTURES}")
   target_compile_definitions(mercatura-gpu-bench PRIVATE
-    GPU_BENCH_SOURCE_COMMIT="${gpu_bench_commit}"
     GPU_BENCH_CUDA_ARCHITECTURES="${gpu_bench_architectures}")
 endif()

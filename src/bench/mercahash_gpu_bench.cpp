@@ -1,6 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
 #include <bench/mercahash_gpu_bench.h>
+#include <bitcoin-build-info.h>
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
@@ -85,7 +86,13 @@ int main(int argc, char** argv)
         UniValue report{UniValue::VOBJ};
         report.pushKV("schema_version", 1); report.pushKV("status", "ok");
         report.pushKV("algorithm", "MercaHash V1");
-        report.pushKV("source_commit", GPU_BENCH_SOURCE_COMMIT);
+#if defined(BUILD_GIT_COMMIT)
+        report.pushKV("source_revision", BUILD_GIT_COMMIT);
+#elif defined(BUILD_GIT_TAG)
+        report.pushKV("source_revision", BUILD_GIT_TAG);
+#else
+        report.pushKV("source_revision", "unknown");
+#endif
         report.pushKV("cuda_architectures", GPU_BENCH_CUDA_ARCHITECTURES);
         report.pushKV("device", DeviceJson(*selected));
         report.pushKV("cuda_driver_version", diagnostics.driver_version);
