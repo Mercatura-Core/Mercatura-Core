@@ -33,7 +33,8 @@ jobs:
       - name: Software correctness and CLI checks
         run: |
           work/build/bin/gpu-bench-tests
-          work/build/bin/test_bitcoin --run_test=crypto_tests/mercahash_v1_vectors,mercahash_gpu_tests,mercahash_gpu_sync_tests,gpu_miner_tests
+          work/build/bin/test_bitcoin --run_test=crypto_tests/mercahash_v1_vectors
+          work/build/bin/test_bitcoin --run_test=mercahash_gpu_tests,mercahash_gpu_sync_tests,gpu_miner_tests
           work/build/bin/mercatura-gpu-bench --help
           set +e
           work/build/bin/mercatura-gpu-bench --contexts 257 --json > work/invalid.json
@@ -120,7 +121,9 @@ jobs:
         run: |
           & work/build/bin/gpu-bench-tests.exe
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          & work/build/bin/test_bitcoin.exe --run_test=crypto_tests/mercahash_v1_vectors,mercahash_gpu_tests,mercahash_gpu_sync_tests,gpu_miner_tests
+          & work/build/bin/test_bitcoin.exe --run_test=crypto_tests/mercahash_v1_vectors
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & work/build/bin/test_bitcoin.exe --run_test=mercahash_gpu_tests,mercahash_gpu_sync_tests,gpu_miner_tests
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           & work/build/bin/mercatura-gpu-bench.exe --help
           if ($LASTEXITCODE) { exit $LASTEXITCODE }

@@ -69,7 +69,8 @@ cmake -S . -B work/gpu-bench -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_GUI=OFF -DENABLE_WALLET=OFF -DENABLE_IPC=OFF -DWITH_ZMQ=OFF
 cmake --build work/gpu-bench --parallel 4 --target mercatura-gpu-bench gpu-bench-tests test_bitcoin
 work/gpu-bench/bin/gpu-bench-tests
-work/gpu-bench/bin/test_bitcoin --run_test=crypto_tests/mercahash_v1_vectors,mercahash_gpu_tests,mercahash_gpu_sync_tests,gpu_miner_tests
+work/gpu-bench/bin/test_bitcoin --run_test=crypto_tests/mercahash_v1_vectors
+work/gpu-bench/bin/test_bitcoin --run_test=mercahash_gpu_tests,mercahash_gpu_sync_tests,gpu_miner_tests
 ```
 
 Select `CUDAToolkit_ROOT` and `CMAKE_CUDA_COMPILER` explicitly if needed. Set
