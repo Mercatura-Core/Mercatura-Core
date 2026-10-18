@@ -1,3 +1,6 @@
+Mercatura MercaHash and benchmark components (MIT License)
+Copyright (c) 2026 The Mercatura Core developers
+
 UniValue (MIT License)
 Copyright 2014 BitPay Inc.
 Copyright 2015 Bitcoin Core Developers
