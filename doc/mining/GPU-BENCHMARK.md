@@ -50,8 +50,15 @@ Sources:
 - `src/crypto/mercahash.cpp`: authoritative CPU V1 implementation.
 - `src/test/gpu_bench_tests.cpp`: non-hardware tests.
 
-The target links only the CUDA backend, shared backend support, crypto and
-UniValue. It does not link `bitcoin_node`, Qt or wallet libraries. Production
+With tests enabled, `gpu-bench-core-tests` reuses the existing consensus-vector,
+GPU arithmetic, synchronization and mock-backend suite sources with normal Core
+fixtures. It selects the required cases without compiling unrelated test sources.
+The full `test_bitcoin` target is unchanged. MSVC 14.40 currently rejects existing
+constant-expression initializers in unrelated `pow_tests.cpp` cases, so the
+benchmark workflow therefore uses this focused runner.
+
+The benchmark target links only the CUDA backend, shared backend support, crypto
+and UniValue. It does not link `bitcoin_node`, Qt or wallet libraries. Production
 construction supplies no diagnostics object and creates no timing events.
 `mercahash_gpu.h`, launch sizes, chunk boundaries, synchronization points,
 consensus arithmetic, mining controller and wallet behavior are unchanged.
@@ -67,10 +74,10 @@ cmake -S . -B work/gpu-bench -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DWITH_CUDA_MINING=ON -DBUILD_GPU_BENCH=ON \
   -DCMAKE_CUDA_ARCHITECTURES='75-real;75-virtual;86-real' \
   -DBUILD_GUI=OFF -DENABLE_WALLET=OFF -DENABLE_IPC=OFF -DWITH_ZMQ=OFF
-cmake --build work/gpu-bench --parallel 4 --target mercatura-gpu-bench gpu-bench-tests test_bitcoin
+cmake --build work/gpu-bench --parallel 4 --target mercatura-gpu-bench gpu-bench-tests gpu-bench-core-tests
 work/gpu-bench/bin/gpu-bench-tests
-work/gpu-bench/bin/test_bitcoin --run_test=crypto_tests/mercahash_v1_vectors
-work/gpu-bench/bin/test_bitcoin --run_test=mercahash_gpu_tests,mercahash_gpu_sync_tests,gpu_miner_tests
+work/gpu-bench/bin/gpu-bench-core-tests --run_test=crypto_tests/mercahash_v1_vectors
+work/gpu-bench/bin/gpu-bench-core-tests --run_test=mercahash_gpu_tests,mercahash_gpu_sync_tests,gpu_miner_tests
 ```
 
 Select `CUDAToolkit_ROOT` and `CMAKE_CUDA_COMPILER` explicitly if needed. Set
@@ -91,7 +98,8 @@ cmake -S . -B work/gpu-bench -G Ninja -DCMAKE_BUILD_TYPE=Release `
   '-DCMAKE_CUDA_ARCHITECTURES=75-real;75-virtual;86-real' `
   -DWITH_CUDA_MINING=ON -DBUILD_GPU_BENCH=ON `
   -DBUILD_GUI=OFF -DENABLE_WALLET=OFF -DENABLE_IPC=OFF -DWITH_ZMQ=OFF
-cmake --build work/gpu-bench --parallel 4 --target mercatura-gpu-bench gpu-bench-tests
+cmake --build work/gpu-bench --parallel 4 --target mercatura-gpu-bench gpu-bench-tests gpu-bench-core-tests
+ctest --test-dir work/gpu-bench --output-on-failure -R '^gpu-bench-'
 ```
 
 Do not use `--allow-unsupported-compiler`. CUDA 12.8 with Debian 13 glibc 2.41 can
@@ -235,6 +243,8 @@ Nsight to verify it remains negligible. No RTX 3090 Ti performance is assumed.
 `.github/workflows/mercatura-gpu-benchmark.yml` builds Windows x64 and Linux x86-64,
 runs benchmark software tests and relevant existing MercaHash/backend tests, and
 uploads successful packages with README, results directory and license notices.
+The Linux ZIP may need `chmod +x Mercatura-GPU-Benchmark/mercatura-gpu-bench`
+after extraction because Actions artifacts do not preserve executable permissions.
 CUDA runtime is statically linked. Windows uses the static MSVC runtime and
 checks imported DLLs; Linux records and checks required OS C/C++ runtime libraries.
 No GPU driver is redistributed. Dependencies/toolkits are build-time only.
@@ -242,7 +252,9 @@ No GPU driver is redistributed. Dependencies/toolkits are build-time only.
 The installer uses controlled NVIDIA CUDA 12.8.1 archives, verifies each against
 NVIDIA's release-manifest SHA256, and retains component licenses. Windows reuses
 the existing vcpkg baseline and static triplet. Existing release/wallet workflows
-are unchanged. Hosted runners have no assumed NVIDIA device: discovery exit 77
+are unchanged. The workflow runs the focused original Core suites plus
+benchmark-specific tests on both platforms; it does not claim to build or run every Core test. Hosted
+runners have no assumed NVIDIA device: discovery exit 77
 is an explicit hardware skip, never a successful device parity/performance test.
 
 Before interpreting RTX 3050 results, run baseline and instrumented parity on the

@@ -134,3 +134,22 @@ if(BUILD_GPU_BENCH)
   target_compile_definitions(mercatura-gpu-bench PRIVATE
     GPU_BENCH_CUDA_ARCHITECTURES="${gpu_bench_architectures}")
 endif()
+
+if(BUILD_GPU_BENCH AND BUILD_TESTS)
+  # Reuse the original suites and normal Core fixtures without coupling this
+  # utility's supported CUDA toolchain to every unrelated Core test source.
+  add_executable(gpu-bench-core-tests
+    ../test/main.cpp
+    ../test/crypto_tests.cpp
+    ../test/gpu_miner_tests.cpp
+    ../test/mercahash_gpu_tests.cpp
+    ../test/mercahash_gpu_sync_tests.cpp
+  )
+  target_link_libraries(gpu-bench-core-tests PRIVATE core_interface test_util
+    bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers
+    libevent::extra $<TARGET_NAME_IF_EXISTS:USDT::headers>)
+  add_test(NAME gpu-bench-consensus-vectors COMMAND gpu-bench-core-tests
+    --run_test=crypto_tests/mercahash_v1_vectors)
+  add_test(NAME gpu-bench-core-regressions COMMAND gpu-bench-core-tests
+    --run_test=mercahash_gpu_tests,mercahash_gpu_sync_tests,gpu_miner_tests)
+endif()

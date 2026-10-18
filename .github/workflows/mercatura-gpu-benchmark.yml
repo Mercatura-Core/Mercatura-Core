@@ -29,12 +29,12 @@ jobs:
             -DWITH_CUDA_MINING=ON -DBUILD_GPU_BENCH=ON -DBUILD_TESTS=ON \
             -DBUILD_GUI=OFF -DENABLE_WALLET=OFF -DENABLE_IPC=OFF -DWITH_ZMQ=OFF \
             -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
-          cmake --build work/build --parallel 4 --target mercatura-gpu-bench gpu-bench-tests test_bitcoin
+          cmake --build work/build --parallel 4 --target mercatura-gpu-bench gpu-bench-tests gpu-bench-core-tests
       - name: Software correctness and CLI checks
         run: |
           work/build/bin/gpu-bench-tests
-          work/build/bin/test_bitcoin --run_test=crypto_tests/mercahash_v1_vectors
-          work/build/bin/test_bitcoin --run_test=mercahash_gpu_tests,mercahash_gpu_sync_tests,gpu_miner_tests
+          work/build/bin/gpu-bench-core-tests --run_test=crypto_tests/mercahash_v1_vectors
+          work/build/bin/gpu-bench-core-tests --run_test=mercahash_gpu_tests,mercahash_gpu_sync_tests,gpu_miner_tests
           work/build/bin/mercatura-gpu-bench --help
           set +e
           work/build/bin/mercatura-gpu-bench --contexts 257 --json > work/invalid.json
@@ -115,15 +115,15 @@ jobs:
             -DBUILD_GUI=OFF -DENABLE_WALLET=OFF -DENABLE_IPC=OFF -DWITH_ZMQ=OFF `
             -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          cmake --build work/build --parallel 4 --target mercatura-gpu-bench gpu-bench-tests test_bitcoin
+          cmake --build work/build --parallel 4 --target mercatura-gpu-bench gpu-bench-tests gpu-bench-core-tests
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Software correctness and no-device checks
         run: |
           & work/build/bin/gpu-bench-tests.exe
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          & work/build/bin/test_bitcoin.exe --run_test=crypto_tests/mercahash_v1_vectors
+          & work/build/bin/gpu-bench-core-tests.exe --run_test=crypto_tests/mercahash_v1_vectors
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          & work/build/bin/test_bitcoin.exe --run_test=mercahash_gpu_tests,mercahash_gpu_sync_tests,gpu_miner_tests
+          & work/build/bin/gpu-bench-core-tests.exe --run_test=mercahash_gpu_tests,mercahash_gpu_sync_tests,gpu_miner_tests
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           & work/build/bin/mercatura-gpu-bench.exe --help
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
