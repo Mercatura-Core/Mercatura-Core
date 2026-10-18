@@ -5,6 +5,7 @@
 #include <consensus/mercatura_controller.h>
 #include <consensus/merkle.h>
 #include <consensus/validation.h>
+#include <crypto/mercahash.h>
 #include <hash.h>
 #include <interfaces/chain.h>
 #include <interfaces/handler.h>
@@ -136,6 +137,72 @@ BOOST_AUTO_TEST_CASE(native_controller_submits_valid_pq_regtest_block)
     wallet->NotifyUnload();
     controller.Wait();
     BOOST_CHECK(!controller.GetStats().busy);
+}
+
+BOOST_AUTO_TEST_CASE(gpu_controller_accepts_native_pq_block_with_cpu_reference_test_double)
+{
+    // Exercise the real GPU worker, candidate double-check, Solo submission and
+    // block validation without a GPU. This is explicitly not CUDA execution.
+    struct ReferenceBackend final : mining::GpuBackend {
+        std::vector<unsigned char> scratch{std::vector<unsigned char>(mercahash::SCRATCHPAD_BYTES)};
+        unsigned int Contexts() const override { return 2; }
+        uint64_t MemoryBytes() const override { return 2 * mercahash::SCRATCHPAD_BYTES; }
+        std::vector<mining::GpuHash> Hash(std::span<const mining::GpuHeader> headers,
+                                        const std::function<bool()>& cancelled) override
+        {
+            std::vector<mining::GpuHash> hashes(headers.size());
+            for (size_t slot{0}; slot < headers.size(); ++slot) {
+                if (cancelled()) return {};
+                mercahash::HashV1(headers[slot], scratch, hashes[slot]);
+            }
+            return cancelled() ? std::vector<mining::GpuHash>{} : hashes;
+        }
+    };
+    WalletContext context;
+    context.args = &m_args;
+    auto wallet{TestCreateWallet(CreateMockableWalletDatabase(), context, WALLET_FLAG_DESCRIPTORS)};
+    auto api{interfaces::MakeWallet(context, wallet)};
+    const auto destination{GetMiningDestination(*api)};
+    BOOST_REQUIRE(destination);
+    const auto script{GetScriptForDestination(*destination)};
+    mining::GpuDevice device{mining::GpuVendor::NVIDIA_CUDA};
+    device.id = "cuda:cpu-reference-test-double";
+    device.name = "CPU reference test double (no GPU execution)";
+    device.supported = true;
+    mining::MiningController controller{
+        {}, [] { return mining::CalculateWorkerLimits(4, 2ULL << 30); }, {},
+        [device] { return mining::GpuDiscovery{{device}, {}}; },
+        [](const auto&, unsigned) { return std::make_unique<ReferenceBackend>(); }};
+    mining::GpuConfig hardware;
+    hardware.cpu = false;
+    hardware.gpu = true;
+    hardware.yield_ms = 0;
+    BOOST_REQUIRE(controller.Start([&] {
+        return std::make_unique<mining::SoloWorkProvider>(interfaces::MakeMining(m_node, false), script,
+                                                         EncodeDestination(*destination), true);
+    }, 0, hardware));
+    const auto deadline{std::chrono::steady_clock::now() + std::chrono::seconds{120}};
+    while (controller.GetStats().accepted == 0 && controller.GetStats().busy && std::chrono::steady_clock::now() < deadline)
+        std::this_thread::sleep_for(std::chrono::milliseconds{10});
+    controller.RequestStop();
+    controller.Wait();
+    const auto stats{controller.GetStats()};
+    BOOST_REQUIRE_MESSAGE(stats.accepted > 0, stats.status);
+    BOOST_CHECK_EQUAL(stats.cpu_hashes, 0U);
+    BOOST_REQUIRE_EQUAL(stats.devices.size(), 1U);
+    BOOST_CHECK(stats.devices[0].hashes > 0);
+    BOOST_CHECK_EQUAL(stats.devices[0].memory_bytes, 0U);
+    BOOST_CHECK_EQUAL(stats.active_workers, 0U);
+    auto& chainman{*m_node.chainman};
+    LOCK(chainman.GetMutex());
+    CBlock block;
+    BOOST_REQUIRE(chainman.m_blockman.ReadBlock(block, *chainman.ActiveChain()[1]));
+    BOOST_CHECK(block.vtx[0]->vout[0].scriptPubKey == script);
+    const auto command{Consensus::GetMcaEmissionCommand(nullptr, 1)};
+    BOOST_REQUIRE(command);
+    BOOST_CHECK_EQUAL(block.vtx[0]->GetValueOut(), command->subsidy);
+    PoWHashContext pow;
+    BOOST_CHECK(CheckProofOfWork(block, Params().GetConsensus(), pow));
 }
 
 BOOST_AUTO_TEST_CASE(solo_template_binding_wrong_work_hash_and_duplicate)

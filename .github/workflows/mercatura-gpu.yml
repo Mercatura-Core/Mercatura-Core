@@ -1,8 +1,8 @@
-name: Mercatura M5 GPU compile and software validation
+name: Mercatura GPU compile and software validation
 on:
   workflow_dispatch:
   pull_request:
-    paths: ['src/mining/**', 'src/qt/mining*', 'src/test/*gpu*', 'src/CMakeLists.txt', 'src/test/CMakeLists.txt', 'vcpkg.json', '.github/workflows/mercatura-gpu.yml']
+    paths: ['src/mining/**', 'src/qt/mining*', 'src/test/*gpu*', 'src/test/cuda_*', 'src/wallet/test/mining_tests.cpp', 'src/CMakeLists.txt', 'src/test/CMakeLists.txt', 'vcpkg.json', '.github/workflows/mercatura-gpu.yml']
   push:
     branches: [feature/qt-gpu-mining, feature/qt-mining-release-hardening, feature/qt-solo-release-qualification, feature/m73-solo-refinement]
 permissions:
@@ -36,7 +36,7 @@ jobs:
         run: |
           clang -x cl -cl-std=CL1.2 -DMH_OPENCL -Werror -fsyntax-only src/mining/mercahash_gpu.h
           clang -x cl -cl-std=CL1.2 -DMH_OPENCL -target spir64-unknown-unknown -emit-llvm -c src/mining/mercahash_gpu.h -o work/mercahash-opencl.bc
-          work/build/bin/test_bitcoin --run_test=worker_limits_tests,cpu_miner_tests,mining_statistics_tests,gpu_miner_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,mining_tests_wallet,mining_tests_solo
+          work/build/bin/test_bitcoin --run_test=worker_limits_tests,cpu_miner_tests,mining_statistics_tests,gpu_miner_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,cuda_binding_tests,mining_tests_wallet,mining_tests_solo
           work/build/bin/test_bitcoin --run_test=crypto_tests/mercahash_v1_vectors
           QT_QPA_PLATFORM=offscreen work/build/bin/test_mining-qt
       - name: AMD checker reports hardware validation unavailable
@@ -68,7 +68,8 @@ jobs:
             -DCUDAToolkit_ROOT=/usr/local/cuda-12.8 -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.8/bin/nvcc \
             -DWITH_CUDA_MINING=ON -DCMAKE_CUDA_ARCHITECTURES='75-real;75-virtual' \
             -DBUILD_GUI=OFF -DENABLE_IPC=OFF -DBUILD_TESTS=ON
-          cmake --build work/cuda -j4 --target mercatura-gpu-check
+          cmake --build work/cuda -j4 --target mercatura-gpu-check test_cuda_backend_host
+          ctest --test-dir work/cuda -R '^test_cuda_backend_host$' --output-on-failure
           set +e
           work/cuda/bin/mercatura-gpu-check --list
           result=$?
