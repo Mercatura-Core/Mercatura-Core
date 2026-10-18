@@ -4,7 +4,7 @@
 #include <mining/gpu_backend.h>
 #define MH_CUDA
 #include <algorithm>
-#include <mining/mercahash_gpu.h>
+#include <mining/mercahash_gpu_specialized.h>
 #include <stdexcept>
 #include <util/string.h>
 #ifndef MERCATURA_CUDA_MIN_ARCH
@@ -78,6 +78,16 @@ class CudaBackend final : public GpuBackend
             return {};
         Check(cudaSetDevice(device), "Select NVIDIA mining device");
         const unsigned int count{static_cast<unsigned int>(input.size())};
+        std::vector<GpuHash> hashes(count);
+        struct DrainOnExit {
+            cudaStream_t stream;
+            bool complete{false};
+            ~DrainOnExit()
+            {
+                // Do not throw during unwinding. Cleanup also handles device loss.
+                if (!complete) cudaStreamSynchronize(stream);
+            }
+        } drain{stream};
         Check(cudaMemcpyAsync(headers, input.data(), input.size_bytes(), cudaMemcpyHostToDevice, stream),
               "Upload NVIDIA headers");
         auto synchronized = [&] {
@@ -88,27 +98,71 @@ class CudaBackend final : public GpuBackend
         mh_init<<<count, 32, 0, stream>>>(headers, states, count);
         if (!synchronized())
             return {};
-        auto advance = [&](unsigned int phase, unsigned int begin, unsigned int end) {
-            if (cancelled())
-                return false;
-            mh_stage<<<count, 32, 0, stream>>>(headers, states, scratch, outputs, count, phase, begin, end);
-            return synchronized();
-        };
-        for (unsigned int begin{0}; begin < 2097152; begin += 4096)
-            if (!advance(0, begin, begin + 4096))
+        // Validated single-lane fill: queue 32 kernels on the same stream.
+        for (unsigned int begin{0}; begin < 2097152; begin += 16384) {
+            if (cancelled()) {
+                Check(cudaStreamSynchronize(stream),
+                      "Drain cancelled fill work");
                 return {};
-        for (unsigned int begin{0}; begin < 32768; begin += 64)
-            if (!advance(1, begin, begin + 64))
+            }
+
+            mh_fill<<<count, 1, 0, stream>>>(headers, states, scratch, outputs, count, begin, begin + 16384);
+
+            Check(cudaGetLastError(),
+                  "Launch NVIDIA fill kernel");
+
+            if (((begin / 16384 + 1) % 32) == 0) {
+                if (!synchronized())
+                    return {};
+            }
+        }
+        // Validated warp-parallel binding: synchronize every 32 chunks.
+        // Same-stream ordering preserves kernel dependencies.
+        for (unsigned int begin{0}; begin < 32768; begin += 64) {
+            if (cancelled()) {
+                Check(cudaStreamSynchronize(stream),
+                      "Drain cancelled binding work");
                 return {};
-        for (unsigned int begin{1}; begin <= 131072; begin += 1024)
-            if (!advance(2, begin, begin + 1023))
+            }
+
+            mh_bind<<<count, 32, 0, stream>>>(headers, states, scratch, outputs, count, begin, begin + 64);
+
+            Check(cudaGetLastError(),
+                  "Launch NVIDIA binding kernel");
+
+            if (((begin / 64 + 1) % 32) == 0) {
+                if (!synchronized())
+                    return {};
+            }
+        }
+        // Validated mixing cadence: synchronize every 16 kernels.
+        for (unsigned int begin{1}; begin <= 131072; begin += 1024) {
+            if (cancelled()) {
+                Check(cudaStreamSynchronize(stream),
+                      "Drain cancelled mixing work");
                 return {};
-        if (!advance(3, 0, 0))
+            }
+
+            mh_mix<<<count, 32, 0, stream>>>(
+                headers, states, scratch, outputs,
+                count, begin, begin + 1023);
+
+            Check(cudaGetLastError(), "Launch NVIDIA mixing kernel");
+
+            if ((((begin - 1) / 1024 + 1) % 16) == 0) {
+                if (!synchronized())
+                    return {};
+            }
+        }
+        if (cancelled())
             return {};
-        std::vector<GpuHash> hashes(count);
+        mh_final<<<count, 32, 0, stream>>>(headers, states, scratch, outputs, count, 0, 0);
+        if (!synchronized())
+            return {};
         Check(cudaMemcpyAsync(hashes.data(), outputs, hashes.size() * sizeof(GpuHash), cudaMemcpyDeviceToHost, stream),
               "Read NVIDIA MercaHash outputs");
         Check(cudaStreamSynchronize(stream), "Synchronize NVIDIA output transfer");
+        drain.complete = true;
         if (cancelled())
             return {};
         return hashes;

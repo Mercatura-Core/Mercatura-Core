@@ -60,6 +60,14 @@ if(WITH_CUDA_MINING)
   set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/gpu_backend.cpp TARGET_DIRECTORY bitcoin_node
     APPEND PROPERTY COMPILE_DEFINITIONS MERCATURA_CUDA)
   target_link_libraries(bitcoin_node PRIVATE mercatura_cuda)
+  if(BUILD_TESTS AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # A separate executable supplies fake runtime/registration symbols. It links
+    # the real backend host object, without executing device code or a driver.
+    add_executable(test_cuda_backend_host ../test/cuda_backend_tests.cpp gpu_backend.cpp)
+    target_compile_definitions(test_cuda_backend_host PRIVATE MERCATURA_CUDA)
+    target_link_libraries(test_cuda_backend_host PRIVATE core_interface mercatura_cuda CUDA::cudart_static)
+    add_test(NAME test_cuda_backend_host COMMAND test_cuda_backend_host)
+  endif()
 endif()
 if(WITH_OPENCL_MINING)
   find_package(OpenCL 1.2 REQUIRED)

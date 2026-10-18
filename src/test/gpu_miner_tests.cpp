@@ -216,6 +216,9 @@ BOOST_AUTO_TEST_CASE(memory_budget_limits_and_overflow)
     BOOST_CHECK_EQUAL(CalculateGpuBudget(512ULL << 20, 512ULL << 20).contexts, 0U);
     BOOST_CHECK_EQUAL(CalculateGpuBudget(2ULL << 30, 1ULL << 30).contexts, 7U);
     BOOST_CHECK_EQUAL(CalculateGpuBudget(8ULL << 30, 8ULL << 30).contexts, 16U);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(6ULL << 30, 6ULL << 30).contexts, 16U);
+    // The 36-context RTX 3050 benchmark must not relax production headroom.
+    BOOST_CHECK_THROW(CalculateGpuBudget(6ULL << 30, 6ULL << 30, 36), std::runtime_error);
     BOOST_CHECK_EQUAL(CalculateGpuBudget(UINT64_MAX, UINT64_MAX).contexts, 16U);
     BOOST_CHECK_EQUAL(CalculateGpuBudget(UINT64_MAX, UINT64_MAX, 256).scratchpad_bytes, 32ULL << 30);
     BOOST_CHECK_THROW(CalculateGpuBudget(UINT64_MAX, UINT64_MAX, 257), std::runtime_error);
