@@ -2,6 +2,10 @@
 # import vendor SDKs. OpenCL is loaded at runtime; CUDA uses the static runtime.
 option(WITH_CUDA_MINING "Build the optional NVIDIA CUDA MercaHash backend" OFF)
 option(WITH_OPENCL_MINING "Build the optional AMD OpenCL MercaHash backend" OFF)
+option(BUILD_GPU_BENCH "Build the standalone NVIDIA MercaHash V1 benchmark" OFF)
+if(BUILD_GPU_BENCH AND NOT WITH_CUDA_MINING)
+  message(FATAL_ERROR "BUILD_GPU_BENCH requires WITH_CUDA_MINING=ON")
+endif()
 target_sources(bitcoin_node PRIVATE gpu_backend.cpp statistics.cpp)
 if(BUILD_TESTS)
   add_executable(mining-bench mining_bench.cpp)
@@ -100,4 +104,36 @@ endif()
 if(BUILD_TESTS AND (WITH_CUDA_MINING OR WITH_OPENCL_MINING))
   add_executable(mercatura-gpu-check gpu_check.cpp)
   target_link_libraries(mercatura-gpu-check PRIVATE core_interface bitcoin_node bitcoin_crypto)
+endif()
+
+# Link only arithmetic, backend and JSON support: no node, wallet or Qt library.
+if(BUILD_GPU_BENCH OR BUILD_TESTS)
+  add_library(mercatura_gpu_bench_support STATIC
+    ../bench/mercahash_gpu_bench_support.cpp
+    gpu_backend.cpp
+  )
+  target_link_libraries(mercatura_gpu_bench_support PRIVATE core_interface PUBLIC bitcoin_crypto univalue)
+  if(WITH_CUDA_MINING)
+    target_compile_definitions(mercatura_gpu_bench_support PRIVATE MERCATURA_CUDA)
+    target_link_libraries(mercatura_gpu_bench_support PUBLIC mercatura_cuda)
+  endif()
+  if(BUILD_TESTS)
+    add_executable(gpu-bench-tests ../test/gpu_bench_tests.cpp)
+    target_link_libraries(gpu-bench-tests PRIVATE core_interface mercatura_gpu_bench_support)
+    add_test(NAME gpu-bench-tests COMMAND gpu-bench-tests)
+  endif()
+endif()
+if(BUILD_GPU_BENCH)
+  add_executable(mercatura-gpu-bench ../bench/mercahash_gpu_bench.cpp)
+  target_compile_definitions(mercatura-gpu-bench PRIVATE MERCATURA_CUDA)
+  target_link_libraries(mercatura-gpu-bench PRIVATE core_interface mercatura_gpu_bench_support)
+  execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    OUTPUT_VARIABLE gpu_bench_commit OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+  if(NOT gpu_bench_commit)
+    set(gpu_bench_commit "unknown")
+  endif()
+  string(REPLACE ";" "," gpu_bench_architectures "${CMAKE_CUDA_ARCHITECTURES}")
+  target_compile_definitions(mercatura-gpu-bench PRIVATE
+    GPU_BENCH_SOURCE_COMMIT="${gpu_bench_commit}"
+    GPU_BENCH_CUDA_ARCHITECTURES="${gpu_bench_architectures}")
 endif()
