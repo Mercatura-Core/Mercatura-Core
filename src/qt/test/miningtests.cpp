@@ -46,6 +46,87 @@ Q_DECLARE_METATYPE(wallet::AddressPurpose)
 class MiningTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void advancedGpuContextSelectionUsesBackendMemory()
+    {
+        TestingSetup setup{ChainType::REGTEST};
+        auto node{interfaces::MakeNode(setup.m_node)};
+        std::atomic<uint64_t> free_cuda{6ULL << 30};
+        MiningSession session{*node, nullptr, [&] {
+            mining::GpuDiscovery result;
+            mining::GpuDevice cuda{mining::GpuVendor::NVIDIA_CUDA};
+            cuda.id = "cuda:0"; cuda.name = "Simulated CUDA"; cuda.supported = true;
+            cuda.total_memory = 80ULL << 30;
+            cuda.available_memory = free_cuda;
+            cuda.max_allocation = free_cuda;
+            mining::GpuDevice amd{mining::GpuVendor::AMD_OPENCL};
+            amd.id = "opencl:0"; amd.name = "Simulated AMD"; amd.supported = true;
+            amd.total_memory = 16ULL << 30;
+            amd.available_memory = UINT64_MAX; // Never interpret this as CUDA free VRAM.
+            amd.max_allocation = 1ULL << 30;
+            result.devices = {cuda, amd};
+            return result;
+        }};
+        MiningPage page{nullptr};
+        page.setSession(&session);
+        auto* hardware{page.findChild<QComboBox*>("miningHardware")};
+        auto* mode{page.findChild<QComboBox*>("gpuContextMode")};
+        auto* contexts{page.findChild<QSpinBox*>("gpuContexts")};
+        auto* devices{page.findChild<QListWidget*>("gpuDevices")};
+        auto* all{page.findChild<QCheckBox*>("automaticGpuDevices")};
+        auto* memory{page.findChild<QLabel*>("gpuMemoryStatus")};
+        auto* refresh{page.findChild<QPushButton*>("refreshGpuDevices")};
+        QVERIFY(hardware && mode && contexts && devices && all && memory && refresh);
+        hardware->setCurrentIndex(1);
+        QTRY_COMPARE(devices->count(), 2);
+        QCOMPARE(mode->currentIndex(), 0); // Conservative automatic on every new page.
+        QVERIFY(!contexts->isEnabled());
+        QCOMPARE(contexts->maximum(), 8); // The tightest selected backend allocation limit.
+        QVERIFY(memory->text().contains("free VRAM is unknown"));
+        mode->setCurrentIndex(1);
+        QVERIFY(contexts->isEnabled());
+        all->setChecked(false);
+        devices->item(1)->setCheckState(Qt::Unchecked);
+        QVERIFY(contexts->maximum() > 36);
+        contexts->setValue(36);
+        QCOMPARE(contexts->value(), 36);
+        QVERIFY(memory->text().contains("4608 MiB scratchpads"));
+        QVERIFY(!memory->text().contains("Warning:"));
+        const auto rescan = [&] {
+            const auto revision{session.gpuDiscoverySnapshot()->revision};
+            refresh->click();
+            QTRY_VERIFY(session.gpuDiscoverySnapshot() && session.gpuDiscoverySnapshot()->revision > revision);
+            QTRY_VERIFY(refresh->isEnabled());
+        };
+        free_cuda = 5200ULL << 20; // 36 fits, with just over the required 512 MiB reserve.
+        rescan();
+        QTRY_COMPARE(contexts->maximum(), 36);
+        QCOMPARE(contexts->value(), 36);
+        QCOMPARE(devices->item(1)->checkState(), Qt::Unchecked); // Refresh preserves explicit device selection.
+        QVERIFY(memory->text().contains("Warning:"));
+        free_cuda = 5ULL << 30;
+        rescan();
+        QTRY_VERIFY(contexts->maximum() < 36);
+        QCOMPARE(contexts->value(), contexts->maximum());
+        free_cuda = 24ULL << 30;
+        rescan();
+        QTRY_VERIFY(contexts->maximum() > 128);
+        contexts->setValue(128);
+        QCOMPARE(contexts->value(), 128); // Larger GPUs are not capped at 36.
+        free_cuda = 80ULL << 30;
+        rescan();
+        QTRY_COMPARE(contexts->maximum(), static_cast<int>(mining::MAX_GPU_CONTEXTS));
+        free_cuda = 0;
+        rescan();
+        QTRY_VERIFY(!contexts->isEnabled());
+        QVERIFY(memory->text().contains("cannot fit"));
+        QVERIFY(!page.findChild<QPushButton*>("startMining")->isEnabled());
+        QVERIFY(!session.stats().busy); // Selector and asynchronous discovery never start mining.
+        mode->setCurrentIndex(0);
+        QVERIFY(!contexts->isEnabled());
+        MiningPage reopened{nullptr};
+        QCOMPARE(reopened.findChild<QComboBox*>("gpuContextMode")->currentIndex(), 0);
+    }
+
     void hardwareAwareManualWorkerSelection()
     {
         QSettings settings;

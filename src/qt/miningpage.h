@@ -56,6 +56,7 @@ private:
     QComboBox* m_hardware;
     QCheckBox* m_all_devices;
     QListWidget* m_devices;
+    QComboBox* m_context_mode;
     QSpinBox* m_contexts;
     QSpinBox* m_yield;
     QPushButton* m_refresh_devices;

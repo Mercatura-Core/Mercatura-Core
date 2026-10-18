@@ -88,13 +88,33 @@ expiry, continuous-share behavior and submission rules. Stale GPU outputs are
 discarded after cancellation or replacement. Each GPU verifier's CPU scratchpad
 is included in the host memory budget.
 
-The GPU budget leaves at least 512 MiB and half of the reported device budget for
-other uses, checks the maximum single allocation, and allows at most 256 contexts
-per device because the shared work ranges contain 256 nonces. Automatic selection
-caps contexts at 16 for responsiveness. This limits contexts, not the number of
-GPUs. OpenCL has no portable free-VRAM query: its conservative budget uses reported
-total global memory, and allocation/launch failures disable the affected device.
-The interface never claims that this value is measured free VRAM.
+The default **Automatic (conservative)** memory mode leaves at least 512 MiB and
+half of the reported device budget for other uses, and caps contexts at 16.
+**Advanced manual (higher VRAM use)** must be selected explicitly on the Mining
+page. For CUDA it uses measured free VRAM, reserving max(512 MiB, 5% of free VRAM),
+plus 64 MiB of estimated runtime overhead and 4 KiB per context in addition to
+each private 128 MiB scratchpad. For example, 36 contexts use 4,608 MiB of
+scratchpads and fit only when measured free VRAM can also cover that overhead and
+reserve (at least 5,184 MiB + 144 KiB in this example). This is not an automatic
+RTX 3050 setting or a universal maximum. Larger GPUs permit proportionally larger
+counts, subject to the single-buffer allocation limit, host address space and
+the current 256-context scheduler limit (shared ranges contain 256 nonces).
+
+The selector uses the tightest limit among selected GPUs. It shows the cached
+CUDA free-memory reading, estimated allocation/headroom, and a warning below
+max(1 GiB, 10% of reported free memory) of remaining headroom. Refresh runs off
+the GUI thread and retains explicit device selections. Allocation also runs off
+the GUI thread: CUDA re-queries free memory before allocation, checks every
+allocation, and checks actual remaining memory against the reserve afterward.
+An unsafe/stale request fails visibly and cleans up; it is not silently retried
+with a different manual count. Other applications can still consume VRAM later.
+
+Core OpenCL has no portable free-VRAM query. AMD manual selection therefore
+retains the half-total-memory reserve and respects `CL_DEVICE_MAX_MEM_ALLOC_SIZE`,
+with the same overhead allowances. Its UI reports total VRAM and explicitly warns
+that free VRAM is unknown; total or unallocated budget is never presented as a
+measurement of free memory. Allocation/launch failures disable the affected
+device. These memory policies do not change either backend's hash arithmetic.
 
 Per-device statistics expose hashes, rate, context count, allocated scratchpad
 memory and status. CPU hashes and rate are separate from GPU totals. Device

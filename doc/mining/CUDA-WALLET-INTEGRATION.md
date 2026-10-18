@@ -35,13 +35,17 @@ After normalizing those three guard lines back to the original name, its bytes
 match the original header checksum above. The ported file SHA-256 is
 `bbcb18a44f6a0d3fd67c1a72d69f12426842582e1fd8e6627e1963bd71b7334f`.
 
-The original `mercahash_gpu.h`, AMD OpenCL backend, consensus/PoW/PQ rules, Qt
-workflow, Solo reward construction and production memory policy are unchanged.
-The benchmark's `gpu_backend_budget_512.cpp` was **not** ported. Production
-reserves max(512 MiB, half available VRAM), checks allocation limits, caps
-explicit contexts at 256 and automatic contexts at 16. Safe manual requests
-remain selectable. A 36-context allocation is not safe under this policy on a
-6 GB card and is rejected; no shipping budget exception was introduced.
+The original `mercahash_gpu.h`, both backends' hash arithmetic, consensus/PoW/PQ
+rules and Solo reward construction are unchanged. The benchmark's
+`gpu_backend_budget_512.cpp` was **not** ported. Automatic allocation still
+reserves max(512 MiB, half the reported memory) and caps contexts at 16.
+The separately selected advanced manual Qt mode now permits 36 CUDA contexts
+when measured free memory covers 4,608 MiB of scratchpads, 64 MiB + 144 KiB
+estimated overhead and at least 512 MiB reserve. Larger CUDA budgets retain at
+least 5% free; manual counts scale with usable VRAM and allocation limits up to
+the current 256-context scheduler bound. CUDA rechecks memory before and after
+allocation. AMD retains the half-total budget because portable OpenCL free VRAM
+is unknown. See [memory policy and UI behavior](../native-gpu-mining.md).
 
 ## Benchmark reference versus wallet evidence
 
@@ -67,8 +71,11 @@ under the conservative production budget.
   launch/synchronization/transfer/callback failures, partial-allocation cleanup
   and destruction. No GPU driver or device instructions execute in this test.
 - `gpu_miner_tests`: retains simulated CPU/GPU scheduling, stale results, device
-  failures and Stop/Start tests, with a new assertion that the 36-context
-  benchmark does not weaken the 6 GiB production budget.
+  failures and Stop/Start tests; covers conservative defaults, explicit 36-context
+  budgets, exact reserve boundaries, larger cards and OpenCL total-only limits.
+  Qt selector tests cover explicit opt-in, mixed-device limits, refresh/clamping,
+  small-headroom warnings and unknown free VRAM. CUDA fake-runtime tests cover
+  stale memory, post-allocation reserve loss and manual-allocation cleanup.
 - Wallet `mining_tests_solo`: adds a GPU-controller test with a CPU-reference
   backend test double. Real native Solo work, independent candidate rehashing,
   PQ reward ownership and actual regtest block validation/acceptance run through
@@ -152,7 +159,9 @@ work/build-cuda-qt/bin/mercatura-gpu-check cuda:0 --contexts 1 --repetitions 3
 
 Repeat at automatic and several manually selected **safe** counts. Check full,
 partial and repeated batches. Exit 77 on a device-free listing is a skip.
-Do not bypass memory headroom to force the old 36-context benchmark configuration.
+An explicit `--contexts 36` uses the advanced manual policy, matching the Qt
+manual mode. Run it only when the real free-memory budget permits it; never
+bypass the reserve/allocation checks to force the benchmark configuration.
 
 Exercise actual Qt GPU-only and CPU+GPU mining: observe accepted blocks on the
 active chain and an isolated peer, match coinbase rewards to the wallet's owned

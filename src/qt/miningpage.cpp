@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <array>
 #include <limits>
+#include <set>
 
 MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningController::LimitDetector limits)
     : QWidget{parent}, m_wallet{wallet}, m_detect_limits{limits ? std::move(limits) : mining::MiningController::LimitDetector{mining::DetectWorkerLimits}}, m_limits{m_detect_limits()}
@@ -61,10 +62,14 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     m_devices->setObjectName(QStringLiteral("gpuDevices"));
     m_devices->setMaximumHeight(100);
     form->addRow(tr("GPU devices"), m_devices);
+    m_context_mode = new QComboBox{group};
+    m_context_mode->setObjectName(QStringLiteral("gpuContextMode"));
+    m_context_mode->addItems({tr("Automatic (conservative)"), tr("Advanced manual (higher VRAM use)")});
+    m_context_mode->setToolTip(tr("Automatic keeps a conservative memory budget. Advanced manual permits more CUDA contexts using measured free VRAM, while retaining a reserve and allocation overhead. AMD OpenCL retains a conservative total-memory budget because free VRAM is unknown. More contexts may reduce desktop responsiveness."));
+    form->addRow(tr("GPU memory mode"), m_context_mode);
     m_contexts = new QSpinBox{group};
     m_contexts->setObjectName(QStringLiteral("gpuContexts"));
-    m_contexts->setRange(0, 256);
-    m_contexts->setSpecialValueText(tr("Automatic"));
+    m_contexts->setRange(1, 1);
     form->addRow(tr("Concurrent contexts per GPU"), m_contexts);
     m_yield = new QSpinBox{group};
     m_yield->setObjectName(QStringLiteral("gpuYield"));
@@ -76,6 +81,7 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     m_refresh_devices->setObjectName(QStringLiteral("refreshGpuDevices"));
     form->addRow(m_refresh_devices);
     m_gpu_status = new QLabel{group}; m_gpu_status->setTextFormat(Qt::PlainText); m_gpu_status->setWordWrap(true);
+    m_gpu_status->setObjectName(QStringLiteral("gpuMemoryStatus"));
     form->addRow(m_gpu_status);
     m_gpu_rates = new QLabel{group}; m_gpu_rates->setTextFormat(Qt::PlainText); m_gpu_rates->setWordWrap(true);
     form->addRow(tr("CPU / GPU statistics"), m_gpu_rates);
@@ -169,6 +175,8 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     connect(m_hardware, &QComboBox::currentIndexChanged, this, [this] { updateStatus(); });
     connect(m_all_devices, &QCheckBox::toggled, this, [this] { updateStatus(); });
     connect(m_devices, &QListWidget::itemChanged, this, [this] { updateStatus(); });
+    connect(m_context_mode, &QComboBox::currentIndexChanged, this, [this] { updateStatus(); });
+    connect(m_contexts, &QSpinBox::valueChanged, this, [this] { updateStatus(); });
     connect(m_refresh_devices, &QPushButton::clicked, this, [this] {
         if (m_session) m_session->refreshDevices();
         updateStatus();
@@ -181,7 +189,7 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
             mining::GpuConfig hardware;
             hardware.cpu = m_hardware->currentIndex() != 1;
             hardware.gpu = m_hardware->currentIndex() != 0;
-            hardware.contexts = static_cast<unsigned int>(m_contexts->value());
+            hardware.contexts = m_context_mode->currentIndex() == 1 ? static_cast<unsigned int>(m_contexts->value()) : 0;
             hardware.yield_ms = static_cast<unsigned int>(m_yield->value());
             if (!m_all_devices->isChecked()) {
                 for (int i{0}; i < m_devices->count(); ++i) {
@@ -225,20 +233,38 @@ void MiningPage::updateStatus()
     const auto discovery{m_session ? m_session->gpuDiscoverySnapshot() : std::optional<MiningSession::GpuDiscoverySnapshot>{}};
     if (discovery && m_devices_revision != discovery->revision) {
         const QSignalBlocker block{m_devices};
+        std::set<std::string> checked_ids;
+        for (int i{0}; i < m_devices->count(); ++i) if (m_devices->item(i)->checkState() == Qt::Checked)
+            checked_ids.insert(m_devices->item(i)->data(Qt::UserRole).toString().toStdString());
         m_devices->clear();
         for (const auto& device : discovery->result.devices) {
             auto* item{new QListWidgetItem{QString::fromStdString(device.name + " (" + device.capability + ")"), m_devices}};
             item->setData(Qt::UserRole, QString::fromStdString(device.id));
             item->setToolTip(QString::fromStdString(device.error));
             item->setFlags(device.supported ? Qt::ItemIsEnabled | Qt::ItemIsUserCheckable : Qt::NoItemFlags);
-            item->setCheckState(device.supported ? Qt::Checked : Qt::Unchecked);
+            item->setCheckState(device.supported && (m_all_devices->isChecked() || checked_ids.contains(device.id)) ? Qt::Checked : Qt::Unchecked);
         }
         m_devices_revision = discovery->revision;
     }
-    size_t selected_gpus{0};
-    for (int i{0}; i < m_devices->count(); ++i) if ((m_devices->item(i)->flags() & Qt::ItemIsEnabled) &&
-        (m_all_devices->isChecked() || m_devices->item(i)->checkState() == Qt::Checked)) ++selected_gpus;
+    std::vector<const mining::GpuDevice*> selected_devices;
+    if (discovery) for (int i{0}; i < m_devices->count(); ++i) {
+        const auto* item{m_devices->item(i)};
+        if (!(item->flags() & Qt::ItemIsEnabled) || (!m_all_devices->isChecked() && item->checkState() != Qt::Checked)) continue;
+        const auto id{item->data(Qt::UserRole).toString().toStdString()};
+        const auto found{std::find_if(discovery->result.devices.begin(), discovery->result.devices.end(),
+                                     [&](const auto& device) { return device.id == id && device.supported; })};
+        if (found != discovery->result.devices.end()) selected_devices.push_back(&*found);
+    }
+    const size_t selected_gpus{selected_devices.size()};
     const bool gpu_available{selected_gpus > 0};
+    unsigned int context_maximum{gpu_available ? mining::MAX_GPU_CONTEXTS : 0};
+    for (const auto* device : selected_devices) context_maximum = std::min(context_maximum, mining::CalculateGpuBudget(*device).maximum_contexts);
+    const bool manual_contexts{m_context_mode->currentIndex() == 1};
+    if (!running && discovery) {
+        const QSignalBlocker block{m_contexts};
+        m_contexts->setMaximum(static_cast<int>(std::max(1U, context_maximum)));
+    }
+    const bool gpu_context_memory{context_maximum > 0 && (!manual_contexts || static_cast<unsigned int>(m_contexts->value()) <= context_maximum)};
     const auto maximum{mining::MaximumCpuWorkers(m_limits, use_gpu ? selected_gpus : 0)};
     const auto host_limits{mining::CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), m_limits.available_memory)};
     const bool gpu_host_memory{!use_gpu || selected_gpus <= host_limits.maximum};
@@ -246,15 +272,16 @@ void MiningPage::updateStatus()
         const QSignalBlocker block{m_workers}; // Resource clamping is not a new manual preference.
         m_workers->setMaximum(static_cast<int>(std::max(1U, std::min(maximum, static_cast<unsigned int>(std::numeric_limits<int>::max())))));
     }
-    m_start->setEnabled(m_wallet && m_session && m_client && !running && !syncing && (!use_cpu || maximum > 0) && (!use_gpu || (discovery && gpu_available && gpu_host_memory)));
+    m_start->setEnabled(m_wallet && m_session && m_client && !running && !syncing && (!use_cpu || maximum > 0) && (!use_gpu || (discovery && gpu_available && gpu_host_memory && gpu_context_memory)));
     m_stop->setEnabled(m_session && running && stats.state != mining::MiningState::STOPPING);
     m_hardware->setEnabled(!running);
     m_all_devices->setEnabled(!running && use_gpu);
     m_devices->setEnabled(!running && use_gpu && !m_all_devices->isChecked());
-    m_contexts->setEnabled(!running && use_gpu);
+    m_context_mode->setEnabled(!running && use_gpu);
+    m_contexts->setEnabled(!running && use_gpu && manual_contexts && context_maximum > 0);
     m_yield->setEnabled(!running && use_gpu);
     m_refresh_devices->setEnabled(m_session && !running && bool(discovery));
-    for (QWidget* field : std::array<QWidget*, 6>{m_all_devices, m_devices, m_contexts, m_yield, m_refresh_devices, m_gpu_status}) {
+    for (QWidget* field : std::array<QWidget*, 7>{m_all_devices, m_devices, m_context_mode, m_contexts, m_yield, m_refresh_devices, m_gpu_status}) {
         field->setVisible(use_gpu);
         if (auto* form{qobject_cast<QFormLayout*>(field->parentWidget()->layout())}) {
             if (auto* label{form->labelForField(field)}) label->setVisible(use_gpu);
@@ -266,6 +293,24 @@ void MiningPage::updateStatus()
         for (const auto& error : discovery->result.errors) gpu_messages << QString::fromStdString(error);
         if (!gpu_available) gpu_messages << tr("Select an available GPU or choose CPU mining.");
         else if (!gpu_host_memory) gpu_messages << tr("Insufficient host memory for the selected GPU verifiers. Select fewer devices or free memory.");
+        if (gpu_available && !gpu_context_memory) gpu_messages << tr("The selected GPUs cannot fit the requested contexts within their memory budgets. Free memory or select fewer contexts/devices.");
+        for (const auto* device : selected_devices) {
+            const auto requested{manual_contexts ? static_cast<unsigned int>(m_contexts->value()) : 0};
+            if (requested > mining::CalculateGpuBudget(*device).maximum_contexts) continue;
+            const auto budget{mining::CalculateGpuBudget(*device, requested)};
+            const auto name{QString::fromStdString(device->name)};
+            if (device->vendor == mining::GpuVendor::NVIDIA_CUDA) {
+                gpu_messages << tr("%1: %2 MiB free at last refresh. %3 contexts: %4 MiB scratchpads + %5 MiB estimated overhead; %6 MiB estimated headroom, %7 MiB minimum reserve. Free memory is rechecked when mining starts.")
+                    .arg(name).arg(qulonglong{device->available_memory >> 20}).arg(budget.contexts)
+                    .arg(qulonglong{budget.scratchpad_bytes >> 20}).arg(qulonglong{budget.overhead_bytes >> 20})
+                    .arg(qulonglong{budget.headroom_bytes >> 20}).arg(qulonglong{budget.reserved_bytes >> 20});
+                if (budget.low_headroom) gpu_messages << tr("Warning: %1 has little VRAM headroom. Other applications may cause allocation failure or reduced desktop responsiveness. Reduce contexts or use Automatic.").arg(name);
+            } else {
+                gpu_messages << tr("%1: %2 MiB total VRAM; free VRAM is unknown. Conservative limit: %3 manual contexts. %4 contexts selected: %5 MiB scratchpads + %6 MiB estimated overhead. Other applications may cause allocation failure.")
+                    .arg(name).arg(qulonglong{device->total_memory >> 20}).arg(budget.maximum_contexts).arg(budget.contexts)
+                    .arg(qulonglong{budget.scratchpad_bytes >> 20}).arg(qulonglong{budget.overhead_bytes >> 20});
+            }
+        }
     }
     m_gpu_status->setText(gpu_messages.join(QStringLiteral("\n")));
     QStringList device_rates{tr("CPU: %1 H/s (%2 hashes)").arg(stats.cpu_hashes_per_second, 0, 'f', 2).arg(qulonglong{stats.cpu_hashes})};
@@ -287,6 +332,7 @@ void MiningPage::updateStatus()
     else if (!running && stats.state != mining::MiningState::FAILED) {
         if (use_gpu && !gpu_available) status = tr("No selected compatible GPU is available. Choose CPU mining or refresh devices.");
         else if (!gpu_host_memory || (use_cpu && maximum == 0)) status = tr("Insufficient available memory for the selected CPU workers and GPU verifiers.");
+        else if (use_gpu && !gpu_context_memory) status = tr("Insufficient GPU memory for the selected contexts. Refresh devices or reduce the selection.");
         else if (syncing) status = tr("Waiting for initial block download to complete.");
         else status = tr("Ready. Mining starts only when you press Start Mining.");
     }
