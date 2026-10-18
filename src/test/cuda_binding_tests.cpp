@@ -14,7 +14,6 @@
 namespace serial_binding {
 #include <mining/mercahash_gpu.h>
 }
-#undef BITCOIN_MINING_MERCAHASH_GPU_H
 #undef MH_GLOBAL
 #undef MH_CONSTANT
 #undef MH_INLINE
