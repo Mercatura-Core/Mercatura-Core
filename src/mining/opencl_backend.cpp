@@ -195,7 +195,8 @@ class OpenClBackend final : public GpuBackend
             // Core OpenCL exposes total global memory, not universally free VRAM.
             // Budget conservatively and fail cleanly on allocation pressure.
             const auto budget{CalculateGpuBudget(Info<cl_ulong>(api, device, CL_DEVICE_GLOBAL_MEM_SIZE),
-                                                 Info<cl_ulong>(api, device, CL_DEVICE_MAX_MEM_ALLOC_SIZE), requested)};
+                                                 Info<cl_ulong>(api, device, CL_DEVICE_MAX_MEM_ALLOC_SIZE), requested,
+                                                 GpuMemorySource::OPENCL_TOTAL)};
             contexts = budget.contexts;
             memory_bytes = budget.scratchpad_bytes;
             if (!contexts)
@@ -357,7 +358,7 @@ GpuDiscovery DiscoverOpenClDevices()
                                   Info<cl_bool>(api, device, CL_DEVICE_AVAILABLE) &&
                                   Info<cl_bool>(api, device, CL_DEVICE_COMPILER_AVAILABLE) &&
                                   Text(api, device, CL_DEVICE_PROFILE) == "FULL_PROFILE" &&
-                                  CalculateGpuBudget(entry.total_memory, entry.max_allocation).contexts > 0;
+                                  CalculateGpuBudget(entry).contexts > 0;
                 if (!entry.supported)
                     entry.error =
                         "AMD device needs OpenCL 1.2 or later, 64-bit full-profile support, an available compiler and sufficient VRAM";

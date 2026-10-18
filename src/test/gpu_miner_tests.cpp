@@ -217,13 +217,51 @@ BOOST_AUTO_TEST_CASE(memory_budget_limits_and_overflow)
     BOOST_CHECK_EQUAL(CalculateGpuBudget(2ULL << 30, 1ULL << 30).contexts, 7U);
     BOOST_CHECK_EQUAL(CalculateGpuBudget(8ULL << 30, 8ULL << 30).contexts, 16U);
     BOOST_CHECK_EQUAL(CalculateGpuBudget(6ULL << 30, 6ULL << 30).contexts, 16U);
-    // The 36-context RTX 3050 benchmark must not relax production headroom.
-    BOOST_CHECK_THROW(CalculateGpuBudget(6ULL << 30, 6ULL << 30, 36), std::runtime_error);
+    // The hardware-specific benchmark is an explicit choice, never a default.
+    const auto manual{CalculateGpuBudget(6ULL << 30, 6ULL << 30, 36)};
+    BOOST_CHECK_EQUAL(manual.contexts, 36U);
+    BOOST_CHECK_EQUAL(manual.scratchpad_bytes, 4608ULL << 20);
+    BOOST_CHECK(manual.reserved_bytes >= (512ULL << 20));
+    BOOST_CHECK(manual.overhead_bytes > 36 * 240U);
+    BOOST_CHECK(manual.headroom_bytes >= manual.reserved_bytes);
+    BOOST_CHECK(!manual.low_headroom);
     BOOST_CHECK_EQUAL(CalculateGpuBudget(UINT64_MAX, UINT64_MAX).contexts, 16U);
     BOOST_CHECK_EQUAL(CalculateGpuBudget(UINT64_MAX, UINT64_MAX, 256).scratchpad_bytes, 32ULL << 30);
     BOOST_CHECK_THROW(CalculateGpuBudget(UINT64_MAX, UINT64_MAX, 257), std::runtime_error);
     BOOST_CHECK_THROW(CalculateGpuBudget(1ULL << 30, 1ULL << 30, UINT32_MAX), std::runtime_error);
     BOOST_CHECK_EQUAL(CalculateGpuBudget(4ULL << 30, 64ULL << 20).contexts, 0U);
+}
+BOOST_AUTO_TEST_CASE(manual_gpu_budget_boundaries_and_backend_reporting)
+{
+    using mining::CalculateGpuBudget;
+    using mining::GpuMemorySource;
+    constexpr uint64_t minimum{512ULL << 20}, overhead{64ULL << 20};
+    constexpr uint64_t per_context{(128ULL << 20) + 4096};
+    const uint64_t exact{minimum + overhead + 36 * per_context};
+    const auto tight{CalculateGpuBudget(exact, exact, 36)};
+    BOOST_CHECK_EQUAL(tight.headroom_bytes, minimum);
+    BOOST_CHECK(tight.low_headroom);
+    BOOST_CHECK_THROW(CalculateGpuBudget(exact - 1, exact, 36), std::runtime_error);
+    BOOST_CHECK_THROW(CalculateGpuBudget(5ULL << 30, 6ULL << 30, 36), std::runtime_error);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(12ULL << 30, 12ULL << 30, 72).contexts, 72U);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(24ULL << 30, 24ULL << 30, 128).contexts, 128U);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(80ULL << 30, 80ULL << 30).maximum_contexts, mining::MAX_GPU_CONTEXTS);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(24ULL << 30, 1ULL << 30).maximum_contexts, 8U);
+    BOOST_CHECK_THROW(CalculateGpuBudget(24ULL << 30, 1ULL << 30, 9), std::runtime_error);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(0, UINT64_MAX).maximum_contexts, 0U);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(UINT64_MAX, 0).maximum_contexts, 0U);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(minimum + overhead + per_context - 1, UINT64_MAX).maximum_contexts, 0U);
+    // OpenCL total memory must never be treated as measured free CUDA memory.
+    BOOST_CHECK_THROW(CalculateGpuBudget(6ULL << 30, 6ULL << 30, 36, GpuMemorySource::OPENCL_TOTAL), std::runtime_error);
+    mining::GpuDevice amd{mining::GpuVendor::AMD_OPENCL};
+    amd.total_memory = 6ULL << 30;
+    amd.available_memory = UINT64_MAX; // Irrelevant without a portable free-VRAM query.
+    amd.max_allocation = 6ULL << 30;
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(amd).maximum_contexts, 23U);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(amd, 23).reserved_bytes, 3ULL << 30);
+    amd.vendor = mining::GpuVendor::NVIDIA_CUDA;
+    amd.available_memory = 0;
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(amd).maximum_contexts, 0U); // No fallback to total VRAM.
 }
 BOOST_AUTO_TEST_CASE(mixed_devices_share_cpu_nonce_allocator_and_refresh)
 {

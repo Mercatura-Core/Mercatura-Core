@@ -39,6 +39,8 @@ class CudaBackend final : public GpuBackend
             Check(cudaGetDeviceProperties(&properties, device), "Read NVIDIA device properties");
             if (selected.name != properties.name)
                 throw std::runtime_error{"NVIDIA enumeration changed; refresh device selection"};
+            if (properties.major * 10 + properties.minor < MERCATURA_CUDA_MIN_ARCH)
+                throw std::runtime_error{"NVIDIA device no longer meets the required compute capability"};
             size_t available{0}, total{0};
             Check(cudaMemGetInfo(&available, &total), "Read NVIDIA free memory");
             const auto budget{CalculateGpuBudget(available, available, requested)};
@@ -53,6 +55,12 @@ class CudaBackend final : public GpuBackend
             Check(cudaMalloc(reinterpret_cast<void **>(&scratch), static_cast<size_t>(memory_bytes)),
                   "Allocate NVIDIA scratchpads");
             Check(cudaMalloc(reinterpret_cast<void **>(&outputs), contexts * size_t{32}), "Allocate NVIDIA outputs");
+            // Another process or runtime initialization may have consumed the
+            // previewed headroom. Validate the actual remaining free memory and
+            // unwind every allocation if the promised reserve was lost.
+            Check(cudaMemGetInfo(&available, &total), "Validate NVIDIA memory headroom");
+            if (available < budget.reserved_bytes)
+                throw std::runtime_error{"NVIDIA free VRAM fell below the required reserve; reduce contexts or free GPU memory"};
         } catch (...) {
             Cleanup();
             throw;

@@ -20,6 +20,8 @@ struct Launch { std::string name; unsigned grid, block, count, begin, end; };
 struct Runtime {
     std::map<const void*, std::string> kernels;
     std::set<void*> allocations;
+    std::map<void*, size_t> allocation_bytes;
+    size_t free_memory{8ULL << 30}, extra_usage{0};
     std::vector<Launch> launches;
     std::vector<std::function<void()>> copies;
     std::vector<size_t> synchronized_at;
@@ -36,6 +38,7 @@ struct Runtime {
         mallocs = transfers = syncs = 0;
         fail_malloc = fail_launch = fail_transfer = fail_sync = 0;
         freed_pending = false;
+        extra_usage = 0;
     }
 };
 Runtime& State() { static Runtime runtime; return runtime; }
@@ -106,7 +109,11 @@ cudaError_t CUDARTAPI cudaGetDeviceProperties(cudaDeviceProp* prop, int)
 }
 cudaError_t CUDARTAPI cudaMemGetInfo(size_t* available, size_t* total)
 {
-    *available = *total = 8ULL << 30; return cudaSuccess;
+    *total = 8ULL << 30;
+    *available = State().free_memory;
+    for (const auto& [pointer, bytes] : State().allocation_bytes) *available -= bytes;
+    if (!State().allocation_bytes.empty()) *available -= State().extra_usage;
+    return cudaSuccess;
 }
 const char* CUDARTAPI cudaGetErrorString(cudaError_t) { return "injected CUDA failure"; }
 cudaError_t CUDARTAPI cudaStreamCreateWithFlags(cudaStream_t* stream, unsigned)
@@ -121,14 +128,16 @@ cudaError_t CUDARTAPI cudaMalloc(void** pointer, size_t bytes)
 {
     auto& s{State()};
     if (++s.mallocs == s.fail_malloc) return cudaErrorMemoryAllocation;
-    *pointer = std::calloc(1, bytes);
+    // Kernels are never executed here: a scratchpad needs only a distinct token.
+    // Track its requested VRAM size without reserving gigabytes of host memory.
+    *pointer = std::calloc(1, bytes >= (128ULL << 20) ? 1 : bytes);
     if (!*pointer) return cudaErrorMemoryAllocation;
-    s.allocations.insert(*pointer); return cudaSuccess;
+    s.allocations.insert(*pointer); s.allocation_bytes[*pointer] = bytes; return cudaSuccess;
 }
 cudaError_t CUDARTAPI cudaFree(void* pointer)
 {
     auto& s{State()}; s.freed_pending |= s.pending != 0;
-    s.allocations.erase(pointer); std::free(pointer); return cudaSuccess;
+    s.allocations.erase(pointer); s.allocation_bytes.erase(pointer); std::free(pointer); return cudaSuccess;
 }
 cudaError_t CUDARTAPI cudaMemcpyAsync(void* dst, const void* src, size_t bytes, cudaMemcpyKind, cudaStream_t)
 {
@@ -165,6 +174,30 @@ int main()
         const auto discovery{mining::DiscoverCudaDevices()};
         Require(discovery.devices.size() == 1 && discovery.devices[0].supported, "Fake CUDA discovery failed");
         const auto device{discovery.devices[0]};
+        state.free_memory = 6ULL << 30;
+        {
+            auto automatic{mining::CreateCudaBackend(device, 0)};
+            Require(automatic->Contexts() == 16, "Automatic allocation lost its conservative cap");
+        }
+        {
+            auto manual{mining::CreateCudaBackend(device, 36)};
+            Require(manual->Contexts() == 36 && manual->MemoryBytes() == (4608ULL << 20), "Explicit 36-context allocation failed");
+        }
+        // Discovery's old 8 GiB snapshot must not authorize a now-unsafe count.
+        state.Reset(); state.free_memory = 5ULL << 30;
+        ExpectFailure([&] { mining::CreateCudaBackend(device, 36); });
+        Require(state.mallocs == 0 && state.streams == 0, "Stale memory budget allocated buffers");
+        // Simulate another application taking VRAM after the preflight query.
+        state.Reset(); state.free_memory = 5200ULL << 20; state.extra_usage = 512ULL << 20;
+        ExpectFailure([&] { mining::CreateCudaBackend(device, 36); });
+        Require(state.allocations.empty() && state.streams == 0, "Lost headroom leaked allocations");
+        state.Reset(); state.free_memory = 6ULL << 30;
+        for (unsigned fail{1}; fail <= 4; ++fail) {
+            state.Reset(); state.fail_malloc = fail;
+            ExpectFailure([&] { mining::CreateCudaBackend(device, 36); });
+            Require(state.allocations.empty() && state.streams == 0, "Advanced manual allocation failure leaked resources");
+        }
+        state.Reset(); state.free_memory = 8ULL << 30;
         std::vector<mining::GpuHeader> full(2), partial(1);
         {
             auto backend{mining::CreateCudaBackend(device, 2)};

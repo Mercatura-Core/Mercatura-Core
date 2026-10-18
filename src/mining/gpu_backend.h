@@ -12,6 +12,10 @@
 namespace mining
 {
 enum class GpuVendor { NVIDIA_CUDA, AMD_OPENCL };
+enum class GpuMemorySource { CUDA_FREE, OPENCL_TOTAL };
+// The current miner assigns nonce ranges of 256. This is a backend/scheduler
+// bound, not a hardware-specific tuning recommendation.
+inline constexpr unsigned int MAX_GPU_CONTEXTS{256};
 struct GpuDevice {
     GpuDevice() = default;
     explicit GpuDevice(GpuVendor value) : vendor{value} {}
@@ -35,15 +39,22 @@ struct GpuConfig {
     bool gpu{false};
     // Empty selects all supported devices. IDs are namespaced by backend.
     std::vector<std::string> devices;
-    unsigned int contexts{0}; // 0: conservative automatic budget.
+    unsigned int contexts{0}; // 0: conservative automatic; positive: explicit advanced manual selection.
     unsigned int yield_ms{10};
 };
 struct GpuMemoryBudget {
     unsigned int contexts{0};
     uint64_t scratchpad_bytes{0};
     uint64_t reserved_bytes{0};
+    uint64_t overhead_bytes{0};
+    uint64_t headroom_bytes{0}; // CUDA: estimated remaining free memory; OpenCL: unallocated total, NOT free VRAM.
+    unsigned int maximum_contexts{0}; // Maximum explicit manual count, before allocating.
+    bool low_headroom{false};
 };
-GpuMemoryBudget CalculateGpuBudget(uint64_t available, uint64_t maximum_allocation, unsigned int requested = 0);
+GpuMemoryBudget CalculateGpuBudget(uint64_t memory, uint64_t maximum_allocation, unsigned int requested = 0,
+                                   GpuMemorySource source = GpuMemorySource::CUDA_FREE);
+// Preview only: discovery can become stale. Backends re-query before allocation.
+GpuMemoryBudget CalculateGpuBudget(const GpuDevice& device, unsigned int requested = 0);
 using GpuHeader = std::array<unsigned char, 80>;
 using GpuHash = std::array<unsigned char, 32>;
 class GpuBackend
