@@ -43,32 +43,36 @@ and asserts 2,097,152 lines. Its frozen `V1_MIX_STEPS` is 131,072;
 whose loop runs from 1 through the supplied count. The larger number describes
 scratchpad lines and fill iterations, not V1 mixing steps or total memory accesses.
 
-`mercahash_gpu.h` contains the actual device arithmetic compiled by CUDA and
-embedded into the OpenCL program. Its C++ execution path exists only for
-permanent arithmetic tests; neither production GPU backend invokes that path.
-Both production backends allocate device memory and launch real device kernels.
+`mercahash_gpu.h` supplies the AMD OpenCL arithmetic and portable C++ tests.
+NVIDIA includes the separately imported `mercahash_gpu_specialized.h`; CMake
+continues to embed only the original shared header for AMD. The specialized
+header preserves the validated device arithmetic; only its include guard is
+renamed for the repository. See
+[CUDA integration and qualification](mining/CUDA-WALLET-INTEGRATION.md) for
+source checksums, the exact port adjustments, tests and hardware requirements.
+Neither production backend delegates hashing to the C++ test execution path.
 
-Each context owns sixteen state lanes and a contiguous, private scratchpad.
-CUDA launches one full warp in a separate block per context; OpenCL launches an
-eight-item workgroup per context. Eight lanes cooperatively store each complete
-64-byte line. A CUDA warp memory barrier / OpenCL global-memory barrier before
-each store lets every lane finish reading the old line before mutation; a second
-barrier after the store publishes the complete line for subsequent reads.
-Private state is replicated across lanes
-to preserve the exact serial recurrence; only the leader persists state and
-outputs. Initialization/finalization execute on the leader. Separate groups can
-run on separate multiprocessors even at conservative context counts, rather than
-packing every context into one CUDA block. Partitioning state/ARX arithmetic
-across lanes remains a performance optimization to evaluate after hardware
-correctness. This is a correctness baseline with no claimed performance or power
-figures. Group barriers and real compiler execution require device parity tests.
+Each context owns sixteen state lanes and a contiguous private 128 MiB scratchpad.
+CUDA uses one thread per context during fill, then a full 32-thread warp per
+context for binding and mixing. Binding distributes each block's 64 lines across
+the warp and combines lane accumulators with XOR shuffles. Mixing retains the
+read-before-write and write-publication warp barriers. AMD retains its existing
+eight-item workgroups and cooperative stores, with barriers before and after
+each complete line mutation. Initialization/finalization execute on the leader.
 
-A hash is split into initialization, chunks of 4,096 fill lines, 64 binding
-blocks, 1,024 mixing steps, and finalization. Cancellation and driver errors are
-checked between synchronized launches. Chunk splitting preserves the exact
-algorithm; no shortened workloads are exposed to mining callers. A driver call
-itself cannot be forcibly interrupted safely. Kernel duration, watchdog behavior,
-sustained responsiveness and driver-reset behavior require hardware qualification.
+CUDA fill launches cover 16,384 lines and synchronize every 32 kernels; binding
+launches cover 64 blocks and synchronize every 32 kernels; mixing launches cover
+1,024 steps and synchronize every 16 kernels. Dependencies remain ordered on
+one nonblocking stream. Cancellation is checked before queued kernels and after
+synchronized groups. Cancellation and exceptions drain outstanding work before
+host buffers expire or device buffers are reused/freed. Default CUDA cache
+behavior is preserved. AMD retains 4,096-line fill chunks and its existing
+per-launch synchronization. No MercaHash workload is shortened.
+
+A driver call itself cannot be forcibly interrupted safely. Kernel duration,
+watchdog behavior, sustained responsiveness and driver-reset behavior require
+hardware qualification. The developer's measured benchmark performance is not
+an integrated-wallet performance claim.
 
 Only 80-byte public headers and resulting 32-byte hashes cross the device
 boundary. Scratchpads stay on the device. The host prefilters all returned hashes
@@ -172,7 +176,13 @@ thread model and rejects writes before every lane can read the old line. It
 protects the pre-store barrier regression; it does not execute a GPU memory model.
 `gpu_miner_tests` use explicitly simulated devices to exercise scheduling,
 selection, budgets, cancellation, faults and authoritative candidate rejection.
-They provide no evidence of actual GPU execution.
+They provide no evidence of actual GPU execution. `cuda_binding_tests` models
+the imported fill and warp binding against the original portable arithmetic.
+With CUDA enabled on Linux, `test_cuda_backend_host` links the real backend host
+object to a fake runtime and checks all cancellation checkpoints, launch geometry,
+full/partial batches, injected errors and cleanup without running a GPU. The
+wallet GPU-controller acceptance test also uses an explicitly CPU-backed device
+test double; it validates native PQ block submission, not hardware hashing.
 
 Every production device runs all four frozen vectors across its context slots
 before it can mine. A mismatch disables the device. `mercatura-gpu-check` is a
@@ -186,7 +196,12 @@ work/build-gpu/bin/mercatura-gpu-check opencl:0 test/data/mercahash-gpu-headers.
 
 Exit 77 on a device-free listing is an explicit skip, not successful hardware
 validation. The optional file contains one canonical 80-byte header per line,
-encoded as 160 hexadecimal characters; each is compared against `HashV1`.
+encoded as 160 hexadecimal characters. The checker always generates six varied
+batches adapted to the safe context count and compares every output independently
+against Core `HashV1` across three repetitions. File inputs are also checked in
+full batches and a final partial batch. Optional `--contexts N` requests a count
+within the unchanged production budget, and `--repetitions N` controls repeated
+checks. A request for 36 on a 6 GB card is expected to exceed that budget.
 
 Before either vendor is release-ready, execute parity on each intended device,
 then Solo and mixed CPU/NVIDIA/AMD mining, concurrent multi-device work,
