@@ -1,0 +1,168 @@
+name: Mercatura standalone CUDA benchmark
+on:
+  workflow_dispatch:
+  push:
+    branches: [gpu-benchmark]
+  pull_request:
+    paths: ['src/bench/mercahash_gpu_bench*', 'src/mining/**', 'src/test/gpu_bench_tests.cpp', 'contrib/gpu-benchmark/**', 'doc/mining/GPU-BENCHMARK.md', '.github/workflows/mercatura-gpu-benchmark.yml']
+permissions:
+  contents: read
+concurrency:
+  group: gpu-benchmark-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - name: Dependencies and controlled CUDA 12.8.1 redistributables
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential cmake ninja-build libboost-dev libevent-dev python3
+          python3 contrib/gpu-benchmark/install-cuda.py "$PWD/work/cuda-toolkit"
+      - name: Configure standalone benchmark without Qt or wallet
+        run: |
+          cmake -S . -B work/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCUDAToolkit_ROOT="$PWD/work/cuda-toolkit" -DCMAKE_CUDA_COMPILER="$PWD/work/cuda-toolkit/bin/nvcc" \
+            -DCMAKE_CUDA_ARCHITECTURES='75-real;75-virtual;86-real' \
+            -DWITH_CUDA_MINING=ON -DBUILD_GPU_BENCH=ON -DBUILD_TESTS=ON \
+            -DBUILD_GUI=OFF -DENABLE_WALLET=OFF -DENABLE_IPC=OFF -DWITH_ZMQ=OFF \
+            -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
+          cmake --build work/build --parallel 4 --target mercatura-gpu-bench gpu-bench-tests test_bitcoin
+      - name: Software correctness and CLI checks
+        run: |
+          work/build/bin/gpu-bench-tests
+          work/build/bin/test_bitcoin --run_test=crypto_tests/mercahash_v1_vectors,mercahash_gpu_tests,mercahash_gpu_sync_tests,gpu_miner_tests
+          work/build/bin/mercatura-gpu-bench --help
+          set +e
+          work/build/bin/mercatura-gpu-bench --contexts 257 --json > work/invalid.json
+          result=$?
+          set -e
+          test "$result" -eq 1
+          python3 -c 'import json; assert json.load(open("work/invalid.json"))["status"] == "error"'
+          set +e
+          work/build/bin/mercatura-gpu-bench --list --json > work/devices.json
+          result=$?
+          set -e
+          if [ "$result" -eq 77 ]; then
+            echo 'Real-GPU parity/performance SKIPPED: no usable NVIDIA GPU.' >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$result" -eq 0 ]; then
+            work/build/bin/mercatura-gpu-bench --duration 1 --warmup 0 --json > work/hardware-smoke.json
+            echo 'Limited real-device parity/smoke run passed; no sustained performance qualification.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            exit "$result"
+          fi
+          git diff --check
+      - name: Package standalone Linux executable and notices
+        run: |
+          package=work/package/Mercatura-GPU-Benchmark
+          mkdir -p "$package/benchmark-results" "$package/notices/CUDA"
+          cp work/build/bin/mercatura-gpu-bench "$package/"
+          cp contrib/gpu-benchmark/README.txt "$package/README.txt"
+          cp doc/mining/GPU-BENCHMARK.md "$package/"
+          cp COPYING "$package/notices/Mercatura-COPYING.txt"
+          cp contrib/gpu-benchmark/THIRD-PARTY-NOTICES.txt "$package/notices/THIRD-PARTY-NOTICES.txt"
+          cp -R work/cuda-toolkit/redistributable-notices/. "$package/notices/CUDA/"
+          printf 'Save benchmark JSON results here.\n' > "$package/benchmark-results/README.txt"
+          ldd "$package/mercatura-gpu-bench" | tee "$package/runtime-dependencies.txt"
+          # The standalone binary should require only OS C/C++/math/loader libraries.
+          python3 - <<'PY'
+          import pathlib, re
+          text = pathlib.Path('work/package/Mercatura-GPU-Benchmark/runtime-dependencies.txt').read_text()
+          allowed = {'libstdc++.so.6', 'libgcc_s.so.1', 'libm.so.6', 'libc.so.6', 'libdl.so.2', 'libpthread.so.0', 'librt.so.1'}
+          for dependency in re.findall(r'^\s*(\S+)\s+=>', text, re.M):
+              assert dependency in allowed and 'not found' not in text, dependency
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mercatura-gpu-bench-linux-x64
+          path: work/package/
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install supported MSVC 14.40 toolset and controlled CUDA 12.8.1
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vswhere.exe" -latest -products '*' -property installationPath
+          $installer = "${env:ProgramFiles(x86)}/Microsoft Visual Studio/Installer/vs_installer.exe"
+          $process = Start-Process $installer -Wait -PassThru -ArgumentList @('modify', '--installPath', "`"$vs`"", '--add', 'Microsoft.VisualStudio.Component.VC.14.40.17.10.x86.x64', '--quiet', '--norestart')
+          if ($process.ExitCode -notin @(0, 3010)) { throw "MSVC installation failed: $($process.ExitCode)" }
+          python contrib/gpu-benchmark/install-cuda.py work/cuda-toolkit
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+          toolset: '14.40'
+      - name: Configure static standalone benchmark without Qt or wallet
+        run: |
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
+          $cuda = (Resolve-Path work/cuda-toolkit).Path
+          cmake -S . -B work/build -G Ninja -DCMAKE_BUILD_TYPE=Release `
+            "-DCMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON `
+            -DVCPKG_MANIFEST_FEATURES=tests -DVCPKG_INSTALL_OPTIONS=--clean-after-build `
+            "-DCUDAToolkit_ROOT=$cuda" "-DCMAKE_CUDA_COMPILER=$cuda/bin/nvcc.exe" `
+            '-DCMAKE_CUDA_ARCHITECTURES=75-real;75-virtual;86-real' `
+            -DWITH_CUDA_MINING=ON -DBUILD_GPU_BENCH=ON -DBUILD_TESTS=ON `
+            -DBUILD_GUI=OFF -DENABLE_WALLET=OFF -DENABLE_IPC=OFF -DWITH_ZMQ=OFF `
+            -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --build work/build --parallel 4 --target mercatura-gpu-bench gpu-bench-tests test_bitcoin
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Software correctness and no-device checks
+        run: |
+          & work/build/bin/gpu-bench-tests.exe
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & work/build/bin/test_bitcoin.exe --run_test=crypto_tests/mercahash_v1_vectors,mercahash_gpu_tests,mercahash_gpu_sync_tests,gpu_miner_tests
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & work/build/bin/mercatura-gpu-bench.exe --help
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & work/build/bin/mercatura-gpu-bench.exe --contexts 257 --json > work/invalid.json
+          if ($LASTEXITCODE -ne 1) { throw 'Expected invalid-argument error' }
+          if ((Get-Content work/invalid.json -Raw | ConvertFrom-Json).status -ne 'error') { throw 'Invalid JSON error' }
+          & work/build/bin/mercatura-gpu-bench.exe --list --json > work/devices.json
+          if ($LASTEXITCODE -eq 77) {
+            'Real-GPU parity/performance SKIPPED: no usable NVIDIA GPU.' >> $env:GITHUB_STEP_SUMMARY
+          } elseif ($LASTEXITCODE -eq 0) {
+            & work/build/bin/mercatura-gpu-bench.exe --duration 1 --warmup 0 --json > work/hardware-smoke.json
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+            'Limited real-device parity/smoke run passed; no sustained performance qualification.' >> $env:GITHUB_STEP_SUMMARY
+          } else { exit $LASTEXITCODE }
+          git diff --check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          exit 0
+      - name: Package Windows executable, static runtime and notices
+        run: |
+          $package = 'work/package/Mercatura-GPU-Benchmark'
+          New-Item -ItemType Directory -Force "$package/benchmark-results", "$package/notices/CUDA", "$package/notices/dependencies" | Out-Null
+          Copy-Item work/build/bin/mercatura-gpu-bench.exe "$package/"
+          Copy-Item contrib/gpu-benchmark/README.txt "$package/README.txt"
+          Copy-Item doc/mining/GPU-BENCHMARK.md "$package/"
+          Copy-Item COPYING "$package/notices/Mercatura-COPYING.txt"
+          Copy-Item contrib/gpu-benchmark/THIRD-PARTY-NOTICES.txt "$package/notices/THIRD-PARTY-NOTICES.txt"
+          Copy-Item work/cuda-toolkit/redistributable-notices/* "$package/notices/CUDA/" -Recurse
+          Get-ChildItem work/build/vcpkg_installed/x64-windows-static/share/*/copyright | ForEach-Object {
+            Copy-Item $_.FullName "$package/notices/dependencies/$($_.Directory.Name)-copyright.txt"
+          }
+          'Save benchmark JSON results here.' | Set-Content "$package/benchmark-results/README.txt"
+          $imports = & dumpbin /DEPENDENTS "$package/mercatura-gpu-bench.exe"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $imports | Set-Content "$package/runtime-dependencies.txt"
+          $dlls = [regex]::Matches(($imports -join "`n"), '(?im)^\s+([a-z0-9_.-]+\.dll)\s*$')
+          foreach ($dll in $dlls) {
+            if ($dll.Groups[1].Value -notmatch '^(KERNEL32|ADVAPI32|USER32|SHELL32|OLE32|WS2_32|BCRYPT|NVCUDA|NTDLL|api-ms-win-.*)\.dll$') {
+              throw "Unexpected non-system DLL dependency: $($dll.Groups[1].Value). Package it and its license explicitly."
+            }
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mercatura-gpu-bench-windows-x64
+          path: work/package/
+          if-no-files-found: error
