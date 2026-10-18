@@ -117,8 +117,13 @@ BOOST_AUTO_TEST_CASE(imported_fill_and_warp_binding_match_portable_baseline)
         cuda_binding::Warp warp;
         std::latch start{1};
         bool launch{false};
-        std::vector<std::jthread> threads;
+        std::vector<std::thread> threads;
         threads.reserve(cuda_binding::LANES);
+        auto join_threads = [&] {
+            for (auto& thread : threads) {
+                if (thread.joinable()) thread.join();
+            }
+        };
         try {
             for (unsigned lane{0}; lane < cuda_binding::LANES; ++lane) {
                 threads.emplace_back([&, lane] {
@@ -137,11 +142,12 @@ BOOST_AUTO_TEST_CASE(imported_fill_and_warp_binding_match_portable_baseline)
             }
         } catch (...) {
             start.count_down(); // Release any threads created before the failure.
+            join_threads();
             throw;
         }
         launch = true;
         start.count_down();
-        threads.clear(); // Join before comparing any scratchpad or state words.
+        join_threads(); // Join before comparing any scratchpad or state words.
         BOOST_CHECK(actual_states == expected_states);
         BOOST_CHECK(actual == expected);
         BOOST_CHECK_EQUAL(actual.front(), guard);
