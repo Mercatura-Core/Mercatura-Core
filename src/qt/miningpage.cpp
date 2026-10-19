@@ -360,10 +360,10 @@ QString MiningPage::formatGpuContexts(const mining::GpuStats& device)
 {
     if (!device.memory_bytes) return tr("No contexts active");
     const auto mode{device.automatic ? tr("Automatic") : tr("Manual")};
-    auto result{tr("%1: %2 contexts active").arg(mode).arg(device.contexts)};
     if (device.automatic && device.estimated_contexts > device.contexts)
-        result += tr(" (%1 estimated; adjusted for available VRAM)").arg(device.estimated_contexts);
-    return result;
+        return tr("%1: %2 contexts active (%3 estimated; adjusted for available VRAM)")
+            .arg(mode).arg(device.contexts).arg(device.estimated_contexts);
+    return tr("%1: %2 contexts active").arg(mode).arg(device.contexts);
 }
 
 QString MiningPage::formatRuntime(uint64_t seconds)
