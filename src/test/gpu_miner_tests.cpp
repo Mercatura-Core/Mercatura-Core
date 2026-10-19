@@ -327,6 +327,25 @@ BOOST_AUTO_TEST_CASE(automatic_allocation_search_cleanup_and_errors)
         }
     }
 }
+BOOST_AUTO_TEST_CASE(allocation_cleanup_error_aborts_fallback)
+{
+    for (const bool allocation_failed : {false, true}) {
+        unsigned int attempts{0}, cleanups{0};
+        auto budget = [] { mining::GpuMemoryBudget result; result.contexts = 43; return result; };
+        // First fail forces a smaller probe; that probe succeeds unless the
+        // allocation itself fails again. Neither cleanup error may be retried.
+        auto allocate = [&](unsigned int, const auto&) {
+            ++attempts;
+            if (attempts == 1 || allocation_failed) throw mining::GpuMemoryAllocationError{"out of VRAM"};
+        };
+        auto cleanup = [&] {
+            if (++cleanups == 2) throw std::runtime_error{"driver failed to release buffers"};
+        };
+        BOOST_CHECK_THROW(mining::AllocateGpuContexts(0, budget, allocate, cleanup, {}), std::runtime_error);
+        BOOST_CHECK_EQUAL(attempts, 2U);
+        BOOST_CHECK_EQUAL(cleanups, 2U);
+    }
+}
 BOOST_AUTO_TEST_CASE(allocation_fallback_cancellation_shutdown_and_fresh_budget)
 {
     for (const bool stop_after_success : {false, true}) {

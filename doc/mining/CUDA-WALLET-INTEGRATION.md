@@ -9,7 +9,8 @@ The final feature update adds bounded Automatic allocation fallback and actual
 per-device context reporting. Only explicit device-buffer memory exhaustion or
 loss of CUDA's required reserve permits retry; Manual never reduces its selected
 count. Each probe releases all mining buffers and rechecks the unchanged memory
-policy. A binary search is bounded to 20 attempts at the unchanged 256-context
+policy. Driver errors during retry cleanup abort fallback; final teardown remains
+non-throwing and attempts any failed releases again. A binary search is bounded to 20 attempts at the unchanged 256-context
 scheduler limit, including revalidation when available memory changes. Cancellation
 and shutdown abort retries. Initialized streams/programs are reused; no mining
 starts until the retained allocation passes the existing independent verification.

@@ -66,7 +66,7 @@ class CudaBackend final : public GpuBackend
                 Check(cudaMemGetInfo(&available, &total), "Validate NVIDIA memory headroom");
                 if (available < budget.reserved_bytes)
                     throw GpuMemoryAllocationError{"NVIDIA free VRAM fell below the required reserve"};
-            }, [&] { CleanupBuffers(); }, cancelled)};
+            }, [&] { CleanupBuffers(true); }, cancelled)};
             estimated = allocation.estimated;
         } catch (...) {
             Cleanup();
@@ -185,23 +185,22 @@ class CudaBackend final : public GpuBackend
     }
 
   private:
-    void CleanupBuffers()
+    void CleanupBuffers(bool checked = false)
     {
-        // Never reset a device: other mining workers or desktop applications may
-        // own independent contexts. Ignore teardown errors after device loss.
-        cudaSetDevice(device);
-        if (stream)
-            cudaStreamSynchronize(stream);
-        if (headers)
-            cudaFree(headers);
-        if (states)
-            cudaFree(states);
-        if (scratch)
-            cudaFree(scratch);
-        if (outputs)
-            cudaFree(outputs);
-        headers = outputs = nullptr;
-        states = scratch = nullptr;
+        // Never reset a device: other workers/applications may own contexts.
+        // Retry cleanup checks errors; final teardown remains non-throwing.
+        auto failure{cudaSetDevice(device)};
+        auto record = [&](cudaError_t error) { if (failure == cudaSuccess) failure = error; };
+        if (stream) record(cudaStreamSynchronize(stream));
+        auto release = [&](auto& buffer) {
+            if (!buffer) return;
+            const auto error{cudaFree(buffer)};
+            record(error);
+            // Retain a failed release for the constructor's final cleanup.
+            if (error == cudaSuccess || !checked) buffer = nullptr;
+        };
+        release(headers); release(states); release(scratch); release(outputs);
+        if (checked) Check(failure, "Clean up NVIDIA allocation attempt");
     }
     void Cleanup()
     {

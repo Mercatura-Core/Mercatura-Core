@@ -115,7 +115,8 @@ Automatic first attempts that maximum. Explicit device-buffer memory exhaustion
 or loss of the required CUDA reserve triggers a bounded binary search for the
 highest allocatable smaller count (at most 20 attempts with the current scheduler).
 Every probe releases all mining buffers before the next budget query; the retained
-allocation is freshly checked. Stop and shutdown cancel between attempts. If even
+allocation is freshly checked. A driver error during cleanup stops fallback;
+final teardown attempts any failed releases again. Stop and shutdown cancel between attempts. If even
 one context cannot fit, or memory keeps changing beyond the retry bound, the device
 fails cleanly. Manual makes one attempt at the exact requested count and never
 silently reduces it. Driver, kernel, build and hash-verification errors do not

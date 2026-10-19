@@ -30,7 +30,7 @@ struct Runtime {
     void* stream{nullptr};
     unsigned pending{0}, streams{0}, mallocs{0}, transfers{0}, syncs{0};
     unsigned fail_malloc{0}, fail_launch{0}, fail_transfer{0}, fail_sync{0};
-    unsigned max_contexts{256}, header_attempts{0};
+    unsigned max_contexts{256}, header_attempts{0}, frees{0}, fail_free{0};
     cudaError_t allocation_error{cudaErrorMemoryAllocation};
     bool dirty_retry{false};
     std::function<void()> on_allocation;
@@ -41,7 +41,7 @@ struct Runtime {
         launches.clear(); copies.clear(); synchronized_at.clear();
         mallocs = transfers = syncs = 0;
         fail_malloc = fail_launch = fail_transfer = fail_sync = 0;
-        max_contexts = 256; header_attempts = 0;
+        max_contexts = 256; header_attempts = frees = fail_free = 0;
         allocation_error = cudaErrorMemoryAllocation;
         dirty_retry = false; on_allocation = {};
         freed_pending = false;
@@ -153,6 +153,7 @@ cudaError_t CUDARTAPI cudaMalloc(void** pointer, size_t bytes)
 cudaError_t CUDARTAPI cudaFree(void* pointer)
 {
     auto& s{State()}; s.freed_pending |= s.pending != 0;
+    if (++s.frees == s.fail_free) return cudaErrorInvalidValue;
     s.allocations.erase(pointer); s.allocation_bytes.erase(pointer); std::free(pointer); return cudaSuccess;
 }
 cudaError_t CUDARTAPI cudaMemcpyAsync(void* dst, const void* src, size_t bytes, cudaMemcpyKind, cudaStream_t)
@@ -238,6 +239,14 @@ int main()
         state.Reset(); state.max_contexts = 39; state.allocation_error = cudaErrorInvalidValue;
         ExpectFailure([&] { mining::CreateCudaBackend(device, 0); });
         Require(state.header_attempts == 1 && state.allocations.empty(), "Unrelated CUDA error triggered fallback");
+        for (const bool release_error : {false, true}) {
+            state.Reset(); state.max_contexts = 39;
+            if (release_error) state.fail_free = 1;
+            else state.fail_sync = 1;
+            ExpectFailure([&] { mining::CreateCudaBackend(device, 0); });
+            Require(state.header_attempts == 1, "CUDA cleanup driver error triggered allocation retries");
+            Require(state.allocations.empty() && state.streams == 0, "Final cleanup did not release a failed probe");
+        }
         state.Reset(); state.max_contexts = 39;
         bool stopping{false};
         state.on_allocation = [&] { stopping = true; };

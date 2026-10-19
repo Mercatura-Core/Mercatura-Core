@@ -68,6 +68,7 @@ struct GpuContextAllocation {
 };
 // Budget is queried with no mining buffers live. Cleanup must release every
 // buffer, including partial attempts; initialized runtime objects may be reused.
+// A cleanup error aborts the search, even after a recoverable allocation error.
 GpuContextAllocation AllocateGpuContexts(unsigned int requested,
     const std::function<GpuMemoryBudget()>& budget,
     const std::function<void(unsigned int, const GpuMemoryBudget&)>& allocate,

@@ -236,7 +236,7 @@ class OpenClBackend final : public GpuBackend
                 allocate(states, contexts * size_t{128});
                 allocate(scratch, static_cast<size_t>(memory_bytes));
                 allocate(outputs, contexts * size_t{32});
-            }, [&] { CleanupBuffers(); }, cancelled)};
+            }, [&] { CleanupBuffers(true); }, cancelled)};
             estimated = allocation.estimated;
         } catch (...) {
             Cleanup();
@@ -316,14 +316,16 @@ class OpenClBackend final : public GpuBackend
     }
 
   private:
-    void CleanupBuffers()
+    void CleanupBuffers(bool checked = false)
     {
-        if (queue)
-            api.clFinish(queue);
-        for (auto buffer : {headers, states, scratch, outputs})
-            if (buffer)
-                api.clReleaseMemObject(buffer);
-        headers = states = scratch = outputs = nullptr;
+        cl_int failure{queue ? api.clFinish(queue) : CL_SUCCESS};
+        for (auto buffer : {&headers, &states, &scratch, &outputs}) {
+            if (!*buffer) continue;
+            const auto error{api.clReleaseMemObject(*buffer)};
+            if (failure == CL_SUCCESS) failure = error;
+            if (error == CL_SUCCESS || !checked) *buffer = nullptr;
+        }
+        if (checked) Check(failure, "Clean up OpenCL allocation attempt");
     }
     void Cleanup()
     {
