@@ -39,7 +39,7 @@ struct GpuConfig {
     bool gpu{false};
     // Empty selects all supported devices. IDs are namespaced by backend.
     std::vector<std::string> devices;
-    unsigned int contexts{0}; // 0: conservative automatic; positive: explicit advanced manual selection.
+    unsigned int contexts{0}; // 0: each device's maximum safe budget; positive: manual reduction.
     unsigned int yield_ms{10};
 };
 struct GpuMemoryBudget {
@@ -48,8 +48,9 @@ struct GpuMemoryBudget {
     uint64_t reserved_bytes{0};
     uint64_t overhead_bytes{0};
     uint64_t headroom_bytes{0}; // CUDA: estimated remaining free memory; OpenCL: unallocated total, NOT free VRAM.
-    unsigned int maximum_contexts{0}; // Maximum explicit manual count, before allocating.
+    unsigned int maximum_contexts{0}; // Maximum automatic/manual count, before allocating.
     bool low_headroom{false};
+    bool scheduler_limited{false}; // More would fit by memory, but nonce leases currently contain 256 nonces.
 };
 GpuMemoryBudget CalculateGpuBudget(uint64_t memory, uint64_t maximum_allocation, unsigned int requested = 0,
                                    GpuMemorySource source = GpuMemorySource::CUDA_FREE);

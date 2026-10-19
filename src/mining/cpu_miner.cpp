@@ -19,6 +19,7 @@
 namespace mining {
 namespace {
 constexpr uint64_t NONCE_CHUNK{256};
+static_assert(MAX_GPU_CONTEXTS == NONCE_CHUNK, "GPU capacity changes require a nonce scheduling review");
 constexpr auto JOB_LIFETIME{std::chrono::seconds{30}};
 uint64_t TotalHashes(const MiningStats& stats)
 {
@@ -399,7 +400,7 @@ void MiningController::GpuWorker(size_t index, GpuConfig hardware)
         GpuDevice device;
         { std::lock_guard lock{m_mutex}; device = m_stats.devices[index].device; }
         auto backend{m_create_backend(device, hardware.contexts)};
-        if (!backend || backend->Contexts() == 0 || backend->Contexts() > 256) throw std::runtime_error{"Invalid GPU hashing context count"};
+        if (!backend || backend->Contexts() == 0 || backend->Contexts() > MAX_GPU_CONTEXTS) throw std::runtime_error{"Invalid GPU hashing context count"};
         {
             std::lock_guard lock{m_mutex};
             auto& stats{m_stats.devices[index]};

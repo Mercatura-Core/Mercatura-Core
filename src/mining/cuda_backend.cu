@@ -41,6 +41,9 @@ class CudaBackend final : public GpuBackend
                 throw std::runtime_error{"NVIDIA enumeration changed; refresh device selection"};
             if (properties.major * 10 + properties.minor < MERCATURA_CUDA_MIN_ARCH)
                 throw std::runtime_error{"NVIDIA device no longer meets the required compute capability"};
+            // Initialize the stream first, then budget from a fresh query
+            // immediately before allocating the mining buffers.
+            Check(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking), "Create NVIDIA mining stream");
             size_t available{0}, total{0};
             Check(cudaMemGetInfo(&available, &total), "Read NVIDIA free memory");
             const auto budget{CalculateGpuBudget(available, available, requested)};
@@ -49,7 +52,6 @@ class CudaBackend final : public GpuBackend
             if (!contexts)
                 throw std::runtime_error{
                     "NVIDIA GPU has insufficient available memory for a safe MercaHash scratchpad"};
-            Check(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking), "Create NVIDIA mining stream");
             Check(cudaMalloc(reinterpret_cast<void **>(&headers), contexts * size_t{80}), "Allocate NVIDIA headers");
             Check(cudaMalloc(reinterpret_cast<void **>(&states), contexts * size_t{128}), "Allocate NVIDIA states");
             Check(cudaMalloc(reinterpret_cast<void **>(&scratch), static_cast<size_t>(memory_bytes)),

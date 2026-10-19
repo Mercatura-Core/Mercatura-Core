@@ -87,19 +87,20 @@ class MockBackend : public mining::GpuBackend
     std::shared_ptr<State> state;
     bool failing;
     bool delay_solo_batch;
+    unsigned int context_count;
 
   public:
-    MockBackend(std::shared_ptr<State> value, bool fail, bool delay = false)
-        : state{std::move(value)}, failing{fail}, delay_solo_batch{delay}
+    MockBackend(std::shared_ptr<State> value, bool fail, bool delay = false, unsigned int contexts = 2)
+        : state{std::move(value)}, failing{fail}, delay_solo_batch{delay}, context_count{contexts}
     {
     }
     unsigned int Contexts() const override
     {
-        return 2;
+        return context_count;
     }
     uint64_t MemoryBytes() const override
     {
-        return 256ULL << 20;
+        return context_count * (128ULL << 20);
     }
     std::vector<mining::GpuHash> Hash(std::span<const mining::GpuHeader> headers,
                                       const std::function<bool()> &cancelled) override
@@ -214,10 +215,10 @@ BOOST_AUTO_TEST_CASE(memory_budget_limits_and_overflow)
 {
     using mining::CalculateGpuBudget;
     BOOST_CHECK_EQUAL(CalculateGpuBudget(512ULL << 20, 512ULL << 20).contexts, 0U);
-    BOOST_CHECK_EQUAL(CalculateGpuBudget(2ULL << 30, 1ULL << 30).contexts, 7U);
-    BOOST_CHECK_EQUAL(CalculateGpuBudget(8ULL << 30, 8ULL << 30).contexts, 16U);
-    BOOST_CHECK_EQUAL(CalculateGpuBudget(6ULL << 30, 6ULL << 30).contexts, 16U);
-    // The hardware-specific benchmark is an explicit choice, never a default.
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(2ULL << 30, 1ULL << 30).contexts, 8U);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(8ULL << 30, 8ULL << 30).contexts, 59U);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(6ULL << 30, 6ULL << 30).contexts, 43U);
+    // Manual may reduce the automatic count, e.g. to reproduce a hardware tuning choice.
     const auto manual{CalculateGpuBudget(6ULL << 30, 6ULL << 30, 36)};
     BOOST_CHECK_EQUAL(manual.contexts, 36U);
     BOOST_CHECK_EQUAL(manual.scratchpad_bytes, 4608ULL << 20);
@@ -225,7 +226,7 @@ BOOST_AUTO_TEST_CASE(memory_budget_limits_and_overflow)
     BOOST_CHECK(manual.overhead_bytes > 36 * 240U);
     BOOST_CHECK(manual.headroom_bytes >= manual.reserved_bytes);
     BOOST_CHECK(!manual.low_headroom);
-    BOOST_CHECK_EQUAL(CalculateGpuBudget(UINT64_MAX, UINT64_MAX).contexts, 16U);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(UINT64_MAX, UINT64_MAX).contexts, mining::MAX_GPU_CONTEXTS);
     BOOST_CHECK_EQUAL(CalculateGpuBudget(UINT64_MAX, UINT64_MAX, 256).scratchpad_bytes, 32ULL << 30);
     BOOST_CHECK_THROW(CalculateGpuBudget(UINT64_MAX, UINT64_MAX, 257), std::runtime_error);
     BOOST_CHECK_THROW(CalculateGpuBudget(1ULL << 30, 1ULL << 30, UINT32_MAX), std::runtime_error);
@@ -241,11 +242,19 @@ BOOST_AUTO_TEST_CASE(manual_gpu_budget_boundaries_and_backend_reporting)
     const auto tight{CalculateGpuBudget(exact, exact, 36)};
     BOOST_CHECK_EQUAL(tight.headroom_bytes, minimum);
     BOOST_CHECK(tight.low_headroom);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(exact, exact).contexts, 36U);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(exact - 1, exact).contexts, 35U);
     BOOST_CHECK_THROW(CalculateGpuBudget(exact - 1, exact, 36), std::runtime_error);
     BOOST_CHECK_THROW(CalculateGpuBudget(5ULL << 30, 6ULL << 30, 36), std::runtime_error);
     BOOST_CHECK_EQUAL(CalculateGpuBudget(12ULL << 30, 12ULL << 30, 72).contexts, 72U);
     BOOST_CHECK_EQUAL(CalculateGpuBudget(24ULL << 30, 24ULL << 30, 128).contexts, 128U);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(12ULL << 30, 12ULL << 30).contexts, 90U);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(24ULL << 30, 24ULL << 30).contexts, 181U);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(24ULL << 30, 24ULL << 30).reserved_bytes, (24ULL << 30) / 20);
     BOOST_CHECK_EQUAL(CalculateGpuBudget(80ULL << 30, 80ULL << 30).maximum_contexts, mining::MAX_GPU_CONTEXTS);
+    BOOST_CHECK(CalculateGpuBudget(80ULL << 30, 80ULL << 30).scheduler_limited);
+    BOOST_CHECK(!CalculateGpuBudget(24ULL << 30, 24ULL << 30).scheduler_limited);
+    BOOST_CHECK(!CalculateGpuBudget(80ULL << 30, 1ULL << 30).scheduler_limited); // Allocation, not scheduler, binds.
     BOOST_CHECK_EQUAL(CalculateGpuBudget(24ULL << 30, 1ULL << 30).maximum_contexts, 8U);
     BOOST_CHECK_THROW(CalculateGpuBudget(24ULL << 30, 1ULL << 30, 9), std::runtime_error);
     BOOST_CHECK_EQUAL(CalculateGpuBudget(0, UINT64_MAX).maximum_contexts, 0U);
@@ -257,11 +266,52 @@ BOOST_AUTO_TEST_CASE(manual_gpu_budget_boundaries_and_backend_reporting)
     amd.total_memory = 6ULL << 30;
     amd.available_memory = UINT64_MAX; // Irrelevant without a portable free-VRAM query.
     amd.max_allocation = 6ULL << 30;
-    BOOST_CHECK_EQUAL(CalculateGpuBudget(amd).maximum_contexts, 23U);
-    BOOST_CHECK_EQUAL(CalculateGpuBudget(amd, 23).reserved_bytes, 3ULL << 30);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(amd).contexts, 11U);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(amd, 11).reserved_bytes, 9ULL << 29);
     amd.vendor = mining::GpuVendor::NVIDIA_CUDA;
     amd.available_memory = 0;
     BOOST_CHECK_EQUAL(CalculateGpuBudget(amd).maximum_contexts, 0U); // No fallback to total VRAM.
+}
+BOOST_AUTO_TEST_CASE(automatic_devices_size_independently_and_manual_reduces)
+{
+    for (const unsigned int requested : {0U, 4U}) {
+        auto state{std::make_shared<State>()};
+        auto devices = [] {
+            mining::GpuDiscovery result;
+            for (unsigned i{0}; i < 3; ++i) {
+                mining::GpuDevice device{mining::GpuVendor::NVIDIA_CUDA};
+                device.id = i == 0 ? "cuda:0" : i == 1 ? "cuda:1" : "cuda:2";
+                device.total_memory = device.available_memory = device.max_allocation = (i == 0 ? 6ULL : i == 1 ? 24ULL : 80ULL) << 30;
+                device.supported = true;
+                result.devices.push_back(device);
+            }
+            return result;
+        };
+        mining::MiningController controller{Hashes(state), Limits, {}, devices,
+            [&, state](const auto& device, unsigned contexts) {
+                BOOST_CHECK_EQUAL(contexts, requested); // Automatic stays 0, never the smallest device's count.
+                return std::make_unique<MockBackend>(state, false, false, mining::CalculateGpuBudget(device, contexts).contexts);
+            }};
+        BOOST_REQUIRE(controller.Start([state] { return std::make_unique<Provider>(state); }, 0, {false, true, {}, requested, 0}));
+        const bool mined{Until([&] {
+            const auto stats{controller.GetStats()};
+            return stats.devices.size() == 3 && std::all_of(stats.devices.begin(), stats.devices.end(), [](const auto& device) { return device.hashes > 0; });
+        })};
+        const auto before_stop{controller.GetStats()};
+        controller.RequestStop();
+        controller.Wait();
+        BOOST_CHECK(mined);
+        const auto stats{controller.GetStats()};
+        BOOST_REQUIRE_EQUAL(stats.devices.size(), 3U);
+        BOOST_CHECK_EQUAL(stats.devices[0].contexts, requested ? requested : 43U);
+        BOOST_CHECK_EQUAL(stats.devices[1].contexts, requested ? requested : 181U);
+        BOOST_CHECK_EQUAL(stats.devices[2].contexts, requested ? requested : mining::MAX_GPU_CONTEXTS);
+        BOOST_REQUIRE_EQUAL(before_stop.devices.size(), 3U);
+        if (!requested) BOOST_CHECK_EQUAL(before_stop.devices[2].memory_bytes, 32ULL << 30);
+        BOOST_CHECK_EQUAL(stats.devices[2].memory_bytes, 0U); // Stop clears the live allocation statistic.
+        BOOST_CHECK(!state->duplicate); // Different full/partial batch sizes still share non-overlapping leases.
+        BOOST_CHECK_EQUAL(stats.active_workers, 0U);
+    }
 }
 BOOST_AUTO_TEST_CASE(mixed_devices_share_cpu_nonce_allocator_and_refresh)
 {

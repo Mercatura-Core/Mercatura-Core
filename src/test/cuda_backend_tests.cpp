@@ -21,7 +21,7 @@ struct Runtime {
     std::map<const void*, std::string> kernels;
     std::set<void*> allocations;
     std::map<void*, size_t> allocation_bytes;
-    size_t free_memory{8ULL << 30}, extra_usage{0};
+    size_t free_memory{8ULL << 30}, extra_usage{0}, stream_memory{0};
     std::vector<Launch> launches;
     std::vector<std::function<void()>> copies;
     std::vector<size_t> synchronized_at;
@@ -39,6 +39,7 @@ struct Runtime {
         fail_malloc = fail_launch = fail_transfer = fail_sync = 0;
         freed_pending = false;
         extra_usage = 0;
+        stream_memory = 0;
     }
 };
 Runtime& State() { static Runtime runtime; return runtime; }
@@ -111,6 +112,7 @@ cudaError_t CUDARTAPI cudaMemGetInfo(size_t* available, size_t* total)
 {
     *total = 8ULL << 30;
     *available = State().free_memory;
+    if (State().streams) *available -= State().stream_memory;
     for (const auto& [pointer, bytes] : State().allocation_bytes) *available -= bytes;
     if (!State().allocation_bytes.empty()) *available -= State().extra_usage;
     return cudaSuccess;
@@ -177,8 +179,14 @@ int main()
         state.free_memory = 6ULL << 30;
         {
             auto automatic{mining::CreateCudaBackend(device, 0)};
-            Require(automatic->Contexts() == 16, "Automatic allocation lost its conservative cap");
+            Require(automatic->Contexts() == 43, "Automatic did not select the maximum safe fresh-memory count");
         }
+        state.stream_memory = 256ULL << 20;
+        {
+            auto automatic{mining::CreateCudaBackend(device, 0)};
+            Require(automatic->Contexts() == 41, "Automatic budget query preceded runtime/stream initialization");
+        }
+        state.Reset();
         {
             auto manual{mining::CreateCudaBackend(device, 36)};
             Require(manual->Contexts() == 36 && manual->MemoryBytes() == (4608ULL << 20), "Explicit 36-context allocation failed");

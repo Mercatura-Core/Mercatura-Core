@@ -10,33 +10,29 @@ namespace mining
 GpuMemoryBudget CalculateGpuBudget(uint64_t memory, uint64_t maximum_allocation, unsigned int requested,
                                    GpuMemorySource source)
 {
-    // Automatic allocation keeps half the reported memory and caps at 16.
-    // Only an explicit CUDA count may use more of measured free VRAM. Core
-    // OpenCL has no portable free-memory query, so never relax its half-total
-    // policy on the assumption that total memory is currently available.
-    const uint64_t automatic_reserve{std::max<uint64_t>(512ULL << 20, memory / 2)};
-    const uint64_t manual_reserve{source == GpuMemorySource::CUDA_FREE
-        ? std::max<uint64_t>(512ULL << 20, memory / 20) : automatic_reserve};
+    // CUDA sizes from measured free memory. OpenCL total memory is NOT free:
+    // without a reliable free-memory query, allow at most a quarter of the
+    // reported global pool, also bounded by CL_DEVICE_MAX_MEM_ALLOC_SIZE.
+    // Its set-aside is a conservative capacity limit, not measured headroom.
+    const uint64_t reserve{std::max<uint64_t>(512ULL << 20,
+        source == GpuMemorySource::CUDA_FREE ? memory / 20 : memory - memory / 4)};
     // Headers/states/results and allocation rounding, plus a separate allowance
     // for runtime/JIT/program/stream overhead. Neither consumes the VRAM reserve.
     constexpr uint64_t fixed_overhead{64ULL << 20};
     const uint64_t context_bytes{mercahash::SCRATCHPAD_BYTES + 4096};
-    const auto limit = [&](uint64_t reserve) {
-        const uint64_t usable{memory > reserve ? memory - reserve : 0};
-        return std::min({usable > fixed_overhead ? (usable - fixed_overhead) / context_bytes : 0,
-                         maximum_allocation / mercahash::SCRATCHPAD_BYTES,
-                         uint64_t{std::numeric_limits<size_t>::max()} / mercahash::SCRATCHPAD_BYTES,
-                         uint64_t{MAX_GPU_CONTEXTS}});
-    };
-    const auto maximum{static_cast<unsigned int>(limit(manual_reserve))};
+    const uint64_t usable{memory > reserve ? memory - reserve : 0};
+    const uint64_t capacity{std::min({usable > fixed_overhead ? (usable - fixed_overhead) / context_bytes : 0,
+                                    maximum_allocation / mercahash::SCRATCHPAD_BYTES,
+                                    uint64_t{std::numeric_limits<size_t>::max()} / mercahash::SCRATCHPAD_BYTES})};
+    const auto maximum{static_cast<unsigned int>(std::min<uint64_t>(capacity, MAX_GPU_CONTEXTS))};
     if (requested > maximum)
         throw std::runtime_error{"GPU context count exceeds the safe memory budget"};
-    const auto count{requested ? requested : static_cast<unsigned int>(std::min<uint64_t>(limit(automatic_reserve), 16))};
+    const auto count{requested ? requested : maximum};
     const uint64_t scratch{count * uint64_t{mercahash::SCRATCHPAD_BYTES}};
     const uint64_t overhead{count ? fixed_overhead + count * uint64_t{4096} : 0};
     const uint64_t headroom{memory - scratch - overhead};
-    return {count, scratch, requested ? manual_reserve : automatic_reserve, overhead, headroom, maximum,
-            count > 0 && headroom < std::max<uint64_t>(1ULL << 30, memory / 10)};
+    return {count, scratch, reserve, overhead, headroom, maximum,
+            count > 0 && headroom < std::max<uint64_t>(1ULL << 30, memory / 10), capacity > MAX_GPU_CONTEXTS};
 }
 GpuMemoryBudget CalculateGpuBudget(const GpuDevice& device, unsigned int requested)
 {
