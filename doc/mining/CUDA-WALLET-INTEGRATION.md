@@ -37,15 +37,16 @@ match the original header checksum above. The ported file SHA-256 is
 
 The original `mercahash_gpu.h`, both backends' hash arithmetic, consensus/PoW/PQ
 rules and Solo reward construction are unchanged. The benchmark's
-`gpu_backend_budget_512.cpp` was **not** ported. Automatic allocation still
-reserves max(512 MiB, half the reported memory) and caps contexts at 16.
-The separately selected advanced manual Qt mode now permits 36 CUDA contexts
-when measured free memory covers 4,608 MiB of scratchpads, 64 MiB + 144 KiB
-estimated overhead and at least 512 MiB reserve. Larger CUDA budgets retain at
-least 5% free; manual counts scale with usable VRAM and allocation limits up to
-the current 256-context scheduler bound. CUDA rechecks memory before and after
-allocation. AMD retains the half-total budget because portable OpenCL free VRAM
-is unknown. See [memory policy and UI behavior](../native-gpu-mining.md).
+`gpu_backend_budget_512.cpp` was **not** ported. Automatic now maximizes each
+CUDA device's independently measured free-memory budget, with no 16-context cap
+or half-VRAM reserve. It retains max(512 MiB, 5% of measured free memory), plus
+64 MiB runtime allowance and 4 KiB per context beyond each 128 MiB scratchpad.
+Manual reduces the count for memory conservation or efficiency tuning. CUDA
+queries free memory immediately before allocation and verifies the reserve
+afterward. AMD uses conservative quarter-global-memory/single-allocation limits
+because portable OpenCL free VRAM is unknown; total memory is never treated as
+measured free VRAM. The 256-context nonce-lease bound remains explicit, including
+a UI notice when it limits capacity. See [memory policy and scheduler review](../native-gpu-mining.md).
 
 ## Benchmark reference versus wallet evidence
 
@@ -54,7 +55,7 @@ using 36 experimental contexts and 128 MiB per context, with 369/369 independent
 CPU/GPU comparisons. The supplied `verify_cpu_gpu_36.cpp` uses batch sizes
 1, 7, 16, 31, 32 and 36 (123 headers), repeated three times. These results were
 not reproduced in the cloud and do not promise integrated-wallet throughput
-under the conservative production budget.
+with the integrated wallet's current automatic/manual memory policies.
 
 ## Permanent regression coverage
 
@@ -71,11 +72,13 @@ under the conservative production budget.
   launch/synchronization/transfer/callback failures, partial-allocation cleanup
   and destruction. No GPU driver or device instructions execute in this test.
 - `gpu_miner_tests`: retains simulated CPU/GPU scheduling, stale results, device
-  failures and Stop/Start tests; covers conservative defaults, explicit 36-context
-  budgets, exact reserve boundaries, larger cards and OpenCL total-only limits.
-  Qt selector tests cover explicit opt-in, mixed-device limits, refresh/clamping,
-  small-headroom warnings and unknown free VRAM. CUDA fake-runtime tests cover
-  stale memory, post-allocation reserve loss and manual-allocation cleanup.
+  failures and Stop/Start tests; covers maximum-safe automatic budgets, manual
+  reductions, exact reserve boundaries, larger cards and OpenCL total-only limits.
+  Mixed-size GPU workers prove independent automatic counts and non-overlapping
+  full/partial nonce batches. Qt tests cover per-device automatic previews,
+  manual limits, refresh/clamping, scheduler notices and small-headroom warnings.
+  CUDA fake-runtime tests cover fresh queries after stream initialization, stale
+  memory, post-allocation reserve loss and allocation cleanup.
 - Wallet `mining_tests_solo`: adds a GPU-controller test with a CPU-reference
   backend test double. Real native Solo work, independent candidate rehashing,
   PQ reward ownership and actual regtest block validation/acceptance run through
@@ -159,8 +162,8 @@ work/build-cuda-qt/bin/mercatura-gpu-check cuda:0 --contexts 1 --repetitions 3
 
 Repeat at automatic and several manually selected **safe** counts. Check full,
 partial and repeated batches. Exit 77 on a device-free listing is a skip.
-An explicit `--contexts 36` uses the advanced manual policy, matching the Qt
-manual mode. Run it only when the real free-memory budget permits it; never
+An explicit `--contexts 36` reduces the automatic count, matching Qt Manual.
+Run it only when the real free-memory budget permits it; never
 bypass the reserve/allocation checks to force the benchmark configuration.
 
 Exercise actual Qt GPU-only and CPU+GPU mining: observe accepted blocks on the

@@ -88,33 +88,58 @@ expiry, continuous-share behavior and submission rules. Stale GPU outputs are
 discarded after cancellation or replacement. Each GPU verifier's CPU scratchpad
 is included in the host memory budget.
 
-The default **Automatic (conservative)** memory mode leaves at least 512 MiB and
-half of the reported device budget for other uses, and caps contexts at 16.
-**Advanced manual (higher VRAM use)** must be selected explicitly on the Mining
-page. For CUDA it uses measured free VRAM, reserving max(512 MiB, 5% of free VRAM),
-plus 64 MiB of estimated runtime overhead and 4 KiB per context in addition to
-each private 128 MiB scratchpad. For example, 36 contexts use 4,608 MiB of
-scratchpads and fit only when measured free VRAM can also cover that overhead and
-reserve (at least 5,184 MiB + 144 KiB in this example). This is not an automatic
-RTX 3050 setting or a universal maximum. Larger GPUs permit proportionally larger
-counts, subject to the single-buffer allocation limit, host address space and
-the current 256-context scheduler limit (shared ranges contain 256 nonces).
+The default **Automatic (maximum safe capacity)** memory mode selects each GPU's
+largest safe context count independently. CUDA uses measured free VRAM after
+stream initialization, reserving max(512 MiB, 5% of measured free VRAM), plus
+64 MiB of estimated runtime overhead and 4 KiB per context in addition to each
+private 128 MiB scratchpad. There is no 16-context automatic cap or half-VRAM
+CUDA reserve. **Manual (reduce VRAM use)** lets miners choose fewer contexts to
+conserve memory, improve desktop responsiveness or tune efficiency.
 
-The selector uses the tightest limit among selected GPUs. It shows the cached
-CUDA free-memory reading, estimated allocation/headroom, and a warning below
+For example, 6 GiB of measured free CUDA memory permits 43 contexts under the
+current budget; 24 GiB permits 181. These are capacity calculations, not measured
+throughput recommendations. A manual 36-context setting needs 4,608 MiB of
+scratchpads plus overhead and reserve (at least 5,184 MiB + 144 KiB). Neither
+36 nor any GPU model's benchmark setting is hard-coded as a default or maximum.
+
+Automatic passes a separate zero/default request to every backend; a smaller
+GPU never supplies a count or a context limit to a larger GPU. Only the shared
+Manual field uses the tightest limit among selected GPUs. The UI shows cached
+CUDA free-memory readings, per-device context counts, estimated allocation/headroom,
+and a warning below
 max(1 GiB, 10% of reported free memory) of remaining headroom. Refresh runs off
 the GUI thread and retains explicit device selections. Allocation also runs off
-the GUI thread: CUDA re-queries free memory before allocation, checks every
-allocation, and checks actual remaining memory against the reserve afterward.
+the GUI thread: CUDA re-queries free memory immediately before allocation, checks
+every allocation, and checks actual remaining memory against the reserve afterward.
 An unsafe/stale request fails visibly and cleans up; it is not silently retried
 with a different manual count. Other applications can still consume VRAM later.
 
-Core OpenCL has no portable free-VRAM query. AMD manual selection therefore
-retains the half-total-memory reserve and respects `CL_DEVICE_MAX_MEM_ALLOC_SIZE`,
-with the same overhead allowances. Its UI reports total VRAM and explicitly warns
-that free VRAM is unknown; total or unallocated budget is never presented as a
-measurement of free memory. Allocation/launch failures disable the affected
-device. These memory policies do not change either backend's hash arithmetic.
+Core OpenCL has no portable free-VRAM query. AMD Automatic therefore selects the
+largest count within a conservative fallback: at most a quarter of reported
+global memory, reduced by overhead and bounded by `CL_DEVICE_MAX_MEM_ALLOC_SIZE`
+and host address space. Manual can reduce that count. This is a capability-based
+allocation ceiling, not a claim that any portion is currently free. Every
+allocation is checked; allocation/launch failure releases the affected backend's
+resources and leaves healthy GPUs/CPU workers running. Its UI reports global
+memory and explicitly warns that free VRAM is unknown; total or unallocated
+budget is never presented as a measurement of free memory. These memory policies
+do not change either backend's hash arithmetic.
+
+### Remaining scheduler limit
+
+Both modes currently allow at most **256 contexts per GPU** (32 GiB of
+scratchpads). The shared CPU/GPU nonce allocator leases 256 nonces at a time;
+larger buffers would be partly idle under this scheduler. Memory previews flag
+devices whose usable capacity exceeds this bound. A static assertion couples the
+backend count limit to the lease size, and boundary tests retain nonce exhaustion
+without wraparound. Mixed-capacity regression tests use distinct full/partial
+batches and check that devices never reuse each other's nonces.
+
+Supporting more than 256 is deferred, rather than merely raising a constant.
+It requires larger or variable GPU leases alongside CPU leases, no overlap or
+overflow at the final 32-bit nonce, audited scratchpad/address/launch bounds,
+and full/partial/repeated/cancelled/stale-work tests at counts above 256. Launch
+group latency and independent verification also need qualification on hardware.
 
 Per-device statistics expose hashes, rate, context count, allocated scratchpad
 memory and status. CPU hashes and rate are separate from GPU totals. Device

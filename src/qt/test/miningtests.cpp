@@ -46,7 +46,7 @@ Q_DECLARE_METATYPE(wallet::AddressPurpose)
 class MiningTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
-    void advancedGpuContextSelectionUsesBackendMemory()
+    void maximumAutomaticAndReducedManualGpuContexts()
     {
         TestingSetup setup{ChainType::REGTEST};
         auto node{interfaces::MakeNode(setup.m_node)};
@@ -63,7 +63,10 @@ private Q_SLOTS:
             amd.total_memory = 16ULL << 30;
             amd.available_memory = UINT64_MAX; // Never interpret this as CUDA free VRAM.
             amd.max_allocation = 1ULL << 30;
-            result.devices = {cuda, amd};
+            mining::GpuDevice large{mining::GpuVendor::NVIDIA_CUDA};
+            large.id = "cuda:1"; large.name = "Simulated large CUDA"; large.supported = true;
+            large.total_memory = large.available_memory = large.max_allocation = 24ULL << 30;
+            result.devices = {cuda, amd, large};
             return result;
         }};
         MiningPage page{nullptr};
@@ -77,15 +80,19 @@ private Q_SLOTS:
         auto* refresh{page.findChild<QPushButton*>("refreshGpuDevices")};
         QVERIFY(hardware && mode && contexts && devices && all && memory && refresh);
         hardware->setCurrentIndex(1);
-        QTRY_COMPARE(devices->count(), 2);
-        QCOMPARE(mode->currentIndex(), 0); // Conservative automatic on every new page.
+        QTRY_COMPARE(devices->count(), 3);
+        QCOMPARE(mode->currentIndex(), 0); // Maximum safe automatic on every new page.
         QVERIFY(!contexts->isEnabled());
-        QCOMPARE(contexts->maximum(), 8); // The tightest selected backend allocation limit.
+        QCOMPARE(contexts->maximum(), 8); // Only the Manual field uses the tightest allocation limit.
+        QVERIFY(memory->text().contains("43 contexts:"));
+        QVERIFY(memory->text().contains("181 contexts:")); // Neither CUDA device is capped by the small AMD device.
+        QVERIFY(memory->text().contains("8 contexts selected"));
         QVERIFY(memory->text().contains("free VRAM is unknown"));
         mode->setCurrentIndex(1);
         QVERIFY(contexts->isEnabled());
         all->setChecked(false);
         devices->item(1)->setCheckState(Qt::Unchecked);
+        devices->item(2)->setCheckState(Qt::Unchecked);
         QVERIFY(contexts->maximum() > 36);
         contexts->setValue(36);
         QCOMPARE(contexts->value(), 36);
@@ -115,6 +122,7 @@ private Q_SLOTS:
         free_cuda = 80ULL << 30;
         rescan();
         QTRY_COMPARE(contexts->maximum(), static_cast<int>(mining::MAX_GPU_CONTEXTS));
+        QVERIFY(memory->text().contains("nonce scheduler limits each GPU to 256"));
         free_cuda = 0;
         rescan();
         QTRY_VERIFY(!contexts->isEnabled());
@@ -123,6 +131,9 @@ private Q_SLOTS:
         QVERIFY(!session.stats().busy); // Selector and asynchronous discovery never start mining.
         mode->setCurrentIndex(0);
         QVERIFY(!contexts->isEnabled());
+        devices->item(2)->setCheckState(Qt::Checked);
+        QVERIFY(memory->text().contains("181 contexts:"));
+        QVERIFY(!memory->text().contains("cannot fit")); // An exhausted small device does not block automatic on the large one.
         MiningPage reopened{nullptr};
         QCOMPARE(reopened.findChild<QComboBox*>("gpuContextMode")->currentIndex(), 0);
     }

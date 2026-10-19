@@ -64,13 +64,14 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     form->addRow(tr("GPU devices"), m_devices);
     m_context_mode = new QComboBox{group};
     m_context_mode->setObjectName(QStringLiteral("gpuContextMode"));
-    m_context_mode->addItems({tr("Automatic (conservative)"), tr("Advanced manual (higher VRAM use)")});
-    m_context_mode->setToolTip(tr("Automatic keeps a conservative memory budget. Advanced manual permits more CUDA contexts using measured free VRAM, while retaining a reserve and allocation overhead. AMD OpenCL retains a conservative total-memory budget because free VRAM is unknown. More contexts may reduce desktop responsiveness."));
+    m_context_mode->addItems({tr("Automatic (maximum safe capacity)"), tr("Manual (reduce VRAM use)")});
+    m_context_mode->setToolTip(tr("Automatic selects each GPU's maximum safe context count independently. CUDA uses measured free VRAM with a safety reserve and overhead allowance. AMD OpenCL uses conservative capacity limits because free VRAM is unknown. Manual reduces contexts to conserve VRAM or optimize efficiency. More contexts may reduce desktop responsiveness."));
     form->addRow(tr("GPU memory mode"), m_context_mode);
     m_contexts = new QSpinBox{group};
     m_contexts->setObjectName(QStringLiteral("gpuContexts"));
     m_contexts->setRange(1, 1);
-    form->addRow(tr("Concurrent contexts per GPU"), m_contexts);
+    m_contexts->setToolTip(tr("Manual count applied to each selected GPU, bounded by the smallest selected device. Automatic ignores this field and sizes each GPU independently."));
+    form->addRow(tr("Manual contexts per GPU"), m_contexts);
     m_yield = new QSpinBox{group};
     m_yield->setObjectName(QStringLiteral("gpuYield"));
     m_yield->setRange(0, 1000);
@@ -258,13 +259,19 @@ void MiningPage::updateStatus()
     const size_t selected_gpus{selected_devices.size()};
     const bool gpu_available{selected_gpus > 0};
     unsigned int context_maximum{gpu_available ? mining::MAX_GPU_CONTEXTS : 0};
-    for (const auto* device : selected_devices) context_maximum = std::min(context_maximum, mining::CalculateGpuBudget(*device).maximum_contexts);
+    bool automatic_memory{false};
+    for (const auto* device : selected_devices) {
+        const auto budget{mining::CalculateGpuBudget(*device)};
+        context_maximum = std::min(context_maximum, budget.maximum_contexts); // Manual field only.
+        automatic_memory |= budget.contexts > 0;
+    }
     const bool manual_contexts{m_context_mode->currentIndex() == 1};
     if (!running && discovery) {
         const QSignalBlocker block{m_contexts};
         m_contexts->setMaximum(static_cast<int>(std::max(1U, context_maximum)));
     }
-    const bool gpu_context_memory{context_maximum > 0 && (!manual_contexts || static_cast<unsigned int>(m_contexts->value()) <= context_maximum)};
+    const bool gpu_context_memory{manual_contexts
+        ? context_maximum > 0 && static_cast<unsigned int>(m_contexts->value()) <= context_maximum : automatic_memory};
     const auto maximum{mining::MaximumCpuWorkers(m_limits, use_gpu ? selected_gpus : 0)};
     const auto host_limits{mining::CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), m_limits.available_memory)};
     const bool gpu_host_memory{!use_gpu || selected_gpus <= host_limits.maximum};
@@ -304,12 +311,14 @@ void MiningPage::updateStatus()
                     .arg(name).arg(qulonglong{device->available_memory >> 20}).arg(budget.contexts)
                     .arg(qulonglong{budget.scratchpad_bytes >> 20}).arg(qulonglong{budget.overhead_bytes >> 20})
                     .arg(qulonglong{budget.headroom_bytes >> 20}).arg(qulonglong{budget.reserved_bytes >> 20});
-                if (budget.low_headroom) gpu_messages << tr("Warning: %1 has little VRAM headroom. Other applications may cause allocation failure or reduced desktop responsiveness. Reduce contexts or use Automatic.").arg(name);
+                if (budget.low_headroom) gpu_messages << tr("Warning: %1 has little VRAM headroom. Other applications may cause allocation failure or reduced desktop responsiveness. Use Manual to reduce contexts if needed.").arg(name);
             } else {
-                gpu_messages << tr("%1: %2 MiB total VRAM; free VRAM is unknown. Conservative limit: %3 manual contexts. %4 contexts selected: %5 MiB scratchpads + %6 MiB estimated overhead. Other applications may cause allocation failure.")
+                gpu_messages << tr("%1: %2 MiB reported global memory; free VRAM is unknown. Conservative capacity limit: %3 contexts. %4 contexts selected: %5 MiB scratchpads + %6 MiB estimated overhead. Other applications may cause allocation failure.")
                     .arg(name).arg(qulonglong{device->total_memory >> 20}).arg(budget.maximum_contexts).arg(budget.contexts)
                     .arg(qulonglong{budget.scratchpad_bytes >> 20}).arg(qulonglong{budget.overhead_bytes >> 20});
             }
+            if (budget.scheduler_limited) gpu_messages << tr("%1: memory could support more contexts, but the current nonce scheduler limits each GPU to %2 contexts.")
+                .arg(name).arg(mining::MAX_GPU_CONTEXTS);
         }
     }
     m_gpu_status->setText(gpu_messages.join(QStringLiteral("\n")));
