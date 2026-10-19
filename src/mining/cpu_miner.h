@@ -79,6 +79,8 @@ struct GpuStats {
     double hashes_per_second{0};
     uint64_t memory_bytes{0};
     unsigned int contexts{0};
+    unsigned int estimated_contexts{0};
+    bool automatic{true};
     std::string status{"Preparing device"};
     bool failed{false};
 };

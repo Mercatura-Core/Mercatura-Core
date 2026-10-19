@@ -1,6 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
 #include <cuda_runtime.h>
+#include <crypto/mercahash.h>
 #include <mining/gpu_backend.h>
 #define MH_CUDA
 #include <algorithm>
@@ -22,7 +23,7 @@ void Check(cudaError_t error, const char *operation)
 class CudaBackend final : public GpuBackend
 {
     int device;
-    unsigned int contexts{0};
+    unsigned int contexts{0}, estimated{0};
     uint64_t memory_bytes{0};
     cudaStream_t stream{nullptr};
     unsigned char *headers{nullptr};
@@ -31,7 +32,7 @@ class CudaBackend final : public GpuBackend
     unsigned char *outputs{nullptr};
 
   public:
-    CudaBackend(const GpuDevice &selected, unsigned int requested) : device{static_cast<int>(selected.ordinal)}
+    CudaBackend(const GpuDevice &selected, unsigned int requested, const std::function<bool()>& cancelled) : device{static_cast<int>(selected.ordinal)}
     {
         try {
             Check(cudaSetDevice(device), "Select NVIDIA device");
@@ -44,25 +45,29 @@ class CudaBackend final : public GpuBackend
             // Initialize the stream first, then budget from a fresh query
             // immediately before allocating the mining buffers.
             Check(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking), "Create NVIDIA mining stream");
-            size_t available{0}, total{0};
-            Check(cudaMemGetInfo(&available, &total), "Read NVIDIA free memory");
-            const auto budget{CalculateGpuBudget(available, available, requested)};
-            contexts = budget.contexts;
-            memory_bytes = budget.scratchpad_bytes;
-            if (!contexts)
-                throw std::runtime_error{
-                    "NVIDIA GPU has insufficient available memory for a safe MercaHash scratchpad"};
-            Check(cudaMalloc(reinterpret_cast<void **>(&headers), contexts * size_t{80}), "Allocate NVIDIA headers");
-            Check(cudaMalloc(reinterpret_cast<void **>(&states), contexts * size_t{128}), "Allocate NVIDIA states");
-            Check(cudaMalloc(reinterpret_cast<void **>(&scratch), static_cast<size_t>(memory_bytes)),
-                  "Allocate NVIDIA scratchpads");
-            Check(cudaMalloc(reinterpret_cast<void **>(&outputs), contexts * size_t{32}), "Allocate NVIDIA outputs");
-            // Another process or runtime initialization may have consumed the
-            // previewed headroom. Validate the actual remaining free memory and
-            // unwind every allocation if the promised reserve was lost.
-            Check(cudaMemGetInfo(&available, &total), "Validate NVIDIA memory headroom");
-            if (available < budget.reserved_bytes)
-                throw std::runtime_error{"NVIDIA free VRAM fell below the required reserve; reduce contexts or free GPU memory"};
+            const auto allocation{AllocateGpuContexts(requested, [&] {
+                size_t available{0}, total{0};
+                Check(cudaMemGetInfo(&available, &total), "Read NVIDIA free memory");
+                return CalculateGpuBudget(available, available);
+            }, [&](unsigned int count, const GpuMemoryBudget& budget) {
+                contexts = count;
+                memory_bytes = count * uint64_t{mercahash::SCRATCHPAD_BYTES};
+                auto allocate = [&](void** buffer, size_t bytes, const char* operation) {
+                    const auto error{cudaMalloc(buffer, bytes)};
+                    if (error == cudaErrorMemoryAllocation)
+                        throw GpuMemoryAllocationError{std::string{operation} + ": " + cudaGetErrorString(error)};
+                    Check(error, operation);
+                };
+                allocate(reinterpret_cast<void **>(&headers), contexts * size_t{80}, "Allocate NVIDIA headers");
+                allocate(reinterpret_cast<void **>(&states), contexts * size_t{128}, "Allocate NVIDIA states");
+                allocate(reinterpret_cast<void **>(&scratch), static_cast<size_t>(memory_bytes), "Allocate NVIDIA scratchpads");
+                allocate(reinterpret_cast<void **>(&outputs), contexts * size_t{32}, "Allocate NVIDIA outputs");
+                size_t available{0}, total{0};
+                Check(cudaMemGetInfo(&available, &total), "Validate NVIDIA memory headroom");
+                if (available < budget.reserved_bytes)
+                    throw GpuMemoryAllocationError{"NVIDIA free VRAM fell below the required reserve"};
+            }, [&] { CleanupBuffers(); }, cancelled)};
+            estimated = allocation.estimated;
         } catch (...) {
             Cleanup();
             throw;
@@ -76,6 +81,7 @@ class CudaBackend final : public GpuBackend
     {
         return contexts;
     }
+    unsigned int EstimatedContexts() const override { return estimated; }
     uint64_t MemoryBytes() const override
     {
         return memory_bytes;
@@ -179,7 +185,7 @@ class CudaBackend final : public GpuBackend
     }
 
   private:
-    void Cleanup()
+    void CleanupBuffers()
     {
         // Never reset a device: other mining workers or desktop applications may
         // own independent contexts. Ignore teardown errors after device loss.
@@ -196,6 +202,10 @@ class CudaBackend final : public GpuBackend
             cudaFree(outputs);
         headers = outputs = nullptr;
         states = scratch = nullptr;
+    }
+    void Cleanup()
+    {
+        CleanupBuffers();
         if (stream)
             cudaStreamDestroy(stream);
         stream = nullptr;
@@ -241,8 +251,8 @@ GpuDiscovery DiscoverCudaDevices()
         result.errors.emplace_back("No NVIDIA CUDA GPU detected");
     return result;
 }
-std::unique_ptr<GpuBackend> CreateCudaBackend(const GpuDevice &device, unsigned int contexts)
+std::unique_ptr<GpuBackend> CreateCudaBackend(const GpuDevice &device, unsigned int contexts, const std::function<bool()>& cancelled)
 {
-    return std::make_unique<CudaBackend>(device, contexts);
+    return std::make_unique<CudaBackend>(device, contexts, cancelled);
 }
 } // namespace mining

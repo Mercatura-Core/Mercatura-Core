@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cstring>
+#include <crypto/mercahash.h>
 #include <mining/gpu_backend.h>
 #include <mining/opencl_source.h>
 #include <stdexcept>
@@ -177,11 +178,11 @@ class OpenClBackend final : public GpuBackend
     cl_program program{nullptr};
     cl_kernel init{nullptr}, stage{nullptr};
     cl_mem headers{nullptr}, states{nullptr}, scratch{nullptr}, outputs{nullptr};
-    unsigned int contexts{0};
+    unsigned int contexts{0}, estimated{0};
     uint64_t memory_bytes{0};
 
   public:
-    OpenClBackend(const GpuDevice &selected, unsigned int requested)
+    OpenClBackend(const GpuDevice &selected, unsigned int requested, const std::function<bool()>& cancelled)
     {
         try {
             const auto devices{Devices(api)};
@@ -192,15 +193,6 @@ class OpenClBackend final : public GpuBackend
                 throw std::runtime_error{"AMD device enumeration changed; refresh device selection"};
             if (!SupportsOpenCl12(Text(api, device, CL_DEVICE_VERSION)))
                 throw std::runtime_error{"AMD GPU requires OpenCL 1.2 or later"};
-            // Core OpenCL exposes total global memory, not universally free VRAM.
-            // Budget conservatively and fail cleanly on allocation pressure.
-            const auto budget{CalculateGpuBudget(Info<cl_ulong>(api, device, CL_DEVICE_GLOBAL_MEM_SIZE),
-                                                 Info<cl_ulong>(api, device, CL_DEVICE_MAX_MEM_ALLOC_SIZE), requested,
-                                                 GpuMemorySource::OPENCL_TOTAL)};
-            contexts = budget.contexts;
-            memory_bytes = budget.scratchpad_bytes;
-            if (!contexts)
-                throw std::runtime_error{"AMD GPU has insufficient memory for a safe MercaHash scratchpad"};
             cl_int error;
             context = api.clCreateContext(nullptr, 1, &device, nullptr, nullptr, &error);
             Check(error, "Create OpenCL context");
@@ -226,14 +218,26 @@ class OpenClBackend final : public GpuBackend
             Check(error, "Create OpenCL init kernel");
             stage = api.clCreateKernel(program, "mh_stage", &error);
             Check(error, "Create OpenCL stage kernel");
-            auto allocate = [&](cl_mem &buffer, size_t bytes) {
-                buffer = api.clCreateBuffer(context, CL_MEM_READ_WRITE, bytes, nullptr, &error);
-                Check(error, "Allocate OpenCL mining buffer");
-            };
-            allocate(headers, contexts * size_t{80});
-            allocate(states, contexts * size_t{128});
-            allocate(scratch, static_cast<size_t>(memory_bytes));
-            allocate(outputs, contexts * size_t{32});
+            const auto allocation{AllocateGpuContexts(requested, [&] {
+                // OpenCL total memory is not measured free VRAM. Retain the
+                // conservative global-pool and single-allocation limits.
+                return CalculateGpuBudget(Info<cl_ulong>(api, device, CL_DEVICE_GLOBAL_MEM_SIZE),
+                    Info<cl_ulong>(api, device, CL_DEVICE_MAX_MEM_ALLOC_SIZE), 0, GpuMemorySource::OPENCL_TOTAL);
+            }, [&](unsigned int count, const GpuMemoryBudget&) {
+                contexts = count;
+                memory_bytes = count * uint64_t{mercahash::SCRATCHPAD_BYTES};
+                auto allocate = [&](cl_mem &buffer, size_t bytes) {
+                    buffer = api.clCreateBuffer(context, CL_MEM_READ_WRITE, bytes, nullptr, &error);
+                    if (error == CL_MEM_OBJECT_ALLOCATION_FAILURE)
+                        throw GpuMemoryAllocationError{"Insufficient OpenCL device buffer memory"};
+                    Check(error, "Allocate OpenCL mining buffer");
+                };
+                allocate(headers, contexts * size_t{80});
+                allocate(states, contexts * size_t{128});
+                allocate(scratch, static_cast<size_t>(memory_bytes));
+                allocate(outputs, contexts * size_t{32});
+            }, [&] { CleanupBuffers(); }, cancelled)};
+            estimated = allocation.estimated;
         } catch (...) {
             Cleanup();
             throw;
@@ -247,6 +251,7 @@ class OpenClBackend final : public GpuBackend
     {
         return contexts;
     }
+    unsigned int EstimatedContexts() const override { return estimated; }
     uint64_t MemoryBytes() const override
     {
         return memory_bytes;
@@ -311,7 +316,7 @@ class OpenClBackend final : public GpuBackend
     }
 
   private:
-    void Cleanup()
+    void CleanupBuffers()
     {
         if (queue)
             api.clFinish(queue);
@@ -319,6 +324,10 @@ class OpenClBackend final : public GpuBackend
             if (buffer)
                 api.clReleaseMemObject(buffer);
         headers = states = scratch = outputs = nullptr;
+    }
+    void Cleanup()
+    {
+        CleanupBuffers();
         if (init)
             api.clReleaseKernel(init);
         if (stage)
@@ -374,8 +383,8 @@ GpuDiscovery DiscoverOpenClDevices()
     }
     return result;
 }
-std::unique_ptr<GpuBackend> CreateOpenClBackend(const GpuDevice &device, unsigned int contexts)
+std::unique_ptr<GpuBackend> CreateOpenClBackend(const GpuDevice &device, unsigned int contexts, const std::function<bool()>& cancelled)
 {
-    return std::make_unique<OpenClBackend>(device, contexts);
+    return std::make_unique<OpenClBackend>(device, contexts, cancelled);
 }
 } // namespace mining

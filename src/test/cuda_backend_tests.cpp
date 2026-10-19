@@ -30,6 +30,10 @@ struct Runtime {
     void* stream{nullptr};
     unsigned pending{0}, streams{0}, mallocs{0}, transfers{0}, syncs{0};
     unsigned fail_malloc{0}, fail_launch{0}, fail_transfer{0}, fail_sync{0};
+    unsigned max_contexts{256}, header_attempts{0};
+    cudaError_t allocation_error{cudaErrorMemoryAllocation};
+    bool dirty_retry{false};
+    std::function<void()> on_allocation;
     bool freed_pending{false};
     void Reset()
     {
@@ -37,6 +41,9 @@ struct Runtime {
         launches.clear(); copies.clear(); synchronized_at.clear();
         mallocs = transfers = syncs = 0;
         fail_malloc = fail_launch = fail_transfer = fail_sync = 0;
+        max_contexts = 256; header_attempts = 0;
+        allocation_error = cudaErrorMemoryAllocation;
+        dirty_retry = false; on_allocation = {};
         freed_pending = false;
         extra_usage = 0;
         stream_memory = 0;
@@ -129,7 +136,14 @@ cudaError_t CUDARTAPI cudaStreamDestroy(cudaStream_t)
 cudaError_t CUDARTAPI cudaMalloc(void** pointer, size_t bytes)
 {
     auto& s{State()};
-    if (++s.mallocs == s.fail_malloc) return cudaErrorMemoryAllocation;
+    if (bytes < (128ULL << 20) && s.allocation_bytes.empty()) ++s.header_attempts;
+    if (bytes >= (128ULL << 20)) {
+        // A scratchpad probe owns exactly its headers and states, never buffers
+        // left from a previous successful or partial allocation.
+        s.dirty_retry |= s.allocations.size() != 2;
+    }
+    if (s.on_allocation) s.on_allocation();
+    if (++s.mallocs == s.fail_malloc || bytes / (128ULL << 20) > s.max_contexts) return s.allocation_error;
     // Kernels are never executed here: a scratchpad needs only a distinct token.
     // Track its requested VRAM size without reserving gigabytes of host memory.
     *pointer = std::calloc(1, bytes >= (128ULL << 20) ? 1 : bytes);
@@ -204,6 +218,36 @@ int main()
             state.Reset(); state.fail_malloc = fail;
             ExpectFailure([&] { mining::CreateCudaBackend(device, 36); });
             Require(state.allocations.empty() && state.streams == 0, "Advanced manual allocation failure leaked resources");
+        }
+        // Exercise the real CUDA allocation path with deterministic memory
+        // pressure. Hash kernels still never execute in this host-only test.
+        state.Reset(); state.max_contexts = 39;
+        {
+            auto automatic{mining::CreateCudaBackend(device, 0)};
+            Require(automatic->Contexts() == 39 && automatic->EstimatedContexts() == 43, "Automatic fallback did not find the highest viable count");
+            Require(state.header_attempts <= 20 && !state.dirty_retry, "Excessive retries or dirty CUDA probe");
+            Require(state.allocations.size() == 4, "Final CUDA allocation is incomplete");
+        }
+        Require(state.allocations.empty() && state.streams == 0, "Fallback leaked CUDA resources");
+        state.Reset(); state.max_contexts = 0;
+        ExpectFailure([&] { mining::CreateCudaBackend(device, 0); });
+        Require(state.allocations.empty() && state.streams == 0 && state.header_attempts <= 20, "No-viable CUDA fallback leaked or exceeded retry bound");
+        state.Reset(); state.max_contexts = 35;
+        ExpectFailure([&] { mining::CreateCudaBackend(device, 36); });
+        Require(state.header_attempts == 1 && state.allocations.empty(), "Manual CUDA request was silently reduced");
+        state.Reset(); state.max_contexts = 39; state.allocation_error = cudaErrorInvalidValue;
+        ExpectFailure([&] { mining::CreateCudaBackend(device, 0); });
+        Require(state.header_attempts == 1 && state.allocations.empty(), "Unrelated CUDA error triggered fallback");
+        state.Reset(); state.max_contexts = 39;
+        bool stopping{false};
+        state.on_allocation = [&] { stopping = true; };
+        ExpectFailure([&] { mining::CreateCudaBackend(device, 0, [&] { return stopping; }); });
+        Require(state.header_attempts == 1 && state.allocations.empty() && state.streams == 0, "Cancelled fallback retried or leaked CUDA resources");
+        // A lost post-allocation reserve is recoverable in Automatic mode.
+        state.Reset(); state.extra_usage = 512ULL << 20;
+        {
+            auto automatic{mining::CreateCudaBackend(device, 0)};
+            Require(automatic->EstimatedContexts() == 43 && automatic->Contexts() == 39, "Automatic did not recover the required post-allocation reserve");
         }
         state.Reset(); state.free_memory = 8ULL << 30;
         std::vector<mining::GpuHeader> full(2), partial(1);

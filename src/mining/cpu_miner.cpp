@@ -56,7 +56,9 @@ MiningController::MiningController(HashFactory factory, LimitDetector limits, Ra
       m_detect_limits{limits ? std::move(limits) : LimitDetector{DetectWorkerLimits}},
       m_allocate_range{ranges ? std::move(ranges) : RangeAllocator{AllocateNonceRange}},
       m_detect_devices{devices ? std::move(devices) : DeviceDetector{DiscoverGpuDevices}},
-      m_create_backend{backends ? std::move(backends) : BackendFactory{CreateGpuBackend}}
+      m_create_backend{backends ? std::move(backends) : BackendFactory{[this](const GpuDevice& device, unsigned int contexts) {
+          return CreateGpuBackend(device, contexts, [this] { return m_stop.load(); });
+      }}}
 {
 }
 MiningController::~MiningController() { RequestStop(); Wait(); }
@@ -405,6 +407,7 @@ void MiningController::GpuWorker(size_t index, GpuConfig hardware)
             std::lock_guard lock{m_mutex};
             auto& stats{m_stats.devices[index]};
             stats.contexts = backend->Contexts(); stats.memory_bytes = backend->MemoryBytes();
+            stats.estimated_contexts = backend->EstimatedContexts(); stats.automatic = hardware.contexts == 0;
             stats.status = "Checking MercaHash V1 reference vectors";
         }
         VerifyGpuBackend(*backend, [this] { return m_stop.load(); });

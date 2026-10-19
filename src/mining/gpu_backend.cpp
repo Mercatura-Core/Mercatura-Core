@@ -40,6 +40,48 @@ GpuMemoryBudget CalculateGpuBudget(const GpuDevice& device, unsigned int request
     return CalculateGpuBudget(cuda ? device.available_memory : device.total_memory, device.max_allocation, requested,
                               cuda ? GpuMemorySource::CUDA_FREE : GpuMemorySource::OPENCL_TOTAL);
 }
+GpuContextAllocation AllocateGpuContexts(unsigned int requested,
+    const std::function<GpuMemoryBudget()>& budget,
+    const std::function<void(unsigned int, const GpuMemoryBudget&)>& allocate,
+    const std::function<void()>& cleanup, const std::function<bool()>& cancelled)
+{
+    unsigned int lower{0}, upper{MAX_GPU_CONTEXTS}, next{MAX_GPU_CONTEXTS}, estimated{0};
+    // Binary search plus revalidation of the last successful allocation. Bound
+    // retries even if other processes continually change memory availability.
+    unsigned int attempts{2};
+    for (unsigned int n{MAX_GPU_CONTEXTS}; n; n /= 2) attempts += 2;
+    for (unsigned int attempt{0}; attempt < attempts; ++attempt) {
+        try {
+            if (cancelled && cancelled()) throw std::runtime_error{"GPU allocation cancelled"};
+            const auto current{budget()};
+            if (attempt == 0) estimated = current.contexts;
+            upper = std::min(upper, current.contexts);
+            if (!upper) throw GpuMemoryAllocationError{"No safe GPU context allocation is available"};
+            if (requested > upper) throw GpuMemoryAllocationError{"GPU context count exceeds the safe memory budget"};
+            next = requested ? requested : std::min(next, upper);
+            allocate(next, current);
+            if (cancelled && cancelled()) throw std::runtime_error{"GPU allocation cancelled"};
+            if (requested || next == upper) return {estimated, next};
+            lower = next;
+        } catch (const GpuMemoryAllocationError&) {
+            cleanup();
+            if (requested || !upper || next <= 1) throw;
+            upper = std::min(upper, next - 1);
+            if (lower > upper) lower = 0; // A previously successful count became unavailable.
+            next = lower + (upper - lower + 1) / 2;
+            continue;
+        } catch (...) {
+            cleanup();
+            throw;
+        }
+        // Release successful probes too: each new query sees the full available
+        // pool. The final returned allocation is always freshly validated.
+        cleanup();
+        if (lower > upper) lower = 0;
+        next = lower + (upper - lower + 1) / 2;
+    }
+    throw GpuMemoryAllocationError{"GPU memory availability did not stabilize during bounded allocation retries"};
+}
 GpuDiscovery DiscoverGpuDevices()
 {
     GpuDiscovery result;
@@ -60,19 +102,20 @@ GpuDiscovery DiscoverGpuDevices()
     (void)append;
     return result;
 }
-std::unique_ptr<GpuBackend> CreateGpuBackend(const GpuDevice &device, unsigned int contexts)
+std::unique_ptr<GpuBackend> CreateGpuBackend(const GpuDevice &device, unsigned int contexts, const std::function<bool()>& cancelled)
 {
     if (!device.supported)
         throw std::runtime_error{"Unsupported GPU: " + device.error};
 #ifdef MERCATURA_CUDA
     if (device.vendor == GpuVendor::NVIDIA_CUDA)
-        return CreateCudaBackend(device, contexts);
+        return CreateCudaBackend(device, contexts, cancelled);
 #endif
 #ifdef MERCATURA_OPENCL
     if (device.vendor == GpuVendor::AMD_OPENCL)
-        return CreateOpenClBackend(device, contexts);
+        return CreateOpenClBackend(device, contexts, cancelled);
 #endif
     (void)contexts;
+    (void)cancelled;
     throw std::runtime_error{"Selected GPU backend was not compiled"};
 }
 void VerifyGpuBackend(GpuBackend &backend, const std::function<bool()> &cancelled)

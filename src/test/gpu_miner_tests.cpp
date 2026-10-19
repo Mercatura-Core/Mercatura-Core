@@ -87,17 +87,18 @@ class MockBackend : public mining::GpuBackend
     std::shared_ptr<State> state;
     bool failing;
     bool delay_solo_batch;
-    unsigned int context_count;
+    unsigned int context_count, estimated_count;
 
   public:
-    MockBackend(std::shared_ptr<State> value, bool fail, bool delay = false, unsigned int contexts = 2)
-        : state{std::move(value)}, failing{fail}, delay_solo_batch{delay}, context_count{contexts}
+    MockBackend(std::shared_ptr<State> value, bool fail, bool delay = false, unsigned int contexts = 2, unsigned int estimated = 0)
+        : state{std::move(value)}, failing{fail}, delay_solo_batch{delay}, context_count{contexts}, estimated_count{estimated ? estimated : contexts}
     {
     }
     unsigned int Contexts() const override
     {
         return context_count;
     }
+    unsigned int EstimatedContexts() const override { return estimated_count; }
     uint64_t MemoryBytes() const override
     {
         return context_count * (128ULL << 20);
@@ -272,9 +273,95 @@ BOOST_AUTO_TEST_CASE(manual_gpu_budget_boundaries_and_backend_reporting)
     amd.available_memory = 0;
     BOOST_CHECK_EQUAL(CalculateGpuBudget(amd).maximum_contexts, 0U); // No fallback to total VRAM.
 }
+BOOST_AUTO_TEST_CASE(automatic_allocation_search_cleanup_and_errors)
+{
+    // Every threshold exercises the bounded search, including 0 (no viable
+    // allocation), 1 and the scheduler maximum. No SDK/hardware is required.
+    for (unsigned int threshold{0}; threshold <= mining::MAX_GPU_CONTEXTS; ++threshold) {
+        unsigned int live{0}, attempts{0}, queries{0}, cleanups{0};
+        auto budget = [&] {
+            BOOST_CHECK_EQUAL(live, 0U);
+            ++queries;
+            mining::GpuMemoryBudget result;
+            result.contexts = mining::MAX_GPU_CONTEXTS;
+            return result;
+        };
+        auto allocate = [&](unsigned count, const auto&) {
+            BOOST_CHECK_EQUAL(live, 0U);
+            live = count; // Even a failed attempt owns partial resources.
+            ++attempts;
+            if (count > threshold) throw mining::GpuMemoryAllocationError{"device memory exhausted"};
+        };
+        auto cleanup = [&] { live = 0; ++cleanups; };
+        if (!threshold) {
+            BOOST_CHECK_THROW(mining::AllocateGpuContexts(0, budget, allocate, cleanup, {}), mining::GpuMemoryAllocationError);
+            BOOST_CHECK_EQUAL(live, 0U);
+        } else {
+            const auto result{mining::AllocateGpuContexts(0, budget, allocate, cleanup, {})};
+            BOOST_CHECK_EQUAL(result.estimated, mining::MAX_GPU_CONTEXTS);
+            BOOST_CHECK_EQUAL(result.active, threshold);
+            BOOST_CHECK_EQUAL(live, threshold);
+            BOOST_CHECK_EQUAL(cleanups + 1, attempts);
+        }
+        BOOST_CHECK_LE(attempts, 20U);
+        BOOST_CHECK_EQUAL(queries, attempts);
+        if (threshold == mining::MAX_GPU_CONTEXTS) BOOST_CHECK_EQUAL(attempts, 1U);
+    }
+    for (const bool memory_error : {false, true}) {
+        unsigned attempts{0}, live{0};
+        auto budget = [] { mining::GpuMemoryBudget result; result.contexts = 43; return result; };
+        auto allocate = [&](unsigned count, const auto&) {
+            live = count; ++attempts;
+            if (memory_error) throw mining::GpuMemoryAllocationError{"out of VRAM"};
+            throw std::runtime_error{"driver failure"};
+        };
+        auto cleanup = [&] { live = 0; };
+        // Manual gets one exact attempt, with no silent reduction.
+        BOOST_CHECK_THROW(mining::AllocateGpuContexts(36, budget, allocate, cleanup, {}), std::runtime_error);
+        BOOST_CHECK_EQUAL(attempts, 1U);
+        BOOST_CHECK_EQUAL(live, 0U);
+        if (!memory_error) {
+            attempts = 0;
+            BOOST_CHECK_THROW(mining::AllocateGpuContexts(0, budget, allocate, cleanup, {}), std::runtime_error);
+            BOOST_CHECK_EQUAL(attempts, 1U);
+        }
+    }
+}
+BOOST_AUTO_TEST_CASE(allocation_fallback_cancellation_shutdown_and_fresh_budget)
+{
+    for (const bool stop_after_success : {false, true}) {
+        std::atomic<bool> stopping{false};
+        unsigned int attempts{0}, live{0};
+        auto budget = [] { mining::GpuMemoryBudget result; result.contexts = 43; return result; };
+        auto allocate = [&](unsigned count, const auto&) {
+            live = count; ++attempts;
+            stopping = true; // Same predicate handles RequestStop and node shutdown.
+            if (!stop_after_success) throw mining::GpuMemoryAllocationError{"out of VRAM"};
+        };
+        BOOST_CHECK_THROW(mining::AllocateGpuContexts(0, budget, allocate, [&] { live = 0; },
+            [&] { return stopping.load(); }), std::runtime_error);
+        BOOST_CHECK_EQUAL(attempts, 1U);
+        BOOST_CHECK_EQUAL(live, 0U);
+    }
+    unsigned queries{0}, attempts{0}, live{0};
+    auto budget = [&] {
+        BOOST_CHECK_EQUAL(live, 0U);
+        mining::GpuMemoryBudget result;
+        result.contexts = ++queries == 1 ? 43 : 7;
+        return result;
+    };
+    const auto result{mining::AllocateGpuContexts(0, budget, [&](unsigned count, const auto&) {
+        live = count;
+        if (++attempts == 1) throw mining::GpuMemoryAllocationError{"memory pressure"};
+        BOOST_CHECK_LE(count, 7U);
+    }, [&] { live = 0; }, {})};
+    BOOST_CHECK_EQUAL(result.estimated, 43U);
+    BOOST_CHECK_EQUAL(result.active, 7U);
+    BOOST_CHECK_EQUAL(attempts, 2U);
+}
 BOOST_AUTO_TEST_CASE(automatic_devices_size_independently_and_manual_reduces)
 {
-    for (const unsigned int requested : {0U, 4U}) {
+    for (const bool adjusted : {false, true}) for (const unsigned int requested : {0U, 4U}) {
         auto state{std::make_shared<State>()};
         auto devices = [] {
             mining::GpuDiscovery result;
@@ -290,7 +377,8 @@ BOOST_AUTO_TEST_CASE(automatic_devices_size_independently_and_manual_reduces)
         mining::MiningController controller{Hashes(state), Limits, {}, devices,
             [&, state](const auto& device, unsigned contexts) {
                 BOOST_CHECK_EQUAL(contexts, requested); // Automatic stays 0, never the smallest device's count.
-                return std::make_unique<MockBackend>(state, false, false, mining::CalculateGpuBudget(device, contexts).contexts);
+                const auto estimated{mining::CalculateGpuBudget(device, contexts).contexts};
+                return std::make_unique<MockBackend>(state, false, false, estimated - (adjusted && !requested ? 4 : 0), estimated);
             }};
         BOOST_REQUIRE(controller.Start([state] { return std::make_unique<Provider>(state); }, 0, {false, true, {}, requested, 0}));
         const bool mined{Until([&] {
@@ -303,11 +391,15 @@ BOOST_AUTO_TEST_CASE(automatic_devices_size_independently_and_manual_reduces)
         BOOST_CHECK(mined);
         const auto stats{controller.GetStats()};
         BOOST_REQUIRE_EQUAL(stats.devices.size(), 3U);
-        BOOST_CHECK_EQUAL(stats.devices[0].contexts, requested ? requested : 43U);
-        BOOST_CHECK_EQUAL(stats.devices[1].contexts, requested ? requested : 181U);
-        BOOST_CHECK_EQUAL(stats.devices[2].contexts, requested ? requested : mining::MAX_GPU_CONTEXTS);
+        BOOST_CHECK_EQUAL(stats.devices[0].contexts, requested ? requested : adjusted ? 39U : 43U);
+        BOOST_CHECK_EQUAL(stats.devices[1].contexts, requested ? requested : adjusted ? 177U : 181U);
+        BOOST_CHECK_EQUAL(stats.devices[2].contexts, requested ? requested : mining::MAX_GPU_CONTEXTS - (adjusted ? 4 : 0));
         BOOST_REQUIRE_EQUAL(before_stop.devices.size(), 3U);
-        if (!requested) BOOST_CHECK_EQUAL(before_stop.devices[2].memory_bytes, 32ULL << 30);
+        BOOST_CHECK_EQUAL(before_stop.devices[0].estimated_contexts, requested ? requested : 43U);
+        BOOST_CHECK_EQUAL(before_stop.devices[1].estimated_contexts, requested ? requested : 181U);
+        BOOST_CHECK_EQUAL(before_stop.devices[2].estimated_contexts, requested ? requested : 256U);
+        BOOST_CHECK_EQUAL(before_stop.devices[0].automatic, !requested);
+        if (!requested) BOOST_CHECK_EQUAL(before_stop.devices[2].memory_bytes, (256ULL - (adjusted ? 4 : 0)) * (128ULL << 20));
         BOOST_CHECK_EQUAL(stats.devices[2].memory_bytes, 0U); // Stop clears the live allocation statistic.
         BOOST_CHECK(!state->duplicate); // Different full/partial batch sizes still share non-overlapping leases.
         BOOST_CHECK_EQUAL(stats.active_workers, 0U);

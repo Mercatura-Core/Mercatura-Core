@@ -7,6 +7,7 @@
 #include <functional>
 #include <memory>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <vector>
 namespace mining
@@ -56,6 +57,21 @@ GpuMemoryBudget CalculateGpuBudget(uint64_t memory, uint64_t maximum_allocation,
                                    GpuMemorySource source = GpuMemorySource::CUDA_FREE);
 // Preview only: discovery can become stale. Backends re-query before allocation.
 GpuMemoryBudget CalculateGpuBudget(const GpuDevice& device, unsigned int requested = 0);
+// Only explicit device-buffer memory exhaustion (or loss of the promised
+// reserve) is recoverable. Driver, kernel and verification errors stay fatal.
+class GpuMemoryAllocationError : public std::runtime_error {
+  public:
+    using std::runtime_error::runtime_error;
+};
+struct GpuContextAllocation {
+    unsigned int estimated{0}, active{0};
+};
+// Budget is queried with no mining buffers live. Cleanup must release every
+// buffer, including partial attempts; initialized runtime objects may be reused.
+GpuContextAllocation AllocateGpuContexts(unsigned int requested,
+    const std::function<GpuMemoryBudget()>& budget,
+    const std::function<void(unsigned int, const GpuMemoryBudget&)>& allocate,
+    const std::function<void()>& cleanup, const std::function<bool()>& cancelled);
 using GpuHeader = std::array<unsigned char, 80>;
 using GpuHash = std::array<unsigned char, 32>;
 class GpuBackend
@@ -63,24 +79,28 @@ class GpuBackend
   public:
     virtual ~GpuBackend() = default;
     virtual unsigned int Contexts() const = 0;
+    virtual unsigned int EstimatedContexts() const { return Contexts(); }
     virtual uint64_t MemoryBytes() const = 0;
     // Empty on cancellation; never return partially executed hashes. The
     // predicate is checked between bounded launches, never by a Qt callback.
     virtual std::vector<GpuHash> Hash(std::span<const GpuHeader> headers, const std::function<bool()> &cancelled) = 0;
 };
 GpuDiscovery DiscoverGpuDevices();
-std::unique_ptr<GpuBackend> CreateGpuBackend(const GpuDevice &device, unsigned int contexts);
+std::unique_ptr<GpuBackend> CreateGpuBackend(const GpuDevice &device, unsigned int contexts,
+                                          const std::function<bool()>& cancelled = {});
 // Executes the permanent reference vectors on the selected backend at startup.
 // A mismatch disables that device before it can mine. A passing self-test is
 // runtime evidence only on the device on which it actually executed.
 void VerifyGpuBackend(GpuBackend &backend, const std::function<bool()> &cancelled);
 #ifdef MERCATURA_CUDA
 GpuDiscovery DiscoverCudaDevices();
-std::unique_ptr<GpuBackend> CreateCudaBackend(const GpuDevice &device, unsigned int contexts);
+std::unique_ptr<GpuBackend> CreateCudaBackend(const GpuDevice &device, unsigned int contexts,
+                                           const std::function<bool()>& cancelled = {});
 #endif
 #ifdef MERCATURA_OPENCL
 GpuDiscovery DiscoverOpenClDevices();
-std::unique_ptr<GpuBackend> CreateOpenClBackend(const GpuDevice &device, unsigned int contexts);
+std::unique_ptr<GpuBackend> CreateOpenClBackend(const GpuDevice &device, unsigned int contexts,
+                                             const std::function<bool()>& cancelled = {});
 #endif
 } // namespace mining
 #endif // BITCOIN_MINING_GPU_BACKEND_H
