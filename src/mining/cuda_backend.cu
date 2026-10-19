@@ -54,8 +54,13 @@ class CudaBackend final : public GpuBackend
                 memory_bytes = count * uint64_t{mercahash::SCRATCHPAD_BYTES};
                 auto allocate = [&](void** buffer, size_t bytes, const char* operation) {
                     const auto error{cudaMalloc(buffer, bytes)};
-                    if (error == cudaErrorMemoryAllocation)
+                    if (error == cudaErrorMemoryAllocation) {
+                        // Consume the handled OOM so it cannot poison the next
+                        // kernel launch check. Never mask a different error.
+                        const auto pending{cudaGetLastError()};
+                        if (pending != cudaErrorMemoryAllocation) Check(pending, "Read NVIDIA allocation error state");
                         throw GpuMemoryAllocationError{std::string{operation} + ": " + cudaGetErrorString(error)};
+                    }
                     Check(error, operation);
                 };
                 allocate(reinterpret_cast<void **>(&headers), contexts * size_t{80}, "Allocate NVIDIA headers");

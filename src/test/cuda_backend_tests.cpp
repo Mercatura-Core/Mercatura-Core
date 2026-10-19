@@ -32,6 +32,7 @@ struct Runtime {
     unsigned fail_malloc{0}, fail_launch{0}, fail_transfer{0}, fail_sync{0};
     unsigned max_contexts{256}, header_attempts{0}, frees{0}, fail_free{0};
     cudaError_t allocation_error{cudaErrorMemoryAllocation};
+    cudaError_t last_error{cudaSuccess}, allocation_last_error{cudaSuccess};
     bool dirty_retry{false};
     std::function<void()> on_allocation;
     bool freed_pending{false};
@@ -43,6 +44,7 @@ struct Runtime {
         fail_malloc = fail_launch = fail_transfer = fail_sync = 0;
         max_contexts = 256; header_attempts = frees = fail_free = 0;
         allocation_error = cudaErrorMemoryAllocation;
+        last_error = allocation_last_error = cudaSuccess;
         dirty_retry = false; on_allocation = {};
         freed_pending = false;
         extra_usage = 0;
@@ -143,11 +145,14 @@ cudaError_t CUDARTAPI cudaMalloc(void** pointer, size_t bytes)
         s.dirty_retry |= s.allocations.size() != 2;
     }
     if (s.on_allocation) s.on_allocation();
-    if (++s.mallocs == s.fail_malloc || bytes / (128ULL << 20) > s.max_contexts) return s.allocation_error;
+    if (++s.mallocs == s.fail_malloc || bytes / (128ULL << 20) > s.max_contexts) {
+        s.last_error = s.allocation_last_error == cudaSuccess ? s.allocation_error : s.allocation_last_error;
+        return s.allocation_error;
+    }
     // Kernels are never executed here: a scratchpad needs only a distinct token.
     // Track its requested VRAM size without reserving gigabytes of host memory.
     *pointer = std::calloc(1, bytes >= (128ULL << 20) ? 1 : bytes);
-    if (!*pointer) return cudaErrorMemoryAllocation;
+    if (!*pointer) return s.last_error = cudaErrorMemoryAllocation;
     s.allocations.insert(*pointer); s.allocation_bytes[*pointer] = bytes; return cudaSuccess;
 }
 cudaError_t CUDARTAPI cudaFree(void* pointer)
@@ -173,7 +178,10 @@ cudaError_t CUDARTAPI cudaLaunchKernel(const void* function, dim3 grid, dim3 blo
 }
 cudaError_t CUDARTAPI cudaGetLastError()
 {
-    auto& s{State()}; return s.launches.size() == s.fail_launch ? cudaErrorLaunchFailure : cudaSuccess;
+    auto& s{State()};
+    const auto error{s.fail_launch && s.launches.size() == s.fail_launch ? cudaErrorLaunchFailure : s.last_error};
+    s.last_error = cudaSuccess;
+    return error;
 }
 cudaError_t CUDARTAPI cudaStreamSynchronize(cudaStream_t)
 {
@@ -228,6 +236,12 @@ int main()
             Require(automatic->Contexts() == 39 && automatic->EstimatedContexts() == 43, "Automatic fallback did not find the highest viable count");
             Require(state.header_attempts <= 20 && !state.dirty_retry, "Excessive retries or dirty CUDA probe");
             Require(state.allocations.size() == 4, "Final CUDA allocation is incomplete");
+            Require(state.last_error == cudaSuccess, "Handled allocation OOM poisoned CUDA error state");
+            const auto syncs_before_hash{state.syncs};
+            Require(automatic->Hash(std::vector<mining::GpuHeader>(1), [] { return false; }).size() == 1,
+                    "First hash batch after fallback failed");
+            Require(state.launches.size() == 770 && state.syncs - syncs_before_hash == 31 && state.pending == 0,
+                    "First post-fallback batch changed the validated launch/synchronization schedule");
         }
         Require(state.allocations.empty() && state.streams == 0, "Fallback leaked CUDA resources");
         state.Reset(); state.max_contexts = 0;
@@ -239,6 +253,9 @@ int main()
         state.Reset(); state.max_contexts = 39; state.allocation_error = cudaErrorInvalidValue;
         ExpectFailure([&] { mining::CreateCudaBackend(device, 0); });
         Require(state.header_attempts == 1 && state.allocations.empty(), "Unrelated CUDA error triggered fallback");
+        state.Reset(); state.max_contexts = 39; state.allocation_last_error = cudaErrorLaunchFailure;
+        ExpectFailure([&] { mining::CreateCudaBackend(device, 0); });
+        Require(state.header_attempts == 1 && state.allocations.empty(), "OOM handling masked a different CUDA driver error");
         for (const bool release_error : {false, true}) {
             state.Reset(); state.max_contexts = 39;
             if (release_error) state.fail_free = 1;
