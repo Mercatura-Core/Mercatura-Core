@@ -29,6 +29,7 @@ public:
     void setClientModel(ClientModel* client);
     void setPrivacy(bool privacy);
     static QString formatRuntime(uint64_t seconds);
+    static QString formatGpuContexts(const mining::GpuStats& device);
 
 Q_SIGNALS:
     void showRewardAddress(const QString& address);

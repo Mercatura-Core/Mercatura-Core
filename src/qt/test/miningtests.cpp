@@ -46,6 +46,21 @@ Q_DECLARE_METATYPE(wallet::AddressPurpose)
 class MiningTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void actualGpuContextsAfterFallback()
+    {
+        mining::GpuStats small, large;
+        small.contexts = 39; small.estimated_contexts = 43;
+        small.memory_bytes = 39ULL * (128ULL << 20);
+        large.contexts = 181; large.estimated_contexts = 181;
+        large.memory_bytes = 181ULL * (128ULL << 20);
+        QCOMPARE(MiningPage::formatGpuContexts(small), QString{"Automatic: 39 contexts active (43 estimated; adjusted for available VRAM)"});
+        QCOMPARE(MiningPage::formatGpuContexts(large), QString{"Automatic: 181 contexts active"});
+        small.automatic = false;
+        QCOMPARE(MiningPage::formatGpuContexts(small), QString{"Manual: 39 contexts active"});
+        small.memory_bytes = 0;
+        QCOMPARE(MiningPage::formatGpuContexts(small), QString{"No contexts active"});
+        QCOMPARE(MiningPage::formatGpuContexts(large), QString{"Automatic: 181 contexts active"});
+    }
     void maximumAutomaticAndReducedManualGpuContexts()
     {
         TestingSetup setup{ChainType::REGTEST};

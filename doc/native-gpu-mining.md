@@ -111,15 +111,30 @@ max(1 GiB, 10% of reported free memory) of remaining headroom. Refresh runs off
 the GUI thread and retains explicit device selections. Allocation also runs off
 the GUI thread: CUDA re-queries free memory immediately before allocation, checks
 every allocation, and checks actual remaining memory against the reserve afterward.
-An unsafe/stale request fails visibly and cleans up; it is not silently retried
-with a different manual count. Other applications can still consume VRAM later.
+Automatic first attempts that maximum. Explicit device-buffer memory exhaustion
+or loss of the required CUDA reserve triggers a bounded binary search for the
+highest allocatable smaller count (at most 20 attempts with the current scheduler).
+Every probe releases all mining buffers before the next budget query; the retained
+allocation is freshly checked. Stop and shutdown cancel between attempts. If even
+one context cannot fit, or memory keeps changing beyond the retry bound, the device
+fails cleanly. Manual makes one attempt at the exact requested count and never
+silently reduces it. Driver, kernel, build and hash-verification errors do not
+trigger allocation retries. Other applications can still consume VRAM later.
+
+The Mining tab reports each GPU's actual active contexts independently. When
+Automatic falls back, it shows the original estimate and final count, for example:
+“RTX 3050 — Automatic: 39 contexts active (43 estimated; adjusted for available
+VRAM).” Stopped devices are not reported as having active allocations.
 
 Core OpenCL has no portable free-VRAM query. AMD Automatic therefore selects the
 largest count within a conservative fallback: at most a quarter of reported
 global memory, reduced by overhead and bounded by `CL_DEVICE_MAX_MEM_ALLOC_SIZE`
 and host address space. Manual can reduce that count. This is a capability-based
 allocation ceiling, not a claim that any portion is currently free. Every
-allocation is checked; allocation/launch failure releases the affected backend's
+allocation is checked. Only `CL_MEM_OBJECT_ALLOCATION_FAILURE` from device-buffer
+creation permits the same bounded Automatic search, with the conservative budget
+rechecked each time. Unknown free memory remains unknown; ambiguous driver/resource
+and host-memory errors are not retried. An unrecoverable allocation/launch failure releases the affected backend's
 resources and leaves healthy GPUs/CPU workers running. Its UI reports global
 memory and explicitly warns that free VRAM is unknown; total or unallocated
 budget is never presented as a measurement of free memory. These memory policies

@@ -323,9 +323,10 @@ void MiningPage::updateStatus()
     }
     m_gpu_status->setText(gpu_messages.join(QStringLiteral("\n")));
     QStringList device_rates{tr("CPU: %1 H/s (%2 hashes)").arg(stats.cpu_hashes_per_second, 0, 'f', 2).arg(qulonglong{stats.cpu_hashes})};
-    for (const auto& device : stats.devices) device_rates << tr("%1: %2 H/s, %3 hashes, %4 MiB, %5 contexts — %6")
-        .arg(QString::fromStdString(device.device.name)).arg(device.hashes_per_second, 0, 'f', 2).arg(qulonglong{device.hashes})
-        .arg(qulonglong{device.memory_bytes >> 20}).arg(device.contexts).arg(QString::fromStdString(device.status));
+    for (const auto& device : stats.devices) device_rates << tr("%1 — %2; %3 H/s, %4 hashes, %5 MiB — %6")
+        .arg(QString::fromStdString(device.device.name)).arg(formatGpuContexts(device))
+        .arg(device.hashes_per_second, 0, 'f', 2).arg(qulonglong{device.hashes})
+        .arg(qulonglong{device.memory_bytes >> 20}).arg(QString::fromStdString(device.status));
     m_gpu_rates->setText(device_rates.join(QStringLiteral("\n")));
     m_workers->setEnabled(!running && use_cpu && maximum > 0);
     m_hashrate->setText(tr("%1 H/s").arg(stats.hashes_per_second_10s, 0, 'f', 2));
@@ -353,6 +354,16 @@ void MiningPage::updateStatus()
     const bool own_destination{!m_privacy && m_wallet && m_session && m_session->owner() == m_wallet && !stats.destination.empty()};
     m_copy_destination->setEnabled(own_destination);
     m_show_destination->setEnabled(own_destination);
+}
+
+QString MiningPage::formatGpuContexts(const mining::GpuStats& device)
+{
+    if (!device.memory_bytes) return tr("No contexts active");
+    const auto mode{device.automatic ? tr("Automatic") : tr("Manual")};
+    auto result{tr("%1: %2 contexts active").arg(mode).arg(device.contexts)};
+    if (device.automatic && device.estimated_contexts > device.contexts)
+        result += tr(" (%1 estimated; adjusted for available VRAM)").arg(device.estimated_contexts);
+    return result;
 }
 
 QString MiningPage::formatRuntime(uint64_t seconds)

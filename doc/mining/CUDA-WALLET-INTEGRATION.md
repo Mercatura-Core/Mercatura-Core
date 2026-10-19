@@ -5,6 +5,29 @@ wallet miner. There is no separate miner product, blockchain, fee, automatic
 mining start, or GPU clock/power/fan control. Qt selectors, Solo, CPU candidate
 verification, MercaHash V1 and ML-DSA wallet/transaction rules remain intact.
 
+The final feature update adds bounded Automatic allocation fallback and actual
+per-device context reporting. Only explicit device-buffer memory exhaustion or
+loss of CUDA's required reserve permits retry; Manual never reduces its selected
+count. Each probe releases all mining buffers and rechecks the unchanged memory
+policy. A binary search is bounded to 20 attempts at the unchanged 256-context
+scheduler limit, including revalidation when available memory changes. Cancellation
+and shutdown abort retries. Initialized streams/programs are reused; no mining
+starts until the retained allocation passes the existing independent verification.
+OpenCL retries only explicit device-buffer allocation failures and continues to
+use conservative total-memory capability limits rather than claiming measured free
+VRAM. The Qt tab shows actual active counts and both estimate and final count when
+Automatic adjusts capacity.
+
+Focused regressions cover every allocatable threshold from 0 through 256, cleanup
+between failed and successful probes, fresh budgets, cancellation/shutdown predicates,
+exact Manual counts, non-memory errors, fake-runtime CUDA allocation/reserve faults,
+and independent multi-GPU statistics and Qt formatting. Physical NVIDIA/AMD memory
+pressure and shutdown qualification remain hardware requirements.
+
+**Feature scope is frozen after this update.** The next stage is hardware
+validation, performance benchmarking, stability testing and bug fixes only. No
+release, tag, merge or publication is authorized by this handoff.
+
 ## Source provenance and scope
 
 Base: `631886dd5159614b628ced3fe4fa1e289ce19451` (`v0.1` when audited).
