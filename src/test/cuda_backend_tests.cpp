@@ -4,6 +4,9 @@
 // Link the actual CUDA backend's host object against a deterministic fake CUDA
 // runtime. No driver/device instructions execute in this separate test binary.
 #include <cuda_runtime.h>
+#ifndef MERCATURA_CUDA_MIN_ARCH
+#define MERCATURA_CUDA_MIN_ARCH 75
+#endif
 #include <mining/gpu_backend.h>
 
 #include <algorithm>
@@ -116,7 +119,10 @@ cudaError_t CUDARTAPI cudaGetDeviceCount(int* count) { *count = 1; return cudaSu
 cudaError_t CUDARTAPI cudaGetDeviceProperties(cudaDeviceProp* prop, int)
 {
     *prop = {}; std::strcpy(prop->name, "Fake CUDA runtime (no hardware)");
-    prop->major = 8; prop->minor = 0; prop->totalGlobalMem = 8ULL << 30; return cudaSuccess;
+    // Match the binary's configured minimum, including RTX 3050-only builds.
+    prop->major = MERCATURA_CUDA_MIN_ARCH / 10;
+    prop->minor = MERCATURA_CUDA_MIN_ARCH % 10;
+    prop->totalGlobalMem = 8ULL << 30; return cudaSuccess;
 }
 cudaError_t CUDARTAPI cudaMemGetInfo(size_t* available, size_t* total)
 {
