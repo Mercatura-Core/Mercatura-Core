@@ -67,3 +67,31 @@ throughput rises by a factor R, initial expected spacing is approximately
 stochastic and subject to the existing clamps. This revision neither resets
 difficulty nor introduces a minimum-difficulty exception. A separate change
 would require measured evidence and explicit consensus coordination.
+
+## Native mining and resource accounting
+
+SoloWorkProvider resolves the assembled template's actual parent in the local
+block index and stores its height and PoW version in the immutable job. A tip
+replacement revokes the job. On a version transition, the controller cancels
+old work, drains and joins workers, releases their resources, recalculates
+budgets, and starts a fresh pool. The same process applies to a reorganization
+back to V1. Nonce leases and cumulative statistics retain their existing
+semantics; stale candidates cannot submit.
+
+A CPU worker or authoritative GPU candidate verifier reserves scratchpad bytes
+plus 32 MiB. V1 therefore reserves 160 MiB and V2 48 MiB. The overhead remains
+conservative for thread stacks and allocator/session state; it is not a tuning
+claim. CPU affinity/cgroup constraints and manual worker selection remain in
+force. Automatic selection retains the existing half-logical-CPU heuristic
+within the current memory bound. No new production worker ceiling is imposed.
+Qt displays a version-aware preview; the actual provider/controller selection
+is authoritative and independently checked.
+
+GPU budgeting uses the selected scratchpad size, retains the existing runtime
+and per-context overhead reserves, and retains the 256-nonce lease bound.
+CUDA budgets from freshly queried free VRAM; OpenCL retains its conservative
+quarter-of-total-memory and single-allocation limits. Total OpenCL memory is
+never described as measured free VRAM. A backend must report the job's exact
+version before its version-specific permanent-vector startup check can pass.
+Every candidate is compared byte-for-byte against the authoritative CPU hash
+before submission.

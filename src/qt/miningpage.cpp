@@ -4,6 +4,7 @@
 #include <qt/miningpage.h>
 
 #include <chainparams.h>
+#include <pow.h>
 #include <interfaces/node.h>
 #include <qt/clientmodel.h>
 #include <qt/guiutil.h>
@@ -226,8 +227,19 @@ void MiningPage::updateStatus()
 {
     const mining::MiningStats stats{m_session ? m_session->stats() : mining::MiningStats{}};
     const bool running{stats.busy};
-    if (!running) m_limits = m_detect_limits();
-    m_hardware_limits->setText(tr("%1 logical processors detected; up to %2 CPU-only workers within the current CPU and memory budget. Combined mode also reserves host memory for GPU verification. Each worker needs a private 128 MiB scratchpad plus overhead. Logical processor count does not predict optimal hashing throughput.").arg(m_limits.logical_cpus).arg(m_limits.maximum));
+    // UI preview only. The provider resolves the actual template's parent,
+    // and the controller rechecks the version's budget before starting workers.
+    const auto version{m_client ? GetPoWVersion(Params().GetConsensus(), int64_t{m_client->getNumBlocks()} + 1) : mercahash::Version::V1};
+    if (!running) {
+        m_limits = m_detect_limits();
+        if (version == mercahash::Version::V2) m_limits = mining::CalculateWorkerLimits(m_limits.logical_cpus, m_limits.available_memory, version);
+    }
+    const auto gpu_budget = [version](const mining::GpuDevice& device, unsigned int requested = 0) {
+        auto selected{device};
+        selected.pow_version = version;
+        return mining::CalculateGpuBudget(selected, requested);
+    };
+    m_hardware_limits->setText(tr("%1 logical processors detected; up to %2 CPU-only workers within the current CPU and memory budget. Combined mode also reserves host memory for GPU verification. Each worker needs a private %3 MiB scratchpad plus overhead. Logical processor count does not predict optimal hashing throughput.").arg(m_limits.logical_cpus).arg(m_limits.maximum).arg(qulonglong{mercahash::ScratchpadBytes(version) >> 20}));
     const bool syncing{m_client && Params().GetChainType() != ChainType::REGTEST && m_client->node().isInitialBlockDownload()};
     const bool use_cpu{m_hardware->currentIndex() != 1};
     const bool use_gpu{m_hardware->currentIndex() != 0};
@@ -261,7 +273,7 @@ void MiningPage::updateStatus()
     unsigned int context_maximum{gpu_available ? mining::MAX_GPU_CONTEXTS : 0};
     bool automatic_memory{false};
     for (const auto* device : selected_devices) {
-        const auto budget{mining::CalculateGpuBudget(*device)};
+        const auto budget{gpu_budget(*device)};
         context_maximum = std::min(context_maximum, budget.maximum_contexts); // Manual field only.
         automatic_memory |= budget.contexts > 0;
     }
@@ -272,8 +284,8 @@ void MiningPage::updateStatus()
     }
     const bool gpu_context_memory{manual_contexts
         ? context_maximum > 0 && static_cast<unsigned int>(m_contexts->value()) <= context_maximum : automatic_memory};
-    const auto maximum{mining::MaximumCpuWorkers(m_limits, use_gpu ? selected_gpus : 0)};
-    const auto host_limits{mining::CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), m_limits.available_memory)};
+    const auto maximum{mining::MaximumCpuWorkers(m_limits, use_gpu ? selected_gpus : 0, version)};
+    const auto host_limits{mining::CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), m_limits.available_memory, version)};
     const bool gpu_host_memory{!use_gpu || selected_gpus <= host_limits.maximum};
     if (!running) {
         const QSignalBlocker block{m_workers}; // Resource clamping is not a new manual preference.
@@ -303,8 +315,8 @@ void MiningPage::updateStatus()
         if (gpu_available && !gpu_context_memory) gpu_messages << tr("The selected GPUs cannot fit the requested contexts within their memory budgets. Free memory or select fewer contexts/devices.");
         for (const auto* device : selected_devices) {
             const auto requested{manual_contexts ? static_cast<unsigned int>(m_contexts->value()) : 0};
-            if (requested > mining::CalculateGpuBudget(*device).maximum_contexts) continue;
-            const auto budget{mining::CalculateGpuBudget(*device, requested)};
+            if (requested > gpu_budget(*device).maximum_contexts) continue;
+            const auto budget{gpu_budget(*device, requested)};
             const auto name{QString::fromStdString(device->name)};
             if (device->vendor == mining::GpuVendor::NVIDIA_CUDA) {
                 gpu_messages << tr("%1: %2 MiB free at last refresh. %3 contexts: %4 MiB scratchpads + %5 MiB estimated overhead; %6 MiB estimated headroom, %7 MiB minimum reserve. Free memory is rechecked when mining starts.")

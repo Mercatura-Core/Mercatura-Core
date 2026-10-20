@@ -3,6 +3,7 @@
 #ifndef BITCOIN_MINING_GPU_BACKEND_H
 #define BITCOIN_MINING_GPU_BACKEND_H
 #include <array>
+#include <crypto/mercahash.h>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -21,6 +22,7 @@ struct GpuDevice {
     GpuDevice() = default;
     explicit GpuDevice(GpuVendor value) : vendor{value} {}
     GpuVendor vendor{GpuVendor::NVIDIA_CUDA};
+    mercahash::Version pow_version{mercahash::Version::V1}; // Selected from the immutable mining job.
     unsigned int ordinal{0};
     std::string id;
     std::string name;
@@ -54,7 +56,8 @@ struct GpuMemoryBudget {
     bool scheduler_limited{false}; // More would fit by memory, but nonce leases currently contain 256 nonces.
 };
 GpuMemoryBudget CalculateGpuBudget(uint64_t memory, uint64_t maximum_allocation, unsigned int requested = 0,
-                                   GpuMemorySource source = GpuMemorySource::CUDA_FREE);
+                                   GpuMemorySource source = GpuMemorySource::CUDA_FREE,
+                                   mercahash::Version version = mercahash::Version::V1);
 // Preview only: discovery can become stale. Backends re-query before allocation.
 GpuMemoryBudget CalculateGpuBudget(const GpuDevice& device, unsigned int requested = 0);
 // Only explicit device-buffer memory exhaustion (or loss of the promised
@@ -80,6 +83,7 @@ class GpuBackend
   public:
     virtual ~GpuBackend() = default;
     virtual unsigned int Contexts() const = 0;
+    virtual mercahash::Version PoWVersion() const { return mercahash::Version::V1; }
     virtual unsigned int EstimatedContexts() const { return Contexts(); }
     virtual uint64_t MemoryBytes() const = 0;
     // Empty on cancellation; never return partially executed hashes. The

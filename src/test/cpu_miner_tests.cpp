@@ -33,6 +33,7 @@ struct FakeState {
     std::atomic<unsigned int> submissions{0};
     std::atomic<bool> interrupted{false};
     std::atomic<bool> cancelled{false};
+    std::atomic<mercahash::Version> version{mercahash::Version::V1};
 };
 class FakeProvider : public mining::WorkProvider {
 public:
@@ -42,6 +43,7 @@ public:
         ++m_state->jobs;
         mining::MiningJob job;
         job.header.nVersion = m_state->parent;
+        job.pow_version = m_state->version;
         job.target = arith_uint256{1};
         return job;
     }
@@ -523,5 +525,78 @@ BOOST_AUTO_TEST_CASE(rate_sampling_includes_blocked_submission_time)
     BOOST_CHECK(sampled);
     BOOST_CHECK(rate > 0 && rate < 10); // Solo work pauses during submission; blocked time stays in the denominator.
     BOOST_CHECK_EQUAL(controller.GetStats().rejected, 0U);
+}
+BOOST_AUTO_TEST_CASE(version_memory_budgets_and_worker_pool_replacement)
+{
+    using mercahash::Version;
+    BOOST_CHECK_EQUAL(mining::WorkerMemoryBytes(Version::V1), 160ULL << 20);
+    BOOST_CHECK_EQUAL(mining::WorkerMemoryBytes(Version::V2), 48ULL << 20);
+    const auto before{mining::CalculateWorkerLimits(12, 1ULL << 30, Version::V1)};
+    const auto after{mining::CalculateWorkerLimits(12, 1ULL << 30, Version::V2)};
+    BOOST_CHECK_EQUAL(before.maximum, 3U);
+    BOOST_CHECK_EQUAL(after.maximum, 10U);
+    BOOST_CHECK_EQUAL(after.recommended, 6U);
+    BOOST_CHECK_EQUAL(mining::CalculateWorkerLimits(12, (512ULL << 20) + (48ULL << 20) - 1, Version::V2).maximum, 0U);
+    BOOST_CHECK_EQUAL(mining::CalculateWorkerLimits(12, (512ULL << 20) + (48ULL << 20), Version::V2).maximum, 1U);
+    auto state{std::make_shared<FakeState>()};
+    std::atomic<unsigned> created{0};
+    mining::MiningController controller{[&] {
+        ++created;
+        return [](const CBlockHeader&) {
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+            return uint256::FromHex(std::string(64, 'f')).value();
+        };
+    }, [before] { return before; }};
+    BOOST_REQUIRE(controller.Start([state] { return std::make_unique<FakeProvider>(state); }));
+    const bool initial{Until([&] { return created == 3; })};
+    state->version = Version::V2;
+    ++state->parent;
+    const bool activated{Until([&] { return created == 9; })};
+    state->version = Version::V1;
+    ++state->parent;
+    const bool reorganized{Until([&] { return created == 12; })};
+    controller.RequestStop(); controller.Wait();
+    BOOST_CHECK(initial);
+    BOOST_CHECK(activated);
+    BOOST_CHECK(reorganized);
+    BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
+    BOOST_CHECK(controller.GetStats().state != mining::MiningState::FAILED);
+}
+
+BOOST_AUTO_TEST_CASE(real_v2_worker_hashes_with_v2_only_memory_budget)
+{
+    struct State {
+        mining::MiningJob job;
+        std::atomic<bool> submitted{false};
+    };
+    struct Provider : mining::WorkProvider {
+        std::shared_ptr<State> state;
+        explicit Provider(std::shared_ptr<State> value) : state{std::move(value)} {}
+        std::optional<mining::MiningJob> GetJob() override { return state->submitted ? std::nullopt : std::optional{state->job}; }
+        bool IsCurrent(const mining::MiningJob&) override { return !state->submitted; }
+        mining::SubmissionResult Submit(const mining::MiningJob&, const CBlockHeader&) override { state->submitted = true; return {true, true, "accepted"}; }
+        void Interrupt() override {}
+    };
+    auto state{std::make_shared<State>()};
+    state->job.pow_version = mercahash::Version::V2;
+    PoWHashContext reference;
+    // The wrong V1 hash must fail this target, making version selection observable.
+    for (;;) {
+        const auto v2{reference.GetHash(state->job.header, mercahash::Version::V2)};
+        const auto v1{reference.GetHash(state->job.header)};
+        if (UintToArith256(v2) < UintToArith256(v1)) {
+            state->job.target = UintToArith256(v2);
+            break;
+        }
+        ++state->job.header.nVersion;
+    }
+    const auto limits{mining::CalculateWorkerLimits(2, 560ULL << 20)};
+    BOOST_CHECK_EQUAL(limits.maximum, 0U); // V1 does not fit, V2 does.
+    mining::MiningController controller{{}, [limits] { return limits; }};
+    BOOST_REQUIRE(controller.Start([state] { return std::make_unique<Provider>(state); }, 1));
+    const bool submitted{Until([&] { return state->submitted.load(); })};
+    controller.RequestStop(); controller.Wait();
+    BOOST_CHECK(submitted);
+    BOOST_CHECK_EQUAL(controller.GetStats().accepted, 1U);
 }
 BOOST_AUTO_TEST_SUITE_END()

@@ -8,7 +8,7 @@
 namespace mining
 {
 GpuMemoryBudget CalculateGpuBudget(uint64_t memory, uint64_t maximum_allocation, unsigned int requested,
-                                   GpuMemorySource source)
+                                   GpuMemorySource source, mercahash::Version version)
 {
     // CUDA sizes from measured free memory. OpenCL total memory is NOT free:
     // without a reliable free-memory query, allow at most a quarter of the
@@ -19,16 +19,16 @@ GpuMemoryBudget CalculateGpuBudget(uint64_t memory, uint64_t maximum_allocation,
     // Headers/states/results and allocation rounding, plus a separate allowance
     // for runtime/JIT/program/stream overhead. Neither consumes the VRAM reserve.
     constexpr uint64_t fixed_overhead{64ULL << 20};
-    const uint64_t context_bytes{mercahash::SCRATCHPAD_BYTES + 4096};
+    const uint64_t context_bytes{mercahash::ScratchpadBytes(version) + 4096};
     const uint64_t usable{memory > reserve ? memory - reserve : 0};
     const uint64_t capacity{std::min({usable > fixed_overhead ? (usable - fixed_overhead) / context_bytes : 0,
-                                    maximum_allocation / mercahash::SCRATCHPAD_BYTES,
-                                    uint64_t{std::numeric_limits<size_t>::max()} / mercahash::SCRATCHPAD_BYTES})};
+                                    maximum_allocation / mercahash::ScratchpadBytes(version),
+                                    uint64_t{std::numeric_limits<size_t>::max()} / mercahash::ScratchpadBytes(version)})};
     const auto maximum{static_cast<unsigned int>(std::min<uint64_t>(capacity, MAX_GPU_CONTEXTS))};
     if (requested > maximum)
         throw std::runtime_error{"GPU context count exceeds the safe memory budget"};
     const auto count{requested ? requested : maximum};
-    const uint64_t scratch{count * uint64_t{mercahash::SCRATCHPAD_BYTES}};
+    const uint64_t scratch{count * uint64_t{mercahash::ScratchpadBytes(version)}};
     const uint64_t overhead{count ? fixed_overhead + count * uint64_t{4096} : 0};
     const uint64_t headroom{memory - scratch - overhead};
     return {count, scratch, reserve, overhead, headroom, maximum,
@@ -38,7 +38,7 @@ GpuMemoryBudget CalculateGpuBudget(const GpuDevice& device, unsigned int request
 {
     const bool cuda{device.vendor == GpuVendor::NVIDIA_CUDA};
     return CalculateGpuBudget(cuda ? device.available_memory : device.total_memory, device.max_allocation, requested,
-                              cuda ? GpuMemorySource::CUDA_FREE : GpuMemorySource::OPENCL_TOTAL);
+                              cuda ? GpuMemorySource::CUDA_FREE : GpuMemorySource::OPENCL_TOTAL, device.pow_version);
 }
 GpuContextAllocation AllocateGpuContexts(unsigned int requested,
     const std::function<GpuMemoryBudget()>& budget,
@@ -124,6 +124,12 @@ void VerifyGpuBackend(GpuBackend &backend, const std::function<bool()> &cancelle
                                     "2321712af21502878986c0c4f21d79e17e2281619e3958f11e3c634c9f17f7d8",
                                     "9c9a427928875304bb7d6351354b5e50ec8e57c581971f68eab176371c4cd2c2",
                                     "1244c6c9e0365baeb5958cfaa57aff582d81ae1d757769e823085bb00676e170"};
+    constexpr const char* vectors_v2[]{
+        "eb53364febf3cbe079be98c554f125ee3b78cc64d162fb831f4364f0f8b26dd8",
+        "98c21c199742ff142100cc795857156909d73ac8fa81012a2803158dc0927b63",
+        "306b4fd4000c5605e57f48395daf1e176c8cc92fd72a14440a9d028f4de93d62",
+        "1328a9db2db6212d474953c5c5a5e20d91a04179d77c60c460ede9b61015243c"};
+    const auto* selected{backend.PoWVersion() == mercahash::Version::V2 ? vectors_v2 : vectors};
     auto nibble = [](char value) { return value <= '9' ? value - '0' : value - 'a' + 10; };
     // Different inputs in every slot also exercise isolation and reuse.
     for (unsigned int base{0}; base < 4 && !cancelled(); ++base) {
@@ -142,11 +148,11 @@ void VerifyGpuBackend(GpuBackend &backend, const std::function<bool()> &cancelle
         if (results.size() != headers.size())
             throw std::runtime_error{"GPU self-test returned an incomplete batch"};
         for (size_t slot{0}; slot < results.size(); ++slot) {
-            const char *expected{vectors[(base + slot) % 4]};
+            const char *expected{selected[(base + slot) % 4]};
             for (size_t byte{0}; byte < 32; ++byte) {
                 if (results[slot][byte] !=
                     static_cast<unsigned char>(nibble(expected[byte * 2]) * 16 + nibble(expected[byte * 2 + 1])))
-                    throw std::runtime_error{"GPU MercaHash V1 reference-vector mismatch"};
+                    throw std::runtime_error{"GPU MercaHash version-specific reference-vector mismatch"};
             }
         }
     }
