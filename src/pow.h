@@ -32,9 +32,10 @@ std::optional<arith_uint256> DeriveTarget(unsigned int nBits, uint256 pow_limit)
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params&);
 
 /**
- * Compute MercaHash-v1 over the canonical serialized 80-byte block header.
+ * Compute the selected MercaHash version over the canonical 80-byte header.
  *
- * The caller owns the 128 MiB scratchpad and may reuse it between calls.
+ * The caller owns the version-sized scratchpad and may reuse it between calls.
+ * The default retains the low-level historical V1 API, not network selection.
  * CBlockHeader::GetHash() remains the SHA256d block-identity hash.
  */
 uint256 GetPoWHash(

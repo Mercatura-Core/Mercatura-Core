@@ -919,6 +919,10 @@ bool AppInitParameterInteraction(const ArgsManager& args)
     const CChainParams& chainparams = Params();
     // ********************************************************* Step 2: parameter interactions
 
+    if (chainparams.HasProvisionalGenesis()) {
+        InitWarning(Untranslated("Mainnet uses a PROVISIONAL MercaHash V2 development genesis. Launch genesis values and launch difficulty have not been finalized."));
+    }
+
     // also see: InitParameterInteraction()
 
     // We removed checkpoints but keep the option to warn users who still have it in their config.

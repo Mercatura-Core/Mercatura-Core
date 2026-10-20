@@ -154,7 +154,8 @@ std::shared_ptr<CBlock> MinerTestingSetup::FinalizeBlock(std::shared_ptr<CBlock>
     while (!CheckProofOfWork(
         *pblock,
         Params().GetConsensus(),
-        m_pow_hash_context)) {
+        m_pow_hash_context,
+        int64_t{prev_block->nHeight} + 1)) {
         ++(pblock->nNonce);
     }
 

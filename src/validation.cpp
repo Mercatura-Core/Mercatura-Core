@@ -5418,6 +5418,27 @@ bool Chainstate::LoadGenesisBlock()
 
     const CChainParams& params{m_chainman.GetParams()};
 
+    // V2-from-genesis chains must bootstrap with V2 as well. Height 0 is
+    // established by chain parameters, never inferred from a peer or tip.
+    if (params.GetConsensus().nMercaHashV2Height == 0) {
+        CBlock genesis{params.GenesisBlock()};
+        genesis.fChecked = false;
+        PoWHashContext context;
+        // Validate the real fixed fixture even in fuzz builds, whose synthetic
+        // PoW shortcut need not accept this genesis header's identity hash.
+        if (!CheckProofOfWorkImpl(context.GetHash(genesis, GetPoWVersion(params.GetConsensus(), 0)),
+                                  genesis.nBits, params.GetConsensus())) {
+            LogError("%s: invalid V2 genesis proof of work", __func__);
+            return false;
+        }
+        BlockValidationState state;
+        if (!CheckBlock(genesis, state, params.GetConsensus(), true, true,
+                        PoWCheckStatus::CHECKED, nullptr, 0)) {
+            LogError("%s: invalid V2 genesis: %s", __func__, state.ToString());
+            return false;
+        }
+    }
+
     // Check whether we're already initialized by checking for genesis in
     // m_blockman.m_block_index. Note that we can't use m_chain here, since it is
     // set based on the coins db, not the block index db, which is the only

@@ -382,8 +382,9 @@ BOOST_AUTO_TEST_CASE(mainnet_connection_templates_disk_and_reindex)
         return block;
     };
     auto solve = [&](CBlock& block) {
+        const int64_t height{WITH_LOCK(cs_main, return int64_t{Assert(chainman.m_blockman.LookupBlockIndex(block.hashPrevBlock))->nHeight} + 1)};
         unsigned int attempts{0};
-        while (!CheckProofOfWork(block, chainman.GetConsensus(), pow_context) && ++attempts < 10000) ++block.nNonce;
+        while (!CheckProofOfWork(block, chainman.GetConsensus(), pow_context, height) && ++attempts < 10000) ++block.nNonce;
         BOOST_REQUIRE(attempts < 10000);
     };
     CTransactionRef first_coinbase;
@@ -667,8 +668,9 @@ BOOST_AUTO_TEST_CASE(ordinary_block_ingestion)
     auto valid = node::BlockAssembler{m_node.chainman->ActiveChainstate(), nullptr, options}.CreateNewBlock()->block;
     node::RegenerateCommitments(valid, *m_node.chainman);
     PoWHashContext context;
+    const int64_t height{WITH_LOCK(cs_main, return int64_t{Assert(m_node.chainman->m_blockman.LookupBlockIndex(valid.hashPrevBlock))->nHeight} + 1)};
     unsigned attempts{0};
-    while (!CheckProofOfWork(valid, Params().GetConsensus(), context) && ++attempts < 10000) ++valid.nNonce;
+    while (!CheckProofOfWork(valid, Params().GetConsensus(), context, height) && ++attempts < 10000) ++valid.nNonce;
     BOOST_REQUIRE(attempts < 10000);
     send_block(valid);
     BOOST_CHECK_EQUAL(m_node.chainman->ActiveChain().Height(), 1);

@@ -45,8 +45,8 @@ void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& opti
 {
     if (args.IsArgSet("-mercahashv2height")) {
         const auto height{ToIntegral<int>(args.GetArg("-mercahashv2height", ""))};
-        if (!height || (*height != -1 && (*height < 1 || *height == std::numeric_limits<int>::max()))) {
-            throw std::runtime_error{"Invalid -mercahashv2height: use -1 or a positive height below INT_MAX"};
+        if (!height || (*height != -1 && (*height < 0 || *height == std::numeric_limits<int>::max()))) {
+            throw std::runtime_error{"Invalid -mercahashv2height: use -1 or a nonnegative height below INT_MAX"};
         }
         if (*height != -1) options.mercahash_v2_height = *height;
     }

@@ -3049,8 +3049,8 @@ BOOST_AUTO_TEST_CASE(mercatura_pq_precomputed_hashes)
     BOOST_CHECK_EQUAL(pq_error, SCRIPT_ERR_PQ_SIGNATURE);
 
     // Phase 12 H12: PQ Authorization v1 is explicitly bound to the
-    // active Mercatura network genesis hash. Lock permanent digest
-    // vectors for every active network and prove a mainnet signature
+    // active Mercatura network genesis hash. Lock digest-format vectors
+    // against current fixtures (mainnet genesis remains provisional) and prove a mainnet signature
     // cannot be replayed on another Mercatura network.
     struct H12NetworkVector {
         ChainType chain;

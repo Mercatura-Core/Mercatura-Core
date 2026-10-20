@@ -1103,12 +1103,13 @@ BOOST_AUTO_TEST_CASE(mercahash_development_genesis_miner)
             while (!CheckProofOfWork(
                 genesis,
                 dev_consensus,
-                pow_context)) {
+                pow_context,
+                0)) {
                 ++genesis.nNonce;
             }
 
             const uint256 pow_hash{
-                pow_context.GetHash(genesis)};
+                pow_context.GetHash(genesis, GetPoWVersion(dev_consensus, 0))};
 
             BOOST_TEST_MESSAGE(
                 "========================================");
@@ -1180,7 +1181,7 @@ BOOST_AUTO_TEST_CASE(mercahash_genesis_pow)
             PoWHashContext pow_context;
 
             const uint256 pow_hash{
-                pow_context.GetHash(genesis)};
+                pow_context.GetHash(genesis, GetPoWVersion(params->GetConsensus(), 0))};
 
             const bool valid{
                 CheckProofOfWorkImpl(
@@ -1216,7 +1217,7 @@ BOOST_AUTO_TEST_CASE(mercahash_genesis_pow)
             BOOST_CHECK_MESSAGE(
                 valid,
                 network_name
-                    << " genesis does not satisfy MercaHash-v1");
+                    << " genesis does not satisfy its network MercaHash schedule");
         };
 
     check_genesis(
@@ -1254,6 +1255,7 @@ BOOST_AUTO_TEST_CASE(mercahash_genesis_vectors)
         uint256 pow_hash;
     };
 
+    // Mainnet identifies a provisional development fixture, not launch values.
     const std::array<GenesisVector, 4> vectors{{
         {
             ChainType::MAIN,
@@ -1319,8 +1321,10 @@ BOOST_AUTO_TEST_CASE(mercahash_genesis_vectors)
             BOOST_CHECK_EQUAL(genesis.hashMerkleRoot, vector.merkle_root);
 
             PoWHashContext pow_context;
+            // Preserve the original V1 reference bytes, including the
+            // provisional mainnet header; these are not its V2 consensus hash.
             const uint256 pow_hash{
-                pow_context.GetHash(genesis)};
+                pow_context.GetHash(genesis, mercahash::Version::V1)};
 
             BOOST_CHECK_EQUAL(pow_hash, vector.pow_hash);
 
@@ -1328,7 +1332,8 @@ BOOST_AUTO_TEST_CASE(mercahash_genesis_vectors)
                 CheckProofOfWork(
                     genesis,
                     params->GetConsensus(),
-                    pow_context));
+                    pow_context,
+                    0));
 
             BOOST_REQUIRE_EQUAL(genesis.vtx.size(), 1U);
 

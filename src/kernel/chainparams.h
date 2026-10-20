@@ -92,6 +92,8 @@ public:
     std::vector<int> GetAvailableSnapshotHeights() const;
 
     const CBlock& GenesisBlock() const { return genesis; }
+    /** Development fixture, not finalized launch genesis or launch difficulty. */
+    bool HasProvisionalGenesis() const { return m_genesis_is_provisional; }
     /** Default value for -checkmempool and -checkblockindex argument */
     bool DefaultConsistencyChecks() const { return fDefaultConsistencyChecks; }
     /** If this chain is exclusively used for testing */
@@ -150,6 +152,7 @@ public:
     struct RegTestOptions {
         std::unordered_map<Consensus::DeploymentPos, VersionBitsParameters> version_bits_parameters{};
         std::unordered_map<Consensus::BuriedDeployment, int> activation_heights{};
+        /** nullopt: V1-only; 0: distinct V2 genesis; positive: transition with V1 genesis. */
         std::optional<int> mercahash_v2_height;
         bool fastprune{false};
         bool enforce_bip94{false};
@@ -175,6 +178,7 @@ protected:
     std::string bech32_hrp;
     ChainType m_chain_type;
     CBlock genesis;
+    bool m_genesis_is_provisional{false};
     std::vector<uint8_t> vFixedSeeds;
     bool fDefaultConsistencyChecks;
     bool m_is_mockable_chain;

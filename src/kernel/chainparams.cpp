@@ -27,6 +27,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <span>
 #include <utility>
@@ -88,6 +89,8 @@ class CMainParams : public CChainParams {
 public:
     CMainParams() {
         m_chain_type = ChainType::MAIN;
+        consensus.nMercaHashV2Height = 0; // Mainnet has no historical V1 period.
+        m_genesis_is_provisional = true;
         consensus.nInitialBlockCapacityBytes = MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES;
         consensus.nWitnessResourceHeight = 0;
         consensus.signet_blocks = false;
@@ -142,9 +145,11 @@ public:
         m_assumed_blockchain_size = 0;
         m_assumed_chain_state_size = 0;
 
-        // Mercatura mainnet genesis phrase is permanent. The current
-        // development nBits remains provisional until launch-hardware
-        // MercaHash benchmarking is complete.
+        // PROVISIONAL DEVELOPMENT FIXTURE, NOT FINAL MAINNET LAUNCH VALUES.
+        // Retain the existing header, which also satisfies V2, without mining
+        // a launch genesis. nTime, nNonce, nBits, hash, Merkle root and launch
+        // difficulty remain subject to a separate launch decision. These
+        // assertions identify this fixture; they do not finalize launch values.
         genesis = CreateGenesisBlock(
             "012b30242c31233b612b20336d1360",
             "012b30242c31233b612b20336d1360",
@@ -539,8 +544,8 @@ class CRegTestParams : public CChainParams
 public:
     explicit CRegTestParams(const RegTestOptions& opts)
     {
-        if (opts.mercahash_v2_height && *opts.mercahash_v2_height < 1) {
-            throw std::runtime_error{"MercaHash V2 activation must follow genesis"};
+        if (opts.mercahash_v2_height && (*opts.mercahash_v2_height < 0 || *opts.mercahash_v2_height == std::numeric_limits<int>::max())) {
+            throw std::runtime_error{"MercaHash V2 height must be nonnegative and below INT_MAX"};
         }
         consensus.nMercaHashV2Height = opts.mercahash_v2_height;
         m_chain_type = ChainType::REGTEST;
@@ -618,16 +623,21 @@ public:
             consensus.vDeployments[deployment_pos].min_activation_height = version_bits_params.min_activation_height;
         }
 
+        // V2-only regtest has a distinct, V2-valid genesis fixture. V1-only
+        // and transition schedules retain their existing V1 genesis/history.
+        const bool v2_genesis{consensus.nMercaHashV2Height == 0};
         genesis = CreateGenesisBlock(
             "Mercatura regtest genesis v0.1",
             "Mercatura regtest genesis v0.1",
             1788566400,
-            1,
+            v2_genesis ? 5 : 1,
             0x207fffff,
             1,
             50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256{"8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685"});
+        assert(consensus.hashGenesisBlock == (v2_genesis
+            ? uint256{"f7086cc3933445280f0e03607dc8b1199a010111f161f11a0c86e0a6f76a9ffe"}
+            : uint256{"8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685"}));
         assert(genesis.hashMerkleRoot == uint256{"f72f87b6fde6ba17583954c5c0ffec58909e4f49752ea7f125e4ecaf488ab83c"});
 
         vFixedSeeds.clear(); //!< Regtest mode doesn't have any fixed seeds.
