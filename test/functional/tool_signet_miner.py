@@ -70,7 +70,7 @@ class SignetMinerTest(BitcoinTestFramework):
         base_dir = self.config["environment"]["SRCDIR"]
         signet_miner_path = os.path.join(base_dir, "contrib", "signet", "miner")
         rpc_argv = node.binaries.rpc_argv() + [f"-datadir={node.cli.datadir}"]
-        util_argv = node.binaries.util_argv() + ["grind"]
+        util_argv = node.binaries.util_argv() + ["-signet", "grind"]
         subprocess.run([
                 sys.executable,
                 signet_miner_path,
@@ -90,7 +90,7 @@ class SignetMinerTest(BitcoinTestFramework):
         base_dir = self.config["environment"]["SRCDIR"]
         signet_miner_path = os.path.join(base_dir, "contrib", "signet", "miner")
         rpc_argv = node.binaries.rpc_argv() + [f"-datadir={node.cli.datadir}"]
-        util_argv = node.binaries.util_argv() + ["grind"]
+        util_argv = node.binaries.util_argv() + ["-signet", "grind"]
         base_cmd = [
             sys.executable,
             signet_miner_path,
