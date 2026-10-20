@@ -33,6 +33,11 @@ Local validation of the network-specific extension passed:
 - Mainnet/public-testnet identity and mainnet witness P2P/compact recovery,
   reindex-chainstate and reindex functional tests. Mainnet tests explicitly
   assert the provisional-genesis warning; other unexpected stderr still fails.
+- The complete 44-test native functional suite passed with four jobs and
+  `--timeout-factor=6` (1,345 seconds after cache preparation). The separate
+  mainnet DGW reindex test also passed, retaining both its tip and next target.
+  DGW fixtures assert the exact provisional warning on restart and shutdown;
+  all difficulty and historical replay assertions remain intact.
 - Development genesis helper V2 defaults and explicit historical V1 mode,
   provisional output markers, network-aware offline grinding, V1 override
   rejection on V2-only networks, and explicit offline transition-version rules.
@@ -251,9 +256,11 @@ not run under the sandbox's process tracing; the successful sanitizer run used
 the explicit SM 8.6 minimum used by the recommended RTX 3050 build; the fake
 runtime's capability now follows that configured minimum.
 
-The unfiltered unit suite and complete default native functional suite were
-not run in cloud. Full local unit/native-functional gates, physical NVIDIA/AMD qualification, Qt runtime,
-Windows and macOS qualification remain required. No hardware parity pass is
+The unfiltered unit suite was not run in the managed cloud workspace. The
+complete 44-test native functional suite now passes there, as recorded above.
+Full WSL2 unit/native-functional gates, physical NVIDIA/AMD qualification, and
+Qt runtime validation remain required. Native Windows and macOS CI results
+must be checked against the delivered commit. No hardware parity pass is
 claimed from CPU emulation or the fake runtime.
 
 The first CUDA 12.6 cloud compile failed on the image's newer GCC/glibc headers;

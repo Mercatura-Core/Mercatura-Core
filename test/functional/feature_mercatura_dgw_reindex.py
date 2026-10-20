@@ -10,6 +10,9 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 
 
+PROVISIONAL_MAINNET_WARNING = "Warning: Mainnet uses a PROVISIONAL MercaHash V2 development genesis. Launch genesis values and launch difficulty have not been finalized."
+
+
 class MercaturaDgwReindexTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 1
@@ -90,7 +93,7 @@ class MercaturaDgwReindexTest(BitcoinTestFramework):
             "Restart node with -reindex"
         )
 
-        self.stop_nodes()
+        self.stop_node(0, expected_stderr=PROVISIONAL_MAINNET_WARNING)
         self.start_nodes([["-reindex"]])
 
         node = self.nodes[0]
@@ -121,6 +124,7 @@ class MercaturaDgwReindexTest(BitcoinTestFramework):
             next_bits_after,
             next_bits_before,
         )
+        self.stop_node(0, expected_stderr=PROVISIONAL_MAINNET_WARNING)
 
 
 if __name__ == "__main__":

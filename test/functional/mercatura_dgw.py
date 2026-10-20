@@ -9,6 +9,8 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal
 
 
+PROVISIONAL_MAINNET_WARNING = "Warning: Mainnet uses a PROVISIONAL MercaHash V2 development genesis. Launch genesis values and launch difficulty have not been finalized."
+
 DGW_WINDOW = 24
 TARGET_SPACING = 150
 TARGET_TIMESPAN = 3600
@@ -190,13 +192,14 @@ class MercaturaDGWTest(BitcoinTestFramework):
 
         #
         # setmocktime RPC is regtest-only, but startup -mocktime is available
-        # on testnet. Restart with the desired block timestamp.
+        # on the isolated development mainnet. Restart with the desired block timestamp.
         #
         self.restart_node(
             0,
             extra_args=[
                 f"-mocktime={timestamp}",
             ],
+            expected_stderr=PROVISIONAL_MAINNET_WARNING,
         )
 
         node = self.nodes[0]
@@ -251,7 +254,7 @@ class MercaturaDGWTest(BitcoinTestFramework):
         node = self.nodes[0]
 
         self.log.info(
-            "Initializing Mercatura testnet DGW history"
+            "Initializing Mercatura provisional mainnet V2 DGW history"
         )
 
         genesis_hash = node.getblockhash(0)
@@ -459,6 +462,7 @@ class MercaturaDGWTest(BitcoinTestFramework):
         self.log.info(
             "Mercatura native DGWv3 functional test passed"
         )
+        self.stop_node(0, expected_stderr=PROVISIONAL_MAINNET_WARNING)
 
 
 if __name__ == "__main__":
