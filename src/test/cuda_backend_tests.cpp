@@ -64,27 +64,28 @@ void ExpectFailure(const std::function<void()>& action)
     Require(State().pending == 0, "Error returned before queued work drained");
     Require(!State().freed_pending, "Freed device memory while work was queued");
 }
-void CheckSchedule(unsigned count)
+void CheckSchedule(unsigned count, bool v2 = false)
 {
     const auto& s{State()};
-    Require(s.launches.size() == 770, "Wrong total kernel count");
-    Require(s.synchronized_at.size() == 31, "Wrong synchronization cadence");
+    Require(s.launches.size() == (v2 ? 98U : 770U), "Wrong total kernel count");
+    Require(s.synchronized_at.size() == (v2 ? 6U : 31U), "Wrong synchronization cadence");
     size_t index{0};
     auto kernel = [&](const char* name, unsigned block, unsigned begin, unsigned end) {
         const auto& launch{s.launches.at(index++)};
-        Require(launch.name == name && launch.grid == count && launch.block == block && launch.count == count &&
+        Require(launch.name == std::string{name} + (v2 ? "_v2" : "") && launch.grid == count && launch.block == block && launch.count == count &&
                 launch.begin == begin && launch.end == end, "Wrong kernel, batch bounds or launch geometry");
     };
     kernel("mh_init", 32, 0, 0);
-    for (unsigned begin{0}; begin < 2097152; begin += 16384) kernel("mh_fill", 1, begin, begin + 16384);
-    for (unsigned begin{0}; begin < 32768; begin += 64) kernel("mh_bind", 32, begin, begin + 64);
-    for (unsigned begin{1}; begin <= 131072; begin += 1024) kernel("mh_mix", 32, begin, begin + 1023);
+    for (unsigned begin{0}; begin < (v2 ? 262144U : 2097152U); begin += 16384) kernel("mh_fill", 1, begin, begin + 16384);
+    for (unsigned begin{0}; begin < (v2 ? 4096U : 32768U); begin += 64) kernel("mh_bind", 32, begin, begin + 64);
+    for (unsigned begin{1}; begin <= (v2 ? 16384U : 131072U); begin += 1024) kernel("mh_mix", 32, begin, begin + 1023);
     kernel("mh_final", 32, 0, 0);
     std::vector<size_t> expected{1};
     for (size_t i{33}; i <= 129; i += 32) expected.push_back(i);
     for (size_t i{161}; i <= 641; i += 32) expected.push_back(i);
     for (size_t i{657}; i <= 769; i += 16) expected.push_back(i);
     expected.push_back(770); expected.push_back(770); // Final kernel, output copy.
+    if (v2) expected = {1, 49, 81, 97, 98, 98};
     Require(s.synchronized_at == expected, "Queued groups crossed a synchronization boundary");
     Require(s.pending == 0, "Successful batch left queued work");
 }
@@ -171,11 +172,25 @@ cudaError_t CUDARTAPI cudaLaunchKernel(const void* function, dim3 grid, dim3 blo
 {
     auto& s{State()};
     const auto& name{s.kernels.at(function)};
-    const bool init{name == "mh_init"};
+    const bool init{name == "mh_init" || name == "mh_init_v2"};
     s.launches.push_back({name, grid.x, block.x, *static_cast<unsigned*>(args[init ? 2 : 4]),
                          init ? 0 : *static_cast<unsigned*>(args[5]), init ? 0 : *static_cast<unsigned*>(args[6])});
     ++s.pending; return cudaSuccess;
 }
+#if CUDART_VERSION >= 13000
+// CUDA 13 uses an opaque kernel handle for the same host launch contract.
+// These stubs remain confined to the fake-runtime executable.
+cudaError_t CUDARTAPI __cudaGetKernel(cudaKernel_t* kernel, const void* function)
+{
+    *kernel = reinterpret_cast<cudaKernel_t>(const_cast<void*>(function));
+    return cudaSuccess;
+}
+cudaError_t CUDARTAPI __cudaLaunchKernel(cudaKernel_t kernel, dim3 grid, dim3 block, void** args,
+                                       size_t shared, cudaStream_t stream)
+{
+    return cudaLaunchKernel(reinterpret_cast<const void*>(kernel), grid, block, args, shared, stream);
+}
+#endif
 cudaError_t CUDARTAPI cudaGetLastError()
 {
     auto& s{State()};
@@ -329,6 +344,47 @@ int main()
             state.Reset(); state.fail_malloc = fail;
             ExpectFailure([&] { mining::CreateCudaBackend(device, 2); });
             Require(state.allocations.empty() && state.streams == 0, "Partial initialization leaked resources");
+        }
+        auto v2_device{device};
+        v2_device.pow_version = mercahash::Version::V2;
+        state.Reset(); state.free_memory = 8ULL << 30;
+        {
+            auto automatic{mining::CreateCudaBackend(v2_device, 0)};
+            Require(automatic->Contexts() == mining::MAX_GPU_CONTEXTS, "V2 automatic budget did not use the actual scratchpad size");
+            Require(automatic->MemoryBytes() == (4ULL << 30), "V2 automatic scratchpad byte count is wrong");
+        }
+        {
+            auto backend{mining::CreateCudaBackend(v2_device, 2)};
+            Require(backend->PoWVersion() == mercahash::Version::V2, "CUDA lost V2 selection");
+            Require(backend->MemoryBytes() == (32ULL << 20), "V2 per-context scratchpad layout is wrong");
+            state.Reset(); unsigned polls{0};
+            Require(backend->Hash(full, [&] { ++polls; return false; }).size() == 2, "Incomplete V2 full batch");
+            CheckSchedule(2, true);
+            const unsigned checkpoints{polls};
+            state.Reset();
+            Require(backend->Hash(partial, [] { return false; }).size() == 1, "Incomplete V2 partial batch");
+            CheckSchedule(1, true);
+            for (unsigned stop{1}; stop <= checkpoints; ++stop) {
+                state.Reset(); polls = 0;
+                Require(backend->Hash(full, [&] { return ++polls >= stop; }).empty(), "Cancelled V2 work escaped");
+                Require(state.pending == 0, "V2 cancellation did not drain the stream");
+                state.Reset();
+                Require(backend->Hash(partial, [] { return false; }).size() == 1, "V2 buffer reuse after cancellation failed");
+            }
+            for (unsigned fail : {1U, 2U, 17U, 18U, 49U, 81U, 82U, 97U, 98U}) {
+                state.Reset(); state.fail_launch = fail;
+                ExpectFailure([&] { backend->Hash(full, [] { return false; }); });
+            }
+            for (unsigned fail{1}; fail <= 6; ++fail) {
+                state.Reset(); state.fail_sync = fail;
+                ExpectFailure([&] { backend->Hash(full, [] { return false; }); });
+            }
+            std::cout << checkpoints << " V2 cancellation checkpoints and restarts passed (fake runtime)\n";
+        }
+        for (unsigned fail{1}; fail <= 4; ++fail) {
+            state.Reset(); state.fail_malloc = fail;
+            ExpectFailure([&] { mining::CreateCudaBackend(v2_device, 2); });
+            Require(state.allocations.empty() && state.streams == 0, "V2 partial allocation leaked resources");
         }
         std::cout << "CUDA host scheduling, full/partial batches, faults and cleanup passed (fake runtime; no GPU execution)\n";
         return 0;

@@ -742,4 +742,15 @@ BOOST_AUTO_TEST_CASE(v2_gpu_memory_budgets_preserve_reserves)
     BOOST_CHECK_THROW(CalculateGpuBudget(exact, exact, 2, GpuMemorySource::CUDA_FREE, Version::V2), std::runtime_error);
     BOOST_CHECK_EQUAL(CalculateGpuBudget(UINT64_MAX, UINT64_MAX, 256, GpuMemorySource::CUDA_FREE, Version::V2).scratchpad_bytes, 4ULL << 30);
 }
+BOOST_AUTO_TEST_CASE(v2_runtime_selftest_rejects_a_v1_implementation)
+{
+    class IncorrectV2 : public MockBackend {
+    public:
+        IncorrectV2(std::shared_ptr<State> state) : MockBackend{std::move(state), false} {}
+        mercahash::Version PoWVersion() const override { return mercahash::Version::V2; }
+    };
+    auto state{std::make_shared<State>()};
+    IncorrectV2 incorrect{state};
+    BOOST_CHECK_THROW(mining::VerifyGpuBackend(incorrect, [] { return false; }), std::runtime_error);
+}
 BOOST_AUTO_TEST_SUITE_END()

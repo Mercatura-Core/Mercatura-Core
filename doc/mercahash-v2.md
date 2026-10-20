@@ -95,3 +95,26 @@ never described as measured free VRAM. A backend must report the job's exact
 version before its version-specific permanent-vector startup check can pass.
 Every candidate is compared byte-for-byte against the authoritative CPU hash
 before submission.
+
+## Device implementations
+
+CUDA compiles the existing specialized device source into distinct V1/V2
+kernel instances. The single-lane fill, 32-lane binding reduction, cooperative
+write barriers, staged mixing and stream-ordering optimizations are retained.
+Only frozen geometry/domains and the matching host allocation/loop bounds
+change. Existing chunk sizes and synchronization cadence are retained for
+correctness; they are not claimed optimal for V2. Cancellation drains queued
+work before buffers can be reused or released. Bounded OOM retries, reserve
+revalidation and fatal driver/kernel error propagation remain intact.
+
+OpenCL compiles the portable source with an explicit `MH_VERSION=1` or `2`;
+unsupported values fail compilation. Its existing 8-lane cooperative layout
+and barriers are retained. CMake embeds the same source without altering the
+existing MSVC-safe string splitting. Device hashing is fixed for the lifetime
+of a backend; changing a job's version recreates and self-tests the backend.
+
+`mercatura-gpu-check DEVICE --version 1` and `--version 2` independently run
+permanent vectors, deterministic random headers, partial/full batches and CPU
+parity. `--contexts N`, `--repetitions N`, and the optional 80-byte-header file
+remain supported. `mining-bench [workers] [seconds] [cycles] [version]` supports
+both algorithms with synthetic work and no node/wallet access.

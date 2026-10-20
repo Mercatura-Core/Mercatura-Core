@@ -5,7 +5,27 @@
 #include <mining/gpu_backend.h>
 #define MH_CUDA
 #include <algorithm>
+namespace mh_v1 {
 #include <mining/mercahash_gpu_specialized.h>
+}
+#undef BITCOIN_MINING_MERCAHASH_GPU_SPECIALIZED_H
+#undef MH_VERSION
+#define MH_VERSION 2
+#define mh_init mh_init_v2
+#define mh_fill mh_fill_v2
+#define mh_bind mh_bind_v2
+#define mh_mix mh_mix_v2
+#define mh_final mh_final_v2
+namespace mh_v2 {
+#include <mining/mercahash_gpu_specialized.h>
+}
+#undef mh_init
+#undef mh_fill
+#undef mh_bind
+#undef mh_mix
+#undef mh_final
+#undef MH_VERSION
+using mh_u64 = unsigned long long;
 #include <stdexcept>
 #include <util/string.h>
 #ifndef MERCATURA_CUDA_MIN_ARCH
@@ -23,6 +43,7 @@ void Check(cudaError_t error, const char *operation)
 class CudaBackend final : public GpuBackend
 {
     int device;
+    const mercahash::Version version;
     unsigned int contexts{0}, estimated{0};
     uint64_t memory_bytes{0};
     cudaStream_t stream{nullptr};
@@ -32,7 +53,7 @@ class CudaBackend final : public GpuBackend
     unsigned char *outputs{nullptr};
 
   public:
-    CudaBackend(const GpuDevice &selected, unsigned int requested, const std::function<bool()>& cancelled) : device{static_cast<int>(selected.ordinal)}
+    CudaBackend(const GpuDevice &selected, unsigned int requested, const std::function<bool()>& cancelled) : device{static_cast<int>(selected.ordinal)}, version{selected.pow_version}
     {
         try {
             Check(cudaSetDevice(device), "Select NVIDIA device");
@@ -48,10 +69,10 @@ class CudaBackend final : public GpuBackend
             const auto allocation{AllocateGpuContexts(requested, [&] {
                 size_t available{0}, total{0};
                 Check(cudaMemGetInfo(&available, &total), "Read NVIDIA free memory");
-                return CalculateGpuBudget(available, available);
+                return CalculateGpuBudget(available, available, 0, GpuMemorySource::CUDA_FREE, version);
             }, [&](unsigned int count, const GpuMemoryBudget& budget) {
                 contexts = count;
-                memory_bytes = count * uint64_t{mercahash::SCRATCHPAD_BYTES};
+                memory_bytes = count * uint64_t{mercahash::ScratchpadBytes(version)};
                 auto allocate = [&](void** buffer, size_t bytes, const char* operation) {
                     const auto error{cudaMalloc(buffer, bytes)};
                     if (error == cudaErrorMemoryAllocation) {
@@ -86,6 +107,7 @@ class CudaBackend final : public GpuBackend
     {
         return contexts;
     }
+    mercahash::Version PoWVersion() const override { return version; }
     unsigned int EstimatedContexts() const override { return estimated; }
     uint64_t MemoryBytes() const override
     {
@@ -116,18 +138,24 @@ class CudaBackend final : public GpuBackend
             Check(cudaStreamSynchronize(stream), "Synchronize NVIDIA MercaHash kernel");
             return !cancelled();
         };
-        mh_init<<<count, 32, 0, stream>>>(headers, states, count);
+        if (version == mercahash::Version::V2)
+            mh_v2::mh_init_v2<<<count, 32, 0, stream>>>(headers, states, count);
+        else
+            mh_v1::mh_init<<<count, 32, 0, stream>>>(headers, states, count);
         if (!synchronized())
             return {};
         // Validated single-lane fill: queue 32 kernels on the same stream.
-        for (unsigned int begin{0}; begin < 2097152; begin += 16384) {
+        for (unsigned int begin{0}; begin < mercahash::LineCount(version); begin += 16384) {
             if (cancelled()) {
                 Check(cudaStreamSynchronize(stream),
                       "Drain cancelled fill work");
                 return {};
             }
 
-            mh_fill<<<count, 1, 0, stream>>>(headers, states, scratch, outputs, count, begin, begin + 16384);
+            if (version == mercahash::Version::V2)
+                mh_v2::mh_fill_v2<<<count, 1, 0, stream>>>(headers, states, scratch, outputs, count, begin, begin + 16384);
+            else
+                mh_v1::mh_fill<<<count, 1, 0, stream>>>(headers, states, scratch, outputs, count, begin, begin + 16384);
 
             Check(cudaGetLastError(),
                   "Launch NVIDIA fill kernel");
@@ -139,14 +167,17 @@ class CudaBackend final : public GpuBackend
         }
         // Validated warp-parallel binding: synchronize every 32 chunks.
         // Same-stream ordering preserves kernel dependencies.
-        for (unsigned int begin{0}; begin < 32768; begin += 64) {
+        for (unsigned int begin{0}; begin < mercahash::BindBlockCount(version); begin += 64) {
             if (cancelled()) {
                 Check(cudaStreamSynchronize(stream),
                       "Drain cancelled binding work");
                 return {};
             }
 
-            mh_bind<<<count, 32, 0, stream>>>(headers, states, scratch, outputs, count, begin, begin + 64);
+            if (version == mercahash::Version::V2)
+                mh_v2::mh_bind_v2<<<count, 32, 0, stream>>>(headers, states, scratch, outputs, count, begin, begin + 64);
+            else
+                mh_v1::mh_bind<<<count, 32, 0, stream>>>(headers, states, scratch, outputs, count, begin, begin + 64);
 
             Check(cudaGetLastError(),
                   "Launch NVIDIA binding kernel");
@@ -157,14 +188,19 @@ class CudaBackend final : public GpuBackend
             }
         }
         // Validated mixing cadence: synchronize every 16 kernels.
-        for (unsigned int begin{1}; begin <= 131072; begin += 1024) {
+        for (unsigned int begin{1}; begin <= mercahash::MixSteps(version); begin += 1024) {
             if (cancelled()) {
                 Check(cudaStreamSynchronize(stream),
                       "Drain cancelled mixing work");
                 return {};
             }
 
-            mh_mix<<<count, 32, 0, stream>>>(
+            if (version == mercahash::Version::V2)
+                mh_v2::mh_mix_v2<<<count, 32, 0, stream>>>(
+                headers, states, scratch, outputs,
+                count, begin, begin + 1023);
+            else
+                mh_v1::mh_mix<<<count, 32, 0, stream>>>(
                 headers, states, scratch, outputs,
                 count, begin, begin + 1023);
 
@@ -177,7 +213,10 @@ class CudaBackend final : public GpuBackend
         }
         if (cancelled())
             return {};
-        mh_final<<<count, 32, 0, stream>>>(headers, states, scratch, outputs, count, 0, 0);
+        if (version == mercahash::Version::V2)
+            mh_v2::mh_final_v2<<<count, 32, 0, stream>>>(headers, states, scratch, outputs, count, 0, 0);
+        else
+            mh_v1::mh_final<<<count, 32, 0, stream>>>(headers, states, scratch, outputs, count, 0, 0);
         if (!synchronized())
             return {};
         Check(cudaMemcpyAsync(hashes.data(), outputs, hashes.size() * sizeof(GpuHash), cudaMemcpyDeviceToHost, stream),
@@ -241,7 +280,7 @@ GpuDiscovery DiscoverCudaDevices()
             entry.available_memory = available;
             entry.max_allocation = available;
             entry.supported = properties.major * 10 + properties.minor >= MERCATURA_CUDA_MIN_ARCH &&
-                              CalculateGpuBudget(available, available).contexts > 0;
+                              CalculateGpuBudget(available, available, 0, GpuMemorySource::CUDA_FREE, mercahash::Version::V2).contexts > 0;
             if (!entry.supported)
                 entry.error = "NVIDIA device needs compute capability at least " +
                               util::ToString(MERCATURA_CUDA_MIN_ARCH / 10) + "." +
