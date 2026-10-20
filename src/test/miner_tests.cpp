@@ -773,10 +773,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         {
             // A block template does not have proof-of-work, but it might pass
             // verification by coincidence. Grind the nonce if needed:
+            const int64_t height{WITH_LOCK(cs_main, return int64_t{Assert(m_node.chainman->m_blockman.LookupBlockIndex(block.hashPrevBlock))->nHeight} + 1)};
             while (CheckProofOfWork(
                 block,
                 Assert(m_node.chainman)->GetParams().GetConsensus(),
-                m_pow_hash_context)) {
+                m_pow_hash_context,
+                height)) {
                 block.nNonce++;
             }
 
@@ -851,11 +853,13 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         }
 
         // The inherited nonce is only a deterministic starting point. Search
-        // forward until this exact Mercatura header satisfies MercaHash-v1.
+        // forward until this exact header satisfies the MAIN-chain schedule.
+        const int64_t height{WITH_LOCK(cs_main, return int64_t{Assert(m_node.chainman->m_blockman.LookupBlockIndex(block.hashPrevBlock))->nHeight} + 1)};
         while (!CheckProofOfWork(
             block,
             Assert(m_node.chainman)->GetParams().GetConsensus(),
-            m_pow_hash_context)) {
+            m_pow_hash_context,
+            height)) {
             ++block.nNonce;
         }
 

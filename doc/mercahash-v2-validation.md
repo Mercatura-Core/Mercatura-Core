@@ -21,11 +21,12 @@ The original four CI repairs remain in the branch.
 
 Local validation of the network-specific extension passed:
 
-- 129 focused unit cases and 12,635 assertions across the original V1 vector
+- 131 focused unit cases and 13,350 assertions across the original V1 vector
   test, V2 vectors, both versions of CPU/GPU arithmetic and binding checks,
   activation/reorg tests, network/genesis schedules, first-block mainnet native
   CPU mining, worker budgets, header synchronization, peer-manager, mainnet
-  witness processing, and mainnet DGW reorg tests.
+  witness processing, mainnet DGW reorg tests, chainstate bootstrap, and the
+  full mainnet mining-template fixture.
 - The expanded activation functional test: V1-only, V2-from-genesis and V1-to-V2
   modes, distinct genesis fixtures, V1-only proof rejection at height 1,
   datadir-genesis mismatch rejection, restart, reindex, and historical replay.
@@ -37,6 +38,14 @@ Local validation of the network-specific extension passed:
   rejection on V2-only networks, and explicit offline transition-version rules.
 - Warnings-as-errors syntax validation of the expanded schedule tests and the
   locale, include, include-guard and file-mode linters.
+
+Windows CI exposed two inherited mainnet mining-template nonce loops that did
+not supply a candidate height. With V2 from genesis, the PoW helper correctly
+fails closed without that height: the invalid-proof test could accidentally
+retain a valid nonce, and the valid-proof search could loop indefinitely. Both
+loops now derive the height from the block's parent index. The original failure
+was reproduced locally; the full repaired fixture passed all 711 assertions.
+Production validation and the fixture's mainnet parameters are unchanged.
 
 The existing mainnet header is unchanged and was verified under V2; no final
 mainnet genesis or launch difficulty was generated. New nonce mining was only
