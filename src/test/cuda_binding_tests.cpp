@@ -73,13 +73,9 @@ unsigned ShuffleXor(unsigned mask, unsigned value, unsigned delta)
 #undef MH_CUDA
 }
 
-#undef BITCOIN_MINING_MERCAHASH_GPU_H
-#undef MH_VERSION
-#define MH_VERSION 2
 namespace serial_binding_v2 {
-#include <mining/mercahash_gpu.h>
+#include <test/util/mercahash_gpu_v2.h>
 }
-#undef BITCOIN_MINING_MERCAHASH_GPU_SPECIALIZED_H
 #define MH_CUDA
 #define __device__
 #define __constant__ constexpr
@@ -93,7 +89,7 @@ namespace serial_binding_v2 {
 #define mh_mix cuda_binding_test_mix_v2
 #define mh_final cuda_binding_test_final_v2
 namespace cuda_binding { namespace v2 {
-#include <mining/mercahash_gpu_specialized.h>
+#include <test/util/mercahash_gpu_specialized_v2.h>
 } }
 #undef mh_final
 #undef mh_mix
@@ -107,7 +103,6 @@ namespace cuda_binding { namespace v2 {
 #undef __constant__
 #undef __device__
 #undef MH_CUDA
-#undef MH_VERSION
 
 BOOST_AUTO_TEST_SUITE(cuda_binding_tests)
 void CheckBinding(bool v2)

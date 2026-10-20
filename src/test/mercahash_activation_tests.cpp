@@ -16,6 +16,7 @@
 #include <string>
 #include <pow.h>
 #include <test/util/setup_common.h>
+#include <util/string.h>
 #include <validation.h>
 #include <array>
 
@@ -195,7 +196,7 @@ BOOST_AUTO_TEST_CASE(regtest_option_bounds_and_disabled_representation)
     args.ForceSetArg("-mercahashv2height", "-1");
     BOOST_CHECK(!CreateChainParams(args, ChainType::REGTEST)->GetConsensus().nMercaHashV2Height);
     for (const int height : {1, 3, 100}) {
-        args.ForceSetArg("-mercahashv2height", std::to_string(height));
+        args.ForceSetArg("-mercahashv2height", util::ToString(height));
         BOOST_CHECK(CreateChainParams(args, ChainType::REGTEST)->GetConsensus().nMercaHashV2Height == height);
     }
     for (const char* invalid : {"0", "-2", "2147483647", "2147483648", "invalid"}) {

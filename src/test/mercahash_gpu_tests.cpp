@@ -11,13 +11,9 @@
 #include <vector>
 // Compile the actual portable device source with independently frozen V2
 // geometry and domains. Its SHA3 implementation is separate from Core SHA3.
-#undef BITCOIN_MINING_MERCAHASH_GPU_H
-#undef MH_VERSION
-#define MH_VERSION 2
 namespace staged_v2 {
-#include <mining/mercahash_gpu.h>
+#include <test/util/mercahash_gpu_v2.h>
 }
-#undef MH_VERSION
 
 BOOST_FIXTURE_TEST_SUITE(mercahash_gpu_tests, BasicTestingSetup)
 BOOST_AUTO_TEST_CASE(staged_device_arithmetic_matches_frozen_vectors_and_core)
