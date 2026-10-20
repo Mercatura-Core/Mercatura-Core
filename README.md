@@ -13,7 +13,7 @@ Mercatura Core is derived from the modern Bitcoin Core codebase and is being ada
 | Project | Mercatura |
 | Ticker | `MCA` |
 | Consensus | Pure Proof of Work |
-| Proof of Work | MercaHash V1 |
+| Proof of Work | MercaHash V2 from mainnet genesis; public testnet retains V1 pending approved activation |
 | Target block time | 150 seconds |
 | Difficulty adjustment | DGWv3 |
 | DGW lookback | 24 blocks |
@@ -54,7 +54,7 @@ The project aims to preserve mature Bitcoin Core networking, mempool, pruning, w
 
 Major Mercatura-specific components include:
 
-- **MercaHash V1**, a memory-intensive CPU-oriented proof-of-work algorithm
+- **MercaHash V1 / V2**, memory-intensive proof-of-work algorithms with network-specific consensus schedules
 - **DGWv3 difficulty adjustment**
 - **native ML-DSA-65 post-quantum authorization**
 - **two-decimal monetary accounting**
@@ -64,11 +64,19 @@ Major Mercatura-specific components include:
 - **Mercatura-specific genesis blocks**
 - **no SegWit witness discount for block-cap accounting**
 
-## MercaHash V1
+## MercaHash versions and network schedules
 
-MercaHash V1 is Mercatura's native proof-of-work function.
+Mainnet selects **MercaHash V2 from genesis (height 0)** and has no historical
+V1 mining period. Its current genesis and launch difficulty remain provisional
+development fixtures. Public testnet keeps its existing V1 genesis and history;
+V2 activation requires a separately approved future height. Signet remains V1.
+Regtest supports V1-only, V2-from-genesis, and height-transition schedules.
+See [the V2 architecture](doc/mercahash-v2.md) for selection rules and fixtures.
 
-Current consensus parameters include:
+V2 uses 16 MiB of scratchpad memory, 262,144 lines, 4,096 binding blocks, one
+binding pass, 16,384 mixing steps, and independent V2 cryptographic domains.
+
+The preserved V1 consensus parameters include:
 
 - 128 MiB private mutable scratchpad per worker
 - 64-byte scratchpad lines
@@ -515,7 +523,9 @@ and submits solved blocks through:
 submitblock
 ```
 
-MercaHash V1 requires approximately **128 MiB of private scratchpad memory per mining worker**.
+Each mining worker needs **128 MiB of private scratchpad for V1** or **16 MiB
+for V2**, plus host overhead. Native CPU/GPU mining selects the version and
+memory budget from the candidate's verified consensus height.
 
 As a result, practical miner configuration depends on both CPU characteristics and available memory bandwidth.
 
@@ -613,11 +623,17 @@ The repository's stable and development branches may differ while work is underw
 
 The current mainnet chain parameters include development placeholders that will be replaced or finalized during launch preparation.
 
+The mainnet schedule is V2 from height 0, including genesis and the first mined
+block. The existing provisional header also satisfies V2; retaining it does not
+finalize any launch genesis values. Startup explicitly warns that this is a
+development genesis.
+
 Before mainnet launch, the project will perform a final launch-parameter pass covering items such as:
 
 - final mainnet starting difficulty
 - final mainnet genesis timestamp
 - final genesis nonce
+- final genesis nBits and Merkle root
 - final genesis block hash
 - final genesis MercaHash
 - dependent test vectors

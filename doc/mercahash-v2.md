@@ -31,12 +31,49 @@ for independent parity checks; CPU emulation is not physical GPU testing.
 
 ## Height selection and activation
 
-`Consensus::Params::nMercaHashV2Height` is optional: `nullopt` means disabled.
-No public network schedules V2. Only isolated regtest accepts
-`-mercahashv2height=H` (H >= 1); `-1` disables it. Using the option on any
-other network fails startup. Reuse the same option on restarts and reindex;
-use a fresh isolated datadir when changing the simulated consensus schedule.
-Genesis and network identity are unchanged.
+`Consensus::Params::nMercaHashV2Height` is network-specific: `nullopt` means
+V1-only, zero means V2 from genesis, and a positive height means a V1-to-V2
+transition. The schedules are:
+
+| Network | Genesis and mining schedule |
+| --- | --- |
+| Mainnet | V2 at height 0 and every subsequent height; no historical V1 period |
+| Public testnet | Existing V1 genesis and V1 history; V2 remains unscheduled pending separate approval |
+| Signet | Existing V1 behavior; no V2 decision or activation |
+| Regtest default / `-mercahashv2height=-1` | Existing V1 genesis and V1-only mining |
+| Regtest `-mercahashv2height=0` | Distinct V2-valid genesis and V2-only mining |
+| Regtest `-mercahashv2height=H`, H > 0 | Existing V1 genesis; V1 below H and V2 from H onward |
+
+Only isolated regtest accepts the CLI override. Using it on any other network
+fails startup, so it cannot disable mainnet V2 or activate public-testnet V2.
+Reuse the same option on restarts and reindex. Different genesis fixtures
+require separate isolated datadirs; changing schedules is not a migration of
+existing blockchain data. Public-testnet and signet genesis bytes are unchanged.
+
+### Provisional mainnet genesis
+
+**Mainnet launch genesis and launch difficulty are not finalized.** The existing
+development header happens to satisfy V2 and is retained without mining a new
+mainnet genesis. Its nTime, nNonce, nBits, block hash and Merkle root are all
+provisional development values. Assertions and test vectors identify this fixture,
+not final launch commitments. `HasProvisionalGenesis()` marks it explicitly, and
+mainnet startup displays a warning. Final genesis mining and launch parameter
+selection require a separate decision after implementation and optimization.
+
+Bootstrap validates V2-from-genesis fixtures with height 0 explicitly. Mainnet
+native jobs derive height 1 from genesis and select V2 for CPU and GPU workers.
+Unknown height fails closed rather than authorizing a V1 fallback. The offline
+grinder defaults to the network's genesis version and rejects V1 on V2-only
+networks; transition schedules require explicit offline version selection.
+The standalone `mercatura-genesis` development helper defaults to V2, accepts
+`--pow-version 1` for historical V1 fixtures, and
+marks its output as provisional. It does not select or finalize launch values.
+
+The V2-only regtest fixture uses nonce 5, block ID
+`f7086cc3933445280f0e03607dc8b1199a010111f161f11a0c86e0a6f76a9ffe`,
+and V2 PoW hash
+`65ae7d866f23a2dafe3fc406a024f9342673fe04ac7083bce28abc3b90460d02`.
+Other regtest schedules retain their original genesis and vectors.
 
 At H-1 the mandatory algorithm is V1, and at H and every later height it is
 V2. This uses the candidate's parent on its own branch. It never uses the

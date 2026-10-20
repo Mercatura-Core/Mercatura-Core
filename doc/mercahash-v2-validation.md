@@ -5,9 +5,47 @@ The revision starts at `724428dbe551fb6bfb8c81272ef74647ebbba839` on
 for the frozen algorithm, permanent-vector configuration, ancestry selection,
 header presync handling, mining resources and difficulty behavior.
 
-No mainnet, testnet, testnet4 or signet activation is scheduled. The only
-activation override is regtest-only. No deployment, reset, wallet migration,
-release, merge or production mining is part of this change.
+Mainnet selects V2 from height 0, with an explicitly provisional development
+genesis and no finalized launch difficulty. Public testnet retains its V1 genesis
+and history, with no V2 activation scheduled. Signet and testnet4 remain V1.
+The only CLI schedule override is regtest-only: `-1` (default) is V1-only,
+`0` uses a distinct V2 genesis, and positive heights transition from V1 to V2.
+No deployment, reset, wallet migration, release, merge or production mining is
+part of this change.
+
+## Network-specific genesis validation
+
+The schedule extension builds on `9abb577`, whose hardening fixes passed all
+seven required jobs in [CI run 39405589900](https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/39405589900).
+The original four CI repairs remain in the branch.
+
+Local validation of the network-specific extension passed:
+
+- 129 focused unit cases and 12,635 assertions across the original V1 vector
+  test, V2 vectors, both versions of CPU/GPU arithmetic and binding checks,
+  activation/reorg tests, network/genesis schedules, first-block mainnet native
+  CPU mining, worker budgets, header synchronization, peer-manager, mainnet
+  witness processing, and mainnet DGW reorg tests.
+- The expanded activation functional test: V1-only, V2-from-genesis and V1-to-V2
+  modes, distinct genesis fixtures, V1-only proof rejection at height 1,
+  datadir-genesis mismatch rejection, restart, reindex, and historical replay.
+- Mainnet/public-testnet identity and mainnet witness P2P/compact recovery,
+  reindex-chainstate and reindex functional tests. Mainnet tests explicitly
+  assert the provisional-genesis warning; other unexpected stderr still fails.
+- Development genesis helper V2 defaults and explicit historical V1 mode,
+  provisional output markers, network-aware offline grinding, V1 override
+  rejection on V2-only networks, and explicit offline transition-version rules.
+- Warnings-as-errors syntax validation of the expanded schedule tests and the
+  locale, include, include-guard and file-mode linters.
+
+The existing mainnet header is unchanged and was verified under V2; no final
+mainnet genesis or launch difficulty was generated. New nonce mining was only
+for the private V2 regtest fixture and generic isolated tool fixtures. Mainnet
+V1 development chains are not a supported launch history; use separate isolated
+development datadirs. No existing blockchain data is rewritten or deleted.
+
+Physical NVIDIA/AMD execution and the Qt build/runtime remain local validation
+gates. The GPU checks above are host emulation, not hardware qualification.
 
 ## Local WSL2 source and dependencies
 
@@ -60,7 +98,7 @@ results for the user's machine. The commands build without starting a node.
   --run_test=crypto_tests/mercahash_v1_vectors --log_level=test_suite
 
 ctest --test-dir "$BUILD" --output-on-failure -j4 \
-  -R '^(mercahash_v2_tests|mercahash_activation_tests|mercahash_gpu_tests|mercahash_gpu_sync_tests|cuda_binding_tests|pow_tests|cpu_miner_tests|gpu_miner_tests|worker_limits_tests|headers_replay_tests|headers_sync_chainwork_tests|mining_tests_solo|mining_tests_wallet)$'
+  -R '^(mercahash_v2_tests|mercahash_activation_tests|mercahash_network_schedule_tests|mercahash_gpu_tests|mercahash_gpu_sync_tests|cuda_binding_tests|pow_tests|peerman_tests|cpu_miner_tests|gpu_miner_tests|worker_limits_tests|headers_replay_tests|headers_sync_chainwork_tests|mining_tests_solo|mining_tests_wallet)$'
 
 python3 "$BUILD/test/functional/test_runner.py" --jobs=4 --timeout-factor=6 \
   mercatura_mercahash_v2.py mercatura_mercahash_pow.py \
@@ -147,7 +185,7 @@ After all correctness gates pass locally, measure CPU and GPU scaling, energy pe
 hash, fill/binding/mixing stage timing, memory use, synchronization cost, historical
 header verification and end-to-end sync. Use those measurements to decide worker
 counts and GPU contexts. This implementation makes no optimized-count or hashrate
-claim, and authorizes no public-network activation.
+claim. It does not deploy nodes or activate V2 on public testnet.
 
 
 ## Cloud verification evidence
