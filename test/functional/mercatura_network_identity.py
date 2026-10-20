@@ -18,6 +18,7 @@ NETWORKS = (
     {
         "arg": "main",
         "rpc_chain": "main",
+        # Provisional development fixture; mainnet launch genesis is not final.
         "genesis": "cd797c78731d68a82b664b3e359a2e69508ea873fe5747b686488589cc7d6f15",
         "address_prefix": "mca1z",
     },

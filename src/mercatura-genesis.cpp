@@ -47,6 +47,7 @@ const uint256 DEV_POW_LIMIT{
 };
 
 struct Options {
+    mercahash::Version pow_version{mercahash::Version::V2};
     uint32_t time{DEFAULT_TIME};
     uint32_t bits{DEFAULT_BITS};
     uint32_t nonce_start{DEFAULT_NONCE_START};
@@ -65,6 +66,7 @@ struct Options {
         << "Usage:\n"
         << "  " << argv0 << " [options]\n\n"
         << "Options:\n"
+        << "  --pow-version <1|2>      MercaHash version (default: 2; 1 for historical V1 fixtures)\n"
         << "  --time <uint32>          Genesis nTime\n"
         << "  --bits <value>           Compact nBits, decimal or 0x-prefixed hex\n"
         << "  --pow-limit <hex>        Full 256-bit PoW limit in hexadecimal\n"
@@ -73,7 +75,8 @@ struct Options {
         << "  --timestamp <text>       Coinbase timestamp text\n"
         << "  --output-text <text>     Unspendable OP_RETURN output text\n"
         << "  --help                    Show this help\n\n"
-        << "Defaults remain development-friendly; pass explicit final network values when freezing a genesis block.\n";
+        << "Development fixtures only. Mainnet requires V2 from height 0.\n"
+        << "Mainnet launch genesis values and difficulty have NOT been finalized.\n";
 
     std::exit(exit_code);
 }
@@ -147,6 +150,12 @@ Options ParseOptions(int argc, char* argv[])
 
         if (arg == "--help") {
             Usage(argv[0], EXIT_SUCCESS);
+        } else if (arg == "--pow-version") {
+            const auto version{require_value("--pow-version")};
+            if (version != "1" && version != "2") {
+                throw std::runtime_error{"--pow-version must be 1 or 2"};
+            }
+            options.pow_version = version == "2" ? mercahash::Version::V2 : mercahash::Version::V1;
         } else if (arg == "--time") {
             options.time =
                 ParseUint32(require_value("--time"), "--time");
@@ -257,6 +266,8 @@ int main(int argc, char* argv[])
 
         Consensus::Params consensus{};
         consensus.powLimit = options.pow_limit;
+        if (options.pow_version == mercahash::Version::V2) consensus.nMercaHashV2Height = 0;
+        const auto version{GetPoWVersion(consensus, 0)};
 
         const auto target{
             DeriveTarget(
@@ -289,7 +300,7 @@ int main(int argc, char* argv[])
 
         while (attempts < options.max_attempts) {
             pow_hash =
-                pow_context.GetHash(genesis);
+                pow_context.GetHash(genesis, version);
 
             ++attempts;
 
@@ -333,6 +344,9 @@ int main(int argc, char* argv[])
         std::cout
             << "========================================\n"
             << "Mercatura genesis helper\n"
+            << "PROVISIONAL DEVELOPMENT OUTPUT - NOT FINAL MAINNET LAUNCH VALUES\n"
+            << "MercaHash version: " << static_cast<unsigned>(version) << '\n'
+            << (version == mercahash::Version::V1 ? "Historical V1 fixture mode; mainnet requires V2\n" : "")
             << "========================================\n"
             << "timestamp text: "
             << options.timestamp << '\n'

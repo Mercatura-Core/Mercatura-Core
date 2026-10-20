@@ -10,17 +10,18 @@ from test_framework.messages import CBlockHeader, from_hex, msg_headers
 from test_framework.p2p import P2PInterface
 from test_framework.script import CScript, OP_TRUE
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.test_node import ErrorMatch
 from test_framework.util import assert_equal, assert_raises_rpc_error
 
 
 class MercaHashV2Test(BitcoinTestFramework):
     def set_test_params(self):
-        self.num_nodes = 2
+        self.num_nodes = 3
         self.setup_clean_chain = True
         self.uses_wallet = False
         self.noban_tx_relay = False
         self.activation_args = ["-mercahashv2height=3", "-debug=net", "-debug=validation"]
-        self.extra_args = [self.activation_args, []]
+        self.extra_args = [self.activation_args, [], ["-mercahashv2height=0"]]
 
     def setup_network(self):
         # Different isolated regtest consensus schedules; no inter-node peering.
@@ -34,7 +35,31 @@ class MercaHashV2Test(BitcoinTestFramework):
         return block
 
     def run_test(self):
-        node, v1_node = self.nodes
+        node, v1_node, v2_node = self.nodes
+        self.log.info("V2-from-genesis regtest has a distinct genesis and no V1 mining period")
+        v2_genesis_hash = v2_node.getblockhash(0)
+        assert_equal(v2_genesis_hash, "f7086cc3933445280f0e03607dc8b1199a010111f161f11a0c86e0a6f76a9ffe")
+        assert v2_genesis_hash != v1_node.getblockhash(0)
+        v2_genesis = from_hex(CBlockHeader(), v2_node.getblockheader(v2_genesis_hash, False))
+        for tag in range(1, 65):
+            wrong_genesis_child = self.block(v1_node, v2_genesis, 1, 200 + tag)
+            try:
+                v2_node.submitheader(CBlockHeader(wrong_genesis_child).serialize().hex())
+            except JSONRPCException as exc:
+                assert "high-hash" in exc.error["message"]
+                break
+        else:
+            raise AssertionError("No V1-only proof found for a V2-genesis child")
+        v2_tip = self.generatetodescriptor(v2_node, 3, "raw(51)", sync_fun=self.no_op)[-1]
+        for extra in ([], ["-reindex"]):
+            self.restart_node(2, extra_args=["-mercahashv2height=0"] + extra)
+            assert_equal(v2_node.getbestblockhash(), v2_tip)
+            assert v2_node.verifychain(4, 0)
+        # Reusing this datadir with a V1 genesis must fail, not silently switch
+        # genesis or reinterpret the existing V2 chain as historical V1 work.
+        self.stop_node(2)
+        v2_node.assert_start_raises_init_error(extra_args=[], expected_msg="Incorrect or no genesis block found", match=ErrorMatch.PARTIAL_REGEX)
+        self.start_node(2, extra_args=["-mercahashv2height=0"])
         # Generate at H-1, H and H+1 through the normal RPC mining path.
         hashes = self.generatetodescriptor(node, 4, "raw(51)", sync_fun=self.no_op)
         for height, block_hash in enumerate(hashes, 1):

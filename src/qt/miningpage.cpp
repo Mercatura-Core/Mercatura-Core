@@ -229,7 +229,7 @@ void MiningPage::updateStatus()
     const bool running{stats.busy};
     // UI preview only. The provider resolves the actual template's parent,
     // and the controller rechecks the version's budget before starting workers.
-    const auto version{m_client ? GetPoWVersion(Params().GetConsensus(), int64_t{m_client->getNumBlocks()} + 1) : mercahash::Version::V1};
+    const auto version{GetPoWVersion(Params().GetConsensus(), m_client ? int64_t{m_client->getNumBlocks()} + 1 : 0)};
     if (!running) {
         m_limits = m_detect_limits();
         if (version == mercahash::Version::V2) m_limits = mining::CalculateWorkerLimits(m_limits.logical_cpus, m_limits.available_memory, version);

@@ -20,6 +20,8 @@ from test_framework.p2p import P2PInterface, p2p_lock
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_raises_rpc_error, initialize_datadir, p2p_port
 
+PROVISIONAL_MAINNET_WARNING = "Warning: Mainnet uses a PROVISIONAL MercaHash V2 development genesis. Launch genesis values and launch difficulty have not been finalized."
+
 
 class BlockMeta:
     msgtype = b"blkmeta"
@@ -151,10 +153,15 @@ class MercaturaWitnessResourceTest(BitcoinTestFramework):
 
         receiver.disconnect_p2ps()
         for option in ("-reindex-chainstate", "-reindex"):
-            self.restart_node(1, extra_args=[option])
+            self.restart_node(1, extra_args=[option], expected_stderr=PROVISIONAL_MAINNET_WARNING)
             self.wait_until(lambda: receiver.getbestblockhash() == third.hash_hex)
             assert_equal(receiver.verifychain(4, 0), True)
         self.log.info("Mainnet P2P/compact recovery and both reconstruction modes passed")
+        # Assert the explicit development-genesis warning, preserving strict
+        # rejection of any other unexpected daemon stderr on these mainnet nodes.
+        self.stop_node(0, expected_stderr=PROVISIONAL_MAINNET_WARNING)
+        self.stop_node(1, expected_stderr=PROVISIONAL_MAINNET_WARNING)
+        self.stop_node(2)
 
 
 if __name__ == "__main__":

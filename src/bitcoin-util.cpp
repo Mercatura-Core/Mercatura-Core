@@ -36,7 +36,7 @@ static void SetupBitcoinUtilArgs(ArgsManager &argsman)
 
     argsman.AddArg("-version", "Print version and exit", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
 
-    argsman.AddArg("-powversion=<1|2>", "MercaHash version for the offline grinder (default: 1). Does not change node consensus.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-powversion=<1|2>", "MercaHash version for the offline grinder (default: network genesis version; required for transition schedules). V2-only networks require 2. Does not change node consensus.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddCommand("grind", "Perform proof of work on hex header string");
 
     SetupChainParamsBaseOptions(argsman);
@@ -129,12 +129,21 @@ static int Grind(const std::vector<std::string>& args, std::string& strPrint)
         return EXIT_FAILURE;
     }
 
-    const auto requested{gArgs.GetArg("-powversion", "1")};
+    const auto& consensus{Params().GetConsensus()};
+    if (consensus.nMercaHashV2Height && *consensus.nMercaHashV2Height > 0 && !gArgs.IsArgSet("-powversion")) {
+        strPrint = "Transition schedules require explicit -powversion for offline header grinding";
+        return EXIT_FAILURE;
+    }
+    const auto requested{gArgs.GetArg("-powversion", GetPoWVersion(consensus, 0) == mercahash::Version::V2 ? "2" : "1")};
     if (requested != "1" && requested != "2") {
         strPrint = "-powversion must be 1 or 2";
         return EXIT_FAILURE;
     }
     const auto version{requested == "2" ? mercahash::Version::V2 : mercahash::Version::V1};
+    if (consensus.nMercaHashV2Height == 0 && version != mercahash::Version::V2) {
+        strPrint = "This network requires MercaHash V2 from genesis";
+        return EXIT_FAILURE;
+    }
     uint32_t nBits = header.nBits;
     std::atomic<bool> found{false};
     uint32_t proposed_nonce{};
