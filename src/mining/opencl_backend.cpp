@@ -172,6 +172,7 @@ std::string Text(Api &api, cl_device_id device, cl_device_info field)
 }
 class OpenClBackend final : public GpuBackend
 {
+    const mercahash::Version version;
     Api api;
     cl_context context{nullptr};
     cl_command_queue queue{nullptr};
@@ -182,7 +183,7 @@ class OpenClBackend final : public GpuBackend
     uint64_t memory_bytes{0};
 
   public:
-    OpenClBackend(const GpuDevice &selected, unsigned int requested, const std::function<bool()>& cancelled)
+    OpenClBackend(const GpuDevice &selected, unsigned int requested, const std::function<bool()>& cancelled) : version{selected.pow_version}
     {
         try {
             const auto devices{Devices(api)};
@@ -202,7 +203,8 @@ class OpenClBackend final : public GpuBackend
             const size_t size{std::strlen(source)};
             program = api.clCreateProgramWithSource(context, 1, &source, &size, &error);
             Check(error, "Create OpenCL program");
-            error = api.clBuildProgram(program, 1, &device, "-cl-std=CL1.2", nullptr, nullptr);
+            const std::string options{version == mercahash::Version::V2 ? "-cl-std=CL1.2 -DMH_VERSION=2" : "-cl-std=CL1.2 -DMH_VERSION=1"};
+            error = api.clBuildProgram(program, 1, &device, options.c_str(), nullptr, nullptr);
             if (error != CL_SUCCESS) {
                 size_t length{0};
                 api.clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &length);
@@ -222,10 +224,10 @@ class OpenClBackend final : public GpuBackend
                 // OpenCL total memory is not measured free VRAM. Retain the
                 // conservative global-pool and single-allocation limits.
                 return CalculateGpuBudget(Info<cl_ulong>(api, device, CL_DEVICE_GLOBAL_MEM_SIZE),
-                    Info<cl_ulong>(api, device, CL_DEVICE_MAX_MEM_ALLOC_SIZE), 0, GpuMemorySource::OPENCL_TOTAL);
+                    Info<cl_ulong>(api, device, CL_DEVICE_MAX_MEM_ALLOC_SIZE), 0, GpuMemorySource::OPENCL_TOTAL, version);
             }, [&](unsigned int count, const GpuMemoryBudget&) {
                 contexts = count;
-                memory_bytes = count * uint64_t{mercahash::SCRATCHPAD_BYTES};
+                memory_bytes = count * uint64_t{mercahash::ScratchpadBytes(version)};
                 auto allocate = [&](cl_mem &buffer, size_t bytes) {
                     buffer = api.clCreateBuffer(context, CL_MEM_READ_WRITE, bytes, nullptr, &error);
                     if (error == CL_MEM_OBJECT_ALLOCATION_FAILURE)
@@ -251,6 +253,7 @@ class OpenClBackend final : public GpuBackend
     {
         return contexts;
     }
+    mercahash::Version PoWVersion() const override { return version; }
     unsigned int EstimatedContexts() const override { return estimated; }
     uint64_t MemoryBytes() const override
     {
@@ -295,13 +298,13 @@ class OpenClBackend final : public GpuBackend
             argument(stage, 7, end);
             return launch(stage);
         };
-        for (cl_uint begin{0}; begin < 2097152; begin += 4096)
+        for (cl_uint begin{0}; begin < mercahash::LineCount(version); begin += 4096)
             if (!advance(0, begin, begin + 4096))
                 return {};
-        for (cl_uint begin{0}; begin < 32768; begin += 64)
+        for (cl_uint begin{0}; begin < mercahash::BindBlockCount(version); begin += 64)
             if (!advance(1, begin, begin + 64))
                 return {};
-        for (cl_uint begin{1}; begin <= 131072; begin += 1024)
+        for (cl_uint begin{1}; begin <= mercahash::MixSteps(version); begin += 1024)
             if (!advance(2, begin, begin + 1023))
                 return {};
         if (!advance(3, 0, 0))
@@ -369,7 +372,7 @@ GpuDiscovery DiscoverOpenClDevices()
                                   Info<cl_bool>(api, device, CL_DEVICE_AVAILABLE) &&
                                   Info<cl_bool>(api, device, CL_DEVICE_COMPILER_AVAILABLE) &&
                                   Text(api, device, CL_DEVICE_PROFILE) == "FULL_PROFILE" &&
-                                  CalculateGpuBudget(entry).contexts > 0;
+                                  CalculateGpuBudget(entry.total_memory, entry.max_allocation, 0, GpuMemorySource::OPENCL_TOTAL, mercahash::Version::V2).contexts > 0;
                 if (!entry.supported)
                     entry.error =
                         "AMD device needs OpenCL 1.2 or later, 64-bit full-profile support, an available compiler and sufficient VRAM";

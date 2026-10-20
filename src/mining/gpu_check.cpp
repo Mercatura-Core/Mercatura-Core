@@ -31,7 +31,7 @@ uint64_t NextRandom(uint64_t& state)
 class DifferentialCheck {
     mining::GpuBackend& m_backend;
     const unsigned m_repetitions;
-    std::vector<unsigned char> m_scratch{std::vector<unsigned char>(mercahash::SCRATCHPAD_BYTES)};
+    std::vector<unsigned char> m_scratch{std::vector<unsigned char>(mercahash::ScratchpadBytes(m_backend.PoWVersion()))};
     uint64_t m_comparisons{0};
 
 public:
@@ -39,12 +39,14 @@ public:
     void Batch(std::span<const mining::GpuHeader> headers)
     {
         std::vector<mining::GpuHash> expected(headers.size());
-        for (size_t slot{0}; slot < headers.size(); ++slot)
-            mercahash::HashV1(headers[slot], m_scratch, expected[slot]);
+        for (size_t slot{0}; slot < headers.size(); ++slot) {
+            if (m_backend.PoWVersion() == mercahash::Version::V2) mercahash::HashV2(headers[slot], m_scratch, expected[slot]);
+            else mercahash::HashV1(headers[slot], m_scratch, expected[slot]);
+        }
         for (unsigned pass{0}; pass < m_repetitions; ++pass) {
             const auto actual{m_backend.Hash(headers, [] { return false; })};
             if (actual != expected)
-                throw std::runtime_error{"GPU batch differs from authoritative Core MercaHash V1 (including size/order)"};
+                throw std::runtime_error{"GPU batch differs from authoritative Core MercaHash (including size/order)"};
             m_comparisons += headers.size();
         }
     }
@@ -55,21 +57,23 @@ public:
 int main(int argc, char** argv)
 {
     try {
-        unsigned requested{0}, repetitions{3};
+        unsigned requested{0}, repetitions{3}, version{1};
         std::string headers_file;
         for (int arg{2}; arg < argc; ++arg) {
             const std::string option{argv[arg]};
-            if (option == "--contexts" || option == "--repetitions") {
+            if (option == "--contexts" || option == "--repetitions" || option == "--version") {
                 if (++arg == argc) throw std::runtime_error{"Missing value for " + option};
                 const auto value{Number(argv[arg])};
                 if (option == "--contexts") requested = value;
+                else if (option == "--version") version = value;
                 else repetitions = value;
             } else if (!option.starts_with('-') && headers_file.empty()) {
                 headers_file = option;
             } else {
-                throw std::runtime_error{"Usage: mercatura-gpu-check [--list | DEVICE_ID [HEADERS_FILE] [--contexts N] [--repetitions N]]"};
+                throw std::runtime_error{"Usage: mercatura-gpu-check [--list | DEVICE_ID [HEADERS_FILE] [--contexts N] [--repetitions N] [--version 1|2]]"};
             }
         }
+        if (version != 1 && version != 2) throw std::runtime_error{"Version must be 1 or 2"};
         if (requested > 256 || repetitions == 0 || repetitions > 100)
             throw std::runtime_error{"Contexts must be 0..256 and repetitions 1..100"};
         const auto discovery{mining::DiscoverGpuDevices()};
@@ -82,10 +86,12 @@ int main(int argc, char** argv)
         const auto device{std::find_if(discovery.devices.begin(), discovery.devices.end(),
                                      [&](const auto& entry) { return entry.id == argv[1]; })};
         if (device == discovery.devices.end()) throw std::runtime_error{"Requested GPU was not detected"};
-        auto backend{mining::CreateGpuBackend(*device, requested)};
+        auto selected{*device};
+        selected.pow_version = version == 2 ? mercahash::Version::V2 : mercahash::Version::V1;
+        auto backend{mining::CreateGpuBackend(selected, requested)};
         mining::VerifyGpuBackend(*backend, [] { return false; });
         const unsigned contexts{backend->Contexts()};
-        std::cout << "Permanent MercaHash V1 vectors passed on " << device->id
+        std::cout << "Permanent MercaHash V" << version << " vectors passed on " << device->id
                   << " (" << contexts << " safe contexts)\n";
         DifferentialCheck check{*backend, repetitions};
         uint64_t seed{0x4D65726361747572ULL};
