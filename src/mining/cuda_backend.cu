@@ -7,6 +7,8 @@
 #include <algorithm>
 namespace mh_v1 {
 #include <mining/mercahash_gpu_specialized.h>
+static_assert(MH_LINE_COUNT == mercahash::LINE_COUNT && MH_LINE_MASK == mercahash::LINE_MASK);
+static_assert(MH_BIND_BLOCK_COUNT == mercahash::BIND_BLOCK_COUNT);
 }
 #undef BITCOIN_MINING_MERCAHASH_GPU_SPECIALIZED_H
 #undef MH_VERSION
@@ -18,6 +20,8 @@ namespace mh_v1 {
 #define mh_final mh_final_v2
 namespace mh_v2 {
 #include <mining/mercahash_gpu_specialized.h>
+static_assert(MH_LINE_COUNT == mercahash::V2_LINE_COUNT && MH_LINE_MASK == mercahash::V2_LINE_MASK);
+static_assert(MH_BIND_BLOCK_COUNT == mercahash::V2_BIND_BLOCK_COUNT);
 }
 #undef mh_init
 #undef mh_fill

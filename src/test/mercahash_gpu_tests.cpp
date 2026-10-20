@@ -25,7 +25,10 @@ BOOST_AUTO_TEST_CASE(staged_device_arithmetic_matches_frozen_vectors_and_core)
     constexpr const char *vectors[]{"cc97e7cbce1d4ed2b54c9c37a81a000383229341a277a44829484855b9ef79dc",
                                     "2321712af21502878986c0c4f21d79e17e2281619e3958f11e3c634c9f17f7d8",
                                     "9c9a427928875304bb7d6351354b5e50ec8e57c581971f68eab176371c4cd2c2",
-                                    "1244c6c9e0365baeb5958cfaa57aff582d81ae1d757769e823085bb00676e170"};
+                                    "1244c6c9e0365baeb5958cfaa57aff582d81ae1d757769e823085bb00676e170",
+                                    "dddbe646a645dce79626911c68e029a7da52b72d9d07d861da705973cde4cfd0",
+                                    "d5f5d203e848943a7700979e1e0659648690f430baf9fadac4334e400366cda5",
+                                    "299ec8464628247debf5b21d0e379017a81ec2ca15888d1829f5e8d12e77e69b"};
     constexpr unsigned contexts{2};
     std::array<unsigned char, contexts * 80> headers{};
     std::array<mh_u64, contexts * 16> states{};
@@ -33,14 +36,18 @@ BOOST_AUTO_TEST_CASE(staged_device_arithmetic_matches_frozen_vectors_and_core)
     // Guard words catch the highest scratchpad indices and private context offsets.
     std::vector<mh_u64> scratch(contexts * mercahash::SCRATCHPAD_BYTES / 8 + 2, 0xfedcba9876543210ULL);
     std::vector<unsigned char> reference_scratch(mercahash::SCRATCHPAD_BYTES);
-    for (unsigned batch{0}; batch < 2; ++batch) {
+    for (unsigned batch{0}; batch < 4; ++batch) {
         for (unsigned slot{0}; slot < contexts; ++slot) {
-            const unsigned pattern{batch * contexts + slot};
+            const unsigned pattern{(batch * contexts + slot) % 7};
             for (unsigned byte{0}; byte < 80; ++byte)
                 headers[slot * 80 + byte] = pattern == 0   ? 0
                                             : pattern == 1 ? byte
                                             : pattern == 2 ? 255
                                                            : (byte * 37 + 11) & 255;
+            if (pattern >= 4) {
+                headers[slot * 80 + 76] = pattern - 3;
+                headers[slot * 80 + 77] = headers[slot * 80 + 78] = headers[slot * 80 + 79] = 0;
+            }
             mh_test_id = slot;
             mh_init(headers.data(), states.data(), contexts);
         }
@@ -61,7 +68,7 @@ BOOST_AUTO_TEST_CASE(staged_device_arithmetic_matches_frozen_vectors_and_core)
             stage(2, begin, std::min(begin + 996, 131072U));
         stage(3, 0, 0);
         for (unsigned slot{0}; slot < contexts; ++slot) {
-            const auto expected{ParseHex(vectors[batch * contexts + slot])};
+            const auto expected{ParseHex(vectors[(batch * contexts + slot) % 7])};
             std::array<unsigned char, 32> authoritative{};
             mercahash::HashV1(std::span<const unsigned char>{headers.data() + slot * 80, 80}, reference_scratch,
                               authoritative);

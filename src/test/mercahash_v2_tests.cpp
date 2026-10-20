@@ -63,5 +63,31 @@ BOOST_AUTO_TEST_CASE(buffer_sizes_are_checked_in_release_builds)
     BOOST_CHECK_THROW(mercahash::HashV2(valid_header, valid_scratch, output), std::invalid_argument);
     BOOST_CHECK_THROW(mercahash::HashV2(valid_header, valid_scratch, valid_output.first(31)), std::invalid_argument);
     BOOST_CHECK_THROW(mercahash::HashV1(valid_header, valid_scratch, valid_output), std::invalid_argument);
+    const mercahash::WorkParams params{mercahash::V1_MIX_STEPS, mercahash::V1_SCRATCHPAD_FILL, mercahash::V1_BINDING_PASSES};
+    mercahash::Diagnostics diagnostics;
+    BOOST_CHECK_THROW(mercahash::Hash(valid_header, valid_scratch, valid_output, params), std::invalid_argument);
+    BOOST_CHECK_THROW(mercahash::HashWithDiagnostics(valid_header, valid_scratch, valid_output, params, diagnostics), std::invalid_argument);
+}
+BOOST_AUTO_TEST_CASE(v1_nonce_vectors_and_buffer_reuse_remain_frozen)
+{
+    constexpr const char* vectors[]{
+        "dddbe646a645dce79626911c68e029a7da52b72d9d07d861da705973cde4cfd0",
+        "d5f5d203e848943a7700979e1e0659648690f430baf9fadac4334e400366cda5",
+        "299ec8464628247debf5b21d0e379017a81ec2ca15888d1829f5e8d12e77e69b"};
+    std::vector<unsigned char> scratch(mercahash::V1_SCRATCHPAD_BYTES, 0xa5);
+    for (unsigned nonce{1}; nonce <= 3; ++nonce) {
+        std::array<unsigned char, 80> header{};
+        for (unsigned i{0}; i < header.size(); ++i) header[i] = (i * 37 + 11) & 255;
+        header[76] = nonce;
+        header[77] = header[78] = header[79] = 0;
+        std::array<unsigned char, 32> output{}, repeated{}, independent{};
+        mercahash::HashV1(header, scratch, output);
+        mercahash::HashV1(header, scratch, repeated);
+        std::vector<unsigned char> other(mercahash::V1_SCRATCHPAD_BYTES, 0xff);
+        mercahash::HashV1(header, other, independent);
+        BOOST_CHECK(output == repeated);
+        BOOST_CHECK(output == independent);
+        BOOST_CHECK(HexStr(output) == vectors[nonce - 1]);
+    }
 }
 BOOST_AUTO_TEST_SUITE_END()

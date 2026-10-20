@@ -140,7 +140,7 @@ void WriteLine(
     std::size_t line_index,
     const Line& line)
 {
-    assert(line_index < LINE_COUNT);
+    assert(line_index < scratchpad.size() / LINE_BYTES);
 
     const std::size_t offset = line_index * LINE_BYTES;
 
@@ -223,7 +223,7 @@ Line ReadLine(
     std::span<const unsigned char> scratchpad,
     std::size_t line_index)
 {
-    assert(line_index < LINE_COUNT);
+    assert(line_index < scratchpad.size() / LINE_BYTES);
 
     const std::size_t offset = line_index * LINE_BYTES;
     Line line{};
@@ -910,10 +910,10 @@ void HashWithDiagnostics(
     const WorkParams& params,
     Diagnostics& diagnostics)
 {
-    assert(header.size() == HEADER_SIZE);
-    assert(scratchpad.size() == SCRATCHPAD_BYTES);
-    assert(output.size() == OUTPUT_SIZE);
-    assert(params.mix_steps > 0);
+    if (header.size() != HEADER_SIZE || scratchpad.size() != SCRATCHPAD_BYTES ||
+        output.size() != OUTPUT_SIZE || params.mix_steps == 0) {
+        throw std::invalid_argument{"Invalid MercaHash diagnostic buffers or workload"};
+    }
 
     diagnostics = {};
 

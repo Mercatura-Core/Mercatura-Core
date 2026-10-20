@@ -36,6 +36,7 @@ static void SetupBitcoinUtilArgs(ArgsManager &argsman)
 
     argsman.AddArg("-version", "Print version and exit", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
 
+    argsman.AddArg("-powversion=<1|2>", "MercaHash version for the offline grinder (default: 1). Does not change node consensus.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddCommand("grind", "Perform proof of work on hex header string");
 
     SetupChainParamsBaseOptions(argsman);
@@ -87,7 +88,7 @@ static int AppInitUtil(ArgsManager& args, int argc, char* argv[])
     return CONTINUE_EXECUTION;
 }
 
-static void grind_task(uint32_t nBits, CBlockHeader header, uint32_t offset, uint32_t step, std::atomic<bool>& found, uint32_t& proposed_nonce)
+static void grind_task(uint32_t nBits, CBlockHeader header, uint32_t offset, uint32_t step, std::atomic<bool>& found, uint32_t& proposed_nonce, mercahash::Version version)
 {
     arith_uint256 target;
     bool neg, over;
@@ -95,8 +96,7 @@ static void grind_task(uint32_t nBits, CBlockHeader header, uint32_t offset, uin
     if (target == 0 || neg || over) return;
     header.nNonce = offset;
 
-    // MercaHash requires one private mutable 128 MiB scratchpad per
-    // worker. Reuse it for every nonce tested by this worker.
+    // One private, version-sized scratchpad per offline worker; reuse it.
     PoWHashContext pow_context;
 
     uint32_t finish = std::numeric_limits<uint32_t>::max() - step;
@@ -105,7 +105,7 @@ static void grind_task(uint32_t nBits, CBlockHeader header, uint32_t offset, uin
     while (!found && header.nNonce < finish) {
         const uint32_t next = (finish - header.nNonce < 5000*step) ? finish : header.nNonce + 5000*step;
         do {
-            if (UintToArith256(pow_context.GetHash(header)) <= target) {
+            if (UintToArith256(pow_context.GetHash(header, version)) <= target) {
                 if (!found.exchange(true)) {
                     proposed_nonce = header.nNonce;
                 }
@@ -129,6 +129,12 @@ static int Grind(const std::vector<std::string>& args, std::string& strPrint)
         return EXIT_FAILURE;
     }
 
+    const auto requested{gArgs.GetArg("-powversion", "1")};
+    if (requested != "1" && requested != "2") {
+        strPrint = "-powversion must be 1 or 2";
+        return EXIT_FAILURE;
+    }
+    const auto version{requested == "2" ? mercahash::Version::V2 : mercahash::Version::V1};
     uint32_t nBits = header.nBits;
     std::atomic<bool> found{false};
     uint32_t proposed_nonce{};
@@ -145,7 +151,7 @@ static int Grind(const std::vector<std::string>& args, std::string& strPrint)
     };
     threads.reserve(n_tasks);
     for (unsigned int i = 0; i < n_tasks; ++i) {
-        threads.emplace_back(grind_task, nBits, header, i, n_tasks, std::ref(found), std::ref(proposed_nonce));
+        threads.emplace_back(grind_task, nBits, header, i, n_tasks, std::ref(found), std::ref(proposed_nonce), version);
     }
     for (auto& t : threads) {
         t.join();

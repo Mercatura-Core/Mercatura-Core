@@ -191,7 +191,10 @@ BOOST_AUTO_TEST_CASE(side_branches_and_concurrent_processing)
             // concurrent callers must each own a context, as documented.
             PoWHashContext context;
             bool valid{true};
-            for (int replay{0}; replay < 4; ++replay) valid &= Check(known, context);
+            // A network batch must describe one continuous branch. Replay
+            // independently known headers from different forks separately.
+            for (int replay{0}; replay < 4; ++replay)
+                for (const auto& header : known) valid &= Check({&header, 1}, context);
             BlockValidationState state;
             accepted[i] = valid && m_node.chainman->ProcessNewBlockHeaders({{new_tip}}, true, state);
             hashes[i] = context.HashesComputed();

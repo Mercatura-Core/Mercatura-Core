@@ -4310,7 +4310,7 @@ bool HasValidProofOfWork(
         }
     }
     if (headers.size() > static_cast<size_t>(std::numeric_limits<int>::max())) return false;
-    if (first_height && (*first_height < 0 || *first_height > std::numeric_limits<int>::max() - static_cast<int64_t>(headers.size()))) return false;
+    if (first_height && (*first_height < 0 || *first_height > std::numeric_limits<int>::max() - static_cast<int64_t>(headers.size() - 1))) return false;
     if (!first_height && consensusParams.nMercaHashV2Height) return false;
     for (size_t i{0}; i < headers.size(); ++i) {
         const auto& header{headers[i]};

@@ -956,6 +956,31 @@ BOOST_AUTO_TEST_CASE(regtest_no_retarget)
         START_BITS);
 }
 
+BOOST_AUTO_TEST_CASE(dgw_mercahash_transition_preserves_targets_and_chainwork)
+{
+    for (const auto chain : {ChainType::MAIN, ChainType::TESTNET}) {
+        const auto original{CreateChainParams(*m_node.args, chain)->GetConsensus()};
+        auto activated{original};
+        activated.nMercaHashV2Height = 30; // Synthetic copy only, no network activation.
+        for (const int spacing : {1, 150, 1000}) {
+            auto blocks{BuildDGWChain(65, 0x1c0ffff0U, 1'700'000'000, 150)};
+            blocks[0].nChainWork = GetBlockProof(blocks[0]);
+            for (int height{1}; height < 65; ++height) {
+                blocks[height].nTime = blocks[height - 1].nTime + (height < 30 ? 150 : spacing);
+                CBlockHeader candidate;
+                candidate.nTime = blocks[height].nTime;
+                const auto expected{GetNextWorkRequired(&blocks[height - 1], &candidate, original)};
+                const auto actual{GetNextWorkRequired(&blocks[height - 1], &candidate, activated)};
+                BOOST_CHECK_EQUAL(actual, expected);
+                blocks[height].nBits = actual;
+                blocks[height].nChainWork = blocks[height - 1].nChainWork + GetBlockProof(blocks[height]);
+                BOOST_CHECK(blocks[height].nChainWork > blocks[height - 1].nChainWork);
+                BOOST_CHECK(blocks[height].nChainWork - blocks[height - 1].nChainWork == GetBlockProof(blocks[height]));
+            }
+        }
+    }
+}
+
 BOOST_AUTO_TEST_CASE(mercahash_v1_pow_bridge)
 {
     // Construct a canonical CBlockHeader from the permanent incremental
