@@ -7,6 +7,7 @@
 #define BITCOIN_POW_H
 
 #include <consensus/params.h>
+#include <crypto/mercahash.h>
 
 #include <cstdint>
 #include <span>
@@ -38,12 +39,13 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
  */
 uint256 GetPoWHash(
     const CBlockHeader& header,
-    std::span<unsigned char> scratchpad);
+    std::span<unsigned char> scratchpad,
+    mercahash::Version version = mercahash::Version::V1);
 
 /**
- * Reusable MercaHash-v1 proof-of-work context.
+ * Reusable, version-aware MercaHash proof-of-work context.
  *
- * Lazily allocates and then owns one 128 MiB scratchpad so repeated
+ * Lazily owns one correctly sized private scratchpad so repeated
  * header hashes do not allocate scratchpad memory for every invocation.
  *
  * A context is not intended for concurrent use by multiple threads.
@@ -59,7 +61,9 @@ public:
     PoWHashContext(PoWHashContext&&) noexcept = default;
     PoWHashContext& operator=(PoWHashContext&&) noexcept = default;
 
-    uint256 GetHash(const CBlockHeader& header);
+    // The one-argument overload retains its permanent V1 contract.
+    uint256 GetHash(const CBlockHeader& header, mercahash::Version version = mercahash::Version::V1);
+    std::size_t ScratchpadSize() const { return m_scratchpad.size(); }
 
     /** Number of completed memory-hard hashes (caller must serialize access). */
     uint64_t HashesComputed() const { return m_hashes_computed; }
@@ -72,14 +76,19 @@ private:
 /**
  * Check the actual Mercatura proof of work for a block header.
  *
- * Normal validation hashes the canonical 80-byte header with MercaHash-v1.
+ * Normal validation selects from verified candidate height. Unknown height fails
+ * closed when V2 activation is configured. With activation disabled, V1 is fixed.
  * Fuzz determinism is handled before MercaHash is invoked, so fuzz targets do
  * not allocate or process the 128 MiB scratchpad.
  */
 bool CheckProofOfWork(
     const CBlockHeader& header,
     const Consensus::Params&,
-    PoWHashContext& context);
+    PoWHashContext& context,
+    std::optional<int64_t> candidate_height = std::nullopt);
+
+/** Only call with a height derived from the candidate's verified ancestry. */
+mercahash::Version GetPoWVersion(const Consensus::Params& params, int64_t candidate_height);
 
 /**
  * Generic target comparison for an already-computed hash.

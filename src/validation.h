@@ -423,7 +423,8 @@ bool CheckBlock(
     bool fCheckPOW = true,
     bool fCheckMerkleRoot = true,
     PoWCheckStatus pow_check = PoWCheckStatus::UNCHECKED,
-    PoWHashContext* pow_context = nullptr);
+    PoWHashContext* pow_context = nullptr,
+    std::optional<int64_t> candidate_height = std::nullopt);
 
 /**
  * Verify a block, including transactions.
@@ -457,7 +458,8 @@ bool HasValidProofOfWork(
     std::span<const CBlockHeader> headers,
     const Consensus::Params& consensusParams,
     PoWHashContext& pow_context,
-    const node::BlockManager& blockman);
+    const node::BlockManager& blockman,
+    std::optional<int64_t> first_height = std::nullopt);
 
 /** Check if a block has been mutated (with respect to its merkle root and witness commitments). */
 bool IsBlockMutated(const CBlock& block, bool check_witness_root);

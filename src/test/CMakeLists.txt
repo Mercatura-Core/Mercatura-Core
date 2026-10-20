@@ -43,6 +43,7 @@ add_executable(test_bitcoin
   witness_resource_tests.cpp
   mining_statistics_tests.cpp
   gpu_miner_tests.cpp
+  mercahash_activation_tests.cpp
   mercahash_v2_tests.cpp
   mercahash_gpu_tests.cpp
   mercahash_gpu_sync_tests.cpp

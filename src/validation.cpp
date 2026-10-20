@@ -2415,7 +2415,8 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
             /*fCheckPOW=*/!fJustCheck,
             /*fCheckMerkleRoot=*/!fJustCheck,
             PoWCheckStatus::UNCHECKED,
-            m_chainman.m_pow_hash_context.get())) {
+            m_chainman.m_pow_hash_context.get(),
+            pindex->nHeight)) {
         if (state.GetResult() == BlockValidationResult::BLOCK_MUTATED) {
             // We don't write down blocks to disk if they may have been
             // corrupted, so this should be impossible unless we're having hardware
@@ -4038,7 +4039,8 @@ static bool CheckBlockHeader(
     BlockValidationState& state,
     const Consensus::Params& consensusParams,
     bool fCheckPOW = true,
-    PoWHashContext* pow_context = nullptr)
+    PoWHashContext* pow_context = nullptr,
+    std::optional<int64_t> candidate_height = std::nullopt)
 {
     if (fCheckPOW) {
         // Free-standing validation callers may not provide a reusable context.
@@ -4050,7 +4052,8 @@ static bool CheckBlockHeader(
         if (!CheckProofOfWork(
                 block,
                 consensusParams,
-                context)) {
+                context,
+                candidate_height)) {
             return state.Invalid(
                 BlockValidationResult::BLOCK_INVALID_HEADER,
                 "high-hash",
@@ -4149,11 +4152,16 @@ bool CheckBlock(
     bool fCheckPOW,
     bool fCheckMerkleRoot,
     PoWCheckStatus pow_check,
-    PoWHashContext* pow_context)
+    PoWHashContext* pow_context,
+    std::optional<int64_t> candidate_height)
 {
     // These are checks that are independent of context.
 
-    if (block.fChecked)
+    if (fCheckPOW && consensusParams.nMercaHashV2Height && !candidate_height) {
+        return state.Invalid(BlockValidationResult::BLOCK_MISSING_PREV, "pow-height-required");
+    }
+    const auto version{GetPoWVersion(consensusParams, candidate_height.value_or(0))};
+    if (block.fChecked && block.m_checked_pow_version == static_cast<uint8_t>(version))
         return true;
 
     // Check that the header is valid. The caller may explicitly report
@@ -4168,7 +4176,8 @@ bool CheckBlock(
             state,
             consensusParams,
             check_pow,
-            pow_context)) {
+            pow_context,
+            candidate_height)) {
         return false;
     }
 
@@ -4230,8 +4239,10 @@ bool CheckBlock(
     if (nSigOps * WITNESS_SCALE_FACTOR > MAX_BLOCK_SIGOPS_COST)
         return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-sigops", "out-of-bounds SigOpCount");
 
-    if (fCheckPOW && fCheckMerkleRoot)
+    if (fCheckPOW && fCheckMerkleRoot) {
         block.fChecked = true;
+        block.m_checked_pow_version = static_cast<uint8_t>(version);
+    }
 
     return true;
 }
@@ -4276,41 +4287,50 @@ bool HasValidProofOfWork(
     std::span<const CBlockHeader> headers,
     const Consensus::Params& consensusParams,
     PoWHashContext& pow_context,
-    const BlockManager& blockman)
+    const BlockManager& blockman,
+    std::optional<int64_t> first_height)
 {
     AssertLockNotHeld(cs_main);
-    return std::ranges::all_of(
-        headers,
-        [&](const CBlockHeader& header) {
-            {
-                LOCK(cs_main);
-                const CBlockIndex* index{blockman.LookupBlockIndex(header.GetHash())};
-                // Mere index presence (including unresolved parent entries) is
-                // not proof of validation. TREE records admission-time PoW,
-                // even if the block body was later marked invalid. Reusing
-                // that PoW does not bypass AcceptBlockHeader's invalid check.
-                if (index && (index->nStatus & BLOCK_VALID_MASK) >= BLOCK_VALID_TREE) {
-                    const CBlockHeader known{index->GetBlockHeader()};
-                    // SHA256d is only the lookup key here, never a substitute
-                    // for MercaHash. Match all canonical header fields before
-                    // reusing the indexed header's previously verified PoW.
-                    if (header.nVersion == known.nVersion &&
-                        header.hashPrevBlock == known.hashPrevBlock &&
-                        header.hashMerkleRoot == known.hashMerkleRoot &&
-                        header.nTime == known.nTime &&
-                        header.nBits == known.nBits &&
-                        header.nNonce == known.nNonce) {
-                        return true;
-                    }
-                }
+    // Check the entire linkage before any expensive work. A continuation height
+    // may come only from HeadersSyncState's locally verified ancestry.
+    for (size_t i{1}; i < headers.size(); ++i) {
+        if (headers[i].hashPrevBlock != headers[i - 1].GetHash()) return false;
+    }
+    if (headers.empty()) return true;
+    {
+        LOCK(cs_main);
+        if (const auto* parent{blockman.LookupBlockIndex(headers.front().hashPrevBlock)};
+            parent && (parent->nStatus & BLOCK_VALID_MASK) >= BLOCK_VALID_TREE) {
+            const int64_t derived{int64_t{parent->nHeight} + 1};
+            if (first_height && *first_height != derived) return false;
+            first_height = derived;
+        } else if (headers.front().GetHash() == consensusParams.hashGenesisBlock) {
+            if (first_height && *first_height != 0) return false;
+            first_height = 0;
+        }
+    }
+    if (headers.size() > static_cast<size_t>(std::numeric_limits<int>::max())) return false;
+    if (first_height && (*first_height < 0 || *first_height > std::numeric_limits<int>::max() - static_cast<int64_t>(headers.size()))) return false;
+    if (!first_height && consensusParams.nMercaHashV2Height) return false;
+    for (size_t i{0}; i < headers.size(); ++i) {
+        const auto& header{headers[i]};
+        const std::optional<int64_t> height{first_height ? std::optional<int64_t>{*first_height + static_cast<int64_t>(i)} : std::nullopt};
+        bool cached{false};
+        {
+            LOCK(cs_main);
+            const auto* index{blockman.LookupBlockIndex(header.GetHash())};
+            if (index && (index->nStatus & BLOCK_VALID_MASK) >= BLOCK_VALID_TREE && (!height || index->nHeight == *height)) {
+                const CBlockHeader known{index->GetBlockHeader()};
+                cached = header.nVersion == known.nVersion && header.hashPrevBlock == known.hashPrevBlock &&
+                    header.hashMerkleRoot == known.hashMerkleRoot && header.nTime == known.nTime &&
+                    header.nBits == known.nBits && header.nNonce == known.nNonce;
             }
-            // Do memory-hard work outside cs_main. The caller must serialize
-            // its context (the network path uses g_msgproc_mutex).
-            return CheckProofOfWork(
-                header,
-                consensusParams,
-                pow_context);
-        });
+        }
+        // Hash outside cs_main. Only exact TREE entries authorize reuse; this
+        // precheck never adds a cache entry or counts unverified claimed work.
+        if (!cached && !CheckProofOfWork(header, consensusParams, pow_context, height)) return false;
+    }
+    return true;
 }
 
 bool IsBlockMutated(const CBlock& block, bool check_witness_root)
@@ -4521,7 +4541,8 @@ bool ChainstateManager::AcceptBlockHeader(
                 state,
                 GetConsensus(),
                 /*fCheckPOW=*/check_pow,
-                m_pow_hash_context.get())) {
+                m_pow_hash_context.get(),
+                int64_t{pindexPrev->nHeight} + 1)) {
             LogDebug(BCLog::VALIDATION, "%s: Consensus::CheckBlockHeader: %s, %s\n", __func__, hash.ToString(), state.ToString());
             return false;
         }
@@ -4739,7 +4760,8 @@ bool ChainstateManager::AcceptBlock(
             /*fCheckPOW=*/true,
             /*fCheckMerkleRoot=*/true,
             PoWCheckStatus::CHECKED,
-            m_pow_hash_context.get()) ||
+            m_pow_hash_context.get(),
+            pindex->nHeight) ||
         !ContextualCheckBlock(block, state, *this, pindex->pprev)) {
         if (Assume(state.IsInvalid())) {
             ActiveChainstate().InvalidBlockFound(pindex, state);
@@ -4807,6 +4829,12 @@ bool ChainstateManager::ProcessNewBlock(const std::shared_ptr<const CBlock>& blo
         // malleability that cause CheckBlock() to fail; see e.g. CVE-2012-2459 and
         // https://lists.linuxfoundation.org/pipermail/bitcoin-dev/2019-February/016697.html.  Because CheckBlock() is
         // not very expensive, the anti-DoS benefits of caching failure (of a definitely-invalid block) are not substantial.
+        std::optional<int64_t> candidate_height;
+        if (block->GetHash() == GetConsensus().hashGenesisBlock) candidate_height = 0;
+        else if (const auto* parent{m_blockman.LookupBlockIndex(block->hashPrevBlock)};
+                 parent && (parent->nStatus & BLOCK_VALID_MASK) >= BLOCK_VALID_TREE) {
+            candidate_height = int64_t{parent->nHeight} + 1;
+        }
         bool ret = CheckBlock(
             *block,
             state,
@@ -4814,7 +4842,8 @@ bool ChainstateManager::ProcessNewBlock(const std::shared_ptr<const CBlock>& blo
             /*fCheckPOW=*/true,
             /*fCheckMerkleRoot=*/true,
             PoWCheckStatus::UNCHECKED,
-            m_pow_hash_context.get());
+            m_pow_hash_context.get(),
+            candidate_height);
         if (ret) {
             // Store to disk
             ret = AcceptBlock(
@@ -4896,7 +4925,8 @@ BlockValidationState TestBlockValidity(
             /*fCheckPOW=*/check_pow,
             /*fCheckMerkleRoot=*/check_merkle_root,
             PoWCheckStatus::UNCHECKED,
-            chainstate.m_chainman.m_pow_hash_context.get())) {
+            chainstate.m_chainman.m_pow_hash_context.get(),
+            int64_t{tip->nHeight} + 1)) {
         // This should never happen, but belt-and-suspenders don't approve the
         // block if it does.
         if (state.IsValid()) NONFATAL_UNREACHABLE();
@@ -5121,7 +5151,8 @@ VerifyDBResult CVerifyDB::VerifyDB(
                 /*fCheckPOW=*/true,
                 /*fCheckMerkleRoot=*/true,
                 PoWCheckStatus::UNCHECKED,
-                &pow_context)) {
+                &pow_context,
+                pindex->nHeight)) {
             LogError("Verification error: found bad block at %d, hash=%s (%s)",
                       pindex->nHeight, pindex->GetBlockHash().ToString(), state.ToString());
             return VerifyDBResult::CORRUPTED_BLOCK_DB;

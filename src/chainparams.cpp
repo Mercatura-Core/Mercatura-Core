@@ -43,6 +43,13 @@ void ReadSigNetArgs(const ArgsManager& args, CChainParams::SigNetOptions& option
 
 void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& options)
 {
+    if (args.IsArgSet("-mercahashv2height")) {
+        const auto height{ToIntegral<int>(args.GetArg("-mercahashv2height", ""))};
+        if (!height || (*height != -1 && (*height < 1 || *height == std::numeric_limits<int>::max()))) {
+            throw std::runtime_error{"Invalid -mercahashv2height: use -1 or a positive height below INT_MAX"};
+        }
+        if (*height != -1) options.mercahash_v2_height = *height;
+    }
     if (auto value = args.GetBoolArg("-fastprune")) options.fastprune = *value;
     if (HasTestOption(args, "bip94")) options.enforce_bip94 = true;
 
@@ -116,6 +123,9 @@ const CChainParams &Params() {
 
 std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, const ChainType chain)
 {
+    if (chain != ChainType::REGTEST && args.IsArgSet("-mercahashv2height")) {
+        throw std::runtime_error{"-mercahashv2height is restricted to regtest"};
+    }
     switch (chain) {
     case ChainType::MAIN:
         return CChainParams::Main();

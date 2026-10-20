@@ -77,6 +77,7 @@ public:
     std::vector<CTransactionRef> vtx;
 
     // Memory-only flags for caching expensive checks
+    mutable uint8_t m_checked_pow_version{0}; // Memory-only, never serialized.
     mutable bool fChecked;                            // CheckBlock()
     mutable bool m_checked_witness_commitment{false}; // CheckWitnessCommitment()
     mutable bool m_checked_merkle_root{false};        // CheckMerkleRoot()
@@ -104,6 +105,7 @@ public:
         CBlockHeader::SetNull();
         vtx.clear();
         fChecked = false;
+        m_checked_pow_version = 0;
         m_checked_witness_commitment = false;
         m_checked_merkle_root = false;
     }

@@ -85,6 +85,10 @@ struct BIP9Deployment {
  */
 struct Params {
     uint256 hashGenesisBlock;
+    /** First V2 candidate height; nullopt disables activation. Genesis remains V1.
+     * Public networks intentionally have no scheduled activation. */
+    std::optional<int> nMercaHashV2Height;
+
     /** Serialized-byte capacity at genesis; public testnet starts at 1 MiB. */
     uint64_t nInitialBlockCapacityBytes{1ULL << 20};
     /** Public-testnet-only switch to the 4 MiB base. No height on other networks. */

@@ -724,7 +724,7 @@ private:
         EXCLUSIVE_LOCKS_REQUIRED(!m_peer_mutex, !m_headers_presync_mutex, g_msgproc_mutex);
     /** Various helpers for headers processing, invoked by ProcessHeadersMessage() */
     /** Return true if headers are continuous and have valid proof-of-work (DoS points assigned on failure) */
-    bool CheckHeadersPoW(const std::vector<CBlockHeader>& headers, Peer& peer)
+    bool CheckHeadersPoW(const std::vector<CBlockHeader>& headers, Peer& peer, CNode& pfrom)
         EXCLUSIVE_LOCKS_REQUIRED(g_msgproc_mutex);
     /** Calculate an anti-DoS work threshold for headers chains */
     arith_uint256 GetAntiDoSWorkThreshold();
@@ -2921,7 +2921,7 @@ void PeerManagerImpl::SendBlockTransactions(CNode& pfrom, Peer& peer, const CBlo
     MakeAndPushMessage(pfrom, NetMsgType::BLOCKTXN, resp);
 }
 
-bool PeerManagerImpl::CheckHeadersPoW(const std::vector<CBlockHeader>& headers, Peer& peer)
+bool PeerManagerImpl::CheckHeadersPoW(const std::vector<CBlockHeader>& headers, Peer& peer, CNode& pfrom)
 {
     // Reject malformed/non-continuous batches before spending memory-hard
     // MercaHash work on them. Header linkage continues to use SHA256d block
@@ -2931,14 +2931,33 @@ bool PeerManagerImpl::CheckHeadersPoW(const std::vector<CBlockHeader>& headers, 
         return false;
     }
 
-    // Verify actual MercaHash-v1 proof of work before these headers are used
-    // by the low-work headers synchronization machinery.
+    std::optional<int64_t> first_height;
+    {
+        LOCK(cs_main);
+        if (const auto* parent{m_chainman.m_blockman.LookupBlockIndex(headers.front().hashPrevBlock)};
+            parent && (parent->nStatus & BLOCK_VALID_MASK) >= BLOCK_VALID_TREE) {
+            first_height = int64_t{parent->nHeight} + 1;
+        }
+    }
+    if (!first_height) {
+        LOCK(peer.m_headers_sync_mutex);
+        if (peer.m_headers_sync) first_height = peer.m_headers_sync->NextHeaderHeight(headers.front());
+    }
+    if (!first_height && m_chainparams.GetConsensus().nMercaHashV2Height) {
+        // Unknown ancestry cannot select a version. Request ancestors and return
+        // before presync, claimed-work accounting, caching or header admission.
+        // Existing getheaders rate limits bound this unconnected-header path.
+        HandleUnconnectingHeaders(pfrom, peer, headers);
+        return false;
+    }
+    // Verify the height-selected proof before low-work synchronization uses it.
     const uint64_t hashes_before{m_pow_hash_context.HashesComputed()};
     const bool valid{HasValidProofOfWork(
             headers,
             m_chainparams.GetConsensus(),
             m_pow_hash_context,
-            m_chainman.m_blockman)};
+            m_chainman.m_blockman,
+            first_height)};
     LogDebug(BCLog::NET, "headers proof-of-work: checked=%u total=%u peer=%d\n",
              m_pow_hash_context.HashesComputed() - hashes_before, headers.size(), peer.m_id);
     if (!valid) {
@@ -3301,7 +3320,7 @@ void PeerManagerImpl::ProcessHeadersMessage(CNode& pfrom, Peer& peer,
     // We'll rely on headers having valid proof-of-work further down, as an
     // anti-DoS criteria (note: this check is required before passing any
     // headers into HeadersSyncState).
-    if (!CheckHeadersPoW(headers, peer)) {
+    if (!CheckHeadersPoW(headers, peer, pfrom)) {
         // Misbehaving() calls are handled within CheckHeadersPoW(), so we can
         // just return. (Note that even if a header is announced via compact
         // block, the header itself should be valid, so this type of error can

@@ -141,12 +141,19 @@ static bool SolveBlockPoW(
     uint64_t& max_tries,
     PoWHashContext& pow_context)
 {
+    const auto height{WITH_LOCK(cs_main, [&]() -> std::optional<int64_t> {
+        const auto* parent{chainman.m_blockman.LookupBlockIndex(block.hashPrevBlock)};
+        if (!parent || (parent->nStatus & BLOCK_VALID_MASK) < BLOCK_VALID_TREE) return std::nullopt;
+        return int64_t{parent->nHeight} + 1;
+    }())};
+    if (!height) return false;
     while (max_tries > 0 &&
            block.nNonce < std::numeric_limits<uint32_t>::max() &&
            !CheckProofOfWork(
                block,
                chainman.GetConsensus(),
-               pow_context) &&
+               pow_context,
+               height) &&
            !chainman.m_interrupt) {
         ++block.nNonce;
         --max_tries;

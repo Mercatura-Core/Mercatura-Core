@@ -539,6 +539,10 @@ class CRegTestParams : public CChainParams
 public:
     explicit CRegTestParams(const RegTestOptions& opts)
     {
+        if (opts.mercahash_v2_height && *opts.mercahash_v2_height < 1) {
+            throw std::runtime_error{"MercaHash V2 activation must follow genesis"};
+        }
+        consensus.nMercaHashV2Height = opts.mercahash_v2_height;
         m_chain_type = ChainType::REGTEST;
         consensus.nInitialBlockCapacityBytes = MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES;
         consensus.signet_blocks = false;
