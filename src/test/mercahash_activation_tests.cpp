@@ -117,8 +117,9 @@ BOOST_AUTO_TEST_CASE(unconnected_malformed_and_presync_continuations)
     const std::array malformed{first, third};
     BOOST_CHECK(!Check(malformed, context));
     BOOST_CHECK_EQUAL(context.HashesComputed(), 0);
-    const auto& start{WITH_LOCK(cs_main, return *m_node.chainman->ActiveChain().Genesis())};
-    HeadersSyncState sync{0, m_node.chainman->GetConsensus(), {.commitment_period=1, .redownload_buffer_size=2}, start, arith_uint256{10}};
+    const CBlockIndex* start{WITH_LOCK(cs_main, return m_node.chainman->ActiveChain().Genesis())};
+    BOOST_REQUIRE(start);
+    HeadersSyncState sync{0, m_node.chainman->GetConsensus(), {.commitment_period=1, .redownload_buffer_size=2}, *start, arith_uint256{10}};
     const std::array low{first, second};
     BOOST_CHECK(sync.NextHeaderHeight(first) == 1);
     BOOST_REQUIRE(Check(low, context, sync.NextHeaderHeight(first)));
