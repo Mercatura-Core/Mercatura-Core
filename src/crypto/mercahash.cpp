@@ -13,15 +13,23 @@
 #include <cassert>
 #include <cstdint>
 #include <string_view>
+#include <stdexcept>
 #include <vector>
 
 namespace mercahash {
 namespace {
 
-constexpr std::string_view STATE_DOMAIN_0{"MercaHash-v1/state/0"};
-constexpr std::string_view STATE_DOMAIN_1{"MercaHash-v1/state/1"};
-constexpr std::string_view CHECKPOINT_DOMAIN{"MercaHash-v1/checkpoint"};
-constexpr std::string_view FINAL_DOMAIN{"MercaHash-v1/final"};
+// Geometry, domains and production workload are selected independently of WorkParams.
+template <Version V> struct Config {
+    static constexpr std::size_t SCRATCHPAD_BYTES = ScratchpadBytes(V);
+    static constexpr std::size_t LINE_COUNT = LineCount(V);
+    static constexpr std::uint64_t LINE_MASK = LINE_COUNT - 1;
+    static constexpr std::size_t BIND_BLOCK_COUNT = BindBlockCount(V);
+    static constexpr std::string_view STATE_DOMAIN_0 = V == Version::V1 ? "MercaHash-v1/state/0" : "MercaHash-v2/state/0";
+    static constexpr std::string_view STATE_DOMAIN_1 = V == Version::V1 ? "MercaHash-v1/state/1" : "MercaHash-v2/state/1";
+    static constexpr std::string_view CHECKPOINT_DOMAIN = V == Version::V1 ? "MercaHash-v1/checkpoint" : "MercaHash-v2/checkpoint";
+    static constexpr std::string_view FINAL_DOMAIN = V == Version::V1 ? "MercaHash-v1/final" : "MercaHash-v2/final";
+};
 
 constexpr std::array<std::uint64_t, 8> CONSTANTS{
     0x9E3779B97F4A7C15ULL,
@@ -56,6 +64,7 @@ std::span<const unsigned char> AsBytes(std::string_view str)
     };
 }
 
+template <typename C = Config<Version::V1>>
 State InitialState(std::span<const unsigned char> header)
 {
     assert(header.size() == HEADER_SIZE);
@@ -64,12 +73,12 @@ State InitialState(std::span<const unsigned char> header)
     std::array<unsigned char, SHA3_512::OUTPUT_SIZE> digest1{};
 
     SHA3_512{}
-        .Write(AsBytes(STATE_DOMAIN_0))
+        .Write(AsBytes(C::STATE_DOMAIN_0))
         .Write(header)
         .Finalize(digest0);
 
     SHA3_512{}
-        .Write(AsBytes(STATE_DOMAIN_1))
+        .Write(AsBytes(C::STATE_DOMAIN_1))
         .Write(header)
         .Finalize(digest1);
 
@@ -142,12 +151,13 @@ void WriteLine(
     }
 }
 
+template <typename C = Config<Version::V1>>
 void FillScratchpad(
     State& state,
     std::span<unsigned char> scratchpad,
     ScratchpadFillMode mode)
 {
-    assert(scratchpad.size() == SCRATCHPAD_BYTES);
+    assert(scratchpad.size() == C::SCRATCHPAD_BYTES);
 
     // Domain-separated transition from initial state into scratchpad fill.
     state[0]  ^= 0x9E3779B97F4A7C15ULL;
@@ -155,7 +165,7 @@ void FillScratchpad(
     state[10] ^= 0x94D049BB133111EBULL;
     state[15] ^= 0xD6E8FEB86659FD93ULL;
 
-    for (std::size_t i = 0; i < LINE_COUNT; ++i) {
+    for (std::size_t i = 0; i < C::LINE_COUNT; ++i) {
         const std::uint64_t x = static_cast<std::uint64_t>(i);
 
         state[0] += x;
@@ -226,20 +236,21 @@ Line ReadLine(
     return line;
 }
 
+template <typename C = Config<Version::V1>>
 void BindScratchpad(
     State& state,
     std::span<unsigned char> scratchpad,
     std::uint32_t passes,
     Diagnostics* diagnostics)
 {
-    assert(scratchpad.size() == SCRATCHPAD_BYTES);
+    assert(scratchpad.size() == C::SCRATCHPAD_BYTES);
 
     for (std::uint64_t pass = 0; pass < passes; ++pass) {
         state[0] ^= pass + CONSTANTS[4];
         state[8] += (pass + 1) * CONSTANTS[5];
         MercaARXRound(state);
 
-        for (std::size_t block = 0; block < BIND_BLOCK_COUNT; ++block) {
+        for (std::size_t block = 0; block < C::BIND_BLOCK_COUNT; ++block) {
             const std::size_t base_line =
                 block * BIND_BLOCK_LINES;
 
@@ -260,12 +271,12 @@ void BindScratchpad(
 
             const std::size_t previous_block =
                 block == 0
-                    ? BIND_BLOCK_COUNT - 1
+                    ? C::BIND_BLOCK_COUNT - 1
                     : block - 1;
 
             const std::size_t reference_block =
                 block == 0
-                    ? BIND_BLOCK_COUNT - 1
+                    ? C::BIND_BLOCK_COUNT - 1
                     : static_cast<std::size_t>(
                           reference_seed % block_u64);
 
@@ -424,6 +435,7 @@ struct PrimaryResult {
     Line written;
 };
 
+template <typename C = Config<Version::V1>>
 PrimaryResult PrimaryStep(
     State& state,
     std::span<unsigned char> scratchpad,
@@ -437,7 +449,7 @@ PrimaryResult PrimaryStep(
         (step * CONSTANTS[0]);
 
     const std::size_t primary_index =
-        static_cast<std::size_t>(primary_seed & LINE_MASK);
+        static_cast<std::size_t>(primary_seed & C::LINE_MASK);
 
     const Line memory = ReadLine(scratchpad, primary_index);
 
@@ -503,6 +515,7 @@ struct SecondaryResult {
     bool forced_distinct;
 };
 
+template <typename C = Config<Version::V1>>
 SecondaryResult SecondaryStep(
     State& state,
     std::span<unsigned char> scratchpad,
@@ -518,7 +531,7 @@ SecondaryResult SecondaryStep(
         (step * CONSTANTS[3]);
 
     std::size_t secondary_index =
-        static_cast<std::size_t>(secondary_seed & LINE_MASK);
+        static_cast<std::size_t>(secondary_seed & C::LINE_MASK);
 
     const bool forced_distinct =
         secondary_index == primary.line_index;
@@ -598,6 +611,7 @@ void WriteHashUint64(SHA3_512& hasher, std::uint64_t value)
     hasher.Write(encoded);
 }
 
+template <typename C = Config<Version::V1>>
 void Checkpoint(
     State& state,
     std::uint64_t step,
@@ -606,7 +620,7 @@ void Checkpoint(
 {
     SHA3_512 hasher;
 
-    hasher.Write(AsBytes(CHECKPOINT_DOMAIN));
+    hasher.Write(AsBytes(C::CHECKPOINT_DOMAIN));
 
     WriteHashUint64(hasher, step);
     WriteHashUint64(hasher, primary.line_index);
@@ -643,6 +657,7 @@ void Checkpoint(
     MercaARXRound(state);
 }
 
+template <typename C = Config<Version::V1>>
 void MixScratchpad(
     State& state,
     std::span<unsigned char> scratchpad,
@@ -650,18 +665,18 @@ void MixScratchpad(
 {
     for (std::uint64_t step = 1; step <= mix_steps; ++step) {
         const PrimaryResult primary =
-            PrimaryStep(state, scratchpad, step);
+            PrimaryStep<C>(state, scratchpad, step);
 
         if (step % SECONDARY_INTERVAL == 0) {
             const SecondaryResult secondary =
-                SecondaryStep(state, scratchpad, step, primary);
+                SecondaryStep<C>(state, scratchpad, step, primary);
 
             if (step % CROSS_LANE_INTERVAL == 0) {
                 CrossLaneMix(state, step);
             }
 
             if (step % CHECKPOINT_INTERVAL == 0) {
-                Checkpoint(state, step, primary, secondary);
+                Checkpoint<C>(state, step, primary, secondary);
             }
         }
     }
@@ -761,6 +776,7 @@ void MixScratchpadDiagnostics(
     }
 }
 
+template <typename C = Config<Version::V1>>
 void FinalSample(
     State& state,
     std::span<const unsigned char> scratchpad)
@@ -774,7 +790,7 @@ void FinalSample(
             (sample * CONSTANTS[0]);
 
         const std::size_t sample_index =
-            static_cast<std::size_t>(sample_seed & LINE_MASK);
+            static_cast<std::size_t>(sample_seed & C::LINE_MASK);
 
         const Line memory = ReadLine(scratchpad, sample_index);
 
@@ -815,6 +831,7 @@ void WriteHashUint64(SHA3_256& hasher, std::uint64_t value)
     hasher.Write(encoded);
 }
 
+template <typename C = Config<Version::V1>>
 void FinalizeHash(
     const State& state,
     std::span<const unsigned char> header,
@@ -822,7 +839,7 @@ void FinalizeHash(
 {
     SHA3_256 hasher;
 
-    hasher.Write(AsBytes(FINAL_DOMAIN));
+    hasher.Write(AsBytes(C::FINAL_DOMAIN));
     hasher.Write(header);
 
     for (const std::uint64_t value : state) {
@@ -832,30 +849,37 @@ void FinalizeHash(
     hasher.Finalize(output);
 }
 
-} // namespace
-
-void Hash(
+template <typename C>
+void Run(
     std::span<const unsigned char> header,
     std::span<unsigned char> scratchpad,
     std::span<unsigned char> output,
     const WorkParams& params)
 {
-    assert(header.size() == HEADER_SIZE);
-    assert(scratchpad.size() == SCRATCHPAD_BYTES);
-    assert(output.size() == OUTPUT_SIZE);
-    assert(params.mix_steps > 0);
+    if (header.size() != HEADER_SIZE || scratchpad.size() != C::SCRATCHPAD_BYTES ||
+        output.size() != OUTPUT_SIZE || params.mix_steps == 0) {
+        throw std::invalid_argument{"Invalid MercaHash buffers or workload"};
+    }
 
-    State state = InitialState(header);
+    State state = InitialState<C>(header);
 
-    FillScratchpad(state, scratchpad, params.scratchpad_fill);
-    BindScratchpad(
+    FillScratchpad<C>(state, scratchpad, params.scratchpad_fill);
+    BindScratchpad<C>(
         state,
         scratchpad,
         params.binding_passes,
         nullptr);
-    MixScratchpad(state, scratchpad, params.mix_steps);
-    FinalSample(state, scratchpad);
-    FinalizeHash(state, header, output);
+    MixScratchpad<C>(state, scratchpad, params.mix_steps);
+    FinalSample<C>(state, scratchpad);
+    FinalizeHash<C>(state, header, output);
+}
+
+} // namespace
+
+void Hash(std::span<const unsigned char> header, std::span<unsigned char> scratchpad,
+          std::span<unsigned char> output, const WorkParams& params)
+{
+    Run<Config<Version::V1>>(header, scratchpad, output, params);
 }
 
 void HashV1(
@@ -869,11 +893,14 @@ void HashV1(
         V1_BINDING_PASSES,
     };
 
-    Hash(
-        header,
-        scratchpad,
-        output,
-        V1_PARAMS);
+    Run<Config<Version::V1>>(header, scratchpad, output, V1_PARAMS);
+}
+
+void HashV2(std::span<const unsigned char> header, std::span<unsigned char> scratchpad,
+            std::span<unsigned char> output)
+{
+    static constexpr WorkParams V2_PARAMS{V2_MIX_STEPS, V2_SCRATCHPAD_FILL, V2_BINDING_PASSES};
+    Run<Config<Version::V2>>(header, scratchpad, output, V2_PARAMS);
 }
 
 void HashWithDiagnostics(

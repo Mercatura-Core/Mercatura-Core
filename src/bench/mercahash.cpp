@@ -117,6 +117,14 @@ void MercaHash_TwoFull_1(benchmark::Bench& bench)
         mercahash::ScratchpadFillMode::TWO_FULL_ROUNDS);
 }
 
+void MercaHash_V2(benchmark::Bench& bench)
+{
+    std::array<unsigned char, mercahash::HEADER_SIZE> header{};
+    std::array<unsigned char, mercahash::OUTPUT_SIZE> output{};
+    std::vector<unsigned char> scratch(mercahash::V2_SCRATCHPAD_BYTES);
+    bench.epochs(3).epochIterations(1).unit("hash").run([&] { mercahash::HashV2(header, scratch, output); });
+}
+
 } // namespace
 
 BENCHMARK(MercaHash_Alt_1);
@@ -128,3 +136,5 @@ BENCHMARK(MercaHash_Alt_131072_Bind1);
 BENCHMARK(MercaHash_Alt_1_Bind2);
 BENCHMARK(MercaHash_Alt_131072_Bind2);
 BENCHMARK(MercaHash_TwoFull_1);
+
+BENCHMARK(MercaHash_V2);

@@ -50,6 +50,32 @@ static_assert((BIND_BLOCK_COUNT & (BIND_BLOCK_COUNT - 1)) == 0);
 static_assert(BIND_BLOCK_MASK == 0x7FFF);
 static_assert(BIND_BLOCK_COUNT % BIND_ARX_INTERVAL == 0);
 
+/** Explicit, frozen consensus versions. Header serialization is unchanged. */
+enum class Version : std::uint8_t { V1 = 1, V2 = 2 };
+
+static constexpr std::size_t V1_SCRATCHPAD_BYTES = SCRATCHPAD_BYTES;
+static constexpr std::size_t V2_SCRATCHPAD_BYTES = 16ULL * 1024 * 1024;
+static constexpr std::size_t V2_LINE_COUNT = V2_SCRATCHPAD_BYTES / LINE_BYTES;
+static constexpr std::size_t V2_LINE_INDEX_BITS = 18;
+static constexpr std::uint64_t V2_LINE_MASK = V2_LINE_COUNT - 1;
+static constexpr std::size_t V2_BIND_BLOCK_COUNT = V2_SCRATCHPAD_BYTES / BIND_BLOCK_BYTES;
+static constexpr std::uint64_t V2_BIND_BLOCK_MASK = V2_BIND_BLOCK_COUNT - 1;
+static constexpr std::uint32_t V2_MIX_STEPS = 16'384;
+static constexpr std::uint32_t V2_BINDING_PASSES = 1;
+
+constexpr std::size_t ScratchpadBytes(Version version)
+{
+    return version == Version::V2 ? V2_SCRATCHPAD_BYTES : V1_SCRATCHPAD_BYTES;
+}
+constexpr std::size_t LineCount(Version version) { return ScratchpadBytes(version) / LINE_BYTES; }
+constexpr std::size_t BindBlockCount(Version version) { return ScratchpadBytes(version) / BIND_BLOCK_BYTES; }
+
+static_assert(V1_SCRATCHPAD_BYTES == 134'217'728);
+static_assert(V2_SCRATCHPAD_BYTES == 16'777'216);
+static_assert(V2_LINE_COUNT == 262'144 && V2_LINE_MASK == 0x3FFFF);
+static_assert(V2_BIND_BLOCK_COUNT == 4096 && V2_BIND_BLOCK_MASK == 0xFFF);
+static_assert(V2_MIX_STEPS == 16'384 && V2_BINDING_PASSES == 1);
+
 static constexpr std::size_t DIAGNOSTIC_REGIONS = 64;
 static constexpr std::size_t LINE_INDEX_BITS = 21;
 
@@ -98,6 +124,9 @@ static constexpr std::uint32_t V1_MIX_STEPS = 131'072;
 static constexpr ScratchpadFillMode V1_SCRATCHPAD_FILL =
     ScratchpadFillMode::ALTERNATING_HALF_ROUND;
 static constexpr std::uint32_t V1_BINDING_PASSES = 1;
+static constexpr ScratchpadFillMode V2_SCRATCHPAD_FILL = ScratchpadFillMode::ALTERNATING_HALF_ROUND;
+static_assert(V1_MIX_STEPS == 131'072 && V1_BINDING_PASSES == 1);
+constexpr std::uint32_t MixSteps(Version version) { return version == Version::V2 ? V2_MIX_STEPS : V1_MIX_STEPS; }
 
 /**
  * Benchmark-time MercaHash work parameters.
@@ -141,6 +170,15 @@ void Hash(
  * internally and must not be supplied by consensus callers.
  */
 void HashV1(
+    std::span<const unsigned char> header,
+    std::span<unsigned char> scratchpad,
+    std::span<unsigned char> output);
+
+/** Frozen V2 production entry point; requires exactly V2_SCRATCHPAD_BYTES.
+ * All hash entry points reject incorrect buffer sizes with std::invalid_argument,
+ * including release builds. Scratchpads may be unaligned and reused.
+ */
+void HashV2(
     std::span<const unsigned char> header,
     std::span<unsigned char> scratchpad,
     std::span<unsigned char> output);
