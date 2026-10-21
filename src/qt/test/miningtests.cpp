@@ -25,6 +25,7 @@
 #include <QSignalSpy>
 #include <QTableView>
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
@@ -46,6 +47,51 @@ Q_DECLARE_METATYPE(wallet::AddressPurpose)
 class MiningTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void unrestrictedV2CapacityControls()
+    {
+        TestingSetup setup{ChainType::MAIN};
+        auto node{interfaces::MakeNode(setup.m_node)};
+        std::atomic<uint64_t> available{24ULL << 30};
+        MiningSession session{*node, nullptr, [&] {
+            mining::GpuDevice device;
+            device.id = "cuda:0"; device.name = "Simulated V2 device"; device.supported = true;
+            device.total_memory = device.available_memory = device.max_allocation = available;
+            mining::GpuDiscovery result; result.devices.push_back(device); return result;
+        }};
+        MiningPage page{nullptr}; page.setSession(&session);
+        auto* hardware{page.findChild<QComboBox*>("miningHardware")};
+        auto* mode{page.findChild<QComboBox*>("gpuContextMode")};
+        auto* contexts{page.findChild<QDoubleSpinBox*>("gpuContextsV2")};
+        auto* devices{page.findChild<QListWidget*>("gpuDevices")};
+        auto* memory{page.findChild<QLabel*>("gpuMemoryStatus")};
+        auto* refresh{page.findChild<QPushButton*>("refreshGpuDevices")};
+        QVERIFY(hardware && mode && contexts && devices && memory && refresh);
+        hardware->setCurrentIndex(1);
+        QTRY_COMPARE(devices->count(), 1);
+        QVERIFY(contexts->maximum() > 1024);
+        QCOMPARE(mode->currentIndex(), 0);
+        QVERIFY(!contexts->isEnabled());
+        QVERIFY(memory->text().contains("maximum safe resource budget"));
+        QVERIFY(!memory->text().contains("nonce scheduler limits"));
+        mode->setCurrentIndex(1);
+        for (const unsigned n : {1U, 128U, 192U, 255U, 256U, 257U, 325U, 512U, 1024U}) {
+            contexts->setValue(n); QCOMPARE(contexts->value(), static_cast<double>(n));
+            QVERIFY(memory->text().contains(QString{"%1 selected"}.arg(n)));
+        }
+        available = UINT64_MAX;
+        QTest::mouseClick(refresh, Qt::LeftButton);
+        QTRY_COMPARE(contexts->maximum(), double{std::numeric_limits<unsigned int>::max()});
+        contexts->setValue(std::numeric_limits<unsigned int>::max());
+        QCOMPARE(contexts->value(), double{std::numeric_limits<unsigned int>::max()});
+        QVERIFY(!session.stats().busy);
+        mining::GpuStats stats;
+        stats.device.pow_version = mercahash::Version::V2;
+        stats.contexts = 325; stats.estimated_contexts = 512;
+        stats.batch_contexts = 128; stats.active_contexts = 17;
+        stats.budget.maximum_contexts = 512;
+        stats.memory_bytes = uint64_t{325} * ((16ULL << 20) + 240);
+        QCOMPARE(MiningPage::formatGpuContexts(stats), QString{"Automatic: 512 selected, 325 allocated, 17 executing (up to 128 per batch; resource maximum 512)"});
+    }
     void actualGpuContextsAfterFallback()
     {
         mining::GpuStats small, large;

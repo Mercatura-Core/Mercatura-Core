@@ -14,6 +14,7 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QHBoxLayout>
@@ -73,6 +74,14 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     m_contexts->setRange(1, 1);
     m_contexts->setToolTip(tr("Manual count applied to each selected GPU, bounded by the smallest selected device. Automatic ignores this field and sizes each GPU independently."));
     form->addRow(tr("Manual contexts per GPU"), m_contexts);
+    // Integral doubles represent the full unsigned backend count exactly.
+    // Keep the original V1 control and its existing range/behavior intact.
+    m_contexts_v2 = new QDoubleSpinBox{group};
+    m_contexts_v2->setObjectName(QStringLiteral("gpuContextsV2"));
+    m_contexts_v2->setDecimals(0);
+    m_contexts_v2->setRange(1, 1);
+    m_contexts_v2->setToolTip(tr("Manual V2 contexts per selected GPU, up to the smallest selected resource budget. Automatic uses each device's full safe capacity independently. Capacity is not an optimal hashrate recommendation."));
+    form->addRow(tr("Manual contexts per GPU"), m_contexts_v2);
     m_yield = new QSpinBox{group};
     m_yield->setObjectName(QStringLiteral("gpuYield"));
     m_yield->setRange(0, 1000);
@@ -179,6 +188,7 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     connect(m_devices, &QListWidget::itemChanged, this, [this] { updateStatus(); });
     connect(m_context_mode, &QComboBox::currentIndexChanged, this, [this] { updateStatus(); });
     connect(m_contexts, &QSpinBox::valueChanged, this, [this] { updateStatus(); });
+    connect(m_contexts_v2, &QDoubleSpinBox::valueChanged, this, [this] { updateStatus(); });
     connect(m_refresh_devices, &QPushButton::clicked, this, [this] {
         if (m_session) m_session->refreshDevices();
         updateStatus();
@@ -191,7 +201,7 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
             mining::GpuConfig hardware;
             hardware.cpu = m_hardware->currentIndex() != 1;
             hardware.gpu = m_hardware->currentIndex() != 0;
-            hardware.contexts = m_context_mode->currentIndex() == 1 ? static_cast<unsigned int>(m_contexts->value()) : 0;
+            hardware.contexts = m_context_mode->currentIndex() == 1 ? static_cast<unsigned int>(m_v2_contexts ? m_contexts_v2->value() : m_contexts->value()) : 0;
             hardware.yield_ms = static_cast<unsigned int>(m_yield->value());
             if (!m_all_devices->isChecked()) {
                 for (int i{0}; i < m_devices->count(); ++i) {
@@ -230,6 +240,7 @@ void MiningPage::updateStatus()
     // UI preview only. The provider resolves the actual template's parent,
     // and the controller rechecks the version's budget before starting workers.
     const auto version{GetPoWVersion(Params().GetConsensus(), m_client ? int64_t{m_client->getNumBlocks()} + 1 : 0)};
+    m_v2_contexts = version == mercahash::Version::V2;
     if (!running) {
         m_limits = m_detect_limits();
         if (version == mercahash::Version::V2) m_limits = mining::CalculateWorkerLimits(m_limits.logical_cpus, m_limits.available_memory, version);
@@ -270,7 +281,7 @@ void MiningPage::updateStatus()
     }
     const size_t selected_gpus{selected_devices.size()};
     const bool gpu_available{selected_gpus > 0};
-    unsigned int context_maximum{gpu_available ? mining::MAX_GPU_CONTEXTS : 0};
+    unsigned int context_maximum{gpu_available ? (m_v2_contexts ? std::numeric_limits<unsigned int>::max() : mining::MAX_GPU_CONTEXTS) : 0};
     bool automatic_memory{false};
     for (const auto* device : selected_devices) {
         const auto budget{gpu_budget(*device)};
@@ -279,11 +290,13 @@ void MiningPage::updateStatus()
     }
     const bool manual_contexts{m_context_mode->currentIndex() == 1};
     if (!running && discovery) {
-        const QSignalBlocker block{m_contexts};
-        m_contexts->setMaximum(static_cast<int>(std::max(1U, context_maximum)));
+        const QSignalBlocker block{m_contexts}, block_v2{m_contexts_v2};
+        if (m_v2_contexts) m_contexts_v2->setMaximum(std::max(1U, context_maximum));
+        else m_contexts->setMaximum(static_cast<int>(std::max(1U, context_maximum)));
     }
+    const auto manual_count{static_cast<unsigned int>(m_v2_contexts ? m_contexts_v2->value() : m_contexts->value())};
     const bool gpu_context_memory{manual_contexts
-        ? context_maximum > 0 && static_cast<unsigned int>(m_contexts->value()) <= context_maximum : automatic_memory};
+        ? context_maximum > 0 && manual_count <= context_maximum : automatic_memory};
     const auto maximum{mining::MaximumCpuWorkers(m_limits, use_gpu ? selected_gpus : 0, version)};
     const auto host_limits{mining::CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), m_limits.available_memory, version)};
     const bool gpu_host_memory{!use_gpu || selected_gpus <= host_limits.maximum};
@@ -298,12 +311,14 @@ void MiningPage::updateStatus()
     m_devices->setEnabled(!running && use_gpu && !m_all_devices->isChecked());
     m_context_mode->setEnabled(!running && use_gpu);
     m_contexts->setEnabled(!running && use_gpu && manual_contexts && context_maximum > 0);
+    m_contexts_v2->setEnabled(!running && use_gpu && manual_contexts && context_maximum > 0);
     m_yield->setEnabled(!running && use_gpu);
     m_refresh_devices->setEnabled(m_session && !running && bool(discovery));
-    for (QWidget* field : std::array<QWidget*, 7>{m_all_devices, m_devices, m_context_mode, m_contexts, m_yield, m_refresh_devices, m_gpu_status}) {
-        field->setVisible(use_gpu);
+    for (QWidget* field : std::array<QWidget*, 8>{m_all_devices, m_devices, m_context_mode, m_contexts, m_contexts_v2, m_yield, m_refresh_devices, m_gpu_status}) {
+        const bool visible{use_gpu && (field != m_contexts || !m_v2_contexts) && (field != m_contexts_v2 || m_v2_contexts)};
+        field->setVisible(visible);
         if (auto* form{qobject_cast<QFormLayout*>(field->parentWidget()->layout())}) {
-            if (auto* label{form->labelForField(field)}) label->setVisible(use_gpu);
+            if (auto* label{form->labelForField(field)}) label->setVisible(visible);
         }
     }
     QStringList gpu_messages;
@@ -314,11 +329,13 @@ void MiningPage::updateStatus()
         else if (!gpu_host_memory) gpu_messages << tr("Insufficient host memory for the selected GPU verifiers. Select fewer devices or free memory.");
         if (gpu_available && !gpu_context_memory) gpu_messages << tr("The selected GPUs cannot fit the requested contexts within their memory budgets. Free memory or select fewer contexts/devices.");
         for (const auto* device : selected_devices) {
-            const auto requested{manual_contexts ? static_cast<unsigned int>(m_contexts->value()) : 0};
+            const auto requested{manual_contexts ? manual_count : 0};
             if (requested > gpu_budget(*device).maximum_contexts) continue;
             const auto budget{gpu_budget(*device, requested)};
             const auto name{QString::fromStdString(device->name)};
-            if (device->vendor == mining::GpuVendor::NVIDIA_CUDA) {
+            if (m_v2_contexts) gpu_messages << tr("%1: maximum safe resource budget %2 contexts; %3 selected. Allocation and execution limits are rechecked at startup; this is capacity sizing, not hashrate tuning.")
+                .arg(name).arg(budget.maximum_contexts).arg(budget.contexts);
+            if (device->vendor == mining::GpuVendor::NVIDIA_CUDA || (m_v2_contexts && device->available_memory_known)) {
                 gpu_messages << tr("%1: %2 MiB free at last refresh. %3 contexts: %4 MiB scratchpads + %5 MiB estimated overhead; %6 MiB estimated headroom, %7 MiB minimum reserve. Free memory is rechecked when mining starts.")
                     .arg(name).arg(qulonglong{device->available_memory >> 20}).arg(budget.contexts)
                     .arg(qulonglong{budget.scratchpad_bytes >> 20}).arg(qulonglong{budget.overhead_bytes >> 20})
@@ -339,6 +356,13 @@ void MiningPage::updateStatus()
         .arg(QString::fromStdString(device.device.name)).arg(formatGpuContexts(device))
         .arg(device.hashes_per_second, 0, 'f', 2).arg(qulonglong{device.hashes})
         .arg(qulonglong{device.memory_bytes >> 20}).arg(QString::fromStdString(device.status));
+    for (const auto& device : stats.devices) if (device.device.pow_version == mercahash::Version::V2 && device.memory_bytes) {
+        device_rates << tr("%1: %2 MiB scratchpads; %3 MiB buffer memory allocated; %4 MiB %5 at allocation; %6 MiB reserve.")
+            .arg(QString::fromStdString(device.device.name)).arg(qulonglong{device.budget.scratchpad_bytes >> 20})
+            .arg(qulonglong{device.memory_bytes >> 20}).arg(qulonglong{device.budget.headroom_bytes >> 20})
+            .arg(device.budget.headroom_measured ? tr("free headroom") : tr("estimated remaining capacity (free VRAM unverified)"))
+            .arg(qulonglong{device.budget.reserved_bytes >> 20});
+    }
     m_gpu_rates->setText(device_rates.join(QStringLiteral("\n")));
     m_workers->setEnabled(!running && use_cpu && maximum > 0);
     m_hashrate->setText(tr("%1 H/s").arg(stats.hashes_per_second_10s, 0, 'f', 2));
@@ -372,6 +396,10 @@ QString MiningPage::formatGpuContexts(const mining::GpuStats& device)
 {
     if (!device.memory_bytes) return tr("No contexts active");
     const auto mode{device.automatic ? tr("Automatic") : tr("Manual")};
+    if (device.device.pow_version == mercahash::Version::V2)
+        return tr("%1: %2 selected, %3 allocated, %4 executing (up to %5 per batch; resource maximum %6)")
+            .arg(mode).arg(device.automatic ? device.estimated_contexts : device.contexts).arg(device.contexts)
+            .arg(device.active_contexts).arg(device.batch_contexts).arg(device.budget.maximum_contexts);
     if (device.automatic && device.estimated_contexts > device.contexts)
         return tr("%1: %2 contexts active (%3 estimated; adjusted for available VRAM)")
             .arg(mode).arg(device.contexts).arg(device.estimated_contexts);
