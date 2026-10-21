@@ -14,9 +14,8 @@
 namespace mining
 {
 enum class GpuVendor { NVIDIA_CUDA, AMD_OPENCL };
-enum class GpuMemorySource { CUDA_FREE, OPENCL_TOTAL };
-// The current miner assigns nonce ranges of 256. This is a backend/scheduler
-// bound, not a hardware-specific tuning recommendation.
+enum class GpuMemorySource { CUDA_FREE, OPENCL_TOTAL, OPENCL_FREE };
+// Frozen V1 backend/scheduler bound. V2 capacity is resource-based.
 inline constexpr unsigned int MAX_GPU_CONTEXTS{256};
 struct GpuDevice {
     GpuDevice() = default;
@@ -30,6 +29,7 @@ struct GpuDevice {
     uint64_t total_memory{0};
     uint64_t available_memory{0};
     uint64_t max_allocation{0};
+    bool available_memory_known{false};
     bool supported{false};
     std::string error;
 };
@@ -53,7 +53,7 @@ struct GpuMemoryBudget {
     uint64_t headroom_bytes{0}; // CUDA: estimated remaining free memory; OpenCL: unallocated total, NOT free VRAM.
     unsigned int maximum_contexts{0}; // Maximum automatic/manual count, before allocating.
     bool low_headroom{false};
-    bool scheduler_limited{false}; // More would fit by memory, but nonce leases currently contain 256 nonces.
+    bool scheduler_limited{false}; // V1 only: more would fit than its frozen 256-context scheduler permits.
 };
 GpuMemoryBudget CalculateGpuBudget(uint64_t memory, uint64_t maximum_allocation, unsigned int requested = 0,
                                    GpuMemorySource source = GpuMemorySource::CUDA_FREE,
@@ -75,7 +75,11 @@ struct GpuContextAllocation {
 GpuContextAllocation AllocateGpuContexts(unsigned int requested,
     const std::function<GpuMemoryBudget()>& budget,
     const std::function<void(unsigned int, const GpuMemoryBudget&)>& allocate,
-    const std::function<void()>& cleanup, const std::function<bool()>& cancelled);
+    const std::function<void()>& cleanup, const std::function<bool()>& cancelled,
+    mercahash::Version version = mercahash::Version::V1);
+// Per-launch geometry/32-bit kernel-index and host-size limits, not a total
+// resident-context ceiling. One context per compute unit bounds queued work.
+unsigned int GpuExecutionContexts(unsigned int resident, uint64_t compute_units, uint64_t maximum_groups);
 using GpuHeader = std::array<unsigned char, 80>;
 using GpuHash = std::array<unsigned char, 32>;
 class GpuBackend
@@ -86,6 +90,8 @@ class GpuBackend
     virtual mercahash::Version PoWVersion() const { return mercahash::Version::V1; }
     virtual unsigned int EstimatedContexts() const { return Contexts(); }
     virtual uint64_t MemoryBytes() const = 0;
+    virtual unsigned int BatchContexts() const { return Contexts(); }
+    virtual GpuMemoryBudget Budget() const { return {}; }
     // Empty on cancellation; never return partially executed hashes. The
     // predicate is checked between bounded launches, never by a Qt callback.
     virtual std::vector<GpuHash> Hash(std::span<const GpuHeader> headers, const std::function<bool()> &cancelled) = 0;
