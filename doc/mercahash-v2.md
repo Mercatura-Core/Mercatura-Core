@@ -124,25 +124,31 @@ within the current memory bound. No new production worker ceiling is imposed.
 Qt displays a version-aware preview; the actual provider/controller selection
 is authoritative and independently checked.
 
-GPU budgeting uses the selected scratchpad size, retains the existing runtime
-and per-context overhead reserves, and retains the 256-nonce lease bound.
-CUDA budgets from freshly queried free VRAM; OpenCL retains its conservative
-quarter-of-total-memory and single-allocation limits. Total OpenCL memory is
-never described as measured free VRAM. A backend must report the job's exact
-version before its version-specific permanent-vector startup check can pass.
-Every candidate is compared byte-for-byte against the authoritative CPU hash
-before submission.
+GPU budgeting uses the selected scratchpad size and retains the runtime and
+per-context overhead reserves. V1 retains its 256-context bound and original
+256-nonce scheduling. V2 assembles those atomic leases into larger batches,
+retaining unused lease tails, with resource-based resident capacity and bounded
+execution windows. CUDA budgets from freshly queried free VRAM. V2 OpenCL uses
+AMD's free-memory query when available, otherwise the conservative
+quarter-of-total-memory policy; V1 retains the latter policy. Single-allocation
+and address limits apply. Total OpenCL memory is never described as measured
+free VRAM. A backend must report the job's exact version before its
+version-specific permanent-vector startup check can pass. Every candidate is
+compared byte-for-byte against the authoritative CPU hash before submission.
+See [Phase G1](mercahash-v2-g1.md) for capacity, scheduling and hardware validation.
 
 ## Device implementations
 
 CUDA compiles the existing specialized device source into distinct V1/V2
 kernel instances. The single-lane fill, 32-lane binding reduction, cooperative
 write barriers, staged mixing and stream-ordering optimizations are retained.
-Only frozen geometry/domains and the matching host allocation/loop bounds
-change. Existing chunk sizes and synchronization cadence are retained for
-correctness; they are not claimed optimal for V2. Cancellation drains queued
-work before buffers can be reused or released. Bounded OOM retries, reserve
-revalidation and fatal driver/kernel error propagation remain intact.
+The frozen geometry/domains and matching host allocation/loop bounds select the
+version. V1 chunk sizes and synchronization cadence are unchanged. G1 bounds
+V2 launches using hardware execution windows and shorter mixing stages, with
+cancellation checks between synchronized launches. These are responsiveness
+bounds, not performance tuning. Cancellation drains queued work before buffers
+can be reused or released. Bounded OOM retries, reserve revalidation and fatal
+driver/kernel error propagation remain intact.
 
 OpenCL compiles the portable source with an explicit `MH_VERSION=1` or `2`;
 unsupported values fail compilation. Its existing 8-lane cooperative layout

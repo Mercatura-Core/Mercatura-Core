@@ -5,6 +5,11 @@ The revision starts at `724428dbe551fb6bfb8c81272ef74647ebbba839` on
 for the frozen algorithm, permanent-vector configuration, ancestry selection,
 header presync handling, mining resources and difficulty behavior.
 
+For the subsequent GPU capacity and scheduling revision, see
+[Phase G1 validation and WSL2 commands](mercahash-v2-g1.md). Its simulation and
+Qt checks supplement the historical results below; physical GPU qualification
+remains a separate gate.
+
 Mainnet selects V2 from height 0, with an explicitly provisional development
 genesis and no finalized launch difficulty. Public testnet retains its V1 genesis
 and history, with no V2 activation scheduled. Signet and testnet4 remain V1.

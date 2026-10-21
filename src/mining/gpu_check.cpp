@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying file COPYING.
 #include <algorithm>
 #include <charconv>
+#include <chrono>
 #include <crypto/mercahash.h>
 #include <fstream>
 #include <iostream>
@@ -57,25 +58,30 @@ public:
 int main(int argc, char** argv)
 {
     try {
-        unsigned requested{0}, repetitions{3}, version{1};
+        unsigned requested{0}, repetitions{3}, version{1}, benchmark_seconds{0};
         std::string headers_file;
         for (int arg{2}; arg < argc; ++arg) {
             const std::string option{argv[arg]};
-            if (option == "--contexts" || option == "--repetitions" || option == "--version") {
+            if (option == "--contexts" || option == "--repetitions" || option == "--version" || option == "--benchmark-seconds") {
                 if (++arg == argc) throw std::runtime_error{"Missing value for " + option};
                 const auto value{Number(argv[arg])};
                 if (option == "--contexts") requested = value;
                 else if (option == "--version") version = value;
+                else if (option == "--benchmark-seconds") benchmark_seconds = value;
                 else repetitions = value;
             } else if (!option.starts_with('-') && headers_file.empty()) {
                 headers_file = option;
             } else {
-                throw std::runtime_error{"Usage: mercatura-gpu-check [--list | DEVICE_ID [HEADERS_FILE] [--contexts N] [--repetitions N] [--version 1|2]]"};
+                throw std::runtime_error{"Usage: mercatura-gpu-check [--list | DEVICE_ID [HEADERS_FILE] [--contexts N] [--repetitions N] [--version 1|2] [--benchmark-seconds N]]"};
             }
         }
         if (version != 1 && version != 2) throw std::runtime_error{"Version must be 1 or 2"};
-        if (requested > 256 || repetitions == 0 || repetitions > 100)
+        if (version == 1 && (requested > mining::MAX_GPU_CONTEXTS || repetitions == 0 || repetitions > 100))
             throw std::runtime_error{"Contexts must be 0..256 and repetitions 1..100"};
+        if (version == 2 && (repetitions == 0 || repetitions > 100))
+            throw std::runtime_error{"Repetitions must be 1..100"};
+        if (benchmark_seconds > 60 || (benchmark_seconds && version != 2))
+            throw std::runtime_error{"Fixed-duration GPU measurements require V2 and 1..60 seconds"};
         const auto discovery{mining::DiscoverGpuDevices()};
         for (const auto& error : discovery.errors) std::cout << error << '\n';
         for (const auto& device : discovery.devices)
@@ -138,6 +144,35 @@ int main(int argc, char** argv)
         }
         std::cout << check.Comparisons() << " independent CPU/GPU comparisons passed across full/partial batches and "
                   << repetitions << " repetitions\n";
+        if (version == 2)
+            std::cout << "V2 resident contexts=" << contexts << " estimated=" << backend->EstimatedContexts()
+                      << " execution_window=" << backend->BatchContexts() << " allocated_buffer_bytes=" << backend->MemoryBytes() << '\n';
+        if (benchmark_seconds) {
+            // Explicit manual measurement after parity. No count selection,
+            // automatic tuning, node connection or block submission occurs.
+            std::vector<mining::GpuHeader> headers(backend->BatchContexts());
+            const auto start{std::chrono::steady_clock::now()};
+            const auto deadline{start + std::chrono::seconds{benchmark_seconds}};
+            const auto cancelled = [&] { return std::chrono::steady_clock::now() >= deadline; };
+            uint64_t completed{0};
+            while (!cancelled()) {
+                for (auto& header : headers) for (size_t i{0}; i < header.size(); i += 8) {
+                    const auto value{NextRandom(seed)};
+                    for (unsigned j{0}; j < 8; ++j) header[i + j] = value >> (8 * j);
+                }
+                const auto hashes{backend->Hash(headers, cancelled)};
+                if (hashes.size() != headers.size()) {
+                    if (cancelled()) break;
+                    throw std::runtime_error{"Incomplete GPU measurement batch"};
+                }
+                completed += hashes.size();
+            }
+            const auto finish{std::chrono::steady_clock::now()};
+            const double elapsed{std::chrono::duration<double>(finish - start).count()};
+            std::cout << "V2 manual measurement: completed_hashes=" << completed << " elapsed_seconds=" << elapsed
+                      << " hashes_per_second=" << completed / elapsed << " deadline_drain_ms="
+                      << std::chrono::duration<double, std::milli>(finish - deadline).count() << '\n';
+        }
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
