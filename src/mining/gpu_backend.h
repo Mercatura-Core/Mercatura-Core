@@ -50,10 +50,11 @@ struct GpuMemoryBudget {
     uint64_t scratchpad_bytes{0};
     uint64_t reserved_bytes{0};
     uint64_t overhead_bytes{0};
-    uint64_t headroom_bytes{0}; // CUDA: estimated remaining free memory; OpenCL: unallocated total, NOT free VRAM.
+    uint64_t headroom_bytes{0}; // Remaining free memory when measured; otherwise a conservative budget estimate.
     unsigned int maximum_contexts{0}; // Maximum automatic/manual count, before allocating.
     bool low_headroom{false};
     bool scheduler_limited{false}; // V1 only: more would fit than its frozen 256-context scheduler permits.
+    bool headroom_measured{false}; // A backend re-queried free memory after allocating its buffers.
 };
 GpuMemoryBudget CalculateGpuBudget(uint64_t memory, uint64_t maximum_allocation, unsigned int requested = 0,
                                    GpuMemorySource source = GpuMemorySource::CUDA_FREE,
@@ -78,7 +79,7 @@ GpuContextAllocation AllocateGpuContexts(unsigned int requested,
     const std::function<void()>& cleanup, const std::function<bool()>& cancelled,
     mercahash::Version version = mercahash::Version::V1);
 // Per-launch geometry/32-bit kernel-index and host-size limits, not a total
-// resident-context ceiling. One context per compute unit bounds queued work.
+// resident-context ceiling. The backend supplies its hardware work window.
 unsigned int GpuExecutionContexts(unsigned int resident, uint64_t compute_units, uint64_t maximum_groups);
 using GpuHeader = std::array<unsigned char, 80>;
 using GpuHash = std::array<unsigned char, 32>;

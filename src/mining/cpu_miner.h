@@ -25,6 +25,15 @@ namespace mining {
 inline constexpr uint64_t NONCE_SPACE{uint64_t{1} << 32};
 struct NonceRange { uint64_t begin; uint64_t end; };
 std::optional<NonceRange> AllocateNonceRange(std::atomic<uint64_t>& cursor);
+// V2 only. Assemble fixed atomic leases without discarding an unused tail.
+// One assembler belongs to one device and immutable Work, never a new job.
+class V2NonceBatch {
+    std::optional<NonceRange> m_pending;
+public:
+    std::vector<uint32_t> Next(std::atomic<uint64_t>& cursor, unsigned int maximum,
+        const std::function<std::optional<NonceRange>(std::atomic<uint64_t>&)>& allocate,
+        const std::function<bool()>& cancelled);
+};
 
 struct WorkerLimits {
     unsigned int logical_cpus{1};
@@ -84,6 +93,8 @@ struct GpuStats {
     uint64_t memory_bytes{0};
     unsigned int contexts{0};
     unsigned int estimated_contexts{0};
+    unsigned int batch_contexts{0}, active_contexts{0};
+    GpuMemoryBudget budget{};
     bool automatic{true};
     std::string status{"Preparing device"};
     bool failed{false};

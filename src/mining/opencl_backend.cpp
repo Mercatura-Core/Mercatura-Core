@@ -6,6 +6,7 @@
 #include <charconv>
 #include <cstring>
 #include <crypto/mercahash.h>
+#include <limits>
 #include <mining/gpu_backend.h>
 #include <mining/opencl_source.h>
 #include <stdexcept>
@@ -60,7 +61,7 @@ class Api
     X(clGetPlatformIDs)                                                                                                \
     X(clGetDeviceIDs)                                                                                                  \
     X(clGetDeviceInfo) X(clCreateContext) X(clReleaseContext) X(clCreateCommandQueue) X(clReleaseCommandQueue)         \
-        X(clCreateBuffer) X(clReleaseMemObject) X(clCreateProgramWithSource) X(clBuildProgram)                         \
+        X(clCreateBuffer) X(clCreateSubBuffer) X(clReleaseMemObject) X(clCreateProgramWithSource) X(clBuildProgram)    \
             X(clGetProgramBuildInfo) X(clReleaseProgram) X(clCreateKernel) X(clReleaseKernel) X(clSetKernelArg)        \
                 X(clEnqueueNDRangeKernel) X(clEnqueueWriteBuffer) X(clEnqueueReadBuffer) X(clFinish)
 #define DECLARE(name) decltype(&::name) name{nullptr};
@@ -170,6 +171,18 @@ std::string Text(Api &api, cl_device_id device, cl_device_info field)
         value.pop_back();
     return value;
 }
+std::optional<uint64_t> FreeMemory(Api& api, cl_device_id device)
+{
+    // cl_amd_device_attribute_query reports free memory in KiB. The core
+    // OpenCL global-memory property is a capacity, never a free-memory query.
+    const auto extensions{" " + Text(api, device, CL_DEVICE_EXTENSIONS) + " "};
+    if (extensions.find(" cl_amd_device_attribute_query ") == std::string::npos) return {};
+    cl_ulong free_kib[2]{};
+    constexpr cl_device_info global_free_memory_amd{0x4039};
+    if (api.clGetDeviceInfo(device, global_free_memory_amd, sizeof(free_kib), free_kib, nullptr) != CL_SUCCESS ||
+        free_kib[0] > std::numeric_limits<uint64_t>::max() / 1024) return {};
+    return std::min<uint64_t>(free_kib[0] * 1024, Info<cl_ulong>(api, device, CL_DEVICE_GLOBAL_MEM_SIZE));
+}
 class OpenClBackend final : public GpuBackend
 {
     const mercahash::Version version;
@@ -181,6 +194,8 @@ class OpenClBackend final : public GpuBackend
     cl_mem headers{nullptr}, states{nullptr}, scratch{nullptr}, outputs{nullptr};
     unsigned int contexts{0}, estimated{0};
     uint64_t memory_bytes{0};
+    unsigned int execution_limit{0}, next_context{0};
+    GpuMemoryBudget allocation_budget;
 
   public:
     OpenClBackend(const GpuDevice &selected, unsigned int requested, const std::function<bool()>& cancelled) : version{selected.pow_version}
@@ -194,6 +209,14 @@ class OpenClBackend final : public GpuBackend
                 throw std::runtime_error{"AMD device enumeration changed; refresh device selection"};
             if (!SupportsOpenCl12(Text(api, device, CL_DEVICE_VERSION)))
                 throw std::runtime_error{"AMD GPU requires OpenCL 1.2 or later"};
+            if (version == mercahash::Version::V2) {
+                const auto alignment{Info<cl_uint>(api, device, CL_DEVICE_MEM_BASE_ADDR_ALIGN)};
+                if (!alignment || alignment % 8 || mercahash::V2_SCRATCHPAD_BYTES % (alignment / 8) ||
+                    Info<cl_uint>(api, device, CL_DEVICE_ADDRESS_BITS) != 64 || Info<size_t>(api, device, CL_DEVICE_MAX_WORK_GROUP_SIZE) < 8)
+                    throw std::runtime_error{"AMD V2 scratchpad alignment or execution geometry is unsupported"};
+                execution_limit = GpuExecutionContexts(std::numeric_limits<unsigned int>::max(),
+                    Info<cl_uint>(api, device, CL_DEVICE_MAX_COMPUTE_UNITS), std::numeric_limits<size_t>::max() / 8);
+            }
             cl_int error;
             context = api.clCreateContext(nullptr, 1, &device, nullptr, nullptr, &error);
             Check(error, "Create OpenCL context");
@@ -223,14 +246,16 @@ class OpenClBackend final : public GpuBackend
             const auto allocation{AllocateGpuContexts(requested, [&] {
                 // OpenCL total memory is not measured free VRAM. Retain the
                 // conservative global-pool and single-allocation limits.
-                return CalculateGpuBudget(Info<cl_ulong>(api, device, CL_DEVICE_GLOBAL_MEM_SIZE),
-                    Info<cl_ulong>(api, device, CL_DEVICE_MAX_MEM_ALLOC_SIZE), 0, GpuMemorySource::OPENCL_TOTAL, version);
-            }, [&](unsigned int count, const GpuMemoryBudget&) {
+                const auto free{version == mercahash::Version::V2 ? FreeMemory(api, device) : std::nullopt};
+                return CalculateGpuBudget(free.value_or(Info<cl_ulong>(api, device, CL_DEVICE_GLOBAL_MEM_SIZE)),
+                    Info<cl_ulong>(api, device, CL_DEVICE_MAX_MEM_ALLOC_SIZE), 0,
+                    free ? GpuMemorySource::OPENCL_FREE : GpuMemorySource::OPENCL_TOTAL, version);
+            }, [&](unsigned int count, const GpuMemoryBudget& budget) {
                 contexts = count;
                 memory_bytes = count * uint64_t{mercahash::ScratchpadBytes(version)};
                 auto allocate = [&](cl_mem &buffer, size_t bytes) {
                     buffer = api.clCreateBuffer(context, CL_MEM_READ_WRITE, bytes, nullptr, &error);
-                    if (error == CL_MEM_OBJECT_ALLOCATION_FAILURE)
+                    if (error == CL_MEM_OBJECT_ALLOCATION_FAILURE || (version == mercahash::Version::V2 && error == CL_OUT_OF_RESOURCES))
                         throw GpuMemoryAllocationError{"Insufficient OpenCL device buffer memory"};
                     Check(error, "Allocate OpenCL mining buffer");
                 };
@@ -238,7 +263,19 @@ class OpenClBackend final : public GpuBackend
                 allocate(states, contexts * size_t{128});
                 allocate(scratch, static_cast<size_t>(memory_bytes));
                 allocate(outputs, contexts * size_t{32});
-            }, [&] { CleanupBuffers(true); }, cancelled)};
+                allocation_budget = budget;
+                allocation_budget.contexts = count;
+                allocation_budget.scratchpad_bytes = memory_bytes;
+                allocation_budget.overhead_bytes = (64ULL << 20) + uint64_t{count} * 4096;
+                allocation_budget.headroom_bytes += budget.scratchpad_bytes + budget.overhead_bytes - memory_bytes - allocation_budget.overhead_bytes;
+                if (version == mercahash::Version::V2) {
+                    if (const auto free{FreeMemory(api, device)}) {
+                        allocation_budget.headroom_bytes = *free;
+                        allocation_budget.headroom_measured = true;
+                        if (*free < budget.reserved_bytes) throw GpuMemoryAllocationError{"AMD free VRAM fell below the required reserve"};
+                    }
+                }
+            }, [&] { CleanupBuffers(true); }, cancelled, version)};
             estimated = allocation.estimated;
         } catch (...) {
             Cleanup();
@@ -255,12 +292,15 @@ class OpenClBackend final : public GpuBackend
     }
     mercahash::Version PoWVersion() const override { return version; }
     unsigned int EstimatedContexts() const override { return estimated; }
+    unsigned int BatchContexts() const override { return version == mercahash::Version::V2 ? std::min({contexts, execution_limit, contexts - next_context}) : contexts; }
+    GpuMemoryBudget Budget() const override { return allocation_budget; }
     uint64_t MemoryBytes() const override
     {
-        return memory_bytes;
+        return memory_bytes + (version == mercahash::Version::V2 ? uint64_t{contexts} * 240 : 0);
     }
     std::vector<GpuHash> Hash(std::span<const GpuHeader> input, const std::function<bool()> &cancelled) override
     {
+        if (version == mercahash::Version::V2) return HashV2(input, cancelled);
         if (input.empty() || input.size() > contexts)
             throw std::runtime_error{"Invalid AMD hashing batch size"};
         if (cancelled())
@@ -319,6 +359,58 @@ class OpenClBackend final : public GpuBackend
     }
 
   private:
+    std::vector<GpuHash> HashV2(std::span<const GpuHeader> input, const std::function<bool()>& cancelled)
+    {
+        if (input.empty() || input.size() > contexts) throw std::runtime_error{"Invalid AMD V2 hashing batch size"};
+        std::vector<GpuHash> hashes(input.size());
+        for (size_t completed{0}; completed < input.size();) {
+            if (cancelled()) return {};
+            const cl_uint count{static_cast<cl_uint>(std::min({size_t{BatchContexts()}, input.size() - completed, size_t{contexts - next_context}}))};
+            // A view selects resident scratchpads without changing kernel math
+            // or requiring a full-pool launch. Header/state/output slots are
+            // local to this bounded execution window and reused after Finish.
+            cl_buffer_region region{size_t{next_context} * mercahash::V2_SCRATCHPAD_BYTES,
+                                    size_t{count} * mercahash::V2_SCRATCHPAD_BYTES};
+            cl_int error;
+            const auto view{api.clCreateSubBuffer(scratch, CL_MEM_READ_WRITE, CL_BUFFER_CREATE_TYPE_REGION, &region, &error)};
+            Check(error, "Select AMD V2 resident scratchpads");
+            struct DrainView {
+                Api& api; cl_command_queue queue; cl_mem view;
+                ~DrainView() { api.clFinish(queue); api.clReleaseMemObject(view); }
+            } drain{api, queue, view};
+            next_context = static_cast<unsigned int>((uint64_t{next_context} + count) % contexts);
+            Check(api.clEnqueueWriteBuffer(queue, headers, CL_TRUE, 0, size_t{count} * 80, input.data() + completed, 0, nullptr, nullptr), "Upload AMD V2 headers");
+            const auto argument = [&](cl_kernel kernel, unsigned index, const auto& value) {
+                Check(api.clSetKernelArg(kernel, index, sizeof(value), &value), "Set AMD V2 argument");
+            };
+            argument(init, 0, headers); argument(init, 1, states); argument(init, 2, count);
+            const size_t local{8}, global{size_t{count} * local};
+            const auto launch = [&](cl_kernel kernel) {
+                if (cancelled()) return false;
+                Check(api.clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &global, &local, 0, nullptr, nullptr), "Launch AMD V2 kernel");
+                Check(api.clFinish(queue), "Synchronize AMD V2 kernel");
+                return !cancelled();
+            };
+            if (!launch(init)) return {};
+            argument(stage, 0, headers); argument(stage, 1, states); argument(stage, 2, view);
+            argument(stage, 3, outputs); argument(stage, 4, count);
+            const auto advance = [&](cl_uint phase, cl_uint begin, cl_uint end) {
+                argument(stage, 5, phase); argument(stage, 6, begin); argument(stage, 7, end);
+                return launch(stage);
+            };
+            for (cl_uint begin{0}; begin < mercahash::V2_LINE_COUNT; begin += 4096)
+                if (!advance(0, begin, begin + 4096)) return {};
+            for (cl_uint begin{0}; begin < mercahash::V2_BIND_BLOCK_COUNT; begin += 64)
+                if (!advance(1, begin, begin + 64)) return {};
+            for (cl_uint begin{1}; begin <= mercahash::V2_MIX_STEPS; begin += 256)
+                if (!advance(2, begin, begin + 255)) return {};
+            if (!advance(3, 0, 0)) return {};
+            Check(api.clEnqueueReadBuffer(queue, outputs, CL_TRUE, 0, size_t{count} * 32, hashes.data() + completed, 0, nullptr, nullptr), "Read AMD V2 output");
+            if (cancelled()) return {};
+            completed += count;
+        }
+        return hashes;
+    }
     void CleanupBuffers(bool checked = false)
     {
         cl_int failure{queue ? api.clFinish(queue) : CL_SUCCESS};
@@ -367,12 +459,17 @@ GpuDiscovery DiscoverOpenClDevices()
                 entry.total_memory = Info<cl_ulong>(api, device, CL_DEVICE_GLOBAL_MEM_SIZE);
                 // 0 denotes unknown free memory, never a claimed measurement.
                 entry.max_allocation = Info<cl_ulong>(api, device, CL_DEVICE_MAX_MEM_ALLOC_SIZE);
+                if (const auto free{FreeMemory(api, device)}) {
+                    entry.available_memory_known = true;
+                    entry.available_memory = *free;
+                }
                 entry.supported = SupportsOpenCl12(entry.capability) &&
                                   Info<cl_uint>(api, device, CL_DEVICE_ADDRESS_BITS) == 64 &&
                                   Info<cl_bool>(api, device, CL_DEVICE_AVAILABLE) &&
                                   Info<cl_bool>(api, device, CL_DEVICE_COMPILER_AVAILABLE) &&
                                   Text(api, device, CL_DEVICE_PROFILE) == "FULL_PROFILE" &&
-                                  CalculateGpuBudget(entry.total_memory, entry.max_allocation, 0, GpuMemorySource::OPENCL_TOTAL, mercahash::Version::V2).contexts > 0;
+                                  CalculateGpuBudget(entry.available_memory_known ? entry.available_memory : entry.total_memory,
+                                      entry.max_allocation, 0, entry.available_memory_known ? GpuMemorySource::OPENCL_FREE : GpuMemorySource::OPENCL_TOTAL, mercahash::Version::V2).contexts > 0;
                 if (!entry.supported)
                     entry.error =
                         "AMD device needs OpenCL 1.2 or later, 64-bit full-profile support, an available compiler and sufficient VRAM";
