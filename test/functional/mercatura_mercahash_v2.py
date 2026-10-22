@@ -108,10 +108,10 @@ class MercaHashV2Test(BitcoinTestFramework):
         # Offline selection is deliberate: the isolated V2 node must refuse to
         # guess a height for this foreign parent. No consensus override exists.
         below_parent = from_hex(CBlockHeader(), node.getblockheader(hashes[17], False))
-        util = str(Path(self.config["environment"]["BUILDDIR"]) / "bin" / "bitcoin-util")
+        util_argv = node.binaries.util_argv()
         for tag in range(1, 65):
             wrong_below = self.block(v1_node, below_parent, 19, 300 + tag)
-            solved = subprocess.check_output([util, "-regtest", "-powversion=2", "grind",
+            solved = subprocess.check_output(util_argv + ["-regtest", "-powversion=2", "grind",
                                               CBlockHeader(wrong_below).serialize().hex()], text=True)
             wrong_below.nNonce = from_hex(CBlockHeader(), solved.strip()).nNonce
             result = node.submitblock(wrong_below.serialize().hex())
