@@ -52,7 +52,7 @@ WSL NVCC/GCC12 or physical SM86 result.
 ```sh
 BUILD=~/projects/mercatura-v2-rebuild-build
 ctest --test-dir "$BUILD" -R 'test_cuda_backend_host|test_mining' --output-on-failure
-"$BUILD/bin/test_bitcoin" --run_test=mercahash_v2_tests,mercahash_activation_tests,mercahash_native_transition_tests,mercahash_gpu_tests,cuda_binding_tests,gpu_capacity_tests,gpu_scheduling_tests,cpu_miner_tests,gpu_miner_tests,mining_tests_v2_solo
+"$BUILD/bin/test_bitcoin" --run_test=mercahash_v2_tests,mercahash_activation_tests,mercahash_activation_tests_transition,mercahash_gpu_tests,cuda_binding_tests,gpu_capacity_tests,gpu_scheduling_tests,cpu_miner_tests,gpu_miner_tests,mining_tests_v2
 python3 "$BUILD/test/functional/test_runner.py" --jobs=4 --timeout-factor=3 mercatura_mercahash_v2 mercatura_mercahash_pow mercatura_solo_native
 ```
 

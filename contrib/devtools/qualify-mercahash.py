@@ -134,7 +134,8 @@ def main():
             print(metadata["reason"], file=sys.stderr)
             return 1
     peer_dir, app_dir = root / "peer", root / "wallet"
-    peer_dir.mkdir(); app_dir.mkdir()
+    peer_dir.mkdir()
+    app_dir.mkdir()
     activation = {"v1": -1, "v2": 0, "transition": 20}[args.schedule]
     peer_rpc, app_rpc, p2p = port(), port(), port()
     while len({peer_rpc, app_rpc, p2p}) != 3:
@@ -147,7 +148,9 @@ def main():
     # Isolate Qt and test scratch state as well as both chain datadirs.
     for name, subdir in (("XDG_CONFIG_HOME", "config"), ("XDG_CACHE_HOME", "cache"),
                          ("XDG_DATA_HOME", "data"), ("TMPDIR", "tmp")):
-        location = root / subdir; location.mkdir(); env[name] = str(location)
+        location = root / subdir
+        location.mkdir()
+        env[name] = str(location)
     if args.offscreen:
         env["QT_QPA_PLATFORM"] = "offscreen"
     env.update(MERCATURA_TEST_DATADIR=str(app_dir), MERCATURA_TEST_WORKERS=str(args.workers),
@@ -199,7 +202,8 @@ def main():
                             last_client_height = info["blocks"]
                     except (OSError, RuntimeError, urllib.error.URLError):
                         observation[name] = "starting or shutting down"
-                observations.write(json.dumps(observation) + "\n"); observations.flush()
+                observations.write(json.dumps(observation) + "\n")
+                observations.flush()
                 time.sleep(0.5)
             if app.returncode:
                 if app.returncode == 77:

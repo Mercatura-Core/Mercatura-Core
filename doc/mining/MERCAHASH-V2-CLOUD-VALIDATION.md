@@ -206,7 +206,7 @@ the principal checks as follows (Qt offscreen is optional on a desktop):
 ```sh
 BUILD=../mercatura-v2-rebuild-build
 "$BUILD/bin/test_bitcoin" --run_test=crypto_tests/mercahash_v1_vectors
-"$BUILD/bin/test_bitcoin" --run_test=mercahash_v2_tests,mercahash_activation_tests,cpu_miner_tests,worker_limits_tests,mining_statistics_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,cuda_binding_tests,gpu_capacity_tests,gpu_scheduling_tests,gpu_miner_tests,mining_tests_v2_solo
+"$BUILD/bin/test_bitcoin" --run_test=mercahash_v2_tests,mercahash_activation_tests,cpu_miner_tests,worker_limits_tests,mining_statistics_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,cuda_binding_tests,gpu_capacity_tests,gpu_scheduling_tests,gpu_miner_tests,mining_tests_v2
 QT_QPA_PLATFORM=offscreen "$BUILD/bin/test_mining-qt"
 QT_QPA_PLATFORM=offscreen ctest --test-dir "$BUILD" \
   -R 'test_cuda_backend_host|test_mining_app-qt' --output-on-failure
@@ -215,7 +215,7 @@ python3 "$BUILD/test/functional/test_runner.py" --jobs=4 --timeout-factor=3 \
   mercatura_coinbase_template mercatura_solo_native mercatura_network_identity \
   mercatura_mercahash_v2 mercatura_headers_replay mercatura_dgw \
   feature_mercatura_dgw_reindex mercatura_reindex mercatura_p2p_propagation
-"$BUILD/bin/test_bitcoin" --run_test=mercahash_v2_tests,mercahash_activation_tests,mercahash_native_transition_tests,pow_tests,headers_sync_chainwork_tests,headers_replay_tests,peerman_tests,validation_block_tests,validation_block_tests_dgw,validation_chainstate_tests,validation_chainstatemanager_tests,validationinterface_tests,miner_tests,block_capacity_tests,testnet_capacity_tests,mercatura_controller_tests,mercatura_emission_tests,mercatura_fixedpoint_tests,witness_resource_tests,witness_resource_tests_chain,witness_resource_tests_net,mining_tests_wallet,mining_tests_solo,mining_tests_v2_solo
+"$BUILD/bin/test_bitcoin" --run_test=mercahash_v2_tests,mercahash_activation_tests,mercahash_activation_tests_transition,pow_tests,headers_sync_chainwork_tests,headers_replay_tests,peerman_tests,validation_block_tests,validation_block_tests_dgw,validation_chainstate_tests,validation_chainstatemanager_tests,validationinterface_tests,miner_tests,block_capacity_tests,testnet_capacity_tests,mercatura_controller_tests,mercatura_emission_tests,mercatura_fixedpoint_tests,witness_resource_tests,witness_resource_tests_chain,witness_resource_tests_net,mining_tests_wallet,mining_tests_solo,mining_tests_v2
 ```
 
 The broad inherited unit selection mines many V1 chains and can take tens of

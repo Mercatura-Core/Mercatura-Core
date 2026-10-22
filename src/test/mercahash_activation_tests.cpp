@@ -237,7 +237,7 @@ struct Transition20Setup : TestingSetup {
     }
 };
 }
-BOOST_FIXTURE_TEST_SUITE(mercahash_native_transition_tests, Transition20Setup)
+BOOST_FIXTURE_TEST_SUITE(mercahash_activation_tests_transition, Transition20Setup)
 BOOST_AUTO_TEST_CASE(live_worker_crosses_twenty_and_reorgs_back_without_restart)
 {
     const auto script{GetScriptForDestination(WitnessV2MercaturaPQ{uint256::ONE})};

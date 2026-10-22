@@ -13,6 +13,7 @@
 #include <qt/networkstyle.h>
 #include <qt/walletcontroller.h>
 #include <test/util/setup_common.h>
+#include <util/string.h>
 #include <wallet/wallet.h>
 
 #include <QElapsedTimer>
@@ -79,7 +80,7 @@ int main(int argc, char* argv[])
     const bool restart{qEnvironmentVariableIsSet("MERCATURA_TEST_RESTART")};
     SetupServerArgs(gArgs);
     gArgs.ForceSetArg("-regtest", "1");
-    gArgs.ForceSetArg("-mercahashv2height", std::to_string(activation));
+    gArgs.ForceSetArg("-mercahashv2height", util::ToString(activation));
     if (harder) gArgs.ForceSetArg("-regtestminingstress", "1");
     SelectParams(ChainType::REGTEST);
     if (!supplied_dir.isEmpty()) gArgs.ForceSetArg("-datadir", supplied_dir.toStdString());
@@ -89,11 +90,11 @@ int main(int argc, char* argv[])
     for (const auto* option : {"-listen", "-listenonion", "-discover", "-dnsseed", "-fixedseeds", "-natpmp"})
         gArgs.ForceSetArg(option, "0");
     const int peer_port{integer("MERCATURA_TEST_PEER_PORT", 0, 0, 65535)};
-    gArgs.ForceSetArg("-connect", peer_port ? "127.0.0.1:" + std::to_string(peer_port) : "0");
+    gArgs.ForceSetArg("-connect", peer_port ? "127.0.0.1:" + util::ToString(peer_port) : "0");
     const int rpc_port{integer("MERCATURA_TEST_RPC_PORT", 0, 0, 65535)};
     gArgs.ForceSetArg("-server", rpc_port ? "1" : "0");
     if (rpc_port) {
-        gArgs.ForceSetArg("-rpcport", std::to_string(rpc_port));
+        gArgs.ForceSetArg("-rpcport", util::ToString(rpc_port));
         gArgs.ForceSetArg("-rpcbind", "127.0.0.1");
         gArgs.ForceSetArg("-rpcallowip", "127.0.0.1");
     }

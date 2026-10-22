@@ -12,6 +12,7 @@
 #include <qt/walletcontroller.h>
 #include <qt/walletmodel.h>
 #include <test/util/setup_common.h>
+#include <util/string.h>
 #include <wallet/context.h>
 #include <wallet/test/util.h>
 #include <wallet/wallet.h>
@@ -116,7 +117,7 @@ private Q_SLOTS:
         }
         QSettings settings;
         settings.remove("mining/cpuWorkers");
-        const std::string schedule{"-mercahashv2height=" + std::to_string(activation)};
+        const std::string schedule{"-mercahashv2height=" + util::ToString(activation)};
         TestingSetup setup{ChainType::REGTEST, {.extra_args={schedule.c_str()}}};
         setup.m_node.notifications->setChainstateLoaded(true);
         auto node{interfaces::MakeNode(setup.m_node)};

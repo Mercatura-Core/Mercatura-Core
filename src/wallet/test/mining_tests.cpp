@@ -519,7 +519,7 @@ BOOST_AUTO_TEST_SUITE_END()
 struct V2SoloTestingSetup : SoloTestingSetup {
     V2SoloTestingSetup() : SoloTestingSetup{TestOpts{.extra_args={"-mercahashv2height=0"}}} {}
 };
-BOOST_FIXTURE_TEST_SUITE(mining_tests_v2_solo, V2SoloTestingSetup)
+BOOST_FIXTURE_TEST_SUITE(mining_tests_v2, V2SoloTestingSetup)
 BOOST_AUTO_TEST_CASE(gpu_worker_and_combined_mode_submit_genuine_v2_blocks_with_cpu_reference_device)
 {
     // The device is a CPU reference test double. Jobs, hashing, independent
