@@ -524,4 +524,78 @@ BOOST_AUTO_TEST_CASE(rate_sampling_includes_blocked_submission_time)
     BOOST_CHECK(rate > 0 && rate < 10); // Solo work pauses during submission; blocked time stays in the denominator.
     BOOST_CHECK_EQUAL(controller.GetStats().rejected, 0U);
 }
+BOOST_AUTO_TEST_CASE(stop_and_snapshots_do_not_wait_for_provider_interruption)
+{
+    struct State { std::atomic<bool> entered{false}, interrupting{false}, release{false}; } state;
+    struct Provider : FakeProvider {
+        Provider(std::shared_ptr<FakeState> fake, State& state) : FakeProvider{std::move(fake)}, s{state} {}
+        std::optional<mining::MiningJob> GetJob() override {
+            s.entered = true;
+            while (!s.release) std::this_thread::yield();
+            return {};
+        }
+        void Interrupt() override {
+            s.interrupting = true;
+            while (!s.release) std::this_thread::yield();
+        }
+        State& s;
+    };
+    auto fake{std::make_shared<FakeState>()};
+    mining::MiningController controller;
+    BOOST_REQUIRE(controller.Start([&] { return std::make_unique<Provider>(fake, state); }, 1));
+    const bool entered{Until([&] { return state.entered.load(); })};
+    const auto begin{std::chrono::steady_clock::now()};
+    controller.RequestStop();
+    const auto stopping{controller.GetStats()};
+    const auto elapsed{std::chrono::steady_clock::now() - begin};
+    const bool interrupted{Until([&] { return state.interrupting.load(); })};
+    // Always release before assertions so a failure cannot strand test threads.
+    state.release = true;
+    controller.Wait();
+    BOOST_CHECK(entered && interrupted);
+    BOOST_CHECK(stopping.busy);
+    BOOST_CHECK(elapsed < std::chrono::milliseconds{100});
+    BOOST_CHECK(!controller.GetStats().busy);
+}
+
+BOOST_AUTO_TEST_CASE(six_worker_v2_logic_and_version_turnover)
+{
+    struct Provider : FakeProvider {
+        Provider(std::shared_ptr<FakeState> s, std::atomic<bool>& v) : FakeProvider{s}, version{v} {}
+        std::optional<mining::MiningJob> GetJob() override {
+            auto job{FakeProvider::GetJob()};
+            job->pow_version = version ? mercahash::Version::V2 : mercahash::Version::V1;
+            return job;
+        }
+        bool IsCurrent(const mining::MiningJob& job) override {
+            return FakeProvider::IsCurrent(job) && job.pow_version == (version ? mercahash::Version::V2 : mercahash::Version::V1);
+        }
+        std::atomic<bool>& version;
+    };
+    auto fake{std::make_shared<FakeState>()};
+    std::atomic<bool> v2{true};
+    std::atomic<unsigned int> allocations{0};
+    mining::MiningController controller{[&] {
+        ++allocations;
+        return [](const CBlockHeader&) {
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+            return uint256::FromHex(std::string(64, 'f')).value();
+        };
+    }, [] { return mining::CalculateWorkerLimits(6, uint64_t{8} << 30); }};
+    BOOST_REQUIRE(controller.Start([&] { return std::make_unique<Provider>(fake, v2); }, 6));
+    const bool first{Until([&] { return controller.GetStats().active_workers == 6 && allocations == 6; })};
+    fake->parent = 2; // Same algorithm: retain all six contexts.
+    const bool replaced{Until([&] { return fake->jobs >= 2; })};
+    const auto retained{allocations.load()};
+    v2 = false;
+    const bool back{Until([&] { return allocations == 12 && controller.GetStats().pow_version == mercahash::Version::V1; })};
+    v2 = true;
+    const bool forward{Until([&] { return allocations == 18 && controller.GetStats().pow_version == mercahash::Version::V2; })};
+    controller.RequestStop(); controller.Wait();
+    BOOST_CHECK(first && replaced && back && forward);
+    BOOST_CHECK_EQUAL(retained, 6U);
+    BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
+    BOOST_CHECK(controller.GetStats().hashes > 0);
+    BOOST_CHECK_EQUAL(mining::WorkerMemoryBytes(mercahash::Version::V2), 48ULL << 20);
+}
 BOOST_AUTO_TEST_SUITE_END()

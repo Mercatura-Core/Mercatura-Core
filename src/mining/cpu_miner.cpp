@@ -49,10 +49,7 @@ struct MiningController::Work {
 };
 
 MiningController::MiningController(HashFactory factory, LimitDetector limits, RangeAllocator ranges, DeviceDetector devices, BackendFactory backends)
-    : m_hash_factory{factory ? std::move(factory) : HashFactory{[] {
-          auto context{std::make_shared<PoWHashContext>()};
-          return [context](const CBlockHeader& header) { return context->GetHash(header); };
-      }}},
+    : m_hash_factory{std::move(factory)},
       m_detect_limits{limits ? std::move(limits) : LimitDetector{DetectWorkerLimits}},
       m_allocate_range{ranges ? std::move(ranges) : RangeAllocator{AllocateNonceRange}},
       m_detect_devices{devices ? std::move(devices) : DeviceDetector{DiscoverGpuDevices}},
@@ -82,6 +79,8 @@ bool MiningController::Start(ProviderFactory factory, unsigned int workers, GpuC
         m_ready_workers = 0;
         m_stats = {};
         m_statistics.Reset(std::chrono::steady_clock::now());
+        m_cpu_statistics.Reset(std::chrono::steady_clock::now());
+        m_device_statistics.clear();
         m_stats.state = MiningState::STARTING;
         m_stats.status = "Preparing mining";
         m_solutions.clear();
@@ -112,8 +111,8 @@ void MiningController::RequestStop()
         if (m_work) m_work->cancelled = true;
     }
     m_cv.notify_all();
-    std::lock_guard provider_lock{m_provider_mutex};
-    if (m_provider) m_provider->Interrupt();
+    // Provider interruption and teardown belong to background threads. Stop
+    // must not wait for a wallet/chain/provider lock on the caller (Qt) thread.
 }
 void MiningController::Wait() { if (m_coordinator.joinable()) m_coordinator.join(); }
 
@@ -122,7 +121,11 @@ MiningStats MiningController::GetStats() const
     std::lock_guard lock{m_mutex};
     MiningStats stats{m_stats};
     stats.cpu_hashes = m_cpu_hashes.load();
-    const auto measured{m_statistics.Observe(std::chrono::steady_clock::now(), TotalHashes(stats))};
+    const auto now{std::chrono::steady_clock::now()};
+    const auto measured{m_statistics.Observe(now, TotalHashes(stats))};
+    stats.cpu_hashes_per_second = m_cpu_statistics.Observe(now, stats.cpu_hashes).live;
+    for (size_t i{0}; i < stats.devices.size(); ++i)
+        stats.devices[i].hashes_per_second = stats.devices[i].failed ? 0 : m_device_statistics[i].Observe(now, stats.devices[i].hashes).live;
     stats.busy = !m_finished.load();
     stats.hashes = measured.hashes;
     stats.hashes_per_second = measured.live;
@@ -156,12 +159,9 @@ void MiningController::CancelWork()
 void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuConfig hardware)
 {
     std::vector<std::thread> workers;
+    std::thread interrupter;
     try {
         util::ThreadRename("mca-mining");
-        const auto limits{m_detect_limits()};
-        const unsigned int count{hardware.cpu ? (requested == 0 ? limits.recommended : requested) : 0};
-        if (hardware.cpu && count == 0) throw std::runtime_error{"Insufficient available memory for a mining worker"};
-        if (count > limits.maximum) throw std::runtime_error{"Requested worker count exceeds the current safe CPU or memory limit"};
         if (!hardware.cpu && !hardware.gpu) throw std::runtime_error{"Select CPU or GPU mining hardware"};
         if (hardware.yield_ms > 1000) throw std::runtime_error{"GPU yield interval exceeds 1000 ms"};
         std::vector<GpuDevice> selected;
@@ -176,34 +176,57 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
             for (const auto& device : discovery.devices) if (device.supported && (ids.empty() || ids.contains(device.id))) selected.push_back(device);
             if (selected.empty()) throw std::runtime_error{discovery.errors.empty() ? "No compatible GPU detected" : discovery.errors.front()};
         }
-        // Every GPU verifier owns a separate authoritative 128 MiB CPU context.
-        // Include those contexts in the host memory budget even in GPU-only mode.
-        const auto host_limits{CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), limits.available_memory)};
-        if (selected.size() > host_limits.maximum || count > MaximumCpuWorkers(limits, selected.size())) throw std::runtime_error{"Insufficient host memory for CPU workers and GPU candidate verification"};
         {
             std::lock_guard lock{m_mutex};
-            for (const auto& device : selected) m_stats.devices.push_back(GpuStats{device});
+            for (const auto& device : selected) {
+                m_stats.devices.push_back(GpuStats{device});
+                m_device_statistics.emplace_back();
+                m_device_statistics.back().Reset(std::chrono::steady_clock::now());
+            }
         }
-        m_worker_count = count + static_cast<unsigned int>(selected.size());
+        m_worker_count = 0;
+        std::optional<mercahash::Version> running_version;
         auto provider{factory()};
         if (!provider) throw std::runtime_error{"Mining provider is unavailable"};
-        {
-            std::lock_guard lock{m_mutex};
-            m_stats.destination = provider->Destination();
-        }
-        {
-            std::lock_guard lock{m_provider_mutex};
-            m_provider = std::move(provider);
-            if (m_stop) m_provider->Interrupt();
-        }
-        if (!m_stop) {
+        const auto destination{provider->Destination()};
+        { std::lock_guard lock{m_mutex}; m_stats.destination = destination; }
+        m_provider = std::move(provider);
+        // Dedicated interruption avoids blocking RequestStop on provider code.
+        // The coordinator keeps the provider alive until this helper joins.
+        interrupter = std::thread{[this] {
+            {
+                std::unique_lock lock{m_mutex};
+                m_cv.wait(lock, [this] { return m_stop.load(); });
+            }
+            try { m_provider->Interrupt(); }
+            catch (const std::exception& e) { Fail(std::string{"Mining interruption failed: "} + e.what()); }
+            catch (...) { Fail("Mining interruption failed"); }
+        }};
+        auto start_workers = [&](mercahash::Version version) {
+            // Ordinary template turnover retains the pool. Only an algorithm
+            // change joins it and rechecks budgets, including a reorg to V1.
+            CancelWork();
+            const uint64_t epoch{++m_worker_epoch};
+            m_cv.notify_all();
+            for (auto& worker : workers) worker.join();
+            workers.clear();
+            const auto detected{m_detect_limits()};
+            const auto limits{version == mercahash::Version::V1 ? detected :
+                CalculateWorkerLimits(detected.logical_cpus, detected.available_memory, version)};
+            const unsigned int count{hardware.cpu ? (requested ? requested : limits.recommended) : 0};
+            if (hardware.cpu && count == 0) throw std::runtime_error{"Insufficient available memory for a mining worker"};
+            if (count > limits.maximum) throw std::runtime_error{"Requested worker count exceeds the current safe CPU or memory limit"};
+            const auto host{CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), limits.available_memory, version)};
+            if (selected.size() > host.maximum || count > MaximumCpuWorkers(limits, selected.size(), version))
+                throw std::runtime_error{"Insufficient host memory for CPU workers and GPU candidate verification"};
+            if (version == mercahash::Version::V2 && !selected.empty())
+                throw std::runtime_error{"V2 GPU integration is not yet enabled"};
+            m_worker_count = count + static_cast<unsigned int>(selected.size());
             workers.reserve(count + selected.size());
-            for (unsigned int i{0}; i < count && !m_stop; ++i) workers.emplace_back([this] { Worker(); });
-            for (size_t i{0}; i < selected.size() && !m_stop; ++i) workers.emplace_back([this, i, hardware] { GpuWorker(i, hardware); });
-        }
-        auto sampled_at{std::chrono::steady_clock::now()};
-        uint64_t sampled_cpu{0};
-        std::vector<uint64_t> sampled_devices(selected.size(), 0);
+            for (unsigned int i{0}; i < count && !m_stop; ++i) workers.emplace_back([this, epoch] { Worker(epoch); });
+            for (size_t i{0}; i < selected.size() && !m_stop; ++i) workers.emplace_back([this, i, hardware, epoch] { GpuWorker(i, hardware, epoch); });
+            running_version = version;
+        };
         while (!m_stop) {
             if (m_provider->IsCancelled()) { RequestStop(); break; }
             std::shared_ptr<Work> work;
@@ -222,8 +245,8 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
                 }
             }
             const auto now{std::chrono::steady_clock::now()};
-            // The provider is used only here; its lifetime is protected until
-            // workers have joined and Interrupt callers release the mutex.
+            // All ordinary provider operations run on this coordinator.
+            // Only the joined interruption helper calls Interrupt concurrently.
             if (work && (!m_provider->IsCurrent(work->job) || now >= work->expires)) {
                 if (solution) {
                     std::lock_guard lock{m_mutex};
@@ -261,36 +284,26 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
             if (!work || exhausted) {
                 auto job{m_provider->GetJob()};
                 if (m_stop) break;
+                const auto waiting{job ? std::string{} : m_provider->WaitingStatus()};
+                if (job) {
+                    (void)mercahash::ScratchpadBytes(job->pow_version);
+                    if (job->height < 0) throw std::runtime_error{"Mining job has an invalid height"};
+                    if (!running_version || *running_version != job->pow_version) start_workers(job->pow_version);
+                }
                 std::lock_guard lock{m_mutex};
                 if (m_stop) break;
                 if (job) {
                     if (job->target == arith_uint256{}) throw std::runtime_error{"Mining job has an invalid zero target"};
+                    m_stats.pow_version = job->pow_version;
+                    m_stats.job_height = job->height;
                     m_work = std::make_shared<Work>(std::move(*job));
                     m_stats.state = m_ready_workers > 0 ? MiningState::RUNNING : MiningState::STARTING;
                     m_stats.status = m_ready_workers > 0 ? "Mining" : "Preparing mining hardware";
                     m_cv.notify_all();
                 } else {
-                    m_stats.status = m_provider->WaitingStatus();
+                    m_stats.status = waiting;
                     m_stats.state = MiningState::STARTING;
                 }
-            }
-            // Provider calls can block while workers finish hashes. Include
-            // that time in the denominator, rather than using the earlier tip
-            // check timestamp with the newer completed-work counters.
-            const auto sampled_now{std::chrono::steady_clock::now()};
-            if (sampled_now - sampled_at >= std::chrono::milliseconds{500}) {
-                std::lock_guard lock{m_mutex};
-                const uint64_t cpu_hashes{m_cpu_hashes.load()};
-                m_stats.cpu_hashes = cpu_hashes;
-                m_statistics.Observe(sampled_now, TotalHashes(m_stats));
-                m_stats.cpu_hashes_per_second = (cpu_hashes - sampled_cpu) / std::chrono::duration<double>(sampled_now - sampled_at).count();
-                sampled_cpu = cpu_hashes;
-                for (size_t i{0}; i < m_stats.devices.size(); ++i) {
-                    auto& device{m_stats.devices[i]};
-                    device.hashes_per_second = device.failed ? 0 : (device.hashes - sampled_devices[i]) / std::chrono::duration<double>(sampled_now - sampled_at).count();
-                    sampled_devices[i] = device.hashes;
-                }
-                sampled_at = sampled_now;
             }
             std::unique_lock lock{m_mutex};
             m_cv.wait_for(lock, std::chrono::milliseconds{100}, [this] { return m_stop.load() || !m_solutions.empty(); });
@@ -308,13 +321,14 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
     // This runs on the coordinator, never on UI Stop, before provider teardown.
     for (auto& worker : workers) worker.join();
     workers.clear();
-    {
-        std::lock_guard lock{m_provider_mutex};
-        m_provider.reset();
-    }
+    if (interrupter.joinable()) interrupter.join();
+    m_provider.reset();
     std::lock_guard lock{m_mutex};
     m_stats.cpu_hashes = m_cpu_hashes.load();
-    m_statistics.Finish(std::chrono::steady_clock::now(), TotalHashes(m_stats));
+    const auto finished_at{std::chrono::steady_clock::now()};
+    m_statistics.Finish(finished_at, TotalHashes(m_stats));
+    m_cpu_statistics.Finish(finished_at, m_stats.cpu_hashes);
+    for (size_t i{0}; i < m_stats.devices.size(); ++i) m_device_statistics[i].Finish(finished_at, m_stats.devices[i].hashes);
     m_stats.hashes_per_second = 0;
     m_stats.cpu_hashes_per_second = 0;
     for (auto& device : m_stats.devices) { device.hashes_per_second = 0; device.memory_bytes = 0; if (!device.failed) device.status = "Stopped"; }
@@ -325,36 +339,37 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
     m_finished = true;
 }
 
-void MiningController::Worker()
+void MiningController::Worker(uint64_t epoch)
 {
     bool active{false}, ready{false};
     try {
         util::ThreadRename("mca-cpu-worker");
-        auto hash{m_hash_factory()}; // Exactly one independent context per worker.
-        if (!hash) throw std::runtime_error{"Mining hash context is unavailable"};
+        PoWHashContext context; // Exactly one private authoritative context.
+        auto hash{m_hash_factory ? m_hash_factory() : HashFunction{}};
+        if (m_hash_factory && !hash) throw std::runtime_error{"Mining hash context is unavailable"};
         ++m_ready_workers; ready = true;
         std::shared_ptr<Work> previous;
-        while (!m_stop) {
+        while (!m_stop && epoch == m_worker_epoch) {
             std::shared_ptr<Work> work;
             {
                 std::unique_lock lock{m_mutex};
-                m_cv.wait(lock, [this, &previous] { return m_stop.load() || (m_work && m_work != previous); });
-                if (m_stop) break;
+                m_cv.wait(lock, [this, &previous, epoch] { return m_stop.load() || epoch != m_worker_epoch || (m_work && m_work != previous); });
+                if (m_stop || epoch != m_worker_epoch) break;
                 work = m_work;
             }
             previous = work;
             ++m_active;
             active = true;
             CBlockHeader header{work->job.header};
-            while (!m_stop && !work->cancelled && !work->solved && (!work->job.valid || *work->job.valid) && std::chrono::steady_clock::now() < work->expires) {
+            while (!m_stop && epoch == m_worker_epoch && !work->cancelled && !work->solved && (!work->job.valid || *work->job.valid) && std::chrono::steady_clock::now() < work->expires) {
                 const auto range{m_allocate_range(work->next_nonce)};
                 if (!range) break;
                 for (uint64_t nonce{range->begin}; nonce < range->end; ++nonce) {
                     // Do not alter MercaHash for cancellation; finish the current
                     // attempt, then check stop, replacement and expiry.
-                    if (m_stop || work->cancelled || work->solved || (work->job.valid && !*work->job.valid) || std::chrono::steady_clock::now() >= work->expires) break;
+                    if (m_stop || epoch != m_worker_epoch || work->cancelled || work->solved || (work->job.valid && !*work->job.valid) || std::chrono::steady_clock::now() >= work->expires) break;
                     header.nNonce = static_cast<uint32_t>(nonce);
-                    const auto result{hash(header)};
+                    const auto result{hash ? hash(header) : context.GetHash(header, work->job.pow_version)};
                     ++m_cpu_hashes;
                     if (UintToArith256(result) <= work->job.target) {
                         ReportCandidate(work, header);
@@ -388,7 +403,7 @@ void MiningController::ReportCandidate(const std::shared_ptr<Work>& work, const 
     }
 }
 
-void MiningController::GpuWorker(size_t index, GpuConfig hardware)
+void MiningController::GpuWorker(size_t index, GpuConfig hardware, uint64_t epoch)
 {
     bool active{false}, ready{false};
     auto status = [&](const std::string& message, bool failed = false) {
@@ -410,25 +425,26 @@ void MiningController::GpuWorker(size_t index, GpuConfig hardware)
             stats.estimated_contexts = backend->EstimatedContexts(); stats.automatic = hardware.contexts == 0;
             stats.status = "Checking MercaHash V1 reference vectors";
         }
-        VerifyGpuBackend(*backend, [this] { return m_stop.load(); });
-        if (m_stop) return;
-        auto verify{m_hash_factory()};
-        if (!verify) throw std::runtime_error{"Authoritative GPU candidate verifier is unavailable"};
+        VerifyGpuBackend(*backend, [this, epoch] { return m_stop.load() || epoch != m_worker_epoch; });
+        if (m_stop || epoch != m_worker_epoch) return;
+        PoWHashContext verifier;
+        auto verify{m_hash_factory ? m_hash_factory() : HashFunction{}};
+        if (m_hash_factory && !verify) throw std::runtime_error{"Authoritative GPU candidate verifier is unavailable"};
         ++m_ready_workers; ready = true;
         status("Ready");
         std::shared_ptr<Work> previous;
-        while (!m_stop) {
+        while (!m_stop && epoch == m_worker_epoch) {
             std::shared_ptr<Work> work;
             {
                 std::unique_lock lock{m_mutex};
-                m_cv.wait(lock, [this, &previous] { return m_stop.load() || (m_work && m_work != previous); });
-                if (m_stop) break;
+                m_cv.wait(lock, [this, &previous, epoch] { return m_stop.load() || epoch != m_worker_epoch || (m_work && m_work != previous); });
+                if (m_stop || epoch != m_worker_epoch) break;
                 work = m_work;
             }
             previous = work;
             ++m_active; active = true;
-            const auto cancelled = [this, work] {
-                return m_stop.load() || work->cancelled.load() || work->solved.load() ||
+            const auto cancelled = [this, work, epoch] {
+                return m_stop.load() || epoch != m_worker_epoch || work->cancelled.load() || work->solved.load() ||
                        (work->job.valid && !work->job.valid->load()) || std::chrono::steady_clock::now() >= work->expires;
             };
             status("Mining");
@@ -460,7 +476,7 @@ void MiningController::GpuWorker(size_t index, GpuConfig hardware)
                         // Exact hash equality detects faults even if a wrong hash
                         // happens to satisfy the target. Never submit device output
                         // without the authoritative Core hash and target checks.
-                        const auto authoritative{verify(candidates[slot])};
+                        const auto authoritative{verify ? verify(candidates[slot]) : verifier.GetHash(candidates[slot])};
                         if (authoritative != result) throw std::runtime_error{"GPU candidate hash disagrees with authoritative MercaHash V1"};
                         if (UintToArith256(authoritative) <= work->job.target && !cancelled()) ReportCandidate(work, candidates[slot]);
                     }

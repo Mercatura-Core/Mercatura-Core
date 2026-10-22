@@ -91,6 +91,15 @@ std::optional<MiningJob> SoloWorkProvider::GetJob()
     auto target{DeriveTarget(block.nBits, Params().GetConsensus().powLimit)};
     if (!target) throw std::runtime_error{"Core returned an invalid mining target"};
     m_job = MiningJob{static_cast<const CBlockHeader&>(block), *target, block.vtx[0]};
+    const auto* context{m_mining->context()};
+    if (!context || !context->chainman) throw std::runtime_error{"Mining chain context is unavailable"};
+    {
+        LOCK(cs_main);
+        const auto* parent{context->chainman->m_blockman.LookupBlockIndex(block.hashPrevBlock)};
+        if (!parent || (parent->nStatus & BLOCK_VALID_MASK) < BLOCK_VALID_TREE) return {};
+        m_job->height = int64_t{parent->nHeight} + 1;
+        m_job->pow_version = GetPoWVersion(context->chainman->GetConsensus(), m_job->height);
+    }
     m_job->valid = std::make_shared<std::atomic<bool>>(true);
     return m_job;
 }
@@ -99,7 +108,8 @@ bool SoloWorkProvider::IsCurrent(const MiningJob& job)
 {
     if (!m_job || job.valid != m_job->valid || !job.valid || !*job.valid ||
         job.header.GetHash() != m_job->header.GetHash() || job.target != m_job->target ||
-        job.coinbase != m_job->coinbase || !IsReady()) return false;
+        job.coinbase != m_job->coinbase || job.height != m_job->height ||
+        job.pow_version != m_job->pow_version || !IsReady()) return false;
     const auto tip{m_mining->getTip()};
     return tip && tip->hash == job.header.hashPrevBlock;
 }

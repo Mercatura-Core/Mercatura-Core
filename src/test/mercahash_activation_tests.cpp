@@ -229,3 +229,60 @@ BOOST_AUTO_TEST_CASE(harder_regtest_fixture_and_public_override_rejection)
     }
 }
 BOOST_AUTO_TEST_SUITE_END()
+
+namespace {
+struct Transition20Setup : TestingSetup {
+    Transition20Setup() : TestingSetup{ChainType::REGTEST, {.extra_args={"-mercahashv2height=20"}}} {
+        m_node.notifications->setChainstateLoaded(true);
+    }
+};
+}
+BOOST_FIXTURE_TEST_SUITE(mercahash_native_transition_tests, Transition20Setup)
+BOOST_AUTO_TEST_CASE(live_worker_crosses_twenty_and_reorgs_back_without_restart)
+{
+    const auto script{GetScriptForDestination(WitnessV2MercaturaPQ{uint256::ONE})};
+    std::atomic<int> ceiling{22};
+    struct Gate : mining::WorkProvider {
+        Gate(std::unique_ptr<mining::SoloWorkProvider> p, std::atomic<int>& c) : provider{std::move(p)}, ceiling{c} {}
+        std::optional<mining::MiningJob> GetJob() override {
+            auto job{provider->GetJob()};
+            return job && job->height <= ceiling ? job : std::nullopt;
+        }
+        bool IsCurrent(const mining::MiningJob& job) override { return provider->IsCurrent(job); }
+        mining::SubmissionResult Submit(const mining::MiningJob& job, const CBlockHeader& h) override { return provider->Submit(job, h); }
+        void Interrupt() override { provider->Interrupt(); }
+        std::unique_ptr<mining::SoloWorkProvider> provider;
+        std::atomic<int>& ceiling;
+    };
+    mining::MiningController controller;
+    BOOST_REQUIRE(controller.Start([&] {
+        return std::make_unique<Gate>(std::make_unique<mining::SoloWorkProvider>(interfaces::MakeMining(m_node, false), script, "", true), ceiling);
+    }, 1));
+    auto height = [&] { return WITH_LOCK(cs_main, return m_node.chainman->ActiveChain().Height()); };
+    auto wait_height = [&](int wanted) {
+        const auto deadline{std::chrono::steady_clock::now() + std::chrono::seconds{30}};
+        while (height() != wanted && controller.GetStats().state != mining::MiningState::FAILED && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds{5});
+        return height() == wanted;
+    };
+    const bool first{wait_height(22)};
+    const auto before{controller.GetStats()};
+    ceiling = 18;
+    BlockValidationState state;
+    auto* disconnect{WITH_LOCK(cs_main, return m_node.chainman->ActiveChain()[19])};
+    const bool invalidated{disconnect && m_node.chainman->ActiveChainstate().InvalidateBlock(state, disconnect)};
+    ceiling = 19;
+    const bool back{wait_height(19)};
+    const auto v1{controller.GetStats()};
+    ceiling = 22;
+    const bool forward{wait_height(22)};
+    controller.RequestStop(); controller.Wait();
+    BOOST_CHECK_MESSAGE(first && invalidated && back && forward, controller.GetStats().status);
+    BOOST_CHECK(before.pow_version == mercahash::Version::V2);
+    BOOST_CHECK(v1.pow_version == mercahash::Version::V1);
+    BOOST_CHECK(controller.GetStats().pow_version == mercahash::Version::V2);
+    BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
+    BOOST_CHECK_EQUAL(controller.GetStats().rejected, 0U);
+    BOOST_CHECK(controller.GetStats().accepted >= 26);
+}
+BOOST_AUTO_TEST_SUITE_END()

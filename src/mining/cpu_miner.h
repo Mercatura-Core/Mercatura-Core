@@ -5,6 +5,7 @@
 #define BITCOIN_MINING_CPU_MINER_H
 
 #include <arith_uint256.h>
+#include <crypto/mercahash.h>
 #include <mining/gpu_backend.h>
 #include <mining/statistics.h>
 #include <primitives/block.h>
@@ -33,10 +34,12 @@ struct WorkerLimits {
     unsigned int recommended{0};
 };
 // A 128 MiB private scratchpad plus 32 MiB for stacks and other worker overhead.
-inline constexpr uint64_t WORKER_MEMORY_BYTES{160ULL * 1024 * 1024};
-WorkerLimits CalculateWorkerLimits(unsigned int cpus, std::optional<uint64_t> memory);
+inline constexpr uint64_t WORKER_OVERHEAD_BYTES{32ULL * 1024 * 1024};
+inline constexpr uint64_t WORKER_MEMORY_BYTES{mercahash::V1_SCRATCHPAD_BYTES + WORKER_OVERHEAD_BYTES};
+constexpr uint64_t WorkerMemoryBytes(mercahash::Version version) { return mercahash::ScratchpadBytes(version) + WORKER_OVERHEAD_BYTES; }
+WorkerLimits CalculateWorkerLimits(unsigned int cpus, std::optional<uint64_t> memory, mercahash::Version version = mercahash::Version::V1);
 WorkerLimits DetectWorkerLimits();
-unsigned int MaximumCpuWorkers(const WorkerLimits& limits, size_t gpu_verifiers = 0);
+unsigned int MaximumCpuWorkers(const WorkerLimits& limits, size_t gpu_verifiers = 0, mercahash::Version version = mercahash::Version::V1);
 // File-reader seam for deterministic Linux namespace/cgroup/resource tests.
 using ResourceFileReader = std::function<std::string(const std::string&)>;
 WorkerLimits ReadLinuxWorkerLimits(unsigned int cpus, std::optional<unsigned int> affinity_cpus, const ResourceFileReader& read);
@@ -49,6 +52,8 @@ struct MiningJob {
     // Providers can revoke work on template or connected-tip replacement.
     std::shared_ptr<std::atomic<bool>> valid{};
     std::optional<std::chrono::steady_clock::time_point> deadline{};
+    int64_t height{0};
+    mercahash::Version pow_version{mercahash::Version::V1};
 };
 
 struct SubmissionResult {
@@ -87,6 +92,8 @@ struct GpuStats {
 struct MiningStats {
     MiningState state{MiningState::STOPPED};
     bool busy{false};
+    mercahash::Version pow_version{mercahash::Version::V1};
+    int64_t job_height{0};
     uint64_t hashes{0};
     double hashes_per_second{0};
     unsigned int active_workers{0};
@@ -133,9 +140,9 @@ public:
 private:
     struct Work;
     void Run(ProviderFactory factory, unsigned int requested, GpuConfig hardware);
-    void GpuWorker(size_t index, GpuConfig hardware);
+    void GpuWorker(size_t index, GpuConfig hardware, uint64_t epoch);
     void ReportCandidate(const std::shared_ptr<Work>& work, const CBlockHeader& header);
-    void Worker();
+    void Worker(uint64_t epoch);
     void Fail(const std::string& error);
     void CancelWork();
 
@@ -144,6 +151,7 @@ private:
     const RangeAllocator m_allocate_range;
     const DeviceDetector m_detect_devices;
     const BackendFactory m_create_backend;
+    std::atomic<uint64_t> m_worker_epoch{0};
     std::atomic<unsigned int> m_worker_count{0};
     std::atomic<unsigned int> m_ready_workers{0};
     std::atomic<uint64_t> m_cpu_hashes{0};
@@ -157,7 +165,8 @@ private:
     std::deque<CBlockHeader> m_solutions;
     MiningStats m_stats;
     mutable MiningStatistics m_statistics;
-    std::mutex m_provider_mutex;
+    mutable MiningStatistics m_cpu_statistics;
+    mutable std::vector<MiningStatistics> m_device_statistics;
     std::unique_ptr<WorkProvider> m_provider;
 };
 

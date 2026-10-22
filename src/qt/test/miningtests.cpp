@@ -52,20 +52,26 @@ private Q_SLOTS:
     void liveSoloResponsiveness_data()
     {
         QTest::addColumn<unsigned int>("workers");
-        QTest::newRow("one-worker") << 1U;
-        QTest::newRow("two-workers") << 2U;
-        QTest::newRow("six-workers") << 6U;
+        QTest::addColumn<int>("activation");
+        for (const int activation : {-1, 0, 20}) {
+            for (const unsigned int count : {1U, 2U, 6U}) {
+                const auto name{QString{"height-%1-workers-%2"}.arg(activation).arg(count).toLatin1()};
+                QTest::newRow(name.constData()) << count << activation;
+            }
+        }
     }
 
     void liveSoloResponsiveness()
     {
         QFETCH(unsigned int, workers);
+        QFETCH(int, activation);
         if (workers > mining::DetectWorkerLimits().maximum) {
             QSKIP("Worker count exceeds this host's actual CPU/memory budget");
         }
         QSettings settings;
         settings.remove("mining/cpuWorkers");
-        TestingSetup setup{ChainType::REGTEST};
+        const std::string schedule{"-mercahashv2height=" + std::to_string(activation)};
+        TestingSetup setup{ChainType::REGTEST, {.extra_args={schedule.c_str()}}};
         setup.m_node.notifications->setChainstateLoaded(true);
         auto node{interfaces::MakeNode(setup.m_node)};
         auto loader{interfaces::MakeWalletLoader(*setup.m_node.chain, setup.m_args)};
@@ -127,7 +133,7 @@ private Q_SLOTS:
             worst_publication_gap = 0;
             const auto begin{clock.elapsed()};
             start->click();
-            QTRY_VERIFY_WITH_TIMEOUT(session.stats().accepted >= 2 && clock.elapsed() - begin >= 2000, 20000);
+            QTRY_VERIFY_WITH_TIMEOUT(session.stats().accepted >= (activation == 20 && cycle == 0 ? 22U : 2U) && clock.elapsed() - begin >= 2000, 20000);
             QVERIFY(publications >= 2);
             QVERIFY(!published->text().isEmpty());
             QVERIFY(session.stats().hashes_per_second_10s > 0);
@@ -147,7 +153,8 @@ private Q_SLOTS:
             const auto final{session.stats()};
             QCOMPARE(final.active_workers, 0U);
             QCOMPARE(final.rejected, uint64_t{0});
-            qInfo().nospace() << "Live V1 Solo workers=" << workers << " cycle=" << cycle
+            if (activation >= 0) QCOMPARE(final.pow_version, mercahash::Version::V2);
+            qInfo().nospace() << "Live Solo activation=" << activation << " workers=" << workers << " cycle=" << cycle
                 << " accepted=" << final.accepted << " hashes=" << final.hashes
                 << " elapsed_ms=" << final.session_elapsed.count() << " rate_hps=" << final.hashes_per_second_session
                 << " stop_dispatch_ms=" << dispatch_ms << " stop_handler_ms=" << handler_ms
@@ -168,7 +175,7 @@ private Q_SLOTS:
         const auto shutdown_ms{clock.elapsed() - shutting_down};
         QTest::qWait(20);
         heartbeat.stop();
-        qInfo().nospace() << "Live V1 Solo workers=" << workers << " session_shutdown_ms=" << shutdown_ms
+        qInfo().nospace() << "Live Solo activation=" << activation << " workers=" << workers << " session_shutdown_ms=" << shutdown_ms
             << " heartbeat_gap_ms=" << worst_heartbeat;
         QVERIFY(!session.stats().busy);
         QCOMPARE(session.stats().active_workers, 0U);

@@ -73,6 +73,7 @@ public:
     int getNumConnections(unsigned int flags = CONNECTIONS_ALL) const;
     std::map<CNetAddr, LocalServiceInfo> getNetLocalAddresses() const;
     int getNumBlocks() const;
+    int getCachedNumBlocks() const { return m_cached_num_blocks.load(); }
     uint256 getBestBlockHash() EXCLUSIVE_LOCKS_REQUIRED(!m_cached_tip_mutex);
     int getHeaderTipHeight() const;
     int64_t getHeaderTipTime() const;
