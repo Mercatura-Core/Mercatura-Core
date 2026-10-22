@@ -100,3 +100,39 @@ models, fake runtimes and source builds do not satisfy that release gate.
 Selecting X, coordinating transport rollout, public-testnet activation and final
 release qualification require a later explicit decision. An unset X does not
 prevent V2 development or isolated native wallet/hardware tests.
+
+## GPU execution and combined work
+
+CUDA compiles V1 and V2 as distinct kernel instances with fixed domains and
+geometry. The historical V1 hashing body keeps its launch grouping unchanged.
+V2 derives each execution window from driver occupancy/grid limits, synchronizes
+bounded fill/bind/mix launches, and rotates windows across the entire allocated
+pool. OpenCL compiles the selected fixed version and uses aligned scratchpad
+sub-buffer views with drained, ordered launches. These are latency/resource
+bounds on a launch, not a universal cap on resident V2 contexts.
+
+CUDA budgets from freshly measured free VRAM with reserve and overhead. V2 AMD
+OpenCL uses an available-memory extension when reliably reported, otherwise the
+conservative total-pool/single-allocation budget. V1 retains its existing policy.
+Automatic allocation has bounded cleanup/retry; an exact Manual request either
+succeeds or reports failure. Capacity is not a recommendation for peak hashrate.
+
+CPU and GPU workers lease unique nonce ranges from the same immutable job.
+A per-device V2 assembler retains unused lease tails, combines leases for larger
+batches and stops at the final 32-bit nonce. Version changes drain/join the old
+pool before replacement. GPU output must match an independent authoritative CPU
+rehash and the job target before submission; revoked, solved or obsolete jobs
+cannot submit queued candidates.
+
+Only complete returned batches count as GPU hashes. Operational counters also
+show batches started, completed and cancelled before completion. Easy regtest
+CPU wins may cancel every GPU batch; that observation alone does not diagnose a
+hashing failure. Deterministic tests separately require uninterrupted CPU/GPU
+progress, rate publication during blocked provider operations, rapid CPU wins,
+cancellation, late results, wrong output, expiry and version reorganization.
+Native tests additionally use a clearly labeled CPU reference device with real
+MercaHash and full Core validation; this remains a device test double.
+
+Use [the physical qualification procedure](MERCAHASH-V2-HARDWARE-QUALIFICATION.md)
+for actual Qt CPU-only, GPU-only and combined launchers, independent localhost
+verification, watchdogs, WSL builds and release acceptance records.
