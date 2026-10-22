@@ -15,6 +15,8 @@
 
 #include <array>
 #include <cassert>
+#include <limits>
+#include <stdexcept>
 #include <vector>
 
 static bool IsDelayedMinDifficultyBlock(
@@ -247,8 +249,10 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
 
 uint256 GetPoWHash(
     const CBlockHeader& header,
-    std::span<unsigned char> scratchpad)
+    std::span<unsigned char> scratchpad,
+    mercahash::Version version)
 {
+    if (scratchpad.size() != mercahash::ScratchpadBytes(version)) throw std::invalid_argument{"Wrong PoW scratchpad size"};
     std::vector<unsigned char> serialized_header;
     serialized_header.reserve(mercahash::HEADER_SIZE);
 
@@ -265,10 +269,11 @@ uint256 GetPoWHash(
     std::array<unsigned char, mercahash::OUTPUT_SIZE>
         output{};
 
-    mercahash::HashV1(
-        serialized_header,
-        scratchpad,
-        output);
+    if (version == mercahash::Version::V2) {
+        mercahash::HashV2(serialized_header, scratchpad, output);
+    } else {
+        mercahash::HashV1(serialized_header, scratchpad, output);
+    }
 
     // Preserve the raw MercaHash bytes exactly. uint256's span
     // constructor copies the bytes without reversing them.
@@ -277,43 +282,38 @@ uint256 GetPoWHash(
     };
 }
 
-uint256 PoWHashContext::GetHash(
-    const CBlockHeader& header)
+mercahash::Version GetPoWVersion(const Consensus::Params& params, int64_t candidate_height)
 {
-    // Allocate the memory-hard scratchpad only when real MercaHash work is
-    // actually requested. This keeps construction cheap for fuzz targets and
-    // code paths that never perform proof-of-work hashing.
-    if (m_scratchpad.empty()) {
-        m_scratchpad.resize(mercahash::SCRATCHPAD_BYTES);
+    if (candidate_height < 0 || candidate_height > std::numeric_limits<int>::max() ||
+        (params.nMercaHashV2Height && *params.nMercaHashV2Height < 0)) throw std::invalid_argument{"Unknown MercaHash candidate height"};
+    return params.nMercaHashV2Height && candidate_height >= *params.nMercaHashV2Height
+        ? mercahash::Version::V2 : mercahash::Version::V1;
+}
+
+uint256 PoWHashContext::GetHash(const CBlockHeader& header, mercahash::Version version)
+{
+    const auto bytes{mercahash::ScratchpadBytes(version)};
+    if (m_scratchpad.size() != bytes) {
+        // Release the previous version's capacity on transitions, including a
+        // reorg back to V1. No permanent 128 MiB allocation for V2 workers.
+        std::vector<unsigned char>(bytes).swap(m_scratchpad);
     }
-
-    assert(
-        m_scratchpad.size() ==
-        mercahash::SCRATCHPAD_BYTES);
-
-    const uint256 hash{GetPoWHash(
-        header,
-        m_scratchpad)};
+    const uint256 hash{GetPoWHash(header, m_scratchpad, version)};
     ++m_hashes_computed;
     return hash;
 }
 
-bool CheckProofOfWork(
-    const CBlockHeader& header,
-    const Consensus::Params& params,
-    PoWHashContext& context)
+bool CheckProofOfWork(const CBlockHeader& header, const Consensus::Params& params,
+                      PoWHashContext& context, std::optional<int64_t> candidate_height)
 {
-    // Preserve Bitcoin Core's cheap deterministic fuzz behavior, but apply it
-    // before MercaHash so fuzzing never allocates the 128 MiB scratchpad.
+    // An unverified peer height or an active-tip height is never a substitute.
+    if ((!candidate_height && params.nMercaHashV2Height) || (candidate_height && (*candidate_height < 0 || *candidate_height > std::numeric_limits<int>::max())) ||
+        (params.nMercaHashV2Height && *params.nMercaHashV2Height < 0)) return false;
     if (EnableFuzzDeterminism()) {
-        const uint256 identity_hash{header.GetHash()};
-        return (identity_hash.data()[31] & 0x80) == 0;
+        return (header.GetHash().data()[31] & 0x80) == 0;
     }
-
-    return CheckProofOfWorkImpl(
-        context.GetHash(header),
-        header.nBits,
-        params);
+    const auto version{GetPoWVersion(params, candidate_height.value_or(0))};
+    return CheckProofOfWorkImpl(context.GetHash(header, version), header.nBits, params);
 }
 
 // Bypasses the actual proof of work check during fuzz testing with a simplified validation checking whether

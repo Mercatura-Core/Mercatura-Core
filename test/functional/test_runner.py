@@ -101,6 +101,7 @@ MERCATURA_SCRIPTS = [
     'mercatura_fee_policy.py',
     'mercatura_headers_replay.py',
     'mercatura_mercahash_pow.py',
+    'mercatura_mercahash_v2.py',
     'mercatura_mining.py',
     'mercatura_network_identity.py',
     'mercatura_p2p_propagation.py',

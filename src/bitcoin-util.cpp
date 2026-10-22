@@ -25,6 +25,7 @@
 #include <functional>
 #include <memory>
 #include <thread>
+#include <stdexcept>
 
 static const int CONTINUE_EXECUTION=-1;
 
@@ -36,6 +37,7 @@ static void SetupBitcoinUtilArgs(ArgsManager &argsman)
 
     argsman.AddArg("-version", "Print version and exit", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
 
+    argsman.AddArg("-powversion=<1|2>", "Offline grinder algorithm; transition schedules require an explicit selection. Does not change network consensus.", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddCommand("grind", "Perform proof of work on hex header string");
 
     SetupChainParamsBaseOptions(argsman);
@@ -87,7 +89,7 @@ static int AppInitUtil(ArgsManager& args, int argc, char* argv[])
     return CONTINUE_EXECUTION;
 }
 
-static void grind_task(uint32_t nBits, CBlockHeader header, uint32_t offset, uint32_t step, std::atomic<bool>& found, uint32_t& proposed_nonce)
+static void grind_task(mercahash::Version version, uint32_t nBits, CBlockHeader header, uint32_t offset, uint32_t step, std::atomic<bool>& found, uint32_t& proposed_nonce)
 {
     arith_uint256 target;
     bool neg, over;
@@ -95,7 +97,7 @@ static void grind_task(uint32_t nBits, CBlockHeader header, uint32_t offset, uin
     if (target == 0 || neg || over) return;
     header.nNonce = offset;
 
-    // MercaHash requires one private mutable 128 MiB scratchpad per
+    // MercaHash requires one private version-sized scratchpad per
     // worker. Reuse it for every nonce tested by this worker.
     PoWHashContext pow_context;
 
@@ -105,7 +107,10 @@ static void grind_task(uint32_t nBits, CBlockHeader header, uint32_t offset, uin
     while (!found && header.nNonce < finish) {
         const uint32_t next = (finish - header.nNonce < 5000*step) ? finish : header.nNonce + 5000*step;
         do {
-            if (UintToArith256(pow_context.GetHash(header)) <= target) {
+            // MercaHash attempts are memory-hard. Do not force other grinder
+            // threads to finish 5,000 attempts after a winning nonce is found.
+            if (found) return;
+            if (UintToArith256(pow_context.GetHash(header, version)) <= target) {
                 if (!found.exchange(true)) {
                     proposed_nonce = header.nNonce;
                 }
@@ -129,6 +134,11 @@ static int Grind(const std::vector<std::string>& args, std::string& strPrint)
         return EXIT_FAILURE;
     }
 
+    const std::string selection{gArgs.GetArg("-powversion", "")};
+    if (!selection.empty() && selection != "1" && selection != "2") throw std::invalid_argument{"-powversion must be 1 or 2"};
+    if (selection.empty() && Params().GetConsensus().nMercaHashV2Height && *Params().GetConsensus().nMercaHashV2Height > 0)
+        throw std::invalid_argument{"Transition schedules require explicit offline -powversion"};
+    const auto version{selection == "2" ? mercahash::Version::V2 : selection == "1" ? mercahash::Version::V1 : GetPoWVersion(Params().GetConsensus(), 0)};
     uint32_t nBits = header.nBits;
     std::atomic<bool> found{false};
     uint32_t proposed_nonce{};
@@ -145,7 +155,7 @@ static int Grind(const std::vector<std::string>& args, std::string& strPrint)
     };
     threads.reserve(n_tasks);
     for (unsigned int i = 0; i < n_tasks; ++i) {
-        threads.emplace_back(grind_task, nBits, header, i, n_tasks, std::ref(found), std::ref(proposed_nonce));
+        threads.emplace_back(grind_task, version, nBits, header, i, n_tasks, std::ref(found), std::ref(proposed_nonce));
     }
     for (auto& t : threads) {
         t.join();

@@ -137,6 +137,8 @@ struct Params {
       */
     bool enforce_BIP94;
     bool fPowNoRetargeting;
+    /** Unset retains V1 forever. Only isolated regtest currently configures this. */
+    std::optional<int> nMercaHashV2Height{};
     int64_t nPowTargetSpacing;
     /**
      * Periodic boundary used by Bitcoin Core's retained BIP94 timewarp

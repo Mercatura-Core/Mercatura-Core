@@ -17,6 +17,7 @@ add_library(bitcoin_crypto STATIC EXCLUDE_FROM_ALL
   sha256.cpp
   sha256_sse4.cpp
   mercahash.cpp
+  mercahash_v2.cpp
   mercatura_mldsa.c
   mercatura_pqderive.cpp
   hmac_sha3_384.cpp

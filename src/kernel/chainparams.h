@@ -150,6 +150,10 @@ public:
     struct RegTestOptions {
         std::unordered_map<Consensus::DeploymentPos, VersionBitsParameters> version_bits_parameters{};
         std::unordered_map<Consensus::BuriedDeployment, int> activation_heights{};
+        /** Unset: V1 only; zero: isolated V2 genesis; positive: V1-to-V2 transition. */
+        std::optional<int> mercahash_v2_height{};
+        /** Isolated fixed-target mining qualification chain with its own genesis. */
+        bool mining_stress{false};
         bool fastprune{false};
         bool enforce_bip94{false};
     };

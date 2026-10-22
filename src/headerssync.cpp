@@ -353,6 +353,17 @@ std::vector<CBlockHeader> HeadersSyncState::PopHeadersReadyForAcceptance()
     return ret;
 }
 
+std::optional<int64_t> HeadersSyncState::NextHeaderHeight(const CBlockHeader& header) const
+{
+    if (m_download_state == State::PRESYNC && header.hashPrevBlock == m_last_header_received.GetHash()) {
+        return m_current_height + 1;
+    }
+    if (m_download_state == State::REDOWNLOAD && header.hashPrevBlock == m_redownload_buffer_last_hash) {
+        return m_redownload_buffer_last_height + 1;
+    }
+    return std::nullopt;
+}
+
 CBlockLocator HeadersSyncState::NextHeadersRequestLocator() const
 {
     Assume(m_download_state != State::FINAL);

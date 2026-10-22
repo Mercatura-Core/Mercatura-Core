@@ -24,6 +24,8 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <limits>
+#include <stdexcept>
 #include <cstdint>
 #include <cstring>
 #include <iterator>
@@ -539,6 +541,11 @@ class CRegTestParams : public CChainParams
 public:
     explicit CRegTestParams(const RegTestOptions& opts)
     {
+        if (opts.mercahash_v2_height && (*opts.mercahash_v2_height < 0 || *opts.mercahash_v2_height == std::numeric_limits<int>::max()))
+            throw std::invalid_argument{"Invalid regtest MercaHash V2 activation height"};
+        consensus.nMercaHashV2Height = opts.mercahash_v2_height;
+        if (opts.mining_stress && opts.mercahash_v2_height != 0)
+            throw std::runtime_error{"-regtestminingstress requires -mercahashv2height=0 and a separate datadir"};
         m_chain_type = ChainType::REGTEST;
         consensus.nInitialBlockCapacityBytes = MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES;
         consensus.signet_blocks = false;
@@ -618,12 +625,16 @@ public:
             "Mercatura regtest genesis v0.1",
             "Mercatura regtest genesis v0.1",
             1788566400,
-            1,
-            0x207fffff,
+            opts.mining_stress ? 7935 : opts.mercahash_v2_height == 0 ? 5 : 1,
+            opts.mining_stress ? 0x1f0fffff : 0x207fffff,
             1,
             50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
-        assert(consensus.hashGenesisBlock == uint256{"8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685"});
+        assert(consensus.hashGenesisBlock == (opts.mining_stress
+            ? uint256{"9336d4e8d61fa82a08386748ac6c1020e200a3e9f0ce303253a1ea3322686802"}
+            : opts.mercahash_v2_height == 0
+            ? uint256{"f7086cc3933445280f0e03607dc8b1199a010111f161f11a0c86e0a6f76a9ffe"}
+            : uint256{"8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685"}));
         assert(genesis.hashMerkleRoot == uint256{"f72f87b6fde6ba17583954c5c0ffec58909e4f49752ea7f125e4ecaf488ab83c"});
 
         vFixedSeeds.clear(); //!< Regtest mode doesn't have any fixed seeds.

@@ -177,6 +177,9 @@ public:
      */
     CBlockLocator NextHeadersRequestLocator() const;
 
+    /** Verified continuation only; never accepts a height supplied by a peer. */
+    std::optional<int64_t> NextHeaderHeight(const CBlockHeader& header) const;
+
 protected:
     /** The (secret) offset on the heights for which to create commitments.
      *

@@ -38,6 +38,8 @@ add_executable(test_bitcoin
   common_url_tests.cpp
   compress_tests.cpp
   crypto_tests.cpp
+  mercahash_v2_tests.cpp
+  mercahash_activation_tests.cpp
   cpu_miner_tests.cpp
   worker_limits_tests.cpp
   witness_resource_tests.cpp

@@ -95,7 +95,8 @@ std::vector<std::shared_ptr<CBlock>> CreateBlockChain(size_t total_height, const
         while (!CheckProofOfWork(
             block,
             params.GetConsensus(),
-            pow_context)) {
+            pow_context,
+            block_height)) {
             ++block.nNonce;
             assert(block.nNonce);
         }
@@ -130,11 +131,13 @@ protected:
 COutPoint MineBlock(const NodeContext& node, std::shared_ptr<CBlock>& block)
 {
     PoWHashContext pow_context;
+    const int64_t height{WITH_LOCK(cs_main, return int64_t{Assert(node.chainman->m_blockman.LookupBlockIndex(block->hashPrevBlock))->nHeight} + 1)};
 
     while (!CheckProofOfWork(
         *block,
         Params().GetConsensus(),
-        pow_context)) {
+        pow_context,
+        height)) {
         ++block->nNonce;
         assert(block->nNonce);
     }

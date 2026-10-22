@@ -47,6 +47,7 @@ const uint256 DEV_POW_LIMIT{
 };
 
 struct Options {
+    mercahash::Version pow_version{mercahash::Version::V1};
     uint32_t time{DEFAULT_TIME};
     uint32_t bits{DEFAULT_BITS};
     uint32_t nonce_start{DEFAULT_NONCE_START};
@@ -65,6 +66,7 @@ struct Options {
         << "Usage:\n"
         << "  " << argv0 << " [options]\n\n"
         << "Options:\n"
+        << "  --pow-version <1|2>      Offline hash algorithm (default: historical V1)\n"
         << "  --time <uint32>          Genesis nTime\n"
         << "  --bits <value>           Compact nBits, decimal or 0x-prefixed hex\n"
         << "  --pow-limit <hex>        Full 256-bit PoW limit in hexadecimal\n"
@@ -147,6 +149,10 @@ Options ParseOptions(int argc, char* argv[])
 
         if (arg == "--help") {
             Usage(argv[0], EXIT_SUCCESS);
+        } else if (arg == "--pow-version") {
+            const auto version{ParseUnsigned(require_value("--pow-version"), "--pow-version")};
+            if (version != 1 && version != 2) throw std::invalid_argument{"--pow-version must be 1 or 2"};
+            options.pow_version = static_cast<mercahash::Version>(version);
         } else if (arg == "--time") {
             options.time =
                 ParseUint32(require_value("--time"), "--time");
@@ -289,7 +295,7 @@ int main(int argc, char* argv[])
 
         while (attempts < options.max_attempts) {
             pow_hash =
-                pow_context.GetHash(genesis);
+                pow_context.GetHash(genesis, options.pow_version);
 
             ++attempts;
 
@@ -366,6 +372,7 @@ int main(int argc, char* argv[])
             << genesis.hashMerkleRoot.GetHex() << '\n'
             << "block id: "
             << genesis.GetHash().GetHex() << '\n'
+            << "PoW version: " << static_cast<unsigned int>(options.pow_version) << '\n'
             << "MercaHash: "
             << pow_hash.GetHex() << '\n'
             << "PoW valid: "

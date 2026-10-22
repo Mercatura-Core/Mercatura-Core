@@ -9,8 +9,26 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <stdexcept>
 
 namespace mercahash {
+
+enum class Version : std::uint8_t { V1 = 1, V2 = 2 };
+inline constexpr std::size_t V1_SCRATCHPAD_BYTES = 128ULL * 1024 * 1024;
+inline constexpr std::size_t V2_SCRATCHPAD_BYTES = 16ULL * 1024 * 1024;
+inline constexpr std::uint32_t V2_MIX_STEPS = 16384;
+constexpr std::size_t ScratchpadBytes(Version version)
+{
+    switch (version) {
+    case Version::V1: return V1_SCRATCHPAD_BYTES;
+    case Version::V2: return V2_SCRATCHPAD_BYTES;
+    }
+    throw std::invalid_argument{"Unknown MercaHash version"};
+}
+/** Frozen V2 consensus function; exact byte buffer sizes are checked in release builds. */
+void HashV2(std::span<const unsigned char> header, std::span<unsigned char> scratchpad,
+            std::span<unsigned char> output);
+
 
 static constexpr std::size_t HEADER_SIZE = 80;
 static constexpr std::size_t OUTPUT_SIZE = 32;

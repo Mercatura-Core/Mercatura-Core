@@ -433,7 +433,8 @@ CBlock TestChain100Setup::CreateBlock(
     while (!CheckProofOfWork(
         block,
         m_node.chainman->GetConsensus(),
-        m_pow_hash_context)) {
+        m_pow_hash_context,
+        WITH_LOCK(cs_main, return int64_t{Assert(m_node.chainman->m_blockman.LookupBlockIndex(block.hashPrevBlock))->nHeight} + 1))) {
         ++block.nNonce;
     }
 
