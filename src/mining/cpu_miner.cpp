@@ -223,7 +223,13 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
             // Ordinary template turnover retains the pool. Only an algorithm
             // change joins it and rechecks budgets, including a reorg to V1.
             CancelWork();
-            const uint64_t epoch{++m_worker_epoch};
+            uint64_t epoch{0};
+            {
+                // Epoch is part of the condition-variable wait predicate.
+                // Its mutex prevents notification between the check and wait.
+                std::lock_guard lock{m_mutex};
+                epoch = ++m_worker_epoch;
+            }
             m_cv.notify_all();
             for (auto& worker : workers) worker.join();
             workers.clear();

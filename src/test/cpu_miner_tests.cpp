@@ -574,26 +574,87 @@ BOOST_AUTO_TEST_CASE(six_worker_v2_logic_and_version_turnover)
     };
     auto fake{std::make_shared<FakeState>()};
     std::atomic<bool> v2{true};
-    std::atomic<unsigned int> allocations{0};
+    struct Contexts {
+        std::mutex mutex;
+        unsigned int allocations{0}, destroyed{0};
+        std::set<unsigned int> live;
+        std::map<int32_t, std::set<unsigned int>> hashed;
+        bool overlap{false};
+    } contexts;
+    struct Context {
+        Contexts& contexts;
+        unsigned int id{0};
+        explicit Context(Contexts& c) : contexts{c} {
+            std::lock_guard lock{contexts.mutex};
+            id = contexts.allocations++;
+            for (const auto live : contexts.live) contexts.overlap |= live / 6 != id / 6;
+            contexts.live.insert(id);
+        }
+        ~Context() {
+            std::lock_guard lock{contexts.mutex};
+            contexts.live.erase(id);
+            ++contexts.destroyed;
+        }
+    };
     mining::MiningController controller{[&] {
-        ++allocations;
-        return [](const CBlockHeader&) {
+        auto context{std::make_shared<Context>(contexts)};
+        return [context](const CBlockHeader& header) {
+            {
+                std::lock_guard lock{context->contexts.mutex};
+                context->contexts.hashed[header.nVersion].insert(context->id);
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds{1});
             return uint256::FromHex(std::string(64, 'f')).value();
         };
     }, [] { return mining::CalculateWorkerLimits(6, uint64_t{8} << 30); }};
+    const auto phase = [&](const char* name, mercahash::Version version, unsigned int allocated, int32_t parent) {
+        mining::MiningStats stats;
+        unsigned int observed_allocations{0}, destroyed{0}, live{0}, hashing{0};
+        bool overlap{false};
+        const bool complete{Until([&] {
+            stats = controller.GetStats();
+            std::lock_guard lock{contexts.mutex};
+            observed_allocations = contexts.allocations;
+            destroyed = contexts.destroyed;
+            live = static_cast<unsigned int>(contexts.live.size());
+            overlap = contexts.overlap;
+            hashing = 0;
+            // Every context in the expected generation must actually hash the
+            // new job, not merely enter its factory or increment GetJob's count.
+            for (unsigned int id{allocated - 6}; id < allocated; ++id)
+                hashing += contexts.hashed[parent].contains(id);
+            return observed_allocations == allocated && destroyed == allocated - 6 && live == 6 && hashing == 6 &&
+                stats.active_workers == 6 && stats.pow_version == version && !overlap;
+        })};
+        // Always release a failed lifecycle wait before Boost aborts the case.
+        // Stop also unblocks any old generation still waiting for work.
+        if (!complete) { controller.RequestStop(); controller.Wait(); }
+        BOOST_TEST_MESSAGE(name << ": allocations=" << observed_allocations << " destroyed=" << destroyed <<
+            " live=" << live << " hashing=" << hashing << " active=" << stats.active_workers <<
+            " version=" << static_cast<int>(stats.pow_version) << " jobs=" << fake->jobs <<
+            " overlap=" << overlap << " status=" << stats.status);
+        BOOST_REQUIRE_MESSAGE(complete, name << " failed: allocations=" << observed_allocations <<
+            " expected=" << allocated << " destroyed=" << destroyed << " live=" << live <<
+            " hashing=" << hashing << " active=" << stats.active_workers <<
+            " version=" << static_cast<int>(stats.pow_version) << " jobs=" << fake->jobs <<
+            " overlap=" << overlap << " status=" << stats.status);
+    };
     BOOST_REQUIRE(controller.Start([&] { return std::make_unique<Provider>(fake, v2); }, 6));
-    const bool first{Until([&] { return controller.GetStats().active_workers == 6 && allocations == 6; })};
+    phase("initial V2 startup", mercahash::Version::V2, 6, 1);
     fake->parent = 2; // Same algorithm: retain all six contexts.
-    const bool replaced{Until([&] { return fake->jobs >= 2; })};
-    const auto retained{allocations.load()};
+    phase("V2 job replacement", mercahash::Version::V2, 6, 2);
     v2 = false;
-    const bool back{Until([&] { return allocations == 12 && controller.GetStats().pow_version == mercahash::Version::V1; })};
+    phase("V2 to V1 turnover", mercahash::Version::V1, 12, 2);
     v2 = true;
-    const bool forward{Until([&] { return allocations == 18 && controller.GetStats().pow_version == mercahash::Version::V2; })};
+    phase("V1 to V2 turnover", mercahash::Version::V2, 18, 2);
     controller.RequestStop(); controller.Wait();
-    BOOST_CHECK(first && replaced && back && forward);
-    BOOST_CHECK_EQUAL(retained, 6U);
+    {
+        std::lock_guard lock{contexts.mutex};
+        BOOST_CHECK_EQUAL(contexts.allocations, 18U);
+        BOOST_CHECK_EQUAL(contexts.destroyed, 18U);
+        BOOST_CHECK(contexts.live.empty());
+        BOOST_CHECK(!contexts.overlap);
+    }
     BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
     BOOST_CHECK(controller.GetStats().hashes > 0);
     BOOST_CHECK_EQUAL(mining::WorkerMemoryBytes(mercahash::Version::V2), 48ULL << 20);

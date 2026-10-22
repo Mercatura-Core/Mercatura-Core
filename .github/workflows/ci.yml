@@ -203,6 +203,17 @@ jobs:
         run: |
           cmake --build build-win-msvc --config Release --parallel 4
 
+      - name: Repeat six-worker version turnover regression
+        shell: pwsh
+        run: |
+          1..20 | ForEach-Object {
+            Write-Host "Turnover regression run $_/20"
+            & .\build-win-msvc\bin\Release\test_bitcoin.exe `
+              --run_test=cpu_miner_tests/six_worker_v2_logic_and_version_turnover `
+              --catch_system_error=no --log_level=message
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
       - name: Unit tests
         shell: pwsh
         run: |
