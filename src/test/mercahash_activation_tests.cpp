@@ -259,23 +259,30 @@ BOOST_AUTO_TEST_CASE(live_worker_crosses_twenty_and_reorgs_back_without_restart)
         return std::make_unique<Gate>(std::make_unique<mining::SoloWorkProvider>(interfaces::MakeMining(m_node, false), script, "", true), ceiling);
     }, 1));
     auto height = [&] { return WITH_LOCK(cs_main, return m_node.chainman->ActiveChain().Height()); };
-    auto wait_height = [&](int wanted) {
+    auto wait_height = [&](int wanted, uint64_t accepted) {
         const auto deadline{std::chrono::steady_clock::now() + std::chrono::seconds{30}};
-        while (height() != wanted && controller.GetStats().state != mining::MiningState::FAILED && std::chrono::steady_clock::now() < deadline)
+        // Core publishes its tip before Solo Submit checks active-chain
+        // acceptance and the controller records the result. Await that
+        // acknowledgement before the test can invalidate the submitted block.
+        const auto acknowledged = [&] { return height() == wanted && controller.GetStats().accepted >= accepted; };
+        while (!acknowledged() && controller.GetStats().state != mining::MiningState::FAILED && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds{5});
-        return height() == wanted;
+        const auto stats{controller.GetStats()};
+        BOOST_TEST_MESSAGE("Transition height=" << height() << " wanted=" << wanted <<
+            " accepted=" << stats.accepted << " expected=" << accepted << " status=" << stats.status);
+        return acknowledged();
     };
-    const bool first{wait_height(22)};
+    const bool first{wait_height(22, 22)};
     const auto before{controller.GetStats()};
     ceiling = 18;
     BlockValidationState state;
     auto* disconnect{WITH_LOCK(cs_main, return m_node.chainman->ActiveChain()[19])};
     const bool invalidated{disconnect && m_node.chainman->ActiveChainstate().InvalidateBlock(state, disconnect)};
     ceiling = 19;
-    const bool back{wait_height(19)};
+    const bool back{wait_height(19, 23)};
     const auto v1{controller.GetStats()};
     ceiling = 22;
-    const bool forward{wait_height(22)};
+    const bool forward{wait_height(22, 26)};
     controller.RequestStop(); controller.Wait();
     BOOST_CHECK_MESSAGE(first && invalidated && back && forward, controller.GetStats().status);
     BOOST_CHECK(before.pow_version == mercahash::Version::V2);
