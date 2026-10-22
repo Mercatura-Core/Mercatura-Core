@@ -180,7 +180,7 @@ BOOST_AUTO_TEST_CASE(side_branches_and_concurrent_processing)
     Accept(fork);
     Accept(fork_tip);
     const auto new_tip{Header(fork_tip, 9)};
-    const std::array known{first, fork, fork_tip};
+    const std::array known_fork{fork, fork_tip};
     const auto size{WITH_LOCK(cs_main, return m_node.chainman->m_blockman.m_block_index.size())};
     std::array<uint64_t, 4> hashes{};
     std::array<bool, 4> accepted{};
@@ -191,7 +191,12 @@ BOOST_AUTO_TEST_CASE(side_branches_and_concurrent_processing)
             // concurrent callers must each own a context, as documented.
             PoWHashContext context;
             bool valid{true};
-            for (int replay{0}; replay < 4; ++replay) valid &= Check(known, context);
+            for (int replay{0}; replay < 4; ++replay) {
+                // Each wire batch must be contiguous, even when replaying
+                // several independently validated branches concurrently.
+                valid &= Check({&first, 1}, context);
+                valid &= Check(known_fork, context);
+            }
             BlockValidationState state;
             accepted[i] = valid && m_node.chainman->ProcessNewBlockHeaders({{new_tip}}, true, state);
             hashes[i] = context.HashesComputed();

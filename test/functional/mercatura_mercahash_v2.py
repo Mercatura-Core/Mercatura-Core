@@ -114,8 +114,13 @@ class MercaHashV2Test(BitcoinTestFramework):
             solved = subprocess.check_output([util, "-regtest", "-powversion=2", "grind",
                                               CBlockHeader(wrong_below).serialize().hex()], text=True)
             wrong_below.nNonce = from_hex(CBlockHeader(), solved.strip()).nNonce
-            if node.submitblock(wrong_below.serialize().hex()) == "high-hash":
+            result = node.submitblock(wrong_below.serialize().hex())
+            if result == "high-hash":
                 break
+            assert result in (None, "inconclusive")
+            # At this easy target a trial can satisfy both algorithms. Keep
+            # those valid side blocks out of the later reorganization test.
+            node.invalidateblock(wrong_below.hash_hex)
         else:
             raise AssertionError("No V2-only proof found below activation")
 
