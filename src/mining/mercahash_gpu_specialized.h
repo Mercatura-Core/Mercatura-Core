@@ -1,8 +1,15 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-// Exact staged MercaHash V1 device arithmetic. Also compiled as C++ for parity tests.
+// Exact staged, explicitly versioned MercaHash device arithmetic. Also compiled as C++ for parity tests.
 #ifndef BITCOIN_MINING_MERCAHASH_GPU_SPECIALIZED_H
 #define BITCOIN_MINING_MERCAHASH_GPU_SPECIALIZED_H
+#undef MH_GLOBAL
+#undef MH_CONSTANT
+#undef MH_INLINE
+#undef MH_KERNEL
+#undef MH_ID
+#undef MH_LANE
+#undef MH_GROUP_SYNC
 #ifdef MH_OPENCL
 typedef ulong mh_u64;
 #define MH_GLOBAL __global
@@ -33,11 +40,36 @@ typedef unsigned long long mh_u64;
 #define MH_GROUP_SYNC() ((void)0)
 static unsigned mh_test_id;
 #endif
-#define MH_LINE_WORDS 8
+// Each compiled instance has frozen geometry/domains. WorkParams never enter
+// device code. The host allocates and launches using the same selected version.
+#ifndef MH_VERSION
+#define MH_VERSION 1
+#endif
+#undef MH_LINE_COUNT
+#undef MH_LINE_MASK
+#undef MH_BIND_BLOCK_COUNT
+#undef MH_STATE_DOMAIN
+#undef MH_CHECKPOINT_DOMAIN
+#undef MH_FINAL_DOMAIN
+#if MH_VERSION == 1
 #define MH_LINE_COUNT 2097152U
 #define MH_LINE_MASK 0x1fffffULL
-#define MH_BIND_BLOCK_LINES 64
 #define MH_BIND_BLOCK_COUNT 32768U
+#define MH_STATE_DOMAIN "MercaHash-v1/state/0"
+#define MH_CHECKPOINT_DOMAIN "MercaHash-v1/checkpoint"
+#define MH_FINAL_DOMAIN "MercaHash-v1/final"
+#elif MH_VERSION == 2
+#define MH_LINE_COUNT 262144U
+#define MH_LINE_MASK 0x3ffffULL
+#define MH_BIND_BLOCK_COUNT 4096U
+#define MH_STATE_DOMAIN "MercaHash-v2/state/0"
+#define MH_CHECKPOINT_DOMAIN "MercaHash-v2/checkpoint"
+#define MH_FINAL_DOMAIN "MercaHash-v2/final"
+#else
+#error Unsupported MercaHash device version
+#endif
+#define MH_LINE_WORDS 8
+#define MH_BIND_BLOCK_LINES 64
 #define MH_BIND_ARX_INTERVAL 16
 #define MH_SECONDARY_INTERVAL 16
 #define MH_CROSS_LANE_INTERVAL 64
@@ -477,7 +509,7 @@ MH_INLINE void CrossLaneMix(mh_u64 *state, mh_u64 step)
 MH_INLINE void Checkpoint(mh_u64 *state, mh_u64 step, PrimaryResult primary, SecondaryResult secondary)
 {
     unsigned char bytes[303];
-    const char domain[] = "MercaHash-v1/checkpoint";
+    const char domain[] = MH_CHECKPOINT_DOMAIN;
     unsigned pos = 0;
     for (unsigned i = 0; i < sizeof(domain) - 1; ++i)
         bytes[pos++] = (unsigned char)domain[i];
@@ -564,7 +596,7 @@ MH_KERNEL void mh_init(MH_GLOBAL const unsigned char *headers, MH_GLOBAL mh_u64 
     if (id >= count || MH_LANE != 0)
         return;
     unsigned char bytes[100], digest[64];
-    const char domain[] = "MercaHash-v1/state/0";
+    const char domain[] = MH_STATE_DOMAIN;
     for (unsigned i = 0; i < 20; ++i)
         bytes[i] = (unsigned char)domain[i];
     for (unsigned i = 0; i < 80; ++i)
@@ -595,7 +627,7 @@ MH_KERNEL void mh_fill(MH_GLOBAL const unsigned char *headers, MH_GLOBAL mh_u64 
     if (stage == 3) {
         FinalSample(state, scratchpad, count, id);
         unsigned char bytes[226], digest[32];
-        const char domain[] = "MercaHash-v1/final";
+        const char domain[] = MH_FINAL_DOMAIN;
         unsigned pos = 0;
         for (unsigned j = 0; j < sizeof(domain) - 1; ++j)
             bytes[pos++] = (unsigned char)domain[j];
@@ -633,7 +665,7 @@ MH_KERNEL void mh_bind(MH_GLOBAL const unsigned char *headers, MH_GLOBAL mh_u64 
     if (stage == 3) {
         FinalSample(state, scratchpad, count, id);
         unsigned char bytes[226], digest[32];
-        const char domain[] = "MercaHash-v1/final";
+        const char domain[] = MH_FINAL_DOMAIN;
         unsigned pos = 0;
         for (unsigned j = 0; j < sizeof(domain) - 1; ++j)
             bytes[pos++] = (unsigned char)domain[j];
@@ -671,7 +703,7 @@ MH_KERNEL void mh_mix(MH_GLOBAL const unsigned char *headers, MH_GLOBAL mh_u64 *
     if (stage == 3) {
         FinalSample(state, scratchpad, count, id);
         unsigned char bytes[226], digest[32];
-        const char domain[] = "MercaHash-v1/final";
+        const char domain[] = MH_FINAL_DOMAIN;
         unsigned pos = 0;
         for (unsigned j = 0; j < sizeof(domain) - 1; ++j)
             bytes[pos++] = (unsigned char)domain[j];
@@ -709,7 +741,7 @@ MH_KERNEL void mh_final(MH_GLOBAL const unsigned char *headers, MH_GLOBAL mh_u64
     if (stage == 3) {
         FinalSample(state, scratchpad, count, id);
         unsigned char bytes[226], digest[32];
-        const char domain[] = "MercaHash-v1/final";
+        const char domain[] = MH_FINAL_DOMAIN;
         unsigned pos = 0;
         for (unsigned j = 0; j < sizeof(domain) - 1; ++j)
             bytes[pos++] = (unsigned char)domain[j];

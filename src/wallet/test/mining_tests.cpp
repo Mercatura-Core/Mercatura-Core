@@ -86,7 +86,7 @@ BOOST_AUTO_TEST_CASE(pq_destination_persistence_and_locked_reuse)
 BOOST_AUTO_TEST_SUITE_END()
 
 struct SoloTestingSetup : TestingSetup {
-    SoloTestingSetup() : TestingSetup{ChainType::REGTEST} { m_node.notifications->setChainstateLoaded(true); }
+    explicit SoloTestingSetup(TestOpts opts = {}) : TestingSetup{ChainType::REGTEST, std::move(opts)} { m_node.notifications->setChainstateLoaded(true); }
 };
 BOOST_FIXTURE_TEST_SUITE(mining_tests_solo, SoloTestingSetup)
 
@@ -512,5 +512,72 @@ BOOST_AUTO_TEST_CASE(real_competing_tip_reorg_and_new_template)
     BOOST_CHECK(replacement->header.hashMerkleRoot != old->header.hashMerkleRoot);
     BOOST_REQUIRE(provider.Submit(*replacement, solve(*replacement)).active_chain);
     BOOST_CHECK_EQUAL(observer->getTip()->height, 1);
+}
+BOOST_AUTO_TEST_SUITE_END()
+
+
+struct V2SoloTestingSetup : SoloTestingSetup {
+    V2SoloTestingSetup() : SoloTestingSetup{TestOpts{.extra_args={"-mercahashv2height=0"}}} {}
+};
+BOOST_FIXTURE_TEST_SUITE(mining_tests_v2_solo, V2SoloTestingSetup)
+BOOST_AUTO_TEST_CASE(gpu_worker_and_combined_mode_submit_genuine_v2_blocks_with_cpu_reference_device)
+{
+    // The device is a CPU reference test double. Jobs, hashing, independent
+    // candidate rehashing, rewards and Core consensus validation are genuine.
+    struct Reference : mining::GpuBackend {
+        std::vector<unsigned char> scratch{std::vector<unsigned char>(mercahash::V2_SCRATCHPAD_BYTES)};
+        unsigned int Contexts() const override { return 1; }
+        mercahash::Version PoWVersion() const override { return mercahash::Version::V2; }
+        uint64_t MemoryBytes() const override { return scratch.size(); }
+        std::vector<mining::GpuHash> Hash(std::span<const mining::GpuHeader> headers, const std::function<bool()>& cancelled) override {
+            std::vector<mining::GpuHash> hashes(headers.size());
+            for (size_t i{0}; i < headers.size(); ++i) {
+                if (cancelled()) return {};
+                mercahash::HashV2(headers[i], scratch, hashes[i]);
+            }
+            return cancelled() ? std::vector<mining::GpuHash>{} : hashes;
+        }
+    };
+    WalletContext context;
+    context.args = &m_args;
+    auto wallet{TestCreateWallet(CreateMockableWalletDatabase(), context, WALLET_FLAG_DESCRIPTORS)};
+    auto api{interfaces::MakeWallet(context, wallet)};
+    const auto destination{GetMiningDestination(*api)};
+    BOOST_REQUIRE(destination);
+    const auto script{GetScriptForDestination(*destination)};
+    for (const bool cpu : {false, true}) {
+        mining::MiningController controller{{}, {}, {}, [] {
+            mining::GpuDevice d; d.id = "cpu-reference-v2"; d.name = "CPU reference device; no GPU execution"; d.supported = true;
+            return mining::GpuDiscovery{{d}, {}};
+        }, [](const auto&, unsigned) { return std::make_unique<Reference>(); }};
+        mining::GpuConfig hardware; hardware.cpu = cpu; hardware.gpu = true; hardware.yield_ms = 0;
+        BOOST_REQUIRE(controller.Start([&] { return std::make_unique<mining::SoloWorkProvider>(
+            interfaces::MakeMining(m_node, false), script, EncodeDestination(*destination), true); }, 1, hardware));
+        const auto deadline{std::chrono::steady_clock::now() + std::chrono::seconds{30}};
+        while (std::chrono::steady_clock::now() < deadline) {
+            const auto stats{controller.GetStats()};
+            if (!stats.busy || (stats.accepted >= 2 && !stats.devices.empty() && stats.devices[0].hashes > 0 && (!cpu || stats.cpu_hashes > 0))) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds{5});
+        }
+        controller.RequestStop(); controller.Wait();
+        const auto stats{controller.GetStats()};
+        BOOST_REQUIRE_MESSAGE(stats.accepted >= 2, stats.status);
+        BOOST_REQUIRE_EQUAL(stats.devices.size(), 1U);
+        BOOST_CHECK(stats.devices[0].hashes > 0 && !stats.devices[0].failed);
+        BOOST_CHECK(cpu ? stats.cpu_hashes > 0 : stats.cpu_hashes == 0);
+        BOOST_CHECK_EQUAL(stats.active_workers, 0U);
+        BOOST_CHECK_EQUAL(stats.rejected, 0U);
+        CBlock block;
+        int height;
+        {
+            LOCK(cs_main);
+            const auto* tip{m_node.chainman->ActiveChain().Tip()};
+            height = tip->nHeight;
+            BOOST_REQUIRE(m_node.chainman->m_blockman.ReadBlock(block, *tip));
+        }
+        BOOST_CHECK(block.vtx[0]->vout[0].scriptPubKey == script);
+        PoWHashContext pow;
+        BOOST_CHECK(CheckProofOfWork(block, Params().GetConsensus(), pow, height));
+    }
 }
 BOOST_AUTO_TEST_SUITE_END()

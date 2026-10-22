@@ -27,6 +27,16 @@ inline constexpr uint64_t NONCE_SPACE{uint64_t{1} << 32};
 struct NonceRange { uint64_t begin; uint64_t end; };
 std::optional<NonceRange> AllocateNonceRange(std::atomic<uint64_t>& cursor);
 
+// One lease assembler belongs to one device and immutable job. Unused tails
+// remain owned by that assembler; fresh jobs get independent cursors.
+class V2NonceBatch {
+    std::optional<NonceRange> m_pending;
+public:
+    std::vector<uint32_t> Next(std::atomic<uint64_t>& cursor, unsigned int maximum,
+        const std::function<std::optional<NonceRange>(std::atomic<uint64_t>&)>& allocate,
+        const std::function<bool()>& cancelled);
+};
+
 struct WorkerLimits {
     unsigned int logical_cpus{1};
     std::optional<uint64_t> available_memory;
@@ -85,6 +95,9 @@ struct GpuStats {
     uint64_t memory_bytes{0};
     unsigned int contexts{0};
     unsigned int estimated_contexts{0};
+    unsigned int batch_contexts{0}, active_contexts{0};
+    uint64_t batches_started{0}, batches_completed{0}, batches_cancelled{0};
+    GpuMemoryBudget budget{};
     bool automatic{true};
     std::string status{"Preparing device"};
     bool failed{false};
@@ -140,7 +153,7 @@ public:
 private:
     struct Work;
     void Run(ProviderFactory factory, unsigned int requested, GpuConfig hardware);
-    void GpuWorker(size_t index, GpuConfig hardware, uint64_t epoch);
+    void GpuWorker(size_t index, GpuConfig hardware, uint64_t epoch, mercahash::Version version);
     void ReportCandidate(const std::shared_ptr<Work>& work, const CBlockHeader& header);
     void Worker(uint64_t epoch);
     void Fail(const std::string& error);

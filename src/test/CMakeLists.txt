@@ -44,6 +44,8 @@ add_executable(test_bitcoin
   worker_limits_tests.cpp
   witness_resource_tests.cpp
   mining_statistics_tests.cpp
+  gpu_capacity_tests.cpp
+  gpu_scheduling_tests.cpp
   gpu_miner_tests.cpp
   mercahash_gpu_tests.cpp
   mercahash_gpu_sync_tests.cpp

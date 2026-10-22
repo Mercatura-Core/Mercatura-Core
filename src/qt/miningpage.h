@@ -17,6 +17,7 @@ class QCheckBox;
 class QLabel;
 class QPushButton;
 class QSpinBox;
+class QDoubleSpinBox;
 class QComboBox;
 class QGroupBox;
 class QListWidget;
@@ -59,6 +60,8 @@ private:
     QListWidget* m_devices;
     QComboBox* m_context_mode;
     QSpinBox* m_contexts;
+    QDoubleSpinBox* m_contexts_v2;
+    bool m_v2_contexts{false};
     QSpinBox* m_yield;
     QPushButton* m_refresh_devices;
     QLabel* m_gpu_status;

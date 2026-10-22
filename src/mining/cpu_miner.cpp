@@ -39,6 +39,23 @@ std::optional<NonceRange> AllocateNonceRange(std::atomic<uint64_t>& cursor)
     return {};
 }
 
+std::vector<uint32_t> V2NonceBatch::Next(std::atomic<uint64_t>& cursor, unsigned int maximum,
+    const std::function<std::optional<NonceRange>(std::atomic<uint64_t>&)>& allocate,
+    const std::function<bool()>& cancelled)
+{
+    if (!maximum) throw std::runtime_error{"Empty V2 GPU execution capacity"};
+    std::vector<uint32_t> nonces;
+    while (nonces.size() < maximum && !cancelled()) {
+        if (!m_pending || m_pending->begin == m_pending->end) m_pending = allocate(cursor);
+        if (!m_pending) break;
+        if (m_pending->begin >= m_pending->end || m_pending->end > NONCE_SPACE)
+            throw std::runtime_error{"Invalid V2 nonce lease"};
+        const auto count{std::min<uint64_t>(maximum - nonces.size(), m_pending->end - m_pending->begin)};
+        for (uint64_t i{0}; i < count; ++i) nonces.push_back(static_cast<uint32_t>(m_pending->begin++));
+    }
+    return cancelled() ? std::vector<uint32_t>{} : nonces;
+}
+
 struct MiningController::Work {
     explicit Work(MiningJob work) : job{std::move(work)}, expires{job.deadline.value_or(std::chrono::steady_clock::now() + JOB_LIFETIME)} {}
     const MiningJob job;
@@ -219,12 +236,22 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
             const auto host{CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), limits.available_memory, version)};
             if (selected.size() > host.maximum || count > MaximumCpuWorkers(limits, selected.size(), version))
                 throw std::runtime_error{"Insufficient host memory for CPU workers and GPU candidate verification"};
-            if (version == mercahash::Version::V2 && !selected.empty())
-                throw std::runtime_error{"V2 GPU integration is not yet enabled"};
+            {
+                std::lock_guard lock{m_mutex};
+                for (auto& stats : m_stats.devices) {
+                    stats.failed = false;
+                    stats.contexts = stats.estimated_contexts = 0;
+                    stats.memory_bytes = 0;
+                    stats.batch_contexts = stats.active_contexts = 0;
+                    stats.budget = {};
+                    stats.device.pow_version = version;
+                    stats.status = "Preparing device";
+                }
+            }
             m_worker_count = count + static_cast<unsigned int>(selected.size());
             workers.reserve(count + selected.size());
             for (unsigned int i{0}; i < count && !m_stop; ++i) workers.emplace_back([this, epoch] { Worker(epoch); });
-            for (size_t i{0}; i < selected.size() && !m_stop; ++i) workers.emplace_back([this, i, hardware, epoch] { GpuWorker(i, hardware, epoch); });
+            for (size_t i{0}; i < selected.size() && !m_stop; ++i) workers.emplace_back([this, i, hardware, epoch, version] { GpuWorker(i, hardware, epoch, version); });
             running_version = version;
         };
         while (!m_stop) {
@@ -331,7 +358,7 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
     for (size_t i{0}; i < m_stats.devices.size(); ++i) m_device_statistics[i].Finish(finished_at, m_stats.devices[i].hashes);
     m_stats.hashes_per_second = 0;
     m_stats.cpu_hashes_per_second = 0;
-    for (auto& device : m_stats.devices) { device.hashes_per_second = 0; device.memory_bytes = 0; if (!device.failed) device.status = "Stopped"; }
+    for (auto& device : m_stats.devices) { device.active_contexts = 0; device.hashes_per_second = 0; device.memory_bytes = 0; if (!device.failed) device.status = "Stopped"; }
     if (m_stats.state != MiningState::FAILED) {
         m_stats.state = MiningState::STOPPED;
         m_stats.status = "Stopped";
@@ -403,29 +430,33 @@ void MiningController::ReportCandidate(const std::shared_ptr<Work>& work, const 
     }
 }
 
-void MiningController::GpuWorker(size_t index, GpuConfig hardware, uint64_t epoch)
+void MiningController::GpuWorker(size_t index, GpuConfig hardware, uint64_t epoch, mercahash::Version version)
 {
     bool active{false}, ready{false};
     auto status = [&](const std::string& message, bool failed = false) {
         std::lock_guard lock{m_mutex};
         m_stats.devices[index].status = message;
         m_stats.devices[index].failed = failed;
-        if (failed) { m_stats.devices[index].hashes_per_second = 0; m_stats.devices[index].memory_bytes = 0; }
+        if (failed) { m_stats.devices[index].hashes_per_second = 0; m_stats.devices[index].memory_bytes = 0; m_stats.devices[index].active_contexts = 0; }
     };
     try {
         util::ThreadRename("mca-gpu-worker");
         GpuDevice device;
         { std::lock_guard lock{m_mutex}; device = m_stats.devices[index].device; }
+        device.pow_version = version;
         auto backend{m_create_backend(device, hardware.contexts)};
-        if (!backend || backend->Contexts() == 0 || backend->Contexts() > MAX_GPU_CONTEXTS) throw std::runtime_error{"Invalid GPU hashing context count"};
+        if (!backend || backend->Contexts() == 0 || (version == mercahash::Version::V1 && backend->Contexts() > MAX_GPU_CONTEXTS)) throw std::runtime_error{"Invalid GPU hashing context count"};
+        if (!backend->BatchContexts() || backend->BatchContexts() > backend->Contexts()) throw std::runtime_error{"Invalid GPU execution capacity"};
+        if (backend->PoWVersion() != version) throw std::runtime_error{"GPU backend selected the wrong MercaHash version"};
         {
             std::lock_guard lock{m_mutex};
             auto& stats{m_stats.devices[index]};
             stats.contexts = backend->Contexts(); stats.memory_bytes = backend->MemoryBytes();
             stats.estimated_contexts = backend->EstimatedContexts(); stats.automatic = hardware.contexts == 0;
-            stats.status = "Checking MercaHash V1 reference vectors";
+            stats.batch_contexts = backend->BatchContexts(); stats.budget = backend->Budget();
+            stats.status = "Checking MercaHash reference vectors";
         }
-        VerifyGpuBackend(*backend, [this, epoch] { return m_stop.load() || epoch != m_worker_epoch; });
+        VerifyGpuBackend(*backend, [this, epoch] { return m_stop || epoch != m_worker_epoch; });
         if (m_stop || epoch != m_worker_epoch) return;
         PoWHashContext verifier;
         auto verify{m_hash_factory ? m_hash_factory() : HashFunction{}};
@@ -448,6 +479,41 @@ void MiningController::GpuWorker(size_t index, GpuConfig hardware, uint64_t epoc
                        (work->job.valid && !work->job.valid->load()) || std::chrono::steady_clock::now() >= work->expires;
             };
             status("Mining");
+            if (version == mercahash::Version::V2) {
+                V2NonceBatch leases;
+                while (!cancelled()) {
+                    const auto nonces{leases.Next(work->next_nonce, backend->BatchContexts(), m_allocate_range, cancelled)};
+                    if (nonces.empty()) break;
+                    std::vector<GpuHeader> headers(nonces.size());
+                    std::vector<CBlockHeader> candidates(nonces.size(), work->job.header);
+                    for (size_t slot{0}; slot < nonces.size(); ++slot) {
+                        candidates[slot].nNonce = nonces[slot];
+                        DataStream stream; stream << candidates[slot];
+                        if (stream.size() != headers[slot].size()) throw std::runtime_error{"Noncanonical mining header size"};
+                        std::memcpy(headers[slot].data(), stream.data(), headers[slot].size());
+                    }
+                    { std::lock_guard lock{m_mutex}; m_stats.devices[index].active_contexts = nonces.size(); ++m_stats.devices[index].batches_started; }
+                    const auto hashes{backend->Hash(headers, cancelled)};
+                    { std::lock_guard lock{m_mutex}; m_stats.devices[index].active_contexts = 0; }
+                    if (hashes.size() != nonces.size()) {
+                        if (cancelled()) { std::lock_guard lock{m_mutex}; ++m_stats.devices[index].batches_cancelled; break; }
+                        throw std::runtime_error{"GPU returned an incomplete hashing batch"};
+                    }
+                    { std::lock_guard lock{m_mutex}; m_stats.devices[index].hashes += nonces.size(); ++m_stats.devices[index].batches_completed; }
+                    if (cancelled()) break;
+                    for (size_t slot{0}; slot < nonces.size() && !cancelled(); ++slot) {
+                        const uint256 result{std::span<const unsigned char>{hashes[slot]}};
+                        if (UintToArith256(result) > work->job.target) continue;
+                        const auto authoritative{verify ? verify(candidates[slot]) : verifier.GetHash(candidates[slot], work->job.pow_version)};
+                        if (authoritative != result) throw std::runtime_error{"GPU candidate hash disagrees with authoritative MercaHash"};
+                        if (UintToArith256(authoritative) <= work->job.target && !cancelled()) ReportCandidate(work, candidates[slot]);
+                    }
+                    if (hardware.yield_ms && !cancelled()) {
+                        std::unique_lock lock{m_mutex};
+                        m_cv.wait_for(lock, std::chrono::milliseconds{hardware.yield_ms}, cancelled);
+                    }
+                }
+            } else
             while (!cancelled()) {
                 const auto range{m_allocate_range(work->next_nonce)};
                 if (!range) break;
@@ -461,14 +527,16 @@ void MiningController::GpuWorker(size_t index, GpuConfig hardware, uint64_t epoc
                         if (stream.size() != headers[slot].size()) throw std::runtime_error{"Noncanonical mining header size"};
                         std::memcpy(headers[slot].data(), stream.data(), headers[slot].size());
                     }
+                    { std::lock_guard lock{m_mutex}; m_stats.devices[index].active_contexts = count; ++m_stats.devices[index].batches_started; }
                     const auto hashes{backend->Hash(headers, cancelled)};
+                    { std::lock_guard lock{m_mutex}; m_stats.devices[index].active_contexts = 0; }
                     if (hashes.size() != count) {
-                        if (cancelled()) break;
+                        if (cancelled()) { std::lock_guard lock{m_mutex}; ++m_stats.devices[index].batches_cancelled; break; }
                         throw std::runtime_error{"GPU returned an incomplete hashing batch"};
                     }
                     // Completed GPU work counts even if a tip change or Stop
                     // arrived during the batch. Obsolete candidates never submit.
-                    { std::lock_guard lock{m_mutex}; m_stats.devices[index].hashes += count; }
+                    { std::lock_guard lock{m_mutex}; m_stats.devices[index].hashes += count; ++m_stats.devices[index].batches_completed; }
                     if (cancelled()) break;
                     for (size_t slot{0}; slot < count && !cancelled(); ++slot) {
                         const uint256 result{std::span<const unsigned char>{hashes[slot]}};
@@ -476,8 +544,8 @@ void MiningController::GpuWorker(size_t index, GpuConfig hardware, uint64_t epoc
                         // Exact hash equality detects faults even if a wrong hash
                         // happens to satisfy the target. Never submit device output
                         // without the authoritative Core hash and target checks.
-                        const auto authoritative{verify ? verify(candidates[slot]) : verifier.GetHash(candidates[slot])};
-                        if (authoritative != result) throw std::runtime_error{"GPU candidate hash disagrees with authoritative MercaHash V1"};
+                        const auto authoritative{verify ? verify(candidates[slot]) : verifier.GetHash(candidates[slot], work->job.pow_version)};
+                        if (authoritative != result) throw std::runtime_error{"GPU candidate hash disagrees with authoritative MercaHash"};
                         if (UintToArith256(authoritative) <= work->job.target && !cancelled()) ReportCandidate(work, candidates[slot]);
                     }
                     nonce += count;

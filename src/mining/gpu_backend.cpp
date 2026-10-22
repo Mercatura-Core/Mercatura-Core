@@ -8,48 +8,58 @@
 namespace mining
 {
 GpuMemoryBudget CalculateGpuBudget(uint64_t memory, uint64_t maximum_allocation, unsigned int requested,
-                                   GpuMemorySource source)
+                                   GpuMemorySource source, mercahash::Version version)
 {
     // CUDA sizes from measured free memory. OpenCL total memory is NOT free:
     // without a reliable free-memory query, allow at most a quarter of the
     // reported global pool, also bounded by CL_DEVICE_MAX_MEM_ALLOC_SIZE.
     // Its set-aside is a conservative capacity limit, not measured headroom.
     const uint64_t reserve{std::max<uint64_t>(512ULL << 20,
-        source == GpuMemorySource::CUDA_FREE ? memory / 20 : memory - memory / 4)};
+        source != GpuMemorySource::OPENCL_TOTAL ? memory / 20 : memory - memory / 4)};
     // Headers/states/results and allocation rounding, plus a separate allowance
     // for runtime/JIT/program/stream overhead. Neither consumes the VRAM reserve.
     constexpr uint64_t fixed_overhead{64ULL << 20};
-    const uint64_t context_bytes{mercahash::SCRATCHPAD_BYTES + 4096};
+    const uint64_t context_bytes{mercahash::ScratchpadBytes(version) + 4096};
     const uint64_t usable{memory > reserve ? memory - reserve : 0};
     const uint64_t capacity{std::min({usable > fixed_overhead ? (usable - fixed_overhead) / context_bytes : 0,
-                                    maximum_allocation / mercahash::SCRATCHPAD_BYTES,
-                                    uint64_t{std::numeric_limits<size_t>::max()} / mercahash::SCRATCHPAD_BYTES})};
-    const auto maximum{static_cast<unsigned int>(std::min<uint64_t>(capacity, MAX_GPU_CONTEXTS))};
+                                    maximum_allocation / mercahash::ScratchpadBytes(version),
+                                    uint64_t{std::numeric_limits<size_t>::max()} /
+                                        (version == mercahash::Version::V1 ? mercahash::ScratchpadBytes(version) : context_bytes)})};
+    const uint64_t count_limit{version == mercahash::Version::V1 ? MAX_GPU_CONTEXTS : std::numeric_limits<unsigned int>::max()};
+    const auto maximum{static_cast<unsigned int>(std::min(capacity, count_limit))};
     if (requested > maximum)
         throw std::runtime_error{"GPU context count exceeds the safe memory budget"};
     const auto count{requested ? requested : maximum};
-    const uint64_t scratch{count * uint64_t{mercahash::SCRATCHPAD_BYTES}};
+    const uint64_t scratch{count * uint64_t{mercahash::ScratchpadBytes(version)}};
     const uint64_t overhead{count ? fixed_overhead + count * uint64_t{4096} : 0};
     const uint64_t headroom{memory - scratch - overhead};
     return {count, scratch, reserve, overhead, headroom, maximum,
-            count > 0 && headroom < std::max<uint64_t>(1ULL << 30, memory / 10), capacity > MAX_GPU_CONTEXTS};
+            count > 0 && headroom < std::max<uint64_t>(1ULL << 30, memory / 10), version == mercahash::Version::V1 && capacity > MAX_GPU_CONTEXTS};
 }
 GpuMemoryBudget CalculateGpuBudget(const GpuDevice& device, unsigned int requested)
 {
     const bool cuda{device.vendor == GpuVendor::NVIDIA_CUDA};
-    return CalculateGpuBudget(cuda ? device.available_memory : device.total_memory, device.max_allocation, requested,
-                              cuda ? GpuMemorySource::CUDA_FREE : GpuMemorySource::OPENCL_TOTAL);
+    const bool free{cuda || (device.pow_version == mercahash::Version::V2 && device.available_memory_known)};
+    return CalculateGpuBudget(free ? device.available_memory : device.total_memory, device.max_allocation, requested,
+                              cuda ? GpuMemorySource::CUDA_FREE : free ? GpuMemorySource::OPENCL_FREE : GpuMemorySource::OPENCL_TOTAL, device.pow_version);
+}
+unsigned int GpuExecutionContexts(unsigned int resident, uint64_t compute_units, uint64_t maximum_groups)
+{
+    if (!resident || !compute_units || !maximum_groups) throw std::runtime_error{"Invalid GPU execution limits"};
+    return static_cast<unsigned int>(std::min({uint64_t{resident}, compute_units, maximum_groups,
+        uint64_t{std::numeric_limits<unsigned int>::max()} / 80, uint64_t{std::numeric_limits<size_t>::max()} / 80}));
 }
 GpuContextAllocation AllocateGpuContexts(unsigned int requested,
     const std::function<GpuMemoryBudget()>& budget,
     const std::function<void(unsigned int, const GpuMemoryBudget&)>& allocate,
-    const std::function<void()>& cleanup, const std::function<bool()>& cancelled)
+    const std::function<void()>& cleanup, const std::function<bool()>& cancelled, mercahash::Version version)
 {
-    unsigned int lower{0}, upper{MAX_GPU_CONTEXTS}, next{MAX_GPU_CONTEXTS}, estimated{0};
+    const auto limit{version == mercahash::Version::V1 ? MAX_GPU_CONTEXTS : std::numeric_limits<unsigned int>::max()};
+    unsigned int lower{0}, upper{limit}, next{limit}, estimated{0};
     // Binary search plus revalidation of the last successful allocation. Bound
     // retries even if other processes continually change memory availability.
     unsigned int attempts{2};
-    for (unsigned int n{MAX_GPU_CONTEXTS}; n; n /= 2) attempts += 2;
+    for (unsigned int n{limit}; n; n /= 2) attempts += 2;
     for (unsigned int attempt{0}; attempt < attempts; ++attempt) {
         try {
             if (cancelled && cancelled()) throw std::runtime_error{"GPU allocation cancelled"};
@@ -68,7 +78,7 @@ GpuContextAllocation AllocateGpuContexts(unsigned int requested,
             if (requested || !upper || next <= 1) throw;
             upper = std::min(upper, next - 1);
             if (lower > upper) lower = 0; // A previously successful count became unavailable.
-            next = lower + (upper - lower + 1) / 2;
+            next = lower + static_cast<unsigned int>((uint64_t{upper} - lower + 1) / 2);
             continue;
         } catch (...) {
             cleanup();
@@ -78,7 +88,7 @@ GpuContextAllocation AllocateGpuContexts(unsigned int requested,
         // pool. The final returned allocation is always freshly validated.
         cleanup();
         if (lower > upper) lower = 0;
-        next = lower + (upper - lower + 1) / 2;
+        next = lower + static_cast<unsigned int>((uint64_t{upper} - lower + 1) / 2);
     }
     throw GpuMemoryAllocationError{"GPU memory availability did not stabilize during bounded allocation retries"};
 }
@@ -124,7 +134,40 @@ void VerifyGpuBackend(GpuBackend &backend, const std::function<bool()> &cancelle
                                     "2321712af21502878986c0c4f21d79e17e2281619e3958f11e3c634c9f17f7d8",
                                     "9c9a427928875304bb7d6351354b5e50ec8e57c581971f68eab176371c4cd2c2",
                                     "1244c6c9e0365baeb5958cfaa57aff582d81ae1d757769e823085bb00676e170"};
+    constexpr const char* vectors_v2[]{
+        "eb53364febf3cbe079be98c554f125ee3b78cc64d162fb831f4364f0f8b26dd8",
+        "98c21c199742ff142100cc795857156909d73ac8fa81012a2803158dc0927b63",
+        "306b4fd4000c5605e57f48395daf1e176c8cc92fd72a14440a9d028f4de93d62",
+        "1328a9db2db6212d474953c5c5a5e20d91a04179d77c60c460ede9b61015243c"};
+    const auto* selected{backend.PoWVersion() == mercahash::Version::V2 ? vectors_v2 : vectors};
     auto nibble = [](char value) { return value <= '9' ? value - '0' : value - 'a' + 10; };
+    if (backend.PoWVersion() == mercahash::Version::V2) {
+        if (!backend.BatchContexts() || backend.BatchContexts() > backend.Contexts())
+            throw std::runtime_error{"Invalid GPU V2 self-test capacity"};
+        for (unsigned base{0}; base < 4; ++base) {
+            for (uint64_t offset{0}; offset < backend.Contexts();) {
+                if (cancelled()) return;
+                const auto count{static_cast<size_t>(std::min<uint64_t>(backend.BatchContexts(), backend.Contexts() - offset))};
+                std::vector<GpuHeader> headers(count);
+                for (size_t slot{0}; slot < count; ++slot) {
+                    const auto pattern{(base + offset + slot) % 4};
+                    for (size_t byte{0}; byte < 80; ++byte)
+                        headers[slot][byte] = pattern == 0 ? 0 : pattern == 1 ? byte : pattern == 2 ? 255 : (byte * 37 + 11) & 255;
+                }
+                const auto hashes{backend.Hash(headers, cancelled)};
+                if (cancelled()) return;
+                if (hashes.size() != headers.size()) throw std::runtime_error{"GPU self-test returned an incomplete batch"};
+                for (size_t slot{0}; slot < count; ++slot) {
+                    const auto* expected{vectors_v2[(base + offset + slot) % 4]};
+                    for (size_t byte{0}; byte < 32; ++byte)
+                        if (hashes[slot][byte] != static_cast<unsigned char>(nibble(expected[2 * byte]) * 16 + nibble(expected[2 * byte + 1])))
+                            throw std::runtime_error{"GPU MercaHash version-specific reference-vector mismatch"};
+                }
+                offset += count;
+            }
+        }
+        return;
+    }
     // Different inputs in every slot also exercise isolation and reuse.
     for (unsigned int base{0}; base < 4 && !cancelled(); ++base) {
         std::vector<GpuHeader> headers(backend.Contexts());
@@ -142,11 +185,11 @@ void VerifyGpuBackend(GpuBackend &backend, const std::function<bool()> &cancelle
         if (results.size() != headers.size())
             throw std::runtime_error{"GPU self-test returned an incomplete batch"};
         for (size_t slot{0}; slot < results.size(); ++slot) {
-            const char *expected{vectors[(base + slot) % 4]};
+            const char *expected{selected[(base + slot) % 4]};
             for (size_t byte{0}; byte < 32; ++byte) {
                 if (results[slot][byte] !=
                     static_cast<unsigned char>(nibble(expected[byte * 2]) * 16 + nibble(expected[byte * 2 + 1])))
-                    throw std::runtime_error{"GPU MercaHash V1 reference-vector mismatch"};
+                    throw std::runtime_error{"GPU MercaHash version-specific reference-vector mismatch"};
             }
         }
     }

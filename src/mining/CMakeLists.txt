@@ -64,7 +64,7 @@ if(WITH_CUDA_MINING)
     # A separate executable supplies fake runtime/registration symbols. It links
     # the real backend host object, without executing device code or a driver.
     add_executable(test_cuda_backend_host ../test/cuda_backend_tests.cpp gpu_backend.cpp)
-    target_compile_definitions(test_cuda_backend_host PRIVATE MERCATURA_CUDA)
+    target_compile_definitions(test_cuda_backend_host PRIVATE MERCATURA_CUDA MERCATURA_CUDA_MIN_ARCH=${MERCATURA_CUDA_MIN_ARCH})
     target_link_libraries(test_cuda_backend_host PRIVATE core_interface mercatura_cuda CUDA::cudart_static)
     add_test(NAME test_cuda_backend_host COMMAND test_cuda_backend_host)
   endif()

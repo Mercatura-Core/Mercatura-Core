@@ -723,4 +723,34 @@ BOOST_AUTO_TEST_CASE(incomplete_device_batch_is_rejected_and_restart_recovers)
     BOOST_CHECK(recovered);
     BOOST_CHECK(controller.GetStats().state == mining::MiningState::STOPPED);
 }
+BOOST_AUTO_TEST_CASE(v2_gpu_memory_budgets_preserve_reserves)
+{
+    using mining::CalculateGpuBudget;
+    using mining::GpuMemorySource;
+    using mercahash::Version;
+    const uint64_t exact{(512ULL << 20) + (64ULL << 20) + (16ULL << 20) + 4096};
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(exact - 1, exact, 0, GpuMemorySource::CUDA_FREE, Version::V2).contexts, 0U);
+    const auto one{CalculateGpuBudget(exact, exact, 1, GpuMemorySource::CUDA_FREE, Version::V2)};
+    BOOST_CHECK_EQUAL(one.contexts, 1U);
+    BOOST_CHECK_EQUAL(one.scratchpad_bytes, 16ULL << 20);
+    BOOST_CHECK_EQUAL(one.headroom_bytes, 512ULL << 20);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(4ULL << 30, 16ULL << 20, 0, GpuMemorySource::CUDA_FREE, Version::V2).contexts, 1U);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(4ULL << 30, (16ULL << 20) - 1, 0, GpuMemorySource::CUDA_FREE, Version::V2).contexts, 0U);
+    const auto opencl{CalculateGpuBudget(8ULL << 30, 2ULL << 30, 0, GpuMemorySource::OPENCL_TOTAL, Version::V2)};
+    BOOST_CHECK(opencl.reserved_bytes >= (6ULL << 30));
+    BOOST_CHECK(opencl.scratchpad_bytes + opencl.overhead_bytes <= (2ULL << 30));
+    BOOST_CHECK_THROW(CalculateGpuBudget(exact, exact, 2, GpuMemorySource::CUDA_FREE, Version::V2), std::runtime_error);
+    BOOST_CHECK_EQUAL(CalculateGpuBudget(UINT64_MAX, UINT64_MAX, 256, GpuMemorySource::CUDA_FREE, Version::V2).scratchpad_bytes, 4ULL << 30);
+}
+BOOST_AUTO_TEST_CASE(v2_runtime_selftest_rejects_a_v1_implementation)
+{
+    class IncorrectV2 : public MockBackend {
+    public:
+        IncorrectV2(std::shared_ptr<State> state) : MockBackend{std::move(state), false} {}
+        mercahash::Version PoWVersion() const override { return mercahash::Version::V2; }
+    };
+    auto state{std::make_shared<State>()};
+    IncorrectV2 incorrect{state};
+    BOOST_CHECK_THROW(mining::VerifyGpuBackend(incorrect, [] { return false; }), std::runtime_error);
+}
 BOOST_AUTO_TEST_SUITE_END()
