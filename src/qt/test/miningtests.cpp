@@ -22,6 +22,7 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QClipboard>
+#include <QElapsedTimer>
 #include <QSignalSpy>
 #include <QTableView>
 #include <QComboBox>
@@ -34,7 +35,9 @@
 #include <QSettings>
 #include <QSpinBox>
 #include <QTest>
+#include <QTimer>
 
+#include <algorithm>
 #include <functional>
 #include <limits>
 
@@ -46,6 +49,136 @@ Q_DECLARE_METATYPE(wallet::AddressPurpose)
 class MiningTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void liveSoloResponsiveness_data()
+    {
+        QTest::addColumn<unsigned int>("workers");
+        QTest::newRow("one-worker") << 1U;
+        QTest::newRow("two-workers") << 2U;
+        QTest::newRow("six-workers") << 6U;
+    }
+
+    void liveSoloResponsiveness()
+    {
+        QFETCH(unsigned int, workers);
+        if (workers > mining::DetectWorkerLimits().maximum) {
+            QSKIP("Worker count exceeds this host's actual CPU/memory budget");
+        }
+        QSettings settings;
+        settings.remove("mining/cpuWorkers");
+        TestingSetup setup{ChainType::REGTEST};
+        setup.m_node.notifications->setChainstateLoaded(true);
+        auto node{interfaces::MakeNode(setup.m_node)};
+        auto loader{interfaces::MakeWalletLoader(*setup.m_node.chain, setup.m_args)};
+        setup.m_node.wallet_loader = loader.get();
+        auto& context{*loader->context()};
+        auto wallet{wallet::TestCreateWallet(wallet::CreateMockableWalletDatabase(), context, wallet::WALLET_FLAG_DESCRIPTORS)};
+        QVERIFY(wallet::AddWallet(context, wallet));
+        OptionsModel options{*node};
+        bilingual_str error;
+        QVERIFY(options.Init(error));
+        ClientModel client{*node, &options};
+        std::unique_ptr<const PlatformStyle> style{PlatformStyle::instantiate("other")};
+        WalletModel model{interfaces::MakeWallet(context, wallet), client, style.get()};
+        MiningSession session{*node};
+        MiningPage page{&model};
+        page.setClientModel(&client);
+        page.setSession(&session);
+        auto* start{page.findChild<QPushButton*>("startMining")};
+        auto* stop{page.findChild<QPushButton*>("stopMining")};
+        auto* selection{page.findChild<QSpinBox*>("manualWorkers")};
+        auto* published{page.findChild<QLabel*>("miningSessionStatistics")};
+        QVERIFY(start && stop && selection && published);
+        selection->setValue(static_cast<int>(workers));
+        QCOMPARE(selection->value(), static_cast<int>(workers));
+        page.show();
+        QCoreApplication::processEvents();
+        QElapsedTimer clock;
+        clock.start();
+        qint64 last_tick{0}, worst_heartbeat{0};
+        QTimer heartbeat;
+        heartbeat.setInterval(10);
+        connect(&heartbeat, &QTimer::timeout, this, [&] {
+            const auto now{clock.elapsed()};
+            worst_heartbeat = std::max(worst_heartbeat, now - last_tick);
+            last_tick = now;
+        });
+        heartbeat.start();
+        uint64_t last_hashes{0};
+        unsigned int publications{0};
+        QString last_text;
+        qint64 last_publication{0}, worst_publication_gap{0};
+        QObject observer;
+        connect(&session, &MiningSession::changed, &observer, [&] {
+            const auto current{session.stats()};
+            if (current.hashes > last_hashes && published->text() != last_text) {
+                if (last_hashes > 0) worst_publication_gap = std::max(worst_publication_gap, clock.elapsed() - last_publication);
+                last_hashes = current.hashes;
+                last_text = published->text();
+                last_publication = clock.elapsed();
+                ++publications;
+            }
+        });
+        // Real SoloWorkProvider, authoritative MercaHash, consensus validation,
+        // wallet notifications and MiningPage. No hash/provider test double.
+        for (unsigned int cycle{0}; cycle < 3; ++cycle) {
+            last_hashes = 0;
+            publications = 0;
+            last_text.clear();
+            worst_publication_gap = 0;
+            const auto begin{clock.elapsed()};
+            start->click();
+            QTRY_VERIFY_WITH_TIMEOUT(session.stats().accepted >= 2 && clock.elapsed() - begin >= 2000, 20000);
+            QVERIFY(publications >= 2);
+            QVERIFY(!published->text().isEmpty());
+            QVERIFY(session.stats().hashes_per_second_10s > 0);
+            bool handled{false};
+            qint64 dispatch_ms{0}, handler_ms{0}, request_at{0};
+            const auto due{clock.elapsed() + 100};
+            QTimer::singleShot(100, &session, [&] {
+                request_at = clock.elapsed();
+                dispatch_ms = request_at - due;
+                stop->click();
+                handler_ms = clock.elapsed() - request_at;
+                handled = true;
+            });
+            QTRY_VERIFY_WITH_TIMEOUT(handled, 2000);
+            QTRY_VERIFY_WITH_TIMEOUT(!session.stats().busy, 2000);
+            const auto stopped_ms{clock.elapsed() - request_at};
+            const auto final{session.stats()};
+            QCOMPARE(final.active_workers, 0U);
+            QCOMPARE(final.rejected, uint64_t{0});
+            qInfo().nospace() << "Live V1 Solo workers=" << workers << " cycle=" << cycle
+                << " accepted=" << final.accepted << " hashes=" << final.hashes
+                << " elapsed_ms=" << final.session_elapsed.count() << " rate_hps=" << final.hashes_per_second_session
+                << " stop_dispatch_ms=" << dispatch_ms << " stop_handler_ms=" << handler_ms
+                << " stop_observed_ms=" << stopped_ms << " heartbeat_gap_ms=" << worst_heartbeat
+                << " publication_gap_ms=" << worst_publication_gap;
+            QVERIFY2(dispatch_ms < 1000, "Stop timer dispatch exceeded one second");
+            QVERIFY2(handler_ms < 1000, "Stop handler blocked the Qt thread for one second");
+            QVERIFY2(stopped_ms < 1000, "Workers did not stop within one second of the Qt handler");
+            QVERIFY2(worst_publication_gap < 1500, "Statistics publication stalled during accepted-block turnover");
+            QTest::qWait(50);
+            QCOMPARE(session.stats().accepted, final.accepted);
+            QTRY_VERIFY_WITH_TIMEOUT(start->isEnabled(), 1000);
+        }
+        start->click();
+        QTRY_VERIFY_WITH_TIMEOUT(session.stats().hashes > 0, 10000);
+        const auto shutting_down{clock.elapsed()};
+        session.shutdown();
+        const auto shutdown_ms{clock.elapsed() - shutting_down};
+        QTest::qWait(20);
+        heartbeat.stop();
+        qInfo().nospace() << "Live V1 Solo workers=" << workers << " session_shutdown_ms=" << shutdown_ms
+            << " heartbeat_gap_ms=" << worst_heartbeat;
+        QVERIFY(!session.stats().busy);
+        QCOMPARE(session.stats().active_workers, 0U);
+        QVERIFY2(shutdown_ms < 1000, "MiningSession shutdown exceeded one second");
+        QVERIFY2(worst_heartbeat < 1000, "Qt event-loop heartbeat stalled for one second");
+        QVERIFY(wallet::RemoveWallet(context, wallet, std::nullopt));
+        setup.m_node.wallet_loader = nullptr;
+        settings.remove("mining/cpuWorkers");
+    }
+
     void actualGpuContextsAfterFallback()
     {
         mining::GpuStats small, large;
