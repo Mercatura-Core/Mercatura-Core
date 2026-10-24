@@ -71,14 +71,18 @@ static bool CheckWalletView(WalletModel& model, interfaces::Node& node, BitcoinG
     std::map<COutPoint, Output> outputs;
     std::map<Txid, CAmount> expected_net, model_net;
     std::map<Txid, int> expected_rows, model_rows;
+    std::map<Txid, int> expected_depth;
+    std::set<Txid> immature_rewards;
     int coinbases{0};
     for (const auto& tx : transactions) {
         interfaces::WalletTxStatus status;
-        int blocks;
-        int64_t time;
-        if (!model.wallet().tryGetTxStatus(tx.tx->GetHash(), status, blocks, time)) return fail("transaction status busy");
+        uint256 status_tip;
+        if (!model.wallet().tryGetTxStatus(tx.tx->GetHash(), status, status_tip)) return fail("transaction status busy");
+        if (status_tip != tip) return fail("wallet tip changed during verification");
         if (status.depth_in_main_chain < 1) return fail("unconfirmed wallet transaction");
         coinbases += tx.is_coinbase;
+        expected_depth.emplace(tx.tx->GetHash(), height - status.block_height + 1);
+        if (tx.is_coinbase && height - status.block_height < COINBASE_MATURITY) immature_rewards.insert(tx.tx->GetHash());
         CAmount owned_credit{0};
         for (size_t i{0}; i < tx.tx->vout.size(); ++i) {
             if (tx.txout_is_mine[i]) {
@@ -111,6 +115,10 @@ static bool CheckWalletView(WalletModel& model, interfaces::Node& node, BitcoinG
         const auto index{table->index(row, 0)};
         const auto* entry{static_cast<const TransactionRecord*>(index.internalPointer())};
         if (!entry || !expected_net.contains(entry->hash)) return fail("unknown transaction model entry");
+        if (entry->status.depth != expected_depth.at(entry->hash)) return fail("Qt transaction confirmations are stale");
+        if (entry->type == TransactionRecord::Generated &&
+            (entry->status.status == TransactionStatus::Immature) != immature_rewards.contains(entry->hash))
+            return fail("Qt reward maturity is stale");
         if (!entries.emplace(entry->hash, entry->idx, entry->type).second) return fail("duplicate transaction model entry");
         const std::pair key{entry->hash, entry->idx};
         if (previous && key < *previous) return fail("transaction model order is incorrect");
@@ -134,7 +142,7 @@ static bool CheckWalletView(WalletModel& model, interfaces::Node& node, BitcoinG
     details = {{"height", height}, {"wallet_transactions", int(transactions.size())}, {"model_rows", table->rowCount({})},
         {"unspent_outputs", int(outputs.size())}, {"mature_base_units", QString::number(expected.balance)},
         {"immature_base_units", QString::number(expected.immature_balance)}, {"unique_entries", true},
-        {"history_ordered", true}, {"balances_match_utxos", true}};
+        {"history_ordered", true}, {"balances_match_utxos", true}, {"confirmations_match", true}, {"maturity_matches", true}};
     return true;
 }
 
@@ -422,10 +430,15 @@ int main(int argc, char* argv[])
                     }
                     if (stage == 6) {
                         auto* table{selected_wallet->getTransactionTableModel()};
-                        int rows{0};
-                        for (int row{0}; row < table->rowCount({}); ++row)
-                            rows += table->index(row, 0).data(TransactionTableModel::TxHashRole).toString() == self_payment;
-                        if (table->pendingNotificationCount() || rows != 2 || !start->isEnabled()) {
+                        int rows{0}, sent{0}, received{0};
+                        for (int row{0}; row < table->rowCount({}); ++row) {
+                            const auto index{table->index(row, 0)};
+                            if (index.data(TransactionTableModel::TxHashRole).toString() != self_payment) continue;
+                            ++rows;
+                            sent += index.data(TransactionTableModel::TypeRole).toInt() == TransactionRecord::SendToAddress;
+                            received += index.data(TransactionTableModel::TypeRole).toInt() == TransactionRecord::RecvWithAddress;
+                        }
+                        if (table->pendingNotificationCount() || rows != 2 || sent != 1 || received != 1 || !start->isEnabled()) {
                             if (clock.elapsed() > verification_deadline) {
                                 qCritical("PQ self-payment history did not appear exactly twice"); app.requestShutdown();
                             }

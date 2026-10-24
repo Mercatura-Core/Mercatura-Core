@@ -62,7 +62,9 @@ if(ENABLE_WALLET)
     core_interface bitcoinqt test_util bitcoin_node bitcoin_wallet Boost::headers Qt6::Test
   )
   import_plugins(test_mining-qt)
-  add_test(NAME test_mining-qt COMMAND test_mining-qt)
+  # Retain diagnostics through the large notification burst; heartbeat and
+  # lifecycle assertions keep their existing deadlines.
+  add_test(NAME test_mining-qt COMMAND test_mining-qt -maxwarnings 10000)
   if(WIN32 AND VCPKG_TARGET_TRIPLET)
     set(plugin_path "$<SHELL_PATH:$<PATH:GET_PARENT_PATH,$<PATH:GET_PARENT_PATH,$<TARGET_PROPERTY:Qt6::QWindowsIntegrationPlugin,LOCATION_$<CONFIG>>>>>")
     set_property(TEST test_mining-qt APPEND PROPERTY ENVIRONMENT_MODIFICATION

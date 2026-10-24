@@ -14,6 +14,7 @@
 #include <qt/walletmodel.h>
 #include <test/util/setup_common.h>
 #include <util/string.h>
+#include <validation.h>
 #include <wallet/context.h>
 #include <wallet/test/util.h>
 #include <wallet/wallet.h>
@@ -152,6 +153,79 @@ private Q_SLOTS:
         int row{0};
         for (const auto& transaction : transactions)
             QCOMPARE(table->index(row++, 0).data(TransactionTableModel::TxHashRole).toString(), QString::fromStdString(transaction.tx->GetHash().GetHex()));
+    }
+
+    void transactionStatusChainContention()
+    {
+        TestingSetup setup{ChainType::REGTEST, {.extra_args={"-mercahashv2height=0"}}};
+        setup.m_node.notifications->setChainstateLoaded(true);
+        auto node{interfaces::MakeNode(setup.m_node)};
+        auto loader{interfaces::MakeWalletLoader(*setup.m_node.chain, setup.m_args)};
+        setup.m_node.wallet_loader = loader.get();
+        auto& context{*loader->context()};
+        auto wallet{wallet::TestCreateWallet(wallet::CreateMockableWalletDatabase(), context, wallet::WALLET_FLAG_DESCRIPTORS)};
+        QVERIFY(wallet::AddWallet(context, wallet));
+        OptionsModel options{*node};
+        bilingual_str error;
+        QVERIFY(options.Init(error));
+        ClientModel client{*node, &options};
+        std::unique_ptr<const PlatformStyle> style{PlatformStyle::instantiate("other")};
+        WalletModel model{interfaces::MakeWallet(context, wallet), client, style.get()};
+        MiningSession session{*node};
+        QVERIFY(session.start(&model, 1));
+        QTRY_VERIFY_WITH_TIMEOUT(session.stats().accepted > 0, 10000);
+        session.stop();
+        QTRY_VERIFY_WITH_TIMEOUT(!session.stats().busy, 2000);
+        session.shutdown();
+        wallet->chain().waitForNotifications();
+        auto* table{model.getTransactionTableModel()};
+        QTRY_COMPARE_WITH_TIMEOUT(table->pendingNotificationCount(), size_t{0}, 5000);
+        const auto transactions{model.wallet().getWalletTxs()};
+        QVERIFY(!transactions.empty());
+        const auto hash{transactions.begin()->tx->GetHash()};
+        table->updateTransaction(QString::fromStdString(hash.GetHex()), CT_UPDATED, true);
+        QTRY_COMPARE_WITH_TIMEOUT(table->pendingNotificationCount(), size_t{0}, 5000);
+        QElapsedTimer clock;
+        clock.start();
+        qint64 last_tick{0}, worst_heartbeat{0}, callback_ms{-1};
+        QTimer heartbeat;
+        heartbeat.setInterval(10);
+        connect(&heartbeat, &QTimer::timeout, this, [&] {
+            const auto now{clock.elapsed()};
+            worst_heartbeat = std::max(worst_heartbeat, now - last_tick);
+            last_tick = now;
+        });
+        heartbeat.start();
+        std::atomic<bool> holding{false}, released{false};
+        std::thread holder{[&] {
+            {
+                LOCK(cs_main);
+                holding = true;
+                std::this_thread::sleep_for(std::chrono::seconds{2});
+            }
+            released = true;
+        }};
+        while (!holding) std::this_thread::yield();
+        bool handled{false}, wallet_available{false}, valid_index{false};
+        QTimer::singleShot(0, &model, [&] {
+            const auto begin{clock.elapsed()};
+            interfaces::WalletTx tx;
+            wallet_available = model.wallet().tryGetWalletTx(hash, tx);
+            valid_index = table->index(0, 0).isValid();
+            callback_ms = clock.elapsed() - begin;
+            handled = true;
+        });
+        while (!handled && clock.elapsed() < 5000) QTest::qWait(10);
+        while (!released && clock.elapsed() < 5000) QTest::qWait(10);
+        holder.join();
+        QTest::qWait(20);
+        heartbeat.stop();
+        qInfo().nospace() << "Transaction status chain contention callback_ms=" << callback_ms
+                         << " heartbeat_gap_ms=" << worst_heartbeat << " wallet_available=" << wallet_available;
+        QVERIFY(handled && wallet_available && valid_index);
+        QCOMPARE(session.stats().active_workers, 0U);
+        QVERIFY2(callback_ms < 1000, "Status lookup waited for the chain lock");
+        QVERIFY2(worst_heartbeat < 1000, "Status lookup blocked the GUI heartbeat");
     }
 
     void unrestrictedV2CapacityControls()

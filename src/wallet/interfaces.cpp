@@ -338,8 +338,7 @@ public:
     }
     bool tryGetTxStatus(const Txid& txid,
         interfaces::WalletTxStatus& tx_status,
-        int& num_blocks,
-        int64_t& block_time) override
+        uint256& block_hash) override
     {
         TRY_LOCK(m_wallet->cs_wallet, locked_wallet);
         if (!locked_wallet) {
@@ -349,9 +348,10 @@ public:
         if (mi == m_wallet->mapWallet.end()) {
             return false;
         }
-        num_blocks = m_wallet->GetLastBlockHeight();
-        block_time = -1;
-        CHECK_NONFATAL(m_wallet->chain().findBlock(m_wallet->GetLastBlockHash(), FoundBlock().time(block_time)));
+        // The GUI needs only wallet-cached status. Looking up block time here
+        // took cs_main despite this interface's nonblocking contract, and the
+        // transaction model did not use that time or the separate height.
+        block_hash = m_wallet->GetLastBlockHash();
         tx_status = MakeWalletTxStatus(*m_wallet, mi->second);
         return true;
     }

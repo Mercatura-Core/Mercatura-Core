@@ -192,11 +192,10 @@ public:
     //! Get list of all wallet transactions.
     virtual std::set<WalletTx> getWalletTxs() = 0;
 
-    //! Try to get updated status for a particular transaction, if possible without blocking.
+    //! Try to read transaction status and its wallet-tip snapshot without waiting.
     virtual bool tryGetTxStatus(const Txid& txid,
         WalletTxStatus& tx_status,
-        int& num_blocks,
-        int64_t& block_time) = 0;
+        uint256& block_hash) = 0;
 
     //! Get transaction details.
     virtual WalletTx getWalletTxDetails(const Txid& txid,

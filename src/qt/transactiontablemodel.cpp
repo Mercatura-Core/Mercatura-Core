@@ -237,10 +237,11 @@ public:
             // try to update the status of this transaction from the wallet.
             // Otherwise, simply reuse the cached status.
             interfaces::WalletTxStatus wtx;
-            int numBlocks;
-            int64_t block_time;
-            if (!cur_block_hash.IsNull() && rec->statusUpdateNeeded(cur_block_hash) && wallet.tryGetTxStatus(rec->hash, wtx, numBlocks, block_time)) {
-                rec->updateStatus(wtx, cur_block_hash, numBlocks, block_time);
+            uint256 wallet_tip;
+            if (!cur_block_hash.IsNull() && rec->statusUpdateNeeded(cur_block_hash) && wallet.tryGetTxStatus(rec->hash, wtx, wallet_tip)) {
+                // Key the cache to the wallet state actually read. If wallet
+                // processing trails Core, keep retrying until it catches up.
+                rec->updateStatus(wtx, wallet_tip);
             }
             return rec;
         }
