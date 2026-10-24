@@ -9,6 +9,7 @@
 #include <qt/guiconstants.h>
 #include <qt/guiutil.h>
 #include <qt/optionsmodel.h>
+#include <qt/notificationtiming.h>
 #include <qt/paymentserver.h>
 #include <qt/recentrequeststablemodel.h>
 #include <qt/sendcoinsdialog.h>
@@ -91,6 +92,7 @@ void WalletModel::updateStatus()
 
 void WalletModel::pollBalanceChanged()
 {
+    const GUIUtil::NotificationTiming timing{"wallet_balance_poll"};
     // Avoid recomputing wallet balances unless a TransactionChanged or
     // BlockTip notification was received.
     if (!fForceCheckBalanceChanged && m_cached_last_update_tip == getLastBlockProcessed()) return;

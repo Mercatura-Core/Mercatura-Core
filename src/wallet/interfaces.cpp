@@ -319,6 +319,14 @@ public:
         }
         return {};
     }
+    bool tryGetWalletTx(const Txid& txid, WalletTx& tx) override
+    {
+        TRY_LOCK(m_wallet->cs_wallet, locked_wallet);
+        if (!locked_wallet) return false;
+        const auto it{m_wallet->mapWallet.find(txid)};
+        tx = it == m_wallet->mapWallet.end() ? WalletTx{} : MakeWalletTx(*m_wallet, it->second);
+        return true;
+    }
     std::set<WalletTx> getWalletTxs() override
     {
         LOCK(m_wallet->cs_wallet);

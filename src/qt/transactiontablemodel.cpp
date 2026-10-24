@@ -10,6 +10,7 @@
 #include <qt/guiconstants.h>
 #include <qt/guiutil.h>
 #include <qt/optionsmodel.h>
+#include <qt/notificationtiming.h>
 #include <qt/platformstyle.h>
 #include <qt/transactiondesc.h>
 #include <qt/transactionrecord.h>
@@ -21,7 +22,10 @@
 #include <uint256.h>
 
 #include <algorithm>
+#include <chrono>
+#include <deque>
 #include <functional>
+#include <mutex>
 
 #include <QColor>
 #include <QDateTime>
@@ -30,6 +34,7 @@
 #include <QLatin1Char>
 #include <QLatin1String>
 #include <QList>
+#include <QTimer>
 
 
 // Amount column is right-aligned it contains numbers
@@ -58,28 +63,14 @@ struct TxLessThan
     }
 };
 
-// queue notifications to show a non freezing progress dialog e.g. for rescan
+// Preserve notification order, including changes received during a rescan.
 struct TransactionNotification
 {
-public:
-    TransactionNotification() = default;
-    TransactionNotification(Txid _hash, ChangeType _status, bool _showTransaction):
-        hash(_hash), status(_status), showTransaction(_showTransaction) {}
-
-    void invoke(QObject *ttm)
-    {
-        QString strHash = QString::fromStdString(hash.GetHex());
-        qDebug() << "NotifyTransactionChanged: " + strHash + " status= " + QString::number(status);
-        bool invoked = QMetaObject::invokeMethod(ttm, "updateTransaction", Qt::QueuedConnection,
-                                  Q_ARG(QString, strHash),
-                                  Q_ARG(int, status),
-                                  Q_ARG(bool, showTransaction));
-        assert(invoked);
-    }
-private:
     Txid hash;
     ChangeType status;
     bool showTransaction;
+    std::chrono::steady_clock::time_point queued_at{GUIUtil::NotificationTiming::Enabled() ?
+        std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{}};
 };
 
 // Private implementation
@@ -96,14 +87,30 @@ public:
     //! Local cache of wallet sorted by transaction hash
     QList<TransactionRecord> cachedWallet;
 
-    /** True when model finishes loading all wallet transactions on start */
+    // Core callbacks and the GUI share only this notification state. Never
+    // hold its mutex while reading the wallet or emitting model signals.
+    std::mutex m_notifications_mutex;
     bool m_loaded = false;
-    /** True when transactions are being notified, for instance when scanning */
     bool m_loading = false;
-    std::vector< TransactionNotification > vQueueNotifications;
+    bool m_notification_scheduled{false};
+    std::deque<TransactionNotification> m_notifications;
 
-    void NotifyTransactionChanged(const Txid& hash, ChangeType status);
+    void NotifyTransactionChanged(const Txid& hash, ChangeType status, bool show_transaction = TransactionRecord::showTransaction());
     void DispatchNotifications();
+    void SetLoading(bool loading)
+    {
+        {
+            std::lock_guard lock{m_notifications_mutex};
+            m_loading = loading;
+        }
+        DispatchNotifications();
+    }
+    void StopNotifications()
+    {
+        std::lock_guard lock{m_notifications_mutex};
+        parent = nullptr;
+        m_notifications.clear();
+    }
 
     /* Query entire wallet anew from core.
      */
@@ -117,7 +124,10 @@ public:
                 }
             }
         }
-        m_loaded = true;
+        {
+            std::lock_guard lock{m_notifications_mutex};
+            m_loaded = true;
+        }
         DispatchNotifications();
     }
 
@@ -126,10 +136,9 @@ public:
 
        Call with transaction that was added, removed or changed.
      */
-    void updateWallet(interfaces::Wallet& wallet, const Txid& hash, int status, bool showTransaction)
+    bool updateWallet(interfaces::Wallet& wallet, const Txid& hash, int status, bool showTransaction)
     {
-        qDebug() << "TransactionTablePriv::updateWallet: " + QString::fromStdString(hash.ToString()) + " " + QString::number(status);
-
+        const GUIUtil::NotificationTiming timing{"transaction_update"};
         // Find bounds of this transaction in model
         QList<TransactionRecord>::iterator lower = std::lower_bound(
             cachedWallet.begin(), cachedWallet.end(), hash, TxLessThan());
@@ -147,6 +156,14 @@ public:
                 status = CT_DELETED; /* In model, but want to hide, treat as deleted */
         }
 
+        interfaces::WalletTx wtx;
+        if (status == CT_NEW && !inModel && showTransaction) {
+            const GUIUtil::NotificationTiming lookup{"transaction_lookup"};
+            // Core may still own the wallet lock when its queued notification
+            // is delivered. Keep the notification and retry without blocking.
+            if (!wallet.tryGetWalletTx(hash, wtx)) return false;
+        }
+        qDebug() << "TransactionTablePriv::updateWallet: " + QString::fromStdString(hash.ToString()) + " " + QString::number(status);
         qDebug() << "    inModel=" + QString::number(inModel) +
                     " Index=" + QString::number(lowerIndex) + "-" + QString::number(upperIndex) +
                     " showTransaction=" + QString::number(showTransaction) + " derivedStatus=" + QString::number(status);
@@ -161,8 +178,6 @@ public:
             }
             if(showTransaction)
             {
-                // Find transaction in wallet
-                interfaces::WalletTx wtx = wallet.getWalletTx(hash);
                 if(!wtx.tx)
                 {
                     qWarning() << "TransactionTablePriv::updateWallet: Warning: Got CT_NEW, but transaction is not in wallet";
@@ -204,6 +219,7 @@ public:
             }
             break;
         }
+        return true;
     }
 
     int size()
@@ -213,6 +229,7 @@ public:
 
     TransactionRecord* index(interfaces::Wallet& wallet, const uint256& cur_block_hash, const int idx)
     {
+        const GUIUtil::NotificationTiming timing{"transaction_index"};
         if (idx >= 0 && idx < cachedWallet.size()) {
             TransactionRecord *rec = &cachedWallet[idx];
 
@@ -249,7 +266,7 @@ public:
 TransactionTableModel::TransactionTableModel(const PlatformStyle *_platformStyle, WalletModel *parent):
         QAbstractTableModel(parent),
         walletModel(parent),
-        priv(new TransactionTablePriv(this)),
+        priv(std::make_shared<TransactionTablePriv>(this)),
         platformStyle(_platformStyle)
 {
     subscribeToCoreSignals();
@@ -263,7 +280,7 @@ TransactionTableModel::TransactionTableModel(const PlatformStyle *_platformStyle
 TransactionTableModel::~TransactionTableModel()
 {
     unsubscribeFromCoreSignals();
-    delete priv;
+    priv->StopNotifications();
 }
 
 /** Updates the column title to "Amount (DisplayUnit)" and emits headerDataChanged() signal for table headers to react. */
@@ -276,8 +293,51 @@ void TransactionTableModel::updateAmountColumnTitle()
 void TransactionTableModel::updateTransaction(const QString &hash, int status, bool showTransaction)
 {
     Txid updated = Txid::FromHex(hash.toStdString()).value();
+    priv->NotifyTransactionChanged(updated, static_cast<ChangeType>(status), showTransaction);
+}
 
-    priv->updateWallet(walletModel->wallet(), updated, status, showTransaction);
+size_t TransactionTableModel::pendingNotificationCount() const
+{
+    std::lock_guard lock{priv->m_notifications_mutex};
+    return priv->m_notifications.size();
+}
+
+void TransactionTableModel::processNotifications()
+{
+    const GUIUtil::NotificationTiming timing{"transaction_notification_batch"};
+    const auto start{std::chrono::steady_clock::now()};
+    bool wallet_busy{false};
+    // Yield between short batches so mining statistics, input, Stop and Close
+    // can run even when wallet notifications arrive faster than model updates.
+    for (unsigned int count{0}; count < 32 && std::chrono::steady_clock::now() - start < std::chrono::milliseconds{4}; ++count) {
+        TransactionNotification notification;
+        {
+            std::lock_guard lock{priv->m_notifications_mutex};
+            if (!priv->m_loaded || priv->m_loading || priv->m_notifications.empty()) break;
+            notification = priv->m_notifications.front();
+            setProcessingQueuedTransactions(priv->m_notifications.size() > 10);
+        }
+        const auto delivered{std::chrono::steady_clock::now()};
+        if (!priv->updateWallet(walletModel->wallet(), notification.hash, notification.status, notification.showTransaction)) {
+            wallet_busy = true;
+            break;
+        }
+        if (GUIUtil::NotificationTiming::Enabled())
+            GUIUtil::NotificationTiming::Record("transaction_queue", delivered - notification.queued_at);
+        std::lock_guard lock{priv->m_notifications_mutex};
+        priv->m_notifications.pop_front();
+    }
+    {
+        std::lock_guard lock{priv->m_notifications_mutex};
+        if (priv->m_notifications.empty() || !priv->m_loaded || priv->m_loading) {
+            priv->m_notification_scheduled = false;
+            setProcessingQueuedTransactions(false);
+            return;
+        }
+    }
+    // Exactly one continuation is outstanding. Busy wallets are retried
+    // without spinning, and without holding up the GUI or the mining worker.
+    QTimer::singleShot(wallet_busy ? 20 : 1, this, &TransactionTableModel::processNotifications);
 }
 
 void TransactionTableModel::updateConfirmations()
@@ -673,51 +733,34 @@ void TransactionTableModel::updateDisplayUnit()
     Q_EMIT dataChanged(index(0, Amount), index(priv->size()-1, Amount));
 }
 
-void TransactionTablePriv::NotifyTransactionChanged(const Txid& hash, ChangeType status)
+void TransactionTablePriv::NotifyTransactionChanged(const Txid& hash, ChangeType status, bool show_transaction)
 {
-    // Find transaction in wallet
-    // Determine whether to show transaction or not (determine this here so that no relocking is needed in GUI thread)
-    bool showTransaction = TransactionRecord::showTransaction();
-
-    TransactionNotification notification(hash, status, showTransaction);
-
-    if (!m_loaded || m_loading)
     {
-        vQueueNotifications.push_back(notification);
-        return;
+        std::lock_guard lock{m_notifications_mutex};
+        if (!parent) return;
+        m_notifications.push_back({hash, status, show_transaction});
     }
-    notification.invoke(parent);
+    qDebug() << "NotifyTransactionChanged: " + QString::fromStdString(hash.GetHex()) + " status= " + QString::number(status);
+    DispatchNotifications();
 }
 
 void TransactionTablePriv::DispatchNotifications()
 {
-    if (!m_loaded || m_loading) return;
-
-    if (vQueueNotifications.size() > 10) { // prevent balloon spam, show maximum 10 balloons
-        bool invoked = QMetaObject::invokeMethod(parent, "setProcessingQueuedTransactions", Qt::QueuedConnection, Q_ARG(bool, true));
-        assert(invoked);
-    }
-    for (unsigned int i = 0; i < vQueueNotifications.size(); ++i)
-    {
-        if (vQueueNotifications.size() - i <= 10) {
-            bool invoked = QMetaObject::invokeMethod(parent, "setProcessingQueuedTransactions", Qt::QueuedConnection, Q_ARG(bool, false));
-            assert(invoked);
-        }
-
-        vQueueNotifications[i].invoke(parent);
-    }
-    vQueueNotifications.clear();
+    std::lock_guard lock{m_notifications_mutex};
+    if (!parent || !m_loaded || m_loading || m_notifications.empty() || m_notification_scheduled) return;
+    m_notification_scheduled = true;
+    const bool invoked{QMetaObject::invokeMethod(parent, "processNotifications", Qt::QueuedConnection)};
+    assert(invoked);
 }
 
 void TransactionTableModel::subscribeToCoreSignals()
 {
     // Connect signals to wallet
-    m_handler_transaction_changed = walletModel->wallet().handleTransactionChanged([this](const Txid& hash, ChangeType status) {
-        priv->NotifyTransactionChanged(hash, status);
+    m_handler_transaction_changed = walletModel->wallet().handleTransactionChanged([state = priv](const Txid& hash, ChangeType status) {
+        state->NotifyTransactionChanged(hash, status);
     });
-    m_handler_show_progress = walletModel->wallet().handleShowProgress([this](const std::string&, int progress) {
-        priv->m_loading = progress < 100;
-        priv->DispatchNotifications();
+    m_handler_show_progress = walletModel->wallet().handleShowProgress([state = priv](const std::string&, int progress) {
+        state->SetLoading(progress < 100);
     });
 }
 

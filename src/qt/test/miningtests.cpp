@@ -9,6 +9,7 @@
 #include <qt/miningsession.h>
 #include <qt/optionsmodel.h>
 #include <qt/platformstyle.h>
+#include <qt/transactiontablemodel.h>
 #include <qt/walletcontroller.h>
 #include <qt/walletmodel.h>
 #include <test/util/setup_common.h>
@@ -17,6 +18,7 @@
 #include <wallet/test/util.h>
 #include <wallet/wallet.h>
 #include <wallet/walletdb.h>
+#include <boost/signals2/connection.hpp>
 
 #include <qt/addressbookpage.h>
 #include <qt/addresstablemodel.h>
@@ -40,8 +42,11 @@
 #include <QTimer>
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <functional>
 #include <limits>
+#include <thread>
 
 const std::function<void(const std::string&)> G_TEST_LOG_FUN{};
 const std::function<std::vector<const char*>()> G_TEST_COMMAND_LINE_ARGUMENTS{};
@@ -51,6 +56,104 @@ Q_DECLARE_METATYPE(wallet::AddressPurpose)
 class MiningTests : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    void walletNotificationContention()
+    {
+        TestingSetup setup{ChainType::REGTEST, {.extra_args={"-mercahashv2height=0"}}};
+        setup.m_node.notifications->setChainstateLoaded(true);
+        auto node{interfaces::MakeNode(setup.m_node)};
+        auto loader{interfaces::MakeWalletLoader(*setup.m_node.chain, setup.m_args)};
+        setup.m_node.wallet_loader = loader.get();
+        auto& context{*loader->context()};
+        auto wallet{wallet::TestCreateWallet(wallet::CreateMockableWalletDatabase(), context, wallet::WALLET_FLAG_DESCRIPTORS)};
+        QVERIFY(wallet::AddWallet(context, wallet));
+        OptionsModel options{*node};
+        bilingual_str error;
+        QVERIFY(options.Init(error));
+        ClientModel client{*node, &options};
+        std::unique_ptr<const PlatformStyle> style{PlatformStyle::instantiate("other")};
+        WalletModel model{interfaces::MakeWallet(context, wallet), client, style.get()};
+        MiningSession session{*node};
+        QElapsedTimer clock;
+        clock.start();
+        std::atomic<bool> entered{false}, released{false};
+        std::atomic<qint64> notification_at{-1};
+        // Connected after the real Qt handlers: Core queues the actual newly
+        // mined transaction before this listener holds its wallet lock. This
+        // models a slow wallet listener/storage operation, without a fake hash
+        // provider or a sleep in the miner. The undelayed throughput test is
+        // separate from this deliberately controlled contention test.
+        boost::signals2::scoped_connection hold{wallet->NotifyTransactionChanged.connect([&](const Txid&, ChangeType status) {
+            if (status != CT_NEW || entered.exchange(true)) return;
+            AssertLockHeld(wallet->cs_wallet);
+            notification_at = clock.elapsed();
+            std::this_thread::sleep_for(std::chrono::seconds{2});
+            released = true;
+        })};
+        qint64 last_tick{0}, worst_heartbeat{0}, stop_dispatch{-1}, stop_handler{-1};
+        size_t pending_at_stop{0};
+        QTimer heartbeat;
+        heartbeat.setInterval(10);
+        connect(&heartbeat, &QTimer::timeout, this, [&] {
+            const auto now{clock.elapsed()};
+            worst_heartbeat = std::max(worst_heartbeat, now - last_tick);
+            last_tick = now;
+        });
+        heartbeat.start();
+        QVERIFY(session.start(&model, 1));
+        QTimer stopper;
+        stopper.setInterval(10);
+        connect(&stopper, &QTimer::timeout, this, [&] {
+            const auto notified{notification_at.load()};
+            if (notified < 0 || clock.elapsed() < notified + 100) return;
+            stopper.stop();
+            stop_dispatch = clock.elapsed() - (notified + 100);
+            pending_at_stop = model.getTransactionTableModel()->pendingNotificationCount();
+            const auto start{clock.elapsed()};
+            session.stop();
+            stop_handler = clock.elapsed() - start;
+        });
+        stopper.start();
+        QTRY_VERIFY_WITH_TIMEOUT(stop_handler >= 0, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!session.stats().busy, 5000);
+        session.shutdown();
+        QTRY_VERIFY_WITH_TIMEOUT(released.load(), 5000);
+        wallet->chain().waitForNotifications();
+        const auto transactions{model.wallet().getWalletTxs()};
+        const auto count{transactions.size()};
+        auto* table{model.getTransactionTableModel()};
+        QTRY_COMPARE_WITH_TIMEOUT(table->rowCount({}), static_cast<int>(count), 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(table->pendingNotificationCount(), size_t{0}, 5000);
+        QTest::qWait(20);
+        heartbeat.stop();
+        qInfo().nospace() << "Wallet notification contention heartbeat_gap_ms=" << worst_heartbeat
+                         << " stop_dispatch_ms=" << stop_dispatch << " stop_handler_ms=" << stop_handler
+                         << " wallet_txs=" << qulonglong{count} << " model_rows=" << table->rowCount({})
+                         << " stop_backlog=" << qulonglong{pending_at_stop}
+                         << " accepted=" << session.stats().accepted;
+        QVERIFY(entered && released);
+        QVERIFY(count > 0);
+        QVERIFY(pending_at_stop > 0);
+        QCOMPARE(session.stats().active_workers, 0U);
+        QVERIFY2(worst_heartbeat < 1000, "Wallet notification blocked the GUI for one second");
+        QVERIFY2(stop_dispatch < 1000, "Stop was starved by a wallet notification");
+        QVERIFY2(stop_handler < 1000, "Stop handler blocked for one second");
+        // Repeated status changes must not duplicate rows, and deleting then
+        // re-adding the same real transaction must retain notification order.
+        const auto hash{transactions.begin()->tx->GetHash()};
+        {
+            LOCK(wallet->cs_wallet);
+            for (int i{0}; i < 1000; ++i) wallet->NotifyTransactionChanged(hash, CT_UPDATED);
+        }
+        QCOMPARE(table->pendingNotificationCount(), size_t{1000});
+        table->updateTransaction(QString::fromStdString(hash.GetHex()), CT_DELETED, true);
+        table->updateTransaction(QString::fromStdString(hash.GetHex()), CT_NEW, true);
+        QTRY_COMPARE_WITH_TIMEOUT(table->pendingNotificationCount(), size_t{0}, 5000);
+        QCOMPARE(table->rowCount({}), static_cast<int>(count));
+        int row{0};
+        for (const auto& transaction : transactions)
+            QCOMPARE(table->index(row++, 0).data(TransactionTableModel::TxHashRole).toString(), QString::fromStdString(transaction.tx->GetHash().GetHex()));
+    }
+
     void unrestrictedV2CapacityControls()
     {
         TestingSetup setup{ChainType::REGTEST, {.extra_args={"-mercahashv2height=0"}}};

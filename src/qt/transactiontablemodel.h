@@ -10,6 +10,7 @@
 #include <QAbstractTableModel>
 #include <QStringList>
 
+#include <cstddef>
 #include <memory>
 
 namespace interfaces {
@@ -77,13 +78,14 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
     QModelIndex index(int row, int column, const QModelIndex & parent = QModelIndex()) const override;
     bool processingQueuedTransactions() const { return fProcessingQueuedTransactions; }
+    size_t pendingNotificationCount() const;
 
 private:
     WalletModel *walletModel;
     std::unique_ptr<interfaces::Handler> m_handler_transaction_changed;
     std::unique_ptr<interfaces::Handler> m_handler_show_progress;
     QStringList columns;
-    TransactionTablePriv *priv;
+    std::shared_ptr<TransactionTablePriv> priv;
     bool fProcessingQueuedTransactions{false};
     const PlatformStyle *platformStyle;
 
@@ -104,6 +106,7 @@ private:
 public Q_SLOTS:
     /* New transaction, or transaction changed status */
     void updateTransaction(const QString &hash, int status, bool showTransaction);
+    void processNotifications();
     void updateConfirmations();
     void updateDisplayUnit();
     /** Updates the column title to "Amount (DisplayUnit)" and emits headerDataChanged() signal for table headers to react. */

@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying file COPYING.
 
 #include <qt/miningsession.h>
+#include <qt/notificationtiming.h>
 
 #include <chainparams.h>
 #include <interfaces/handler.h>
@@ -105,6 +106,7 @@ void MiningSession::shutdown()
 }
 void MiningSession::poll()
 {
+    const GUIUtil::NotificationTiming timing{"mining_statistics_poll"};
     if (m_node.shutdownRequested() && stats().busy) stop();
     if (m_unload_token && *m_unload_token) {
         stop();

@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <qt/walletview.h>
+#include <qt/notificationtiming.h>
 #include <qt/miningpage.h>
 
 #include <qt/addressbookpage.h>
@@ -136,6 +137,7 @@ void WalletView::setClientModel(ClientModel *_clientModel)
 
 void WalletView::processNewTransaction(const QModelIndex& parent, int start, int /*end*/)
 {
+    const GUIUtil::NotificationTiming timing{"wallet_incoming_transaction"};
     // Prevent balloon-spam when initial block download is in progress
     if (!clientModel || clientModel->node().isInitialBlockDownload()) {
         return;

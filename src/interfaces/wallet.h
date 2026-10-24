@@ -185,6 +185,10 @@ public:
     //! Get transaction information.
     virtual WalletTx getWalletTx(const Txid& txid) = 0;
 
+    //! Try to read transaction information without waiting for the wallet lock.
+    //! Return false when busy; true with an empty tx when the transaction is absent.
+    virtual bool tryGetWalletTx(const Txid& txid, WalletTx& tx) = 0;
+
     //! Get list of all wallet transactions.
     virtual std::set<WalletTx> getWalletTxs() = 0;
 

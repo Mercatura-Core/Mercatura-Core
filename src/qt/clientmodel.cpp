@@ -9,6 +9,7 @@
 #include <qt/bantablemodel.h>
 #include <qt/guiconstants.h>
 #include <qt/guiutil.h>
+#include <qt/notificationtiming.h>
 #include <qt/peertablemodel.h>
 #include <qt/peertablesortproxy.h>
 
@@ -225,6 +226,7 @@ QString ClientModel::blocksDir() const
 
 void ClientModel::TipChanged(SynchronizationState sync_state, interfaces::BlockTip tip, double verification_progress, SyncType synctype)
 {
+    const GUIUtil::NotificationTiming timing{"client_tip_notification"};
     if (synctype == SyncType::HEADER_SYNC) {
         // cache best headers time and height to reduce future cs_main locks
         cachedBestHeaderHeight = tip.block_height;

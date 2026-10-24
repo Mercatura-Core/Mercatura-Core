@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying file COPYING.
 
 #include <qt/miningpage.h>
+#include <qt/notificationtiming.h>
 
 #include <chainparams.h>
 #include <pow.h>
@@ -235,6 +236,7 @@ void MiningPage::setClientModel(ClientModel* client) { m_client = client; update
 void MiningPage::setPrivacy(bool privacy) { m_privacy = privacy; updateStatus(); }
 void MiningPage::updateStatus()
 {
+    const GUIUtil::NotificationTiming timing{"mining_page_status"};
     const mining::MiningStats stats{m_session ? m_session->stats() : mining::MiningStats{}};
     const bool running{stats.busy};
     // UI preview only. The provider resolves the actual template's parent,

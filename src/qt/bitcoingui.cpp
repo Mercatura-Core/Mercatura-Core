@@ -5,6 +5,7 @@
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
 #include <qt/bitcoingui.h>
+#include <qt/notificationtiming.h>
 
 #include <qt/bitcoinunits.h>
 #include <qt/clientmodel.h>
@@ -1142,6 +1143,7 @@ void BitcoinGUI::openOptionsDialogWithTab(OptionsDialog::Tab tab)
 
 void BitcoinGUI::setNumBlocks(int count, const QDateTime& blockDate, double nVerificationProgress, SyncType synctype, SynchronizationState sync_state)
 {
+    const GUIUtil::NotificationTiming timing{"gui_block_tip"};
 // Disabling macOS App Nap on initial sync, disk and reindex operations.
 #ifdef Q_OS_MACOS
     if (sync_state == SynchronizationState::POST_INIT) {
