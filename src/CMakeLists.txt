@@ -209,6 +209,8 @@ add_library(bitcoin_node STATIC EXCLUDE_FROM_ALL
   mapport.cpp
   net.cpp
   net_pq_protocol.cpp
+  net_pq.cpp
+  net_pq_identity.cpp
   net_processing.cpp
   netgroup.cpp
   node/abort.cpp

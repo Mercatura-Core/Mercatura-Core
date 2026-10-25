@@ -78,6 +78,7 @@ add_executable(test_bitcoin
   net_peer_eviction_tests.cpp
   net_tests.cpp
   pq_p2p_tests.cpp
+  pq_transport_tests.cpp
   netbase_tests.cpp
   node_init_tests.cpp
   node_warnings_tests.cpp
@@ -175,7 +176,8 @@ target_raw_data_sources(test_bitcoin NAMESPACE test::data
 
 add_windows_application_manifest(test_bitcoin)
 
-# Small independent runner for the permanent protocol/primitive tests.
+# Small independent runner: exercises the very same permanent protocol tests
+# without waiting for the complete node/unit-test executable to link.
 add_executable(pq_stagea_tests EXCLUDE_FROM_ALL
   ../../contrib/devtools/pq-stagea-test-main.cpp
   pq_p2p_tests.cpp
@@ -186,6 +188,12 @@ target_json_data_sources(pq_stagea_tests
   data/pq_p2p_candidate1.json
   data/pq_p2p_packets.json
 )
+
+add_executable(pq_transport_runner EXCLUDE_FROM_ALL
+  ../../contrib/devtools/pq-stagea-test-main.cpp
+  pq_transport_tests.cpp
+)
+target_link_libraries(pq_transport_runner PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
 
 add_executable(pq_fuzz_smoke EXCLUDE_FROM_ALL
   ../../contrib/devtools/pq-fuzz-smoke.cpp

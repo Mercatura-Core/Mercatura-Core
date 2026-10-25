@@ -6,6 +6,7 @@
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
 #include <net.h>
+#include <net_pq.h>
 
 #include <addrdb.h>
 #include <addrman.h>
@@ -543,6 +544,7 @@ CNode* CConnman::ConnectNode(CAddress addrConnect,
                                     .i2p_sam_session = std::move(i2p_transient_session),
                                     .recv_flood_size = nReceiveFloodSize,
                                     .use_v2transport = use_v2transport,
+                                    .pq_context = m_pq_context,
                                 });
         pnode->AddRef();
 
@@ -558,6 +560,7 @@ CNode* CConnman::ConnectNode(CAddress addrConnect,
 void CNode::CloseSocketDisconnect()
 {
     fDisconnect = true;
+    m_transport->Disconnect();
     LOCK(m_sock_mutex);
     if (m_sock) {
         LogDebug(BCLog::NET, "Resetting socket for peer=%d%s", GetId(), LogIP(fLogIPs));
@@ -647,6 +650,10 @@ void CNode::CopyStats(CNodeStats& stats)
         Transport::Info info = m_transport->GetInfo();
         stats.m_transport_type = info.transport_type;
         if (info.session_id) stats.m_session_id = HexStr(*info.session_id);
+        stats.m_pq_encrypted = info.pq_encrypted;
+        stats.m_pq_authenticated = info.pq_authenticated;
+        stats.m_pq_identity_verified = info.pq_identity_verified;
+        stats.m_pq_identity = info.pq_identity;
     }
     X(m_permission_flags);
 
@@ -1818,6 +1825,13 @@ void CConnman::CreateNodeFromAcceptedSocket(std::unique_ptr<Sock>&& sock,
 
     if (nInbound >= m_max_inbound)
     {
+        if (m_pq_context) {
+            // A new TCP peer has not authenticated yet. Stage A must not
+            // evict an established peer merely to admit an incomplete PQ
+            // handshake; normal capacity becomes available on disconnect.
+            m_pq_context->ReportFailure("inbound capacity reached; incomplete PQ handshake cannot evict existing peers");
+            return;
+        }
         if (!AttemptToEvictConnection()) {
             // No connection to evict, disconnect the new connection
             LogDebug(BCLog::NET, "failed to find an eviction candidate - connection dropped (full)\n");
@@ -1853,6 +1867,7 @@ void CConnman::CreateNodeFromAcceptedSocket(std::unique_ptr<Sock>&& sock,
                                  .prefer_evict = discouraged,
                                  .recv_flood_size = nReceiveFloodSize,
                                  .use_v2transport = use_v2transport,
+                                 .pq_context = m_pq_context,
                              });
     pnode->AddRef();
     m_msgproc->InitializeNode(*pnode, local_services);
@@ -2078,6 +2093,7 @@ Sock::EventsPerSock CConnman::GenerateWaitSockets(std::span<CNode* const> nodes)
     }
 
     for (CNode* pnode : nodes) {
+        if (!pnode->m_transport->Poll()) { pnode->fDisconnect = true; continue; }
         bool select_recv = !pnode->fPauseRecv;
         bool select_send;
         {
@@ -3661,6 +3677,7 @@ void CConnman::StopThreads()
         threadDNSAddressSeed.join();
     if (threadSocketHandler.joinable())
         threadSocketHandler.join();
+    if (m_pq_context) m_pq_context->Stop();
 }
 
 void CConnman::StopNodes()
@@ -4037,8 +4054,17 @@ ServiceFlags CConnman::GetLocalServices() const
     return m_local_services;
 }
 
-static std::unique_ptr<Transport> MakeTransport(NodeId id, bool use_v2transport, bool inbound) noexcept
+static std::unique_ptr<Transport> MakeTransport(NodeId id, bool use_v2transport, bool inbound, const std::shared_ptr<pq::Context>& pq_context, const CAddress& address, const std::string& name, bool anonymous) noexcept
 {
+    if (pq_context) {
+        std::optional<pq::Digest> pin;
+        if (!inbound) {
+            const auto dest = name.empty() ? address.ToStringAddrPort() : name;
+            auto it = pq_context->pins.find(dest);
+            if (it != pq_context->pins.end()) pin = it->second;
+        }
+        return std::make_unique<pq::PQTransport>(pq_context, !inbound, pin, pq::SourceGroup(address, anonymous));
+    }
     if (use_v2transport) {
         return std::make_unique<V2Transport>(id, /*initiating=*/!inbound);
     } else {
@@ -4057,7 +4083,7 @@ CNode::CNode(NodeId idIn,
              bool inbound_onion,
              uint64_t network_key,
              CNodeOptions&& node_opts)
-    : m_transport{MakeTransport(idIn, node_opts.use_v2transport, conn_type_in == ConnectionType::INBOUND)},
+    : m_transport{MakeTransport(idIn, node_opts.use_v2transport, conn_type_in == ConnectionType::INBOUND, node_opts.pq_context, addrIn, addrNameIn, inbound_onion)},
       m_permission_flags{node_opts.permission_flags},
       m_sock{sock},
       m_connected{GetTime<std::chrono::seconds>()},
