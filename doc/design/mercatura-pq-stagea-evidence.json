@@ -1,0 +1,68 @@
+{
+  "network": "isolated loopback regtest",
+  "txid": "61817cd1757412e33a64926190c41da3a93406861b2a20d695be53ee097fa456",
+  "relayed_block": "fafa59db9b6ad3ae14272a8e26f1b8749b03622fb7833b0759a7ef87af647931",
+  "height": 102,
+  "handshake_bytes": 15488,
+  "ephemeral_reconnect_changed_identities": true,
+  "wrong_pin_rejected_without_fallback": true,
+  "connection_including_version_pong_ms": 260.84441599959973,
+  "reconnection_including_version_pong_ms": 262.3782560003747,
+  "peers": [
+    {
+      "transport_protocol_type": "pq-v1",
+      "session_id": "4132848b334b11ef3e9d8ecaea8d33b9fe460f736c9142d25169a2ebdd49dc87",
+      "inbound": true,
+      "pq_encrypted": true,
+      "pq_authenticated": true,
+      "pq_identity_verified": false,
+      "pq_identity": "mcapq1:12a09a3f1305259c04149570d4343cc093c601491aa69e2a7ef0b49362f813e76261b2537e99a6bc8e5b072ae8d57d3d",
+      "pq_kem": "ML-KEM-768",
+      "pq_auth_algorithm": "ML-DSA-65",
+      "bytesrecv": 8920,
+      "bytesrecv_per_msg": {
+        "feefilter": 29,
+        "getaddr": 33,
+        "getheaders": 634,
+        "headers": 103,
+        "ping": 29,
+        "pong": 29,
+        "sendaddrv2": 33,
+        "sendcmpct": 30,
+        "sendheaders": 33,
+        "verack": 33,
+        "version": 151,
+        "wtxidrelay": 33
+      }
+    },
+    {
+      "transport_protocol_type": "pq-v1",
+      "session_id": "4132848b334b11ef3e9d8ecaea8d33b9fe460f736c9142d25169a2ebdd49dc87",
+      "inbound": false,
+      "pq_encrypted": true,
+      "pq_authenticated": true,
+      "pq_identity_verified": true,
+      "pq_identity": "mcapq1:df0ca8cb3866c7043c3c740822187278c24002e3f8ad66da4aa146d4c06e81935ea2b813813bbf433c28aa7e47825e44",
+      "pq_kem": "ML-KEM-768",
+      "pq_auth_algorithm": "ML-DSA-65",
+      "bytesrecv": 8875,
+      "bytesrecv_per_msg": {
+        "feefilter": 29,
+        "getheaders": 634,
+        "headers": 103,
+        "ping": 29,
+        "pong": 29,
+        "sendaddrv2": 33,
+        "sendcmpct": 30,
+        "sendheaders": 33,
+        "verack": 33,
+        "version": 151,
+        "wtxidrelay": 33
+      }
+    }
+  ],
+  "result": "PASS",
+  "implementation_commit": "2682b2987a968f2cbd3b22ce4d7961277ec3d61f",
+  "test": "test/functional/feature_pq_transport.py",
+  "public_test_evidence_only": true
+}

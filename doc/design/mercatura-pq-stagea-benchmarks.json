@@ -1,0 +1,175 @@
+{
+  "implementation_commit": "2682b2987a968f2cbd3b22ce4d7961277ec3d61f",
+  "hardware": {
+    "cpu": "Intel Xeon Platinum 8573C",
+    "architecture": "x86_64",
+    "cpu_quota": 2,
+    "memory_limit_bytes": 8589934592,
+    "kernel": "Linux 6.18.55",
+    "compiler": "GCC 14.2.0",
+    "normal_build": "Release -O2",
+    "note": "Managed Debian 13 host; not the user Ryzen/WSL2 machine"
+  },
+  "in_memory": {
+    "method": "12 complete handshakes per mode; 1024 16-KiB messages per transport (16 MiB), encryption/decryption and message codec; separate PQ packet wrapper loop; four concurrent PQ sessions using a two-worker pool",
+    "results": {
+      "bip324": {
+        "samples": 12,
+        "median_ms": 0.272073,
+        "max_ms": 0.482183,
+        "process_cpu_ms": 3.616,
+        "min_handshake_bytes": 1053,
+        "max_handshake_bytes": 7550
+      },
+      "pq": {
+        "samples": 12,
+        "median_ms": 2.931053,
+        "max_ms": 5.807149,
+        "process_cpu_ms": 35.443,
+        "min_handshake_bytes": 15488,
+        "max_handshake_bytes": 15488
+      },
+      "bip324_transport_mib_per_second": 169.1226982004394,
+      "pq_transport_mib_per_second": 164.1311549080508,
+      "pq_encrypt_decrypt_mib_per_second": 181.9872583213475,
+      "crypto_jobs": 65,
+      "max_job_us": 3335,
+      "worker_0_stack_reservation": 1048576,
+      "worker_1_stack_reservation": 1048576,
+      "peak_pending": 2,
+      "peak_queue": 1,
+      "handshake_object_bytes": 6416,
+      "identity_object_bytes": 5984,
+      "four_concurrent_pq_sessions": {
+        "sessions": 4,
+        "wall_ms": 4.366097,
+        "process_cpu_ms": 9.013,
+        "observed_peak_active": 2,
+        "peak_queue": 3,
+        "peak_pending": 8
+      }
+    }
+  },
+  "real_nodes": {
+    "platform": "Linux-6.18.55-x86_64-with-glibc2.41",
+    "method": "4 isolated loopback regtest nodes; 4 connection samples/mode including RPC, TCP, transport, version and pong; 50 idle RPC samples; 4 RPC-generated regtest blocks as optional load diagnostic",
+    "limitations": [
+      "Small local diagnostic; not a statistical capacity or endurance qualification",
+      "RPC block generation is not MercaHash V2 native CPU/GPU branch qualification",
+      "No realistic multi-host latency, public discovery, partitions or lower-power host qualification"
+    ],
+    "bip324": {
+      "connection_ms": [
+        177.83952399986447,
+        150.89823699963745,
+        63.71736800065264,
+        116.09277699972154
+      ],
+      "connection_median_ms": 133.4955069996795,
+      "handshake_bytes": [
+        6051,
+        1031,
+        5503,
+        1864
+      ],
+      "node_metrics_after_connections": [
+        {
+          "VmSize_kib": 862776,
+          "VmHWM_kib": 184192,
+          "VmRSS_kib": 184192,
+          "cpu_seconds": 0.76
+        },
+        {
+          "VmSize_kib": 928312,
+          "VmHWM_kib": 184348,
+          "VmRSS_kib": 184348,
+          "cpu_seconds": 0.75
+        }
+      ],
+      "combined_cpu_seconds_for_connections": 0.06000000000000005,
+      "connection_window_seconds_including_pacing": 3.8785345850010344,
+      "idle_getpeerinfo_median_ms": 0.8258360012405319,
+      "idle_getpeerinfo_max_ms": 1.7205990006914362,
+      "getpeerinfo_under_rpc_block_generation": {
+        "samples": 90,
+        "median_ms": 1.3403694974840619,
+        "max_ms": 455.6152769982873
+      },
+      "node_metrics_after_rpc_block_generation": [
+        {
+          "VmSize_kib": 865304,
+          "VmHWM_kib": 318456,
+          "VmRSS_kib": 187736,
+          "cpu_seconds": 2.85
+        },
+        {
+          "VmSize_kib": 1061916,
+          "VmHWM_kib": 318532,
+          "VmRSS_kib": 318532,
+          "cpu_seconds": 2.75
+        }
+      ]
+    },
+    "pq": {
+      "connection_ms": [
+        213.25377700122772,
+        187.07509199884953,
+        212.15288199891802,
+        215.50443800151697
+      ],
+      "connection_median_ms": 212.70332950007287,
+      "handshake_bytes": [
+        15488,
+        15488,
+        15488,
+        15488
+      ],
+      "node_metrics_after_connections": [
+        {
+          "VmSize_kib": 995904,
+          "VmHWM_kib": 184084,
+          "VmRSS_kib": 184084,
+          "cpu_seconds": 0.7
+        },
+        {
+          "VmSize_kib": 995904,
+          "VmHWM_kib": 184220,
+          "VmRSS_kib": 184220,
+          "cpu_seconds": 0.7
+        }
+      ],
+      "combined_cpu_seconds_for_connections": 0.05999999999999983,
+      "connection_window_seconds_including_pacing": 4.152905120001378,
+      "idle_getpeerinfo_median_ms": 0.9986750010284595,
+      "idle_getpeerinfo_max_ms": 2.5595570004952606,
+      "getpeerinfo_under_rpc_block_generation": {
+        "samples": 152,
+        "median_ms": 0.9088935003092047,
+        "max_ms": 156.78845099682803
+      },
+      "node_metrics_after_rpc_block_generation": [
+        {
+          "VmSize_kib": 998432,
+          "VmHWM_kib": 318432,
+          "VmRSS_kib": 187644,
+          "cpu_seconds": 3.13
+        },
+        {
+          "VmSize_kib": 1129508,
+          "VmHWM_kib": 318468,
+          "VmRSS_kib": 318468,
+          "cpu_seconds": 2.41
+        }
+      ]
+    }
+  },
+  "limitations": [
+    "Small local samples, no statistical performance claim",
+    "Node connection timings include RPC, TCP, transport, version and pong",
+    "CPU counters from /proc have clock-tick granularity; memory is whole-process RSS/high-water/virtual reservation",
+    "Virtual reservations include allocator arenas and thread runtime, not just the explicit 1 MiB worker stacks",
+    "Block-generation responsiveness is a separate four-regtest-block diagnostic, not normal block cadence or native MercaHash V2 CPU/GPU qualification",
+    "In-memory throughput is not measured TCP/WAN throughput",
+    "No endurance, partition, NAT/Tor/IPv6 or lower-power-host qualification is inferred"
+  ]
+}

@@ -56,8 +56,10 @@ to apply to Mercatura.
 ## Development
 
 - [PQ P2P source audit and integration plan](design/mercatura-pq-audit.md)
-- [PQ P2P Transport v1 candidate specification (awaiting approval)](design/mercatura-pq-transport-v1.md)
+- [PQ P2P Transport v1 specification (conditional isolated Stage A approval)](design/mercatura-pq-transport-v1.md)
 - [PQ checkpoint validation and outstanding security gates](design/mercatura-pq-validation.md)
+- [Experimental PQ P2P Stage A operation and implementation](design/mercatura-pq-stagea.md)
+- [Stage A validation evidence and remaining gates](design/mercatura-pq-stagea-validation.md)
 
 The repository [README](/README.md) contains the primary project overview,
 development status, and consensus summary.

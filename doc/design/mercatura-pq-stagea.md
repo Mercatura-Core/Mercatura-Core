@@ -148,7 +148,8 @@ holding backpressure allocations. No BIP324 ECDH initializer is repurposed.
 
 ## Reproducing checks
 
-The exact evidence and limitations belong in the Stage A validation report.
+The exact evidence and limitations are recorded in the
+[Stage A validation report](mercatura-pq-stagea-validation.md).
 Useful commands from the repository root are:
 
 ```sh
