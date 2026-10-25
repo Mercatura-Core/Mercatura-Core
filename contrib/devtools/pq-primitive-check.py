@@ -73,7 +73,7 @@ def build(args):
         subprocess.run([args.cc, "-std=c99", *flags, *kem_flags, "-c", str(source / "mlkem/mlkem_native.c"), "-o", str(obj)], check=True)
         objects.append(str(obj))
     binary = dest / "pq-primitive-driver"
-    sources = ["crypto/sha3.cpp", "crypto/hmac_sha3_384.cpp", "crypto/hkdf_sha3_384.cpp"]
+    sources = ["crypto/sha3.cpp", "crypto/hmac_sha3_384.cpp", "crypto/hkdf_sha3_384.cpp", "support/cleanse.cpp"]
     subprocess.run([args.cxx, "-std=c++20", *flags, *include, *kem_flags, str(ROOT / "contrib/devtools/pq-primitive-driver.cpp"), *(str(ROOT / "src" / s) for s in sources), *objects, "-o", str(binary)], check=True)
     return binary
 

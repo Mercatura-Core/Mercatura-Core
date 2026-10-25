@@ -22,6 +22,7 @@ public:
     static constexpr size_t BLOCK_SIZE = 104;
 
     CHMAC_SHA3_384(const unsigned char* key, size_t keylen);
+    ~CHMAC_SHA3_384();
 
     CHMAC_SHA3_384& Write(std::span<const unsigned char> data)
     {

@@ -59,10 +59,13 @@ Digest MAC(std::span<const uint8_t> key, std::span<const uint8_t> msg)
     Digest out;
     CHMAC_SHA3_384 state(key.data(), key.size());
     state.Write(msg).Finalize(out);
-    memory_cleanse(&state, sizeof(state));
     return out;
 }
-Digest Extract(std::span<const uint8_t> salt, std::span<const uint8_t> ikm) { return MAC(salt, ikm); }
+void Extract(std::span<const uint8_t> salt, std::span<const uint8_t> ikm, std::span<uint8_t,48> prk)
+{
+    CHMAC_SHA3_384 state(salt.data(),salt.size());
+    state.Write(ikm).Finalize(prk);
+}
 bool Expand(std::span<const uint8_t> prk, std::span<const uint8_t> info, std::span<uint8_t> out)
 {
     if (prk.size() != 48 || out.size() > 255 * 48) return false;
@@ -73,7 +76,6 @@ bool Expand(std::span<const uint8_t> prk, std::span<const uint8_t> info, std::sp
         if (pos) state.Write(t.bytes);
         const uint8_t c = counter;
         state.Write(info).Write({&c, 1}).Finalize(t.bytes);
-        memory_cleanse(&state, sizeof(state));
         const auto count = std::min(size_t{48}, out.size() - pos);
         std::copy_n(t.bytes.begin(), count, out.begin() + pos);
         pos += count;

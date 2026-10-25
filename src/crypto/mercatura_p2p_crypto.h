@@ -42,7 +42,7 @@ struct Identity {
     bool Sign(std::span<const uint8_t> msg, Signature& sig, const Random& rng) const;
 };
 bool Verify(std::span<const uint8_t> pub, std::span<const uint8_t> msg, std::span<const uint8_t> sig);
-Digest Extract(std::span<const uint8_t> salt, std::span<const uint8_t> ikm);
+void Extract(std::span<const uint8_t> salt, std::span<const uint8_t> ikm, std::span<uint8_t,48> prk);
 bool Expand(std::span<const uint8_t> prk, std::span<const uint8_t> info, std::span<uint8_t> out);
 Digest MAC(std::span<const uint8_t> key, std::span<const uint8_t> msg);
 bool Equal(std::span<const uint8_t> a, std::span<const uint8_t> b);

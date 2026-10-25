@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <crypto/hmac_sha3_384.h>
+#include <support/cleanse.h>
 
 #include <algorithm>
 #include <array>
@@ -14,11 +15,12 @@ CHMAC_SHA3_384::CHMAC_SHA3_384(const unsigned char* key, size_t keylen)
 
     if (keylen > BLOCK_SIZE) {
         std::array<unsigned char, OUTPUT_SIZE> key_hash{};
-        SHA3_384()
-            .Write(std::span<const unsigned char>{key, keylen})
-            .Finalize(key_hash);
+        SHA3_384 key_hasher;
+        key_hasher.Write(std::span<const unsigned char>{key, keylen}).Finalize(key_hash);
+        memory_cleanse(&key_hasher, sizeof(key_hasher));
 
         std::copy(key_hash.begin(), key_hash.end(), key_block.begin());
+        memory_cleanse(key_hash.data(), key_hash.size());
     } else if (keylen != 0) {
         std::copy(key, key + keylen, key_block.begin());
     }
@@ -33,7 +35,12 @@ CHMAC_SHA3_384::CHMAC_SHA3_384(const unsigned char* key, size_t keylen)
 
     m_inner.Write(inner_pad);
     m_outer.Write(outer_pad);
+    memory_cleanse(key_block.data(), key_block.size());
+    memory_cleanse(inner_pad.data(), inner_pad.size());
+    memory_cleanse(outer_pad.data(), outer_pad.size());
 }
+
+CHMAC_SHA3_384::~CHMAC_SHA3_384() { memory_cleanse(this, sizeof(*this)); }
 
 void CHMAC_SHA3_384::Finalize(std::span<unsigned char> hash)
 {
@@ -44,4 +51,5 @@ void CHMAC_SHA3_384::Finalize(std::span<unsigned char> hash)
 
     m_outer.Write(inner_hash);
     m_outer.Finalize(hash);
+    memory_cleanse(inner_hash.data(), inner_hash.size());
 }
