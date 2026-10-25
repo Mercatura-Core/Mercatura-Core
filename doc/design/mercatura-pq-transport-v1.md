@@ -1,11 +1,14 @@
 # Mercatura PQ P2P Transport v1 — candidate 1
 
-**UNAPPROVED DESIGN. No custom handshake or production transport is implemented.**
-This is the byte-exact candidate submitted for the handoff's P2 checkpoint.
-The constants and public fixtures identify this candidate for review; maintainer
-approval must name the document revision/commit. Any protocol change requires
-new fixtures and renewed approval before implementation. Approval is not an
-independent security audit or deployment authorization.
+**APPROVED WITH REQUIRED CHANGES — ISOLATED STAGE A DEVELOPMENT ONLY.**
+The October 25, 2026 maintainer handoff conditionally approved the candidate at
+`f268f94c209c44f6ffc6a544a7f0866bb441120e`. This revision resolves the M3
+processing-order and identity-policy corrections and makes permanent packet
+vectors a prerequisite for validated application traffic. The five-message wire
+format, signing inputs and key schedule are unchanged. Packet vectors may be
+developed alongside P3/P4 but must pass before accepting encrypted application
+traffic as validated. Fundamental cryptographic changes require renewed review.
+This approval is neither an independent security audit nor deployment approval.
 
 Read the [source audit](mercatura-pq-audit.md), [dependency manifest](mercatura-pq-dependencies.json),
 [validation report](mercatura-pq-validation.md), and [permanent candidate fixtures](../../src/test/data/pq_p2p_candidate1.json).
@@ -182,8 +185,23 @@ Header hex: `03000100010000002d110000`.
 | 1088 | 3,309 | `sig_I`, defined in section 6 |
 
 Body 4,397 bytes; total 4,409. I decapsulates `ct_R` with `dk_I`, obtains
-`ss_R`, and generates `(ct_I,ss_I)` with new encapsulation coins. R then
-decapsulates `ct_I` with `dk_R`, obtains `ss_I`, and verifies sig_I.
+`ss_R`, and generates `(ct_I,ss_I)` with new encapsulation coins. R MUST use
+this authoritative processing order before producing M4:
+
+1. Receive the complete M3 record.
+2. Check expected state, type, role, version, suite, flags and exact length.
+3. Recheck the accepted M1/M2 materials and local network binding.
+4. Reject any expected-identity mismatch against the identity in M1.
+5. Reconstruct the exact initiator signature message from section 6.
+6. Verify sig_I with the presented ML-DSA-65 key and exact CTX.
+7. Only after successful verification, decapsulate ct_I with dk_R.
+8. Derive the shared key schedule.
+9. Produce sig_R and confirm_R.
+10. Queue M4.
+
+Invalid authentication never reaches responder M3 decapsulation. Verification
+itself is expensive and remains subject to bounded worker/admission limits.
+These steps change local processing order only, not transcript bytes or KDF.
 
 ### M4 — R to I, ResponderAuthenticationAndConfirmation
 
@@ -434,7 +452,7 @@ secret buffers erased.
 | I INITIAL | admitted local job produces new keys/M1 | SEND_M1 (P+M1), then WAIT_M2 |
 | R DETECTING | exact P, valid complete M1, admission | CHECK_M1/MAKE_M2; then SEND_M2 (P+M2), then WAIT_M3 |
 | I WAIT_M2 | exact P + valid complete M2, early expected-key check | CHECK_M2/MAKE_M3; then SEND_M3, then WAIT_M4 |
-| R WAIT_M3 | complete valid M3, sig_I and pin verified, KEM success | MAKE_M4; SEND_M4, then WAIT_M5 |
+| R WAIT_M3 | complete M3; structure/network checks; expected pin; sig_I verified; then KEM decapsulation/schedule | MAKE_M4; SEND_M4, then WAIT_M5 |
 | I WAIT_M4 | complete valid M4, sig_R/pin/confirm_R verified | MAKE_M5; SEND_M5 |
 | I SEND_M5 | all M5 bytes reported by MarkBytesSent | ESTABLISHED; application send/receive enabled |
 | R WAIT_M5 | complete M5 and valid confirm_I | ESTABLISHED; application send/receive enabled |
@@ -518,7 +536,8 @@ service or a pinned peer. There is no wallet dependency, unlocking requirement,
 TOFU database, implicit pin, or correlation across networks. Public identity
 keys and signatures are sent in cleartext during this candidate handshake.
 Persistent keys are therefore correlatable by passive and active observers.
-This privacy cost is deliberate and requires approval; Tor hides IP origin but
+This privacy cost is provisionally accepted for isolated Stage A engineering;
+it is not final production identity-security approval. Tor hides IP origin but
 does not hide an exposed stable identity. Operators needing identity privacy
 must not select persistence without understanding this limitation.
 
@@ -537,7 +556,12 @@ checksum and recomputed keypair/public-key equality before signing. A missing
 explicit persistent file is a startup error; create it only through an explicit
 generation operation. Never silently regenerate on corruption or key loss.
 Seed storage is unencrypted at rest in this candidate and requires filesystem
-protection; encryption-at-rest would need a separately reviewed unlock design.
+protection. Restrictive permissions do not provide encryption at rest. This
+policy is provisionally accepted only for isolated experimental testing;
+encryption-at-rest would need a separately reviewed unlock design. Networking
+identity keys must never come from transaction wallets. Persistent identities
+and pins must never be silently replaced, and unpinned key possession must never
+be described as verification of the expected remote node.
 
 Linux/macOS creation uses an exclusive owner-only temporary file in the same
 directory, mode 0600, protected directory, full write, fsync/FileCommit, atomic
@@ -746,7 +770,24 @@ candidate fixture digest and signing semantics. Before interoperability claims,
 obtain a second independently implemented fixture/packet derivation and exercise
 the full negative matrix against real transports. No formal model has been run.
 
-Required reviewer decisions:
+### Stage A correction B acceptance gate
+
+Permanent packet fixtures must cover initial directional keys, exact AAD and
+role, length encryption, AEAD, zero-based counters, partial writes and complete
+reconstruction; tampered lengths/tags/AAD, invalid controls, empty/oversized
+messages, independent directions, packet/epoch counters, packet 223/224 and
+multiple 224-packet rekey boundaries. AEAD failure is terminal and releases no
+plaintext. Derive reference bytes independently of the final transport wrapper
+where possible and compare with the existing FS cipher classes. A discrepancy
+with frozen cryptographic semantics blocks the affected work pending renewed
+approval; changing cipher semantics to pass tests is prohibited.
+
+The maintainer reports independent verification of the candidate record lengths,
+15,488-byte budget, transcript/signature inputs, HKDF, confirmations and traffic
+keys. That review did not independently reverify ML-KEM/ML-DSA implementations
+or establish a formal AKE proof. Candidate fixtures remain unchanged.
+
+Required reviewer decisions for any broader qualification:
 
 - Accept or revise the complete custom AKE, ordering of two ephemeral KEM
   contributions, Pure ML-DSA transcript signing, HKDF concatenation, M4/M5
