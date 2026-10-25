@@ -241,6 +241,22 @@ def check_openssl_hkdf():
     return 12
 
 
+def check_mldsa_signature_acvp(driver):
+    fixture = json.loads((ROOT / "src/test/data/pq_p2p_mldsa_acvp.json").read_text())
+    count = 0
+    for group in fixture["groups"]:
+        for test in group["tests"]:
+            b = lambda key: bytes.fromhex(test[key])
+            label = f"NIST Pure ML-DSA tgId={group['tgId']} tcId={test['tcId']}"
+            if group["operation"] == "sigGen":
+                require(driver.call("dsa-sign", b("message"), b("context"), b("rnd"), b("sk")) == ["1", test["signature"]], label + " full signature mismatch")
+                require(driver.call("dsa-verify", b("signature"), b("message"), b("context"), b("pk")) == ["1"], label + " generated signature rejected")
+            else:
+                require(driver.call("dsa-verify", b("signature"), b("message"), b("context"), b("pk")) == ["1" if test["testPassed"] else "0"], label + " verification result mismatch")
+            count += 1
+    return count
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--work-dir", type=Path, required=True)
@@ -259,9 +275,10 @@ def main():
         upstream = check_upstream_kat(driver, args.mlkem_source.resolve()) if args.mlkem_source else 0
         candidate = check_candidate_primitives(driver)
         openssl_hkdf = check_openssl_hkdf()
+        nist_signatures = check_mldsa_signature_acvp(driver)
     finally:
         driver.close()
-    print(json.dumps({"result": "PASS", "symmetric_cases": symmetric, "nist_acvp_cases": acvp, "signature_cases": signatures, "kem_negative_cases": kem_negatives, "upstream_kat_cases": upstream, "candidate_primitive_cases": candidate, "openssl_hkdf_cases": openssl_hkdf, "mlkem": bool(args.mlkem_source), "sanitizer": args.sanitize, "node_build": False}, sort_keys=True))
+    print(json.dumps({"result": "PASS", "symmetric_cases": symmetric, "nist_acvp_cases": acvp, "nist_mldsa_signature_cases": nist_signatures, "signature_cases": signatures, "kem_negative_cases": kem_negatives, "upstream_kat_cases": upstream, "candidate_primitive_cases": candidate, "openssl_hkdf_cases": openssl_hkdf, "mlkem": bool(args.mlkem_source), "sanitizer": args.sanitize, "node_build": False}, sort_keys=True))
 
 
 if __name__ == "__main__":
