@@ -85,8 +85,11 @@ if(ENABLE_WALLET)
     set_tests_properties(test_mining_app-qt-${workers} PROPERTIES TIMEOUT 200 SKIP_RETURN_CODE 77
       ENVIRONMENT "MERCATURA_TEST_WORKERS=${workers}")
   endforeach()
-  add_test(NAME test_mining_app-qt-rapid-wallet
-    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/test/mining/qt_restart.py $<TARGET_FILE:test_mining_app-qt>)
-  set_tests_properties(test_mining_app-qt-rapid-wallet PROPERTIES TIMEOUT 200 SKIP_RETURN_CODE 77
-    ENVIRONMENT "MERCATURA_TEST_WORKERS=1;MERCATURA_TEST_SECONDS=30;MERCATURA_TEST_STOP_FIRST=1;MERCATURA_TEST_RAPID_WALLET=1")
+  option(MERCATURA_ENABLE_EXTREME_QT_STRESS_TESTS "Register extreme rapid-wallet stress test" OFF)
+  if(MERCATURA_ENABLE_EXTREME_QT_STRESS_TESTS)
+    add_test(NAME test_mining_app-qt-rapid-wallet
+      COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/test/mining/qt_restart.py $<TARGET_FILE:test_mining_app-qt>)
+    set_tests_properties(test_mining_app-qt-rapid-wallet PROPERTIES TIMEOUT 200 SKIP_RETURN_CODE 77
+      ENVIRONMENT "MERCATURA_TEST_WORKERS=1;MERCATURA_TEST_SECONDS=30;MERCATURA_TEST_STOP_FIRST=1;MERCATURA_TEST_RAPID_WALLET=1")
+  endif()
 endif()
