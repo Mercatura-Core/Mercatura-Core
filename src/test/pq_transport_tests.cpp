@@ -112,6 +112,23 @@ BOOST_AUTO_TEST_CASE(admission_cancellation_and_no_fallback)
     auto c = std::make_shared<Context>(RegtestNetwork()); PQTransport inbound(c,false,{},"source");
     Bytes wrong(16,0); std::span<const uint8_t> bytes{wrong}; BOOST_CHECK(!inbound.ReceivedBytes(bytes)); BOOST_CHECK(!inbound.ReceivedMessageComplete());
 }
+BOOST_AUTO_TEST_CASE(silent_inbound_connections_reserve_pending_quota)
+{
+    auto context=std::make_shared<Context>(RegtestNetwork());
+    std::vector<std::unique_ptr<PQTransport>> silent;
+    for (unsigned n=0;n<4;++n) {
+        silent.push_back(std::make_unique<PQTransport>(context,false,std::nullopt,"same-source"));
+        BOOST_REQUIRE(silent.back()->Poll());
+    }
+    BOOST_CHECK_EQUAL(context->Pending(),4U);
+    PQTransport excess(context,false,std::nullopt,"same-source");
+    BOOST_CHECK(!excess.Poll());
+    BOOST_CHECK(!excess.GetInfo().pq_authenticated);
+    BOOST_CHECK(std::get<0>(excess.GetBytesToSend(false)).empty());
+    silent.clear();
+    BOOST_CHECK_EQUAL(context->Pending(),0U);
+    BOOST_CHECK_EQUAL(context->Resources().completed_jobs,0U);
+}
 BOOST_AUTO_TEST_CASE(source_groups_global_cap_and_recovery)
 {
     auto a=LookupHost("1.2.3.4",false), b=LookupHost("1.2.3.5",false);

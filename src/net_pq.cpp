@@ -219,10 +219,12 @@ std::string SourceGroup(const CNetAddr& address, bool anonymous)
 PQTransport::PQTransport(std::shared_ptr<Context> context, bool initiator, std::optional<Digest> pin, std::string source)
     : m_context(std::move(context)), m_initiator(initiator), m_pin(pin), m_source(std::move(source)), m_expected(initiator ? 2 : 1)
 {
-    if (initiator) {
-        m_admission = m_context->Admit(m_source);
-        if (!m_admission || !Queue({})) Fail();
-    }
+    // Charge the accepted socket immediately, including silent/partial-preface
+    // inbound peers. They must not bypass the global/source/anonymous pending
+    // limits while waiting for their first complete header. No crypto is queued
+    // for an inbound peer until a complete, structurally valid M1 is received.
+    m_admission = m_context->Admit(m_source);
+    if (!m_admission || (initiator && !Queue({}))) Fail();
 }
 PQTransport::~PQTransport() { Disconnect(); }
 bool PQTransport::Fail(bool report)
@@ -312,7 +314,7 @@ bool PQTransport::ReceivedBytes(std::span<const uint8_t>& bytes)
             m_recv.insert(m_recv.end(), bytes.begin(), bytes.begin()+count); bytes = bytes.subspan(count);
             if (m_recv.size() == 12) {
                 if (!ValidHeader(m_recv, m_expected)) return Fail();
-                if (!m_admission) { m_admission = m_context->Admit(m_source); if (!m_admission) return Fail(); }
+                if (!m_admission) return Fail();
                 m_recv.reserve(RECORD_SIZES[m_expected]);
             }
             if ((m_expected == 1 || m_expected == 2) && m_recv.size() > 12) {
