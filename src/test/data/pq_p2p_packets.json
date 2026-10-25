@@ -1,0 +1,328 @@
+{
+  "status": "Stage A public deterministic packet fixtures; no production keys",
+  "candidate_sha256": "6222abf5163ee34a987fe383a8e10b07e50abf1a3ab93f2a0e031a50dd9415f5",
+  "reference": "Existing Python test_framework.crypto FSChaCha20 and FSChaCha20Poly1305, independent of C++ PQ wrapper",
+  "h5": "1853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf76",
+  "directions": [
+    {
+      "role": 0,
+      "length_key": "14d82f06eddcf6a74e4e8ac8b056907fdb3948f526c6a10bd3ffacbe70eed299",
+      "payload_key": "1a3871f95bc407dce39b9ea1489bab34b51390f267507e187dfebde2e5e9fd36",
+      "packets": [
+        {
+          "index": 0,
+          "epoch": 0,
+          "counter": 0,
+          "contents": "120000000000000000",
+          "control": 128,
+          "wire_length": "841d9d",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf7600841d9d",
+          "wire": "841d9db0202c93a9d336283dafe18f02847887c33523ec5dfaf01f4b16"
+        },
+        {
+          "index": 1,
+          "epoch": 0,
+          "counter": 1,
+          "contents": "120100000000000000",
+          "control": 0,
+          "wire_length": "084e49",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf7600084e49",
+          "wire": "084e493321d68cdb4671eddd467646a4db117baf27cacc1ce6280fdbd7"
+        },
+        {
+          "index": 222,
+          "epoch": 0,
+          "counter": 222,
+          "contents": "12de00000000000000",
+          "control": 0,
+          "wire_length": "281643",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf7600281643",
+          "wire": "2816433b46e3ea1d670bc0c638debb7cddecf84a63c269484e63dc012c"
+        },
+        {
+          "index": 223,
+          "epoch": 0,
+          "counter": 223,
+          "contents": "12df00000000000000",
+          "control": 0,
+          "wire_length": "9ac348",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf76009ac348",
+          "wire": "9ac348e5bc0f97654c9dc6d85ae61c9f6d48c3014110d55ddc6d11b271"
+        },
+        {
+          "index": 224,
+          "epoch": 1,
+          "counter": 0,
+          "contents": "12e000000000000000",
+          "control": 128,
+          "wire_length": "3c3018",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf76003c3018",
+          "wire": "3c3018842f5b1b4741c5e002fa727a22d8fd29061296ae941054e05e0b"
+        },
+        {
+          "index": 225,
+          "epoch": 1,
+          "counter": 1,
+          "contents": "12e100000000000000",
+          "control": 0,
+          "wire_length": "3c4dde",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf76003c4dde",
+          "wire": "3c4ddee443d969a12dd4ba2bb2ce5bba509c28698addf7fc872728cb1c"
+        },
+        {
+          "index": 446,
+          "epoch": 1,
+          "counter": 222,
+          "contents": "12be01000000000000",
+          "control": 0,
+          "wire_length": "0e1451",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf76000e1451",
+          "wire": "0e14515682c12e0fb04981b49ef349840372b6c5e37b71788c411c4e59"
+        },
+        {
+          "index": 447,
+          "epoch": 1,
+          "counter": 223,
+          "contents": "12bf01000000000000",
+          "control": 0,
+          "wire_length": "1b23a9",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf76001b23a9",
+          "wire": "1b23a906da6e4bc22e5cf0d360747b77f872f8c40d092e11ec5464dd07"
+        },
+        {
+          "index": 448,
+          "epoch": 2,
+          "counter": 0,
+          "contents": "12c001000000000000",
+          "control": 128,
+          "wire_length": "0ab6c6",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf76000ab6c6",
+          "wire": "0ab6c6d0626ddc57785fe0e531cee51d7f54121d845cd74cc022e409c3"
+        },
+        {
+          "index": 449,
+          "epoch": 2,
+          "counter": 1,
+          "contents": "12c101000000000000",
+          "control": 0,
+          "wire_length": "deb357",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf7600deb357",
+          "wire": "deb35718dbcff4cf956bb673bc888bcb73487052ec98ad7f3dbc1e3e19"
+        },
+        {
+          "index": 670,
+          "epoch": 2,
+          "counter": 222,
+          "contents": "129e02000000000000",
+          "control": 0,
+          "wire_length": "6b00d8",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf76006b00d8",
+          "wire": "6b00d838a268f5520ac83991f7a4cab75adc687ecfec5ba6340bbf370e"
+        },
+        {
+          "index": 671,
+          "epoch": 2,
+          "counter": 223,
+          "contents": "129f02000000000000",
+          "control": 0,
+          "wire_length": "566597",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf7600566597",
+          "wire": "566597106a6c108fd33a575c35b16164ce22763f12b8953fed9bacdcf6"
+        },
+        {
+          "index": 672,
+          "epoch": 3,
+          "counter": 0,
+          "contents": "12a002000000000000",
+          "control": 128,
+          "wire_length": "62c298",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf760062c298",
+          "wire": "62c298f2a7d7c43b29bc02de46ebcb8d25bd3b739c3efd57f8145d229b"
+        },
+        {
+          "index": 673,
+          "epoch": 3,
+          "counter": 1,
+          "contents": "12a102000000000000",
+          "control": 0,
+          "wire_length": "a2a1ec",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf7600a2a1ec",
+          "wire": "a2a1ec62d0d7d8f0e1adcf00fb58fb2dbd5831f3b16ff55cb911606ea2"
+        }
+      ],
+      "count": 674,
+      "all_packets_sha3_384": "c0b050ca56e5a0ec0810fd62ad97716d006a24e82344443cbaf9b5ffbd5769b15ea731db6bd82237a0d0fcd5c27806e5",
+      "invalid_packets": [
+        {
+          "name": "invalid_control",
+          "wire": "8c1d9d3120156ddb35578a670fa8773f1e87e9a0d6"
+        },
+        {
+          "name": "empty_ordinary",
+          "wire": "8d1d9d30f5729d5b26d1728bd819b8f9c41773c2"
+        }
+      ],
+      "oversized_wire_length": "8314a0"
+    },
+    {
+      "role": 1,
+      "length_key": "15ef532ada063936e938beaffc9cf7481b20160a886d46d9d60191ef54222500",
+      "payload_key": "baa6a0cdf1473989af3676496dcf1d25878fb43acb38ef983f84af16282a976e",
+      "packets": [
+        {
+          "index": 0,
+          "epoch": 0,
+          "counter": 0,
+          "contents": "120000000000000000",
+          "control": 128,
+          "wire_length": "7c7a10",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf76017c7a10",
+          "wire": "7c7a10e9cf4b512672acd46ae672071cc544504803dffffe9a8d055da8"
+        },
+        {
+          "index": 1,
+          "epoch": 0,
+          "counter": 1,
+          "contents": "120100000000000000",
+          "control": 0,
+          "wire_length": "9bbbcb",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf76019bbbcb",
+          "wire": "9bbbcba107cd9989d3040696cd228734a63738b9e24cd077f3d100fa2b"
+        },
+        {
+          "index": 222,
+          "epoch": 0,
+          "counter": 222,
+          "contents": "12de00000000000000",
+          "control": 0,
+          "wire_length": "26de4e",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf760126de4e",
+          "wire": "26de4e80943601e9c2fc93a5f5e13fa2de8413637f87d3ed7643b02db6"
+        },
+        {
+          "index": 223,
+          "epoch": 0,
+          "counter": 223,
+          "contents": "12df00000000000000",
+          "control": 0,
+          "wire_length": "576d6e",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf7601576d6e",
+          "wire": "576d6e07404530c11bfe6c2c8485ed5103898f1951a61f50b67f20fed0"
+        },
+        {
+          "index": 224,
+          "epoch": 1,
+          "counter": 0,
+          "contents": "12e000000000000000",
+          "control": 128,
+          "wire_length": "9bded9",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf76019bded9",
+          "wire": "9bded910ecda80dc31ab3176315ab384e2462aed6b2bc34200cad968b7"
+        },
+        {
+          "index": 225,
+          "epoch": 1,
+          "counter": 1,
+          "contents": "12e100000000000000",
+          "control": 0,
+          "wire_length": "ce010f",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf7601ce010f",
+          "wire": "ce010f92feff7eed060432f771a1f6c186f5abb6dee8eabcdac228c8b3"
+        },
+        {
+          "index": 446,
+          "epoch": 1,
+          "counter": 222,
+          "contents": "12be01000000000000",
+          "control": 0,
+          "wire_length": "71137e",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf760171137e",
+          "wire": "71137e5ca79d4848aa59df9de5a59063f33d57096cccde4b45adfb1cf9"
+        },
+        {
+          "index": 447,
+          "epoch": 1,
+          "counter": 223,
+          "contents": "12bf01000000000000",
+          "control": 0,
+          "wire_length": "630a5d",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf7601630a5d",
+          "wire": "630a5d7d8b260f512f31e17ede13cceebb8174e9465b445031350c9762"
+        },
+        {
+          "index": 448,
+          "epoch": 2,
+          "counter": 0,
+          "contents": "12c001000000000000",
+          "control": 128,
+          "wire_length": "b20241",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf7601b20241",
+          "wire": "b202412135211640d7b7a1d185a40e04611541efd12a1564510613c9cb"
+        },
+        {
+          "index": 449,
+          "epoch": 2,
+          "counter": 1,
+          "contents": "12c101000000000000",
+          "control": 0,
+          "wire_length": "ff2bc3",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf7601ff2bc3",
+          "wire": "ff2bc3ae289a81f1a0b5eb149e6c55a58cb7e406660a1421a014227d20"
+        },
+        {
+          "index": 670,
+          "epoch": 2,
+          "counter": 222,
+          "contents": "129e02000000000000",
+          "control": 0,
+          "wire_length": "d71a2e",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf7601d71a2e",
+          "wire": "d71a2e5e5db1195c5b7e574b4cb80df0d53116bc2e42b6e2ff0781f56c"
+        },
+        {
+          "index": 671,
+          "epoch": 2,
+          "counter": 223,
+          "contents": "129f02000000000000",
+          "control": 0,
+          "wire_length": "4ff89f",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf76014ff89f",
+          "wire": "4ff89fc56d155d2d50c9378bd6d3fa921474003499e7a262c749e207e3"
+        },
+        {
+          "index": 672,
+          "epoch": 3,
+          "counter": 0,
+          "contents": "12a002000000000000",
+          "control": 128,
+          "wire_length": "c0726a",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf7601c0726a",
+          "wire": "c0726a6d1784047b8ff9b7fb0b4b91458e694d42c43c75c0d89baf6b02"
+        },
+        {
+          "index": 673,
+          "epoch": 3,
+          "counter": 1,
+          "contents": "12a102000000000000",
+          "control": 0,
+          "wire_length": "f9841f",
+          "aad": "16004d65726361747572612f5032505061636b65742f76311853defe6d11690b464a4a2cf5f0d160ab17a89db2b94f1c67ed3d408b0a09a0e2459c4c85a44db02463623e64b6bf7601f9841f",
+          "wire": "f9841fc5c0ec75012371df4ef097c58cc45f6f198a3f09d69ae8e8feaf"
+        }
+      ],
+      "count": 674,
+      "all_packets_sha3_384": "5633760545b15566bafe3721e03e5dd693316e24a05c034a089363293ee7ec7ff034008e805d61f0835829a6026b1a1a",
+      "invalid_packets": [
+        {
+          "name": "invalid_control",
+          "wire": "747a1068cf7820edff17a9d237a328bed6850b14b3"
+        },
+        {
+          "name": "empty_ordinary",
+          "wire": "757a106949e5e161bc969b170f0520f96d7a3f79"
+        }
+      ],
+      "oversized_wire_length": "7b732d"
+    }
+  ]
+}

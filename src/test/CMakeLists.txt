@@ -77,6 +77,7 @@ add_executable(test_bitcoin
   net_peer_connection_tests.cpp
   net_peer_eviction_tests.cpp
   net_tests.cpp
+  pq_p2p_tests.cpp
   netbase_tests.cpp
   node_init_tests.cpp
   node_warnings_tests.cpp
@@ -156,6 +157,8 @@ add_executable(test_bitcoin
 
 include(TargetDataSources)
 target_json_data_sources(test_bitcoin
+  data/pq_p2p_candidate1.json
+  data/pq_p2p_packets.json
   data/base58_encode_decode.json
   data/bip341_wallet_vectors.json
   data/blockfilters.json
@@ -171,6 +174,25 @@ target_raw_data_sources(test_bitcoin NAMESPACE test::data
 )
 
 add_windows_application_manifest(test_bitcoin)
+
+# Small independent runner for the permanent protocol/primitive tests.
+add_executable(pq_stagea_tests EXCLUDE_FROM_ALL
+  ../../contrib/devtools/pq-stagea-test-main.cpp
+  pq_p2p_tests.cpp
+  ../net_pq_protocol.cpp
+)
+target_link_libraries(pq_stagea_tests PRIVATE core_interface bitcoin_crypto univalue Boost::headers)
+target_json_data_sources(pq_stagea_tests
+  data/pq_p2p_candidate1.json
+  data/pq_p2p_packets.json
+)
+
+add_executable(pq_fuzz_smoke EXCLUDE_FROM_ALL
+  ../../contrib/devtools/pq-fuzz-smoke.cpp
+  fuzz/pq_transport.cpp
+  ../net_pq_protocol.cpp
+)
+target_link_libraries(pq_fuzz_smoke PRIVATE core_interface bitcoin_crypto)
 
 target_link_libraries(test_bitcoin
   core_interface
