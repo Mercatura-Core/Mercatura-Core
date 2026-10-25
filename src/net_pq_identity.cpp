@@ -52,6 +52,15 @@ std::shared_ptr<const Identity> LoadIdentity(const std::string& path, bool creat
         FD output{openat(directory, temp.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600)};
         if (output.fd < 0) throw std::runtime_error("Cannot exclusively create PQ identity temporary");
         try {
+            // open(0600) is filtered by umask. Set and validate the permissions
+            // on the opened inode before writing any secret, so an unusually
+            // restrictive umask cannot publish an identity that cannot be loaded.
+            struct stat temporary{};
+            if (fchmod(output.fd, 0600) || fstat(output.fd, &temporary) ||
+                !S_ISREG(temporary.st_mode) || temporary.st_uid != geteuid() ||
+                (temporary.st_mode & 07777) != 0600 || temporary.st_nlink != 1) {
+                throw std::runtime_error("Unsafe PQ identity temporary owner/permissions/type");
+            }
             size_t pos = 0;
             while (pos < contents.bytes.size()) {
                 auto count = write(output.fd, contents.bytes.data()+pos, contents.bytes.size()-pos);

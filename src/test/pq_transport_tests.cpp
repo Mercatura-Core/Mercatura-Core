@@ -8,6 +8,10 @@
 #include <iostream>
 #include <ctime>
 #include <univalue.h>
+#ifndef WIN32
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 namespace {
 using namespace pq;
@@ -307,6 +311,19 @@ BOOST_AUTO_TEST_CASE(benchmark, *boost::unit_test::disabled())
     std::cout << "PQ_BENCHMARK " << report.write() << std::endl;
 }
 #ifndef WIN32
+BOOST_AUTO_TEST_CASE(persistent_identity_creation_ignores_restrictive_umask)
+{
+    const auto directory=m_path_root/"pq-umask";
+    fs::create_directory(directory); fs::permissions(directory,fs::perms::owner_all);
+    const auto file=directory/"identity.dat";
+    struct RestoreUmask { mode_t saved; ~RestoreUmask() { umask(saved); } } restore{umask(0777)};
+    auto created=LoadIdentity(fs::PathToString(file),true,RegtestNetwork());
+    struct stat status{};
+    BOOST_REQUIRE_EQUAL(stat(fs::PathToString(file).c_str(),&status),0);
+    BOOST_CHECK_EQUAL(status.st_mode & 07777,0600);
+    auto loaded=LoadIdentity(fs::PathToString(file),false,RegtestNetwork());
+    BOOST_CHECK(created->pub==loaded->pub);
+}
 BOOST_AUTO_TEST_CASE(persistent_identity_storage_failures)
 {
     const auto directory=m_path_root/"pq-identities";
@@ -323,6 +340,60 @@ BOOST_AUTO_TEST_CASE(persistent_identity_storage_failures)
     std::fstream stream(name,std::ios::in|std::ios::out|std::ios::binary); stream.seekp(95); stream.put(char{1}); stream.close();
     BOOST_CHECK_THROW(LoadIdentity(name,false,net),std::runtime_error);
     BOOST_CHECK_THROW(LoadIdentity(fs::PathToString(directory/"missing"),false,net),std::runtime_error);
+}
+BOOST_AUTO_TEST_CASE(identity_filesystem_types_atomic_creation_and_recovery)
+{
+    const auto directory=m_path_root/"pq-filesystem";
+    fs::create_directory(directory); fs::permissions(directory,fs::perms::owner_all);
+    const auto file=directory/"identity.dat";
+    const auto name=fs::PathToString(file);
+    const auto network=RegtestNetwork();
+    auto original=LoadIdentity(name,true,network);
+    auto hard=directory/"hardlink";
+    fs::create_hard_link(file,hard);
+    BOOST_CHECK_THROW(LoadIdentity(name,false,network),std::runtime_error);
+    BOOST_CHECK_THROW(LoadIdentity(fs::PathToString(hard),false,network),std::runtime_error);
+    fs::remove(hard);
+    const auto fifo=fs::PathToString(directory/"fifo");
+    BOOST_REQUIRE_EQUAL(mkfifo(fifo.c_str(),0600),0);
+    BOOST_CHECK_THROW(LoadIdentity(fifo,false,network),std::runtime_error);
+    fs::remove(fs::PathFromString(fifo));
+    BOOST_CHECK_THROW(LoadIdentity(fs::PathToString(directory),false,network),std::runtime_error);
+    fs::permissions(directory,fs::perms::owner_all|fs::perms::group_write);
+    BOOST_CHECK_THROW(LoadIdentity(name,false,network),std::runtime_error);
+    BOOST_CHECK_THROW(LoadIdentity(fs::PathToString(directory/"unsafe-create"),true,network),std::runtime_error);
+    fs::permissions(directory,fs::perms::owner_all);
+    const auto linked=m_path_root/"pq-linked-directory";
+    fs::create_directory_symlink(directory,linked);
+    BOOST_CHECK_THROW(LoadIdentity(fs::PathToString(linked/"identity.dat"),false,network),std::runtime_error);
+    auto restored=LoadIdentity(name,false,network);
+    BOOST_CHECK(restored->pub==original->pub);
+    fs::resize_file(file,2126);
+    BOOST_CHECK_THROW(LoadIdentity(name,false,network),std::runtime_error);
+    fs::resize_file(file,2128);
+    BOOST_CHECK_THROW(LoadIdentity(name,false,network),std::runtime_error);
+    // Explicit recovery creates a different filename; a corrupt original is
+    // retained rather than silently overwritten or regenerated.
+    const auto recovered=directory/"recovered.dat";
+    auto replacement=LoadIdentity(fs::PathToString(recovered),true,network);
+    BOOST_CHECK(replacement->pub!=original->pub);
+    BOOST_CHECK_EQUAL(fs::file_size(file),2128U);
+    BOOST_CHECK(LoadIdentity(fs::PathToString(recovered),false,network)->pub==replacement->pub);
+
+    const auto raced=fs::PathToString(directory/"race.dat");
+    std::array<std::shared_ptr<const Identity>,2> winners;
+    std::array<std::exception_ptr,2> errors;
+    std::array<std::thread,2> contenders;
+    for (size_t n=0;n<contenders.size();++n) contenders[n]=std::thread([&,n] {
+        try { winners[n]=LoadIdentity(raced,true,network); } catch (...) { errors[n]=std::current_exception(); }
+    });
+    for (auto& thread:contenders) thread.join();
+    BOOST_REQUIRE_EQUAL(bool(winners[0])+bool(winners[1]),1);
+    BOOST_CHECK_EQUAL(bool(errors[0])+bool(errors[1]),1);
+    BOOST_CHECK(LoadIdentity(raced,false,network)->pub==(winners[0] ? winners[0] : winners[1])->pub);
+    for (const auto& entry:fs::directory_iterator(directory)) {
+        BOOST_CHECK(!fs::PathToString(entry.path().filename()).starts_with(".mcapq-"));
+    }
 }
 #endif
 BOOST_AUTO_TEST_SUITE_END()
