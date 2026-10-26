@@ -10,4 +10,7 @@ SHARED_EXCLUDED_SUBTREES = ["src/leveldb/",
                  "src/minisketch/",
                  "src/ipc/libmultiprocess/",
                  "src/crypto/mldsa_native/",
+                 # Pinned upstream ML-KEM sources retain upstream conventions.
+                 # Mercatura's wrappers in src/crypto remain covered by lint.
+                 "src/crypto/mlkem_native/",
                 ]
