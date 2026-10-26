@@ -3,8 +3,8 @@
 #include <net_pq.h>
 #include <net_pq_identity_format.h>
 #include <random.h>
+#include <util/fs.h>
 #include <stdexcept>
-#include <filesystem>
 
 #ifndef WIN32
 #include <fcntl.h>
@@ -20,9 +20,8 @@ std::shared_ptr<const Identity> LoadIdentity(const std::string& path, bool creat
     // Fail closed until owner-only ACL and atomic no-clobber publication are qualified.
     throw std::runtime_error("Stage A persistent PQ identity storage is not yet supported on Windows; use ephemeral identities");
 #else
-    namespace fs = std::filesystem;
-    const fs::path file(path);
-    auto parent = file.parent_path(); if (parent.empty()) parent = ".";
+    const fs::path file = fs::PathFromString(path);
+    fs::path parent = file.parent_path(); if (parent.empty()) parent = ".";
     struct stat dir{};
     if (lstat(parent.c_str(), &dir) || !S_ISDIR(dir.st_mode) || dir.st_uid != geteuid() || (dir.st_mode & 0077)) throw std::runtime_error("PQ identity directory must be owner-only (0700), owned by this user and not a symlink");
     int directory = open(parent.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
@@ -31,7 +30,7 @@ std::shared_ptr<const Identity> LoadIdentity(const std::string& path, bool creat
     struct stat opened_dir{};
     if (fstat(directory, &opened_dir) || !S_ISDIR(opened_dir.st_mode) || opened_dir.st_uid != geteuid() || (opened_dir.st_mode & 0077) || opened_dir.st_dev != dir.st_dev || opened_dir.st_ino != dir.st_ino) throw std::runtime_error("PQ identity directory changed or is unsafe");
     IdentityFile contents;
-    const auto name = file.filename().string();
+    const auto name = fs::PathToString(file.filename());
     if (name.empty() || name == "." || name == "..") throw std::runtime_error("Invalid PQ identity filename");
     if (create) {
         auto id = std::make_shared<Identity>();
