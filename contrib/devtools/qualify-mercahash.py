@@ -89,6 +89,7 @@ def main():
     parser.add_argument("--deadline", type=int, default=600, help="External total watchdog, including startup")
     parser.add_argument("--output-parent", type=Path, default=Path("work/hardware-qualification"))
     parser.add_argument("--offscreen", action="store_true")
+    parser.add_argument("--pq", action="store_true", help="Require isolated regtest PQ transport on both nodes")
     args = parser.parse_args()
     if os.name != "posix":
         parser.error("Run this process-group watchdog under Linux or WSL")
@@ -142,6 +143,8 @@ def main():
         peer_rpc, app_rpc, p2p = port(), port(), port()
     common = ["-regtest", f"-mercahashv2height={activation}", "-listenonion=0", "-dnsseed=0",
               "-fixedseeds=0", "-discover=0", "-natpmp=0", "-rpcbind=127.0.0.1", "-rpcallowip=127.0.0.1"]
+    if args.pq:
+        common.append("-pqp2p=required")
     if args.harder:
         common.append("-regtestminingstress")
     env = dict(os.environ)
@@ -161,13 +164,18 @@ def main():
     env.pop("MERCATURA_TEST_RESTART", None)
     env.pop("MERCATURA_TEST_HARDER", None)
     env.pop("MERCATURA_TEST_GPU_DEVICE", None)
+    env.pop("MERCATURA_TEST_PQ", None)
+    if args.pq:
+        env["MERCATURA_TEST_PQ"] = "1"
     if args.device:
         env["MERCATURA_TEST_GPU_DEVICE"] = args.device
     if args.harder:
         env["MERCATURA_TEST_HARDER"] = "1"
-    peer = app = None
+    peer = app = restarted_client = None
     began = time.monotonic()
     last_client_height = 0
+    last_client_hash = None
+    pq_observed = set()
     try:
         with (root / "peer.log").open("w") as peer_log, (root / "qt.log").open("w") as app_log, (root / "rpc-observation.jsonl").open("w") as observations:
             peer = subprocess.Popen([str(binaries / "mercaturad"), f"-datadir={peer_dir}", *common,
@@ -198,8 +206,19 @@ def main():
                     try:
                         info = rpc(directory, rpc_port, "getblockchaininfo")
                         observation[name] = {k: info[k] for k in ("blocks", "headers", "bestblockhash", "chainwork")}
+                        if args.pq:
+                            peers = rpc(directory, rpc_port, "getpeerinfo")
+                            established = [peer for peer in peers if peer.get("session_id")]
+                            for peer_info in established:
+                                if not (peer_info['transport_protocol_type'] == 'pq-v1' and
+                                        peer_info['pq_encrypted'] and peer_info['pq_authenticated']):
+                                    raise ValueError("Mining peer lacks authenticated PQ encryption")
+                            if established:
+                                pq_observed.add(name)
+                                observation[name]['pq_sessions'] = [peer['session_id'] for peer in established]
                         if name == "client":
                             last_client_height = info["blocks"]
+                            last_client_hash = info["bestblockhash"]
                     except (OSError, RuntimeError, urllib.error.URLError):
                         observation[name] = "starting or shutting down"
                 observations.write(json.dumps(observation) + "\n")
@@ -211,11 +230,68 @@ def main():
                     metadata["reason"] = "Requested physical CPU worker budget unavailable"
                     return 77
                 raise RuntimeError(f"Native Qt qualification failed with exit code {app.returncode}")
-            deadline = time.monotonic() + 20
+            if args.pq and pq_observed != {"client", "peer"}:
+                raise RuntimeError("Did not observe authenticated PQ transport on both mining nodes")
+            metadata["pq_observed_endpoints"] = sorted(pq_observed)
+            if args.pq:
+                # Close deliberately stops the producer while mining. A peer
+                # may still need blocks which were not sent before disconnect.
+                # Reopen the retained chain without a miner and qualify normal
+                # PQ reconnect/recovery, rather than assuming relay has drained.
+                with (root / "client-restart.log").open("w") as restart_log:
+                    restarted_client = subprocess.Popen([str(binaries / "mercaturad"),
+                        f"-datadir={app_dir}", *common, f"-connect=127.0.0.1:{p2p}",
+                        "-listen=0", f"-rpcport={app_rpc}", "-server=1", "-disablewallet"],
+                        env=env, stdout=restart_log, stderr=subprocess.STDOUT, start_new_session=True)
+                startup_deadline = min(began + args.deadline, time.monotonic() + 45)
+                while True:
+                    if restarted_client.poll() is not None:
+                        raise RuntimeError("Native mining chain failed to reopen after Qt shutdown")
+                    try:
+                        info = rpc(app_dir, app_rpc, "getblockchaininfo")
+                        last_client_height = info["blocks"]
+                        last_client_hash = info["bestblockhash"]
+                        break
+                    except (OSError, RuntimeError, urllib.error.URLError):
+                        if time.monotonic() > startup_deadline:
+                            raise RuntimeError("Native mining chain restart timed out")
+                        time.sleep(0.1)
+                metadata["mining_node_restarted"] = True
+                handshake_deadline = min(began + args.deadline, time.monotonic() + 10)
+                while True:
+                    endpoints = [rpc(directory, rpc_port, "getpeerinfo") for directory, rpc_port in
+                                 ((app_dir, app_rpc), (peer_dir, peer_rpc))]
+                    sessions = [{p['session_id'] for p in peers if p.get('pq_encrypted') and
+                                 p.get('pq_authenticated') and p['transport_protocol_type'] == 'pq-v1'}
+                                for peers in endpoints]
+                    if sessions[0] & sessions[1]:
+                        metadata["restart_pq_session"] = sorted(sessions[0] & sessions[1])[0]
+                        break
+                    if time.monotonic() > handshake_deadline:
+                        raise RuntimeError("Restarted mining node did not establish matching PQ sessions")
+                    time.sleep(0.1)
+            deadline = min(began + args.deadline, time.monotonic() + (60 if args.pq else 20))
             while rpc(peer_dir, peer_rpc, "getblockcount") < max(1, last_client_height):
                 if time.monotonic() > deadline:
                     raise RuntimeError("Independent peer did not synchronize the mined chain")
                 time.sleep(0.2)
+            if args.pq and last_client_height < 1:
+                raise RuntimeError("Did not observe a mined block through the native client's RPC")
+            if last_client_height:
+                if rpc(peer_dir, peer_rpc, "getblockhash", (last_client_height,)) != last_client_hash:
+                    raise RuntimeError("Independent peer disagrees with the observed native mining chain")
+                metadata["observed_mining_height"] = last_client_height
+                metadata["observed_mining_hash"] = last_client_hash
+                metadata["peer_prefix_matches"] = True
+            if args.pq:
+                peer_info = rpc(peer_dir, peer_rpc, "getblockchaininfo")
+                if (peer_info["blocks"] != last_client_height or peer_info["headers"] != last_client_height or
+                        peer_info["bestblockhash"] != last_client_hash):
+                    raise RuntimeError("Restarted mining nodes disagree on their exact block/header tip")
+                if not rpc(app_dir, app_rpc, "verifychain", (4, 0), timeout=min(120, max(2, args.deadline - (time.monotonic() - began)))):
+                    raise RuntimeError("Restarted mining node verification failed")
+                metadata["restart_tip_matches"] = True
+                metadata["restarted_client_verifychain"] = True
             if not rpc(peer_dir, peer_rpc, "verifychain", (4, 0), timeout=min(120, max(2, args.deadline - (time.monotonic() - began)))):
                 raise RuntimeError("Independent peer verification failed")
             metadata["peer_height"] = rpc(peer_dir, peer_rpc, "getblockcount")
@@ -223,6 +299,9 @@ def main():
             results = [json.loads(line) for line in (root / "qt-statistics.jsonl").read_text().splitlines()]
             metadata["qt_result"] = next(row for row in reversed(results) if row["event"] == "result")
             metadata["status"] = "PASSED"
+            if restarted_client is not None:
+                rpc(app_dir, app_rpc, "stop")
+                restarted_client.wait(timeout=20)
             rpc(peer_dir, peer_rpc, "stop")
             peer.wait(timeout=20)
             print(f"Passed; independent peer height {metadata['peer_height']}. Logs retained in {root}", flush=True)
@@ -234,6 +313,7 @@ def main():
         print(str(error), file=sys.stderr, flush=True)
         return 1
     finally:
+        stop_owned(restarted_client)
         stop_owned(app)
         stop_owned(peer)
         metadata["elapsed_seconds"] = round(time.monotonic() - began, 3)

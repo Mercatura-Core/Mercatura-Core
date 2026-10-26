@@ -85,6 +85,17 @@ if(ENABLE_WALLET)
     set_tests_properties(test_mining_app-qt-${workers} PROPERTIES TIMEOUT 200 SKIP_RETURN_CODE 77
       ENVIRONMENT "MERCATURA_TEST_WORKERS=${workers}")
   endforeach()
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_DAEMON)
+    foreach(schedule IN ITEMS v2 transition)
+      add_test(NAME test_mining_app-qt-pq-${schedule}
+        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/contrib/devtools/qualify-mercahash.py
+          --build-dir ${PROJECT_BINARY_DIR} --mode cpu --schedule ${schedule}
+          --workers 1 --seconds 10 --deadline 180 --offscreen --pq
+          --output-parent ${PROJECT_BINARY_DIR}/test/mining-pq)
+      set_tests_properties(test_mining_app-qt-pq-${schedule} PROPERTIES
+        TIMEOUT 200 SKIP_RETURN_CODE 77 RUN_SERIAL TRUE)
+    endforeach()
+  endif()
   option(MERCATURA_ENABLE_EXTREME_QT_STRESS_TESTS "Register extreme rapid-wallet stress test" OFF)
   if(MERCATURA_ENABLE_EXTREME_QT_STRESS_TESTS)
     add_test(NAME test_mining_app-qt-rapid-wallet

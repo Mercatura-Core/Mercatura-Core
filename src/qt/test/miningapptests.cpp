@@ -189,6 +189,7 @@ int main(int argc, char* argv[])
     SetupServerArgs(gArgs);
     gArgs.ForceSetArg("-regtest", "1");
     gArgs.ForceSetArg("-mercahashv2height", util::ToString(activation));
+    if (qEnvironmentVariableIsSet("MERCATURA_TEST_PQ")) gArgs.ForceSetArg("-pqp2p", "required");
     if (harder) gArgs.ForceSetArg("-regtestminingstress", "1");
     SelectParams(ChainType::REGTEST);
     if (!supplied_dir.isEmpty()) gArgs.ForceSetArg("-datadir", supplied_dir.toStdString());
