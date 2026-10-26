@@ -31,14 +31,17 @@ struct Pair {
     UniValue v{Candidate()};
     std::shared_ptr<Identity> idi{std::make_shared<Identity>()}, idr{std::make_shared<Identity>()};
     std::unique_ptr<Handshake> i, r;
-    Pair(bool pins = true) {
+    Pair(bool pins = true, uint8_t session = 0) {
         BOOST_REQUIRE(idi->FromSeed(V(v["inputs"]["identity_seed_I"])));
         BOOST_REQUIRE(idr->FromSeed(V(v["inputs"]["identity_seed_R"])));
         auto n = Array<85>(v["N"]);
+        auto nonce_i = V(v["inputs"]["nonce_I"]), nonce_r = V(v["inputs"]["nonce_R"]);
+        nonce_i.back() ^= session;
+        nonce_r.back() ^= session;
         i = std::make_unique<Handshake>(true, n, pins ? std::optional{Fingerprint(n, idr->pub)} : std::nullopt, idi,
-            Draws({V(v["inputs"]["kem_coins_I"]), V(v["inputs"]["nonce_I"]), V(v["inputs"]["enc_coins_I"]), V(v["inputs"]["sign_randomness_I"])}));
+            Draws({V(v["inputs"]["kem_coins_I"]), nonce_i, V(v["inputs"]["enc_coins_I"]), V(v["inputs"]["sign_randomness_I"])}));
         r = std::make_unique<Handshake>(false, n, pins ? std::optional{Fingerprint(n, idi->pub)} : std::nullopt, idr,
-            Draws({V(v["inputs"]["kem_coins_R"]), V(v["inputs"]["enc_coins_R"]), V(v["inputs"]["nonce_R"]), V(v["inputs"]["sign_randomness_R"])}));
+            Draws({V(v["inputs"]["kem_coins_R"]), V(v["inputs"]["enc_coins_R"]), nonce_r, V(v["inputs"]["sign_randomness_R"])}));
     }
     Bytes Record(int type) { return V(v["messages"][type-1]["wire"]); }
 };
@@ -149,6 +152,53 @@ BOOST_AUTO_TEST_CASE(invalid_kem_public_keys_fail_before_avoidable_work)
     auto m2=p.Record(2); std::fill(m2.begin()+129,m2.begin()+1313,255);
     BOOST_CHECK(!p.i->Advance(m2,response));
     BOOST_CHECK_EQUAL(p.i->Decapsulations(),0U);
+}
+BOOST_AUTO_TEST_CASE(cross_session_signature_and_confirmation_substitution)
+{
+    // Both sessions use the same valid identities, pins and KEM coins, but
+    // different nonces. Valid messages from one must not authenticate the other.
+    for (int substituted : {3, 4, 5}) {
+        Pair a, b(true, 1);
+        Bytes wire_a, wire_b, next_a, next_b;
+        BOOST_REQUIRE(a.i->Start(wire_a));
+        BOOST_REQUIRE(b.i->Start(wire_b));
+        wire_a.erase(wire_a.begin(), wire_a.begin()+16);
+        wire_b.erase(wire_b.begin(), wire_b.begin()+16);
+        for (int type = 1; type < substituted; ++type) {
+            auto& receiver_a = type % 2 ? a.r : a.i;
+            auto& receiver_b = type % 2 ? b.r : b.i;
+            BOOST_REQUIRE(receiver_a->Advance(wire_a, next_a));
+            BOOST_REQUIRE(receiver_b->Advance(wire_b, next_b));
+            if (type == 1) {
+                next_a.erase(next_a.begin(), next_a.begin()+16);
+                next_b.erase(next_b.begin(), next_b.begin()+16);
+            }
+            wire_a = std::move(next_a);
+            wire_b = std::move(next_b);
+        }
+        BOOST_REQUIRE(wire_a != wire_b);
+        auto& receiver = substituted % 2 ? b.r : b.i;
+        BOOST_CHECK(!receiver->Advance(wire_a, next_b));
+        BOOST_CHECK(!receiver->Ready());
+        if (substituted == 3) BOOST_CHECK_EQUAL(receiver->Decapsulations(), 0U);
+    }
+}
+BOOST_AUTO_TEST_CASE(wrong_network_rejected_before_randomness)
+{
+    Pair p;
+    auto network = Array<85>(p.v["N"]);
+    for (size_t offset = 0; offset < network.size(); ++offset) {
+        unsigned draws{0};
+        auto rng = [&](std::span<uint8_t>) { ++draws; return false; };
+        Handshake responder(false, network, std::nullopt, p.idr, rng);
+        auto record = p.Record(1);
+        record[12+offset] ^= 1;
+        Bytes response;
+        BOOST_CHECK(!responder.Advance(record, response));
+        BOOST_CHECK_EQUAL(draws, 0U);
+        BOOST_CHECK_EQUAL(responder.Decapsulations(), 0U);
+        BOOST_CHECK(!responder.Ready());
+    }
 }
 BOOST_AUTO_TEST_CASE(packet_reference_and_multiple_rekeys)
 {
