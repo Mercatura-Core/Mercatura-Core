@@ -29,4 +29,4 @@ struct PinBinding {
 std::optional<Digest> ParseFingerprint(std::string_view text);
 std::optional<PinBinding> ParsePinBinding(std::string_view text);
 } // namespace pq
-#endif
+#endif // BITCOIN_NET_PQ_IDENTITY_FORMAT_H

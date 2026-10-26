@@ -92,4 +92,4 @@ public:
     uint64_t Epoch() const { return m_packets / 224; }
 };
 } // namespace pq
-#endif
+#endif // BITCOIN_NET_PQ_PROTOCOL_H

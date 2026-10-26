@@ -133,4 +133,4 @@ public:
     bool ShouldReconnectV1() const noexcept override { return false; }
 };
 } // namespace pq
-#endif
+#endif // BITCOIN_NET_PQ_H

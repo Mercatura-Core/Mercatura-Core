@@ -48,4 +48,4 @@ bool Expand(std::span<const uint8_t> prk, std::span<const uint8_t> info, std::sp
 Digest MAC(std::span<const uint8_t> key, std::span<const uint8_t> msg);
 bool Equal(std::span<const uint8_t> a, std::span<const uint8_t> b);
 } // namespace pq
-#endif
+#endif // BITCOIN_CRYPTO_MERCATURA_P2P_CRYPTO_H
