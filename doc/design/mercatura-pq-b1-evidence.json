@@ -1,0 +1,999 @@
+{
+  "schema": "mercatura-pq-b1-evidence/v1",
+  "date_utc": "2026-10-26",
+  "completion": "complete_with_documented_limitations",
+  "source_branch": "validation/pq-v2-integrated-hardening",
+  "source_commit": "1380d473de01049404af2af99a81063f19789153",
+  "qualified_source_commit": "760df129c6d78b7855c0bc774379ae692e47e9bc",
+  "publication_branch": "hardening/pq-p2p-b1-identity-lifecycle",
+  "publication_remote": "project",
+  "publication_head_note": "The final handoff and remote ref identify the documentation-only publication descendant. No production or test code changes follow qualified_source_commit.",
+  "round_a": {
+    "branch": "qualification/pq-v2-round-a-ci",
+    "observed_at_start": false,
+    "observed_at_prepublication_recheck": false,
+    "integration_dependency": "Review and integrate future Round A networking/CMake overlap separately; broad CI qualification is not claimed."
+  },
+  "environment": {
+    "os": "Debian GNU/Linux 13 x86_64",
+    "compiler": "g++ (Debian 14.2.0-19) 14.2.0",
+    "cpu_quota": 2,
+    "memory_limit_gib": 8,
+    "build_type": "Release",
+    "compiler_optimization": "-O2",
+    "build_parallelism": 2
+  },
+  "sanitizers": {
+    "instrumented_sources": [
+      "src/crypto/mercatura_p2p_crypto.cpp",
+      "src/net_pq.cpp",
+      "src/net_pq_protocol.cpp",
+      "src/net_pq_identity.cpp",
+      "src/net_pq_identity_format.cpp",
+      "src/test/pq_lifecycle_tests.cpp",
+      "src/test/util/pq_lifecycle.cpp",
+      "src/test/pq_identity_tests.cpp",
+      "src/test/pq_p2p_tests.cpp",
+      "src/test/pq_transport_tests.cpp"
+    ],
+    "compile_command_example": "/usr/bin/c++ -DBOOST_MULTI_INDEX_DISABLE_SERIALIZATION -DMERCATURA_PQ_TESTING -I/workspace/work/build-integrated/src -I/workspace/Mercatura-Core/src -I/workspace/Mercatura-Core/src/crypto/mlkem_native/mlkem -I/workspace/Mercatura-Core/src/univalue/include -I/workspace/Mercatura-Core/src/minisketch/include -I/workspace/Mercatura-Core/src/secp256k1/include -isystem /workspace/work/deps/usr/include -O2 -std=c++20 -fPIE -g1 -fsanitize=address,undefined -fno-omit-frame-pointer -fno-extended-identifiers -fmacro-prefix-map=/workspace/Mercatura-Core/src=. -fstack-reuse=none -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3 -Wstack-protector -fstack-protector-all -fcf-protection=full -fstack-clash-protection -Wall -Wextra -Wformat -Wformat-security -Wvla -Wredundant-decls -Wdate-time -Wduplicated-branches -Wduplicated-cond -Wlogical-op -Woverloaded-virtual -Wsuggest-override -Wimplicit-fallthrough -Wunreachable-code -Wbidi-chars=any -Wundef -Wno-unused-parameter -MD -MT src/test/CMakeFiles/pq_b1_sanitizer_tests.dir/__/net_pq.cpp.o -MF src/test/CMakeFiles/pq_b1_sanitizer_tests.dir/__/net_pq.cpp.o.d -o src/test/CMakeFiles/pq_b1_sanitizer_tests.dir/__/net_pq.cpp.o -c /workspace/Mercatura-Core/src/net_pq.cpp",
+    "asan_flags": [
+      "-g1",
+      "-fsanitize=address,undefined",
+      "-fno-omit-frame-pointer"
+    ],
+    "tsan_flags": [
+      "-g1",
+      "-fsanitize=thread",
+      "-fno-omit-frame-pointer"
+    ],
+    "excluded": "Boost runner object, other Core/static native ML-KEM/ML-DSA/ChaCha/HMAC and system dependencies remain uninstrumented in these focused targets. This is not full-node sanitizer qualification.",
+    "leak_check": "Standard sandbox reproduced ptrace limitation; explicit compatible-context execution with detect_leaks=1 passed. No leak suppressions or sanitizer suppressions added."
+  },
+  "runs": [
+    {
+      "passed_cases": 41,
+      "catalogued_cases": 42,
+      "passed_assertions": 115473,
+      "total_assertions": 115473,
+      "case_names": [
+        "pq_lifecycle_tests/storage_prepublication_faults_release_descriptors",
+        "pq_lifecycle_tests/storage_short_interrupted_io_and_read_failure_recovery",
+        "pq_lifecycle_tests/storage_postpublication_failure_preserves_identity",
+        "pq_lifecycle_tests/storage_format_errors_do_not_modify_existing_files",
+        "pq_lifecycle_tests/storage_cleanup_error_reports_residual_temporary",
+        "pq_lifecycle_tests/partial_worker_startup_is_joined",
+        "pq_lifecycle_tests/cancel_before_execution_and_destroy_pending_transport",
+        "pq_lifecycle_tests/cancelled_worker_keeps_ephemeral_identity_alive_until_cleanup",
+        "pq_lifecycle_tests/stale_completed_generation_cannot_publish_authentication",
+        "pq_lifecycle_tests/worker_exception_then_recovery",
+        "pq_lifecycle_tests/failed_worker_discards_owned_secrets_before_publication",
+        "pq_lifecycle_tests/stop_discards_queued_handshake_even_with_external_job_owner",
+        "pq_lifecycle_tests/stop_prevents_late_completed_result_from_authenticating",
+        "pq_lifecycle_tests/stop_revokes_established_transport_assurance",
+        "pq_lifecycle_tests/concurrent_stop_serializes_worker_joins",
+        "pq_lifecycle_tests/shared_persistent_identity_concurrent_sessions_are_isolated",
+        "pq_lifecycle_tests/handshake_failures_release_identity_and_secret_state",
+        "pq_lifecycle_tests/network_bound_pin_and_pinned_admission_remain_fail_closed",
+        "pq_identity_tests/identity_format_corruption_network_and_key_binding",
+        "pq_identity_tests/canonical_fingerprint_and_explicit_destination_bindings",
+        "pq_identity_tests/secret_move_failure_and_destruction_cleanup",
+        "pq_identity_tests/throwing_rng_clears_replaced_key_outputs",
+        "pq_p2p_tests/production_crypto_wrapper",
+        "pq_p2p_tests/exact_five_message_fixture",
+        "pq_p2p_tests/handshake_mutations_fail_closed",
+        "pq_p2p_tests/invalid_kem_public_keys_fail_before_avoidable_work",
+        "pq_p2p_tests/cross_session_signature_and_confirmation_substitution",
+        "pq_p2p_tests/wrong_network_rejected_before_randomness",
+        "pq_p2p_tests/packet_reference_and_multiple_rekeys",
+        "pq_transport_tests/fragmentation_gates_duplex_and_cleanup",
+        "pq_transport_tests/m5_coalesced_packet_and_no_early_application",
+        "pq_transport_tests/admission_cancellation_and_no_fallback",
+        "pq_transport_tests/silent_inbound_connections_reserve_pending_quota",
+        "pq_transport_tests/source_groups_global_cap_and_recovery",
+        "pq_transport_tests/worker_queue_bound_and_cancelled_publication",
+        "pq_transport_tests/execution_deadline_discards_late_success",
+        "pq_transport_tests/identity_pins_and_wrong_expected_identity",
+        "pq_transport_tests/packet_failure_releases_nothing_and_large_send_memory",
+        "pq_transport_tests/persistent_identity_creation_ignores_restrictive_umask",
+        "pq_transport_tests/persistent_identity_storage_failures",
+        "pq_transport_tests/identity_filesystem_types_atomic_creation_and_recovery"
+      ],
+      "name": "final-focused",
+      "exit_code": 0,
+      "command": [
+        "/workspace/work/build-integrated/bin/pq_b1_tests",
+        "--log_level=test_suite",
+        "--report_level=detailed"
+      ],
+      "wall_seconds": null,
+      "boost_execution_seconds": 12.073898,
+      "log_sha256": "b20ab5857f5eb323dd7bd2845282411315b9840495a51bd244980777f433fa78",
+      "status": "passed",
+      "source_commit": "760df129c6d78b7855c0bc774379ae692e47e9bc",
+      "category": "focused_unit_and_fault_lifecycle"
+    },
+    {
+      "name": "asan-ubsan-lsan",
+      "command": [
+        "/workspace/work/build-integrated/bin/pq_b1_sanitizer_tests",
+        "--log_level=test_suite",
+        "--report_level=detailed"
+      ],
+      "cwd": "/workspace/Mercatura-Core",
+      "source_commit": "760df129c6d78b7855c0bc774379ae692e47e9bc",
+      "exit_code": 0,
+      "wall_seconds": 13.111127,
+      "log_sha256": "9fa8ff4c72183e4c84d0bdbd4532f31ff2495643249f520b03994970c28814bf",
+      "options": {
+        "ASAN_OPTIONS": "detect_leaks=1:halt_on_error=1",
+        "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"
+      },
+      "passed_cases": 41,
+      "catalogued_cases": 42,
+      "passed_assertions": 115494,
+      "total_assertions": 115494,
+      "case_names": [
+        "pq_lifecycle_tests/storage_prepublication_faults_release_descriptors",
+        "pq_lifecycle_tests/storage_short_interrupted_io_and_read_failure_recovery",
+        "pq_lifecycle_tests/storage_postpublication_failure_preserves_identity",
+        "pq_lifecycle_tests/storage_format_errors_do_not_modify_existing_files",
+        "pq_lifecycle_tests/storage_cleanup_error_reports_residual_temporary",
+        "pq_lifecycle_tests/partial_worker_startup_is_joined",
+        "pq_lifecycle_tests/cancel_before_execution_and_destroy_pending_transport",
+        "pq_lifecycle_tests/cancelled_worker_keeps_ephemeral_identity_alive_until_cleanup",
+        "pq_lifecycle_tests/stale_completed_generation_cannot_publish_authentication",
+        "pq_lifecycle_tests/worker_exception_then_recovery",
+        "pq_lifecycle_tests/failed_worker_discards_owned_secrets_before_publication",
+        "pq_lifecycle_tests/stop_discards_queued_handshake_even_with_external_job_owner",
+        "pq_lifecycle_tests/stop_prevents_late_completed_result_from_authenticating",
+        "pq_lifecycle_tests/stop_revokes_established_transport_assurance",
+        "pq_lifecycle_tests/concurrent_stop_serializes_worker_joins",
+        "pq_lifecycle_tests/shared_persistent_identity_concurrent_sessions_are_isolated",
+        "pq_lifecycle_tests/handshake_failures_release_identity_and_secret_state",
+        "pq_lifecycle_tests/network_bound_pin_and_pinned_admission_remain_fail_closed",
+        "pq_identity_tests/identity_format_corruption_network_and_key_binding",
+        "pq_identity_tests/canonical_fingerprint_and_explicit_destination_bindings",
+        "pq_identity_tests/secret_move_failure_and_destruction_cleanup",
+        "pq_identity_tests/throwing_rng_clears_replaced_key_outputs",
+        "pq_p2p_tests/production_crypto_wrapper",
+        "pq_p2p_tests/exact_five_message_fixture",
+        "pq_p2p_tests/handshake_mutations_fail_closed",
+        "pq_p2p_tests/invalid_kem_public_keys_fail_before_avoidable_work",
+        "pq_p2p_tests/cross_session_signature_and_confirmation_substitution",
+        "pq_p2p_tests/wrong_network_rejected_before_randomness",
+        "pq_p2p_tests/packet_reference_and_multiple_rekeys",
+        "pq_transport_tests/fragmentation_gates_duplex_and_cleanup",
+        "pq_transport_tests/m5_coalesced_packet_and_no_early_application",
+        "pq_transport_tests/admission_cancellation_and_no_fallback",
+        "pq_transport_tests/silent_inbound_connections_reserve_pending_quota",
+        "pq_transport_tests/source_groups_global_cap_and_recovery",
+        "pq_transport_tests/worker_queue_bound_and_cancelled_publication",
+        "pq_transport_tests/execution_deadline_discards_late_success",
+        "pq_transport_tests/identity_pins_and_wrong_expected_identity",
+        "pq_transport_tests/packet_failure_releases_nothing_and_large_send_memory",
+        "pq_transport_tests/persistent_identity_creation_ignores_restrictive_umask",
+        "pq_transport_tests/persistent_identity_storage_failures",
+        "pq_transport_tests/identity_filesystem_types_atomic_creation_and_recovery"
+      ],
+      "status": "passed",
+      "category": "address_undefined_leak_sanitizer"
+    },
+    {
+      "name": "tsan",
+      "command": [
+        "/workspace/work/build-integrated/bin/pq_b1_tsan_tests",
+        "--log_level=test_suite",
+        "--report_level=detailed"
+      ],
+      "cwd": "/workspace/Mercatura-Core",
+      "source_commit": "760df129c6d78b7855c0bc774379ae692e47e9bc",
+      "exit_code": 0,
+      "wall_seconds": 13.202378,
+      "log_sha256": "69e6ccdc5324dbd1872910fcc8836a08530d5337e12afb11dada4f4d3d5592f9",
+      "options": {
+        "TSAN_OPTIONS": "halt_on_error=1:second_deadlock_stack=1"
+      },
+      "passed_cases": 41,
+      "catalogued_cases": 42,
+      "passed_assertions": 115473,
+      "total_assertions": 115473,
+      "case_names": [
+        "pq_lifecycle_tests/storage_prepublication_faults_release_descriptors",
+        "pq_lifecycle_tests/storage_short_interrupted_io_and_read_failure_recovery",
+        "pq_lifecycle_tests/storage_postpublication_failure_preserves_identity",
+        "pq_lifecycle_tests/storage_format_errors_do_not_modify_existing_files",
+        "pq_lifecycle_tests/storage_cleanup_error_reports_residual_temporary",
+        "pq_lifecycle_tests/partial_worker_startup_is_joined",
+        "pq_lifecycle_tests/cancel_before_execution_and_destroy_pending_transport",
+        "pq_lifecycle_tests/cancelled_worker_keeps_ephemeral_identity_alive_until_cleanup",
+        "pq_lifecycle_tests/stale_completed_generation_cannot_publish_authentication",
+        "pq_lifecycle_tests/worker_exception_then_recovery",
+        "pq_lifecycle_tests/failed_worker_discards_owned_secrets_before_publication",
+        "pq_lifecycle_tests/stop_discards_queued_handshake_even_with_external_job_owner",
+        "pq_lifecycle_tests/stop_prevents_late_completed_result_from_authenticating",
+        "pq_lifecycle_tests/stop_revokes_established_transport_assurance",
+        "pq_lifecycle_tests/concurrent_stop_serializes_worker_joins",
+        "pq_lifecycle_tests/shared_persistent_identity_concurrent_sessions_are_isolated",
+        "pq_lifecycle_tests/handshake_failures_release_identity_and_secret_state",
+        "pq_lifecycle_tests/network_bound_pin_and_pinned_admission_remain_fail_closed",
+        "pq_identity_tests/identity_format_corruption_network_and_key_binding",
+        "pq_identity_tests/canonical_fingerprint_and_explicit_destination_bindings",
+        "pq_identity_tests/secret_move_failure_and_destruction_cleanup",
+        "pq_identity_tests/throwing_rng_clears_replaced_key_outputs",
+        "pq_p2p_tests/production_crypto_wrapper",
+        "pq_p2p_tests/exact_five_message_fixture",
+        "pq_p2p_tests/handshake_mutations_fail_closed",
+        "pq_p2p_tests/invalid_kem_public_keys_fail_before_avoidable_work",
+        "pq_p2p_tests/cross_session_signature_and_confirmation_substitution",
+        "pq_p2p_tests/wrong_network_rejected_before_randomness",
+        "pq_p2p_tests/packet_reference_and_multiple_rekeys",
+        "pq_transport_tests/fragmentation_gates_duplex_and_cleanup",
+        "pq_transport_tests/m5_coalesced_packet_and_no_early_application",
+        "pq_transport_tests/admission_cancellation_and_no_fallback",
+        "pq_transport_tests/silent_inbound_connections_reserve_pending_quota",
+        "pq_transport_tests/source_groups_global_cap_and_recovery",
+        "pq_transport_tests/worker_queue_bound_and_cancelled_publication",
+        "pq_transport_tests/execution_deadline_discards_late_success",
+        "pq_transport_tests/identity_pins_and_wrong_expected_identity",
+        "pq_transport_tests/packet_failure_releases_nothing_and_large_send_memory",
+        "pq_transport_tests/persistent_identity_creation_ignores_restrictive_umask",
+        "pq_transport_tests/persistent_identity_storage_failures",
+        "pq_transport_tests/identity_filesystem_types_atomic_creation_and_recovery"
+      ],
+      "status": "passed",
+      "category": "thread_sanitizer"
+    },
+    {
+      "name": "final-adjacent",
+      "command": [
+        "/workspace/work/build-integrated/bin/test_bitcoin",
+        "--run_test=crypto_tests,bip324_tests,key_tests,script_tests,wallet_crypto_tests,mercahash_v2_tests,mercahash_activation_tests,mercahash_activation_tests_transition,net_tests,netbase_tests,protocol_tests,blockencodings_tests",
+        "--report_level=short"
+      ],
+      "cwd": "/workspace/Mercatura-Core",
+      "source_commit": "760df129c6d78b7855c0bc774379ae692e47e9bc",
+      "exit_code": 0,
+      "wall_seconds": 62.425469,
+      "log_sha256": "6ab5c3836ee6a330f37d14a4077dc4a9711255b95086ef1fc819c6493c526037",
+      "options": {},
+      "passed_cases": 114,
+      "catalogued_cases": 1024,
+      "passed_assertions": 632313,
+      "total_assertions": 632313,
+      "case_names": [],
+      "status": "passed",
+      "category": "adjacent_crypto_network_pow_units"
+    },
+    {
+      "name": "final-real-node",
+      "command": [
+        "python3",
+        "test/functional/feature_pq_b1_lifecycle.py",
+        "--configfile=/workspace/work/build-integrated/test/config.ini",
+        "--tmpdir=/workspace/work/b1/regtest-final",
+        "--nocleanup",
+        "--portseed=791",
+        "--mercahash-v2-height=0"
+      ],
+      "cwd": "/workspace/Mercatura-Core",
+      "source_commit": "760df129c6d78b7855c0bc774379ae692e47e9bc",
+      "exit_code": 0,
+      "wall_seconds": 54.102756,
+      "log_sha256": "fdb53949536a04a05a99fe2175ffa2fece4a11d237f65b339cdda51f1f6d526c",
+      "options": {},
+      "status": "passed",
+      "category": "isolated_regtest_identity_pinning_and_relay"
+    },
+    {
+      "name": "final-native-mining",
+      "command": [
+        "ctest",
+        "--test-dir",
+        "/workspace/work/build-integrated",
+        "-R",
+        "^test_mining_app-qt-pq-v2$",
+        "--output-on-failure"
+      ],
+      "cwd": "/workspace/Mercatura-Core",
+      "source_commit": "760df129c6d78b7855c0bc774379ae692e47e9bc",
+      "exit_code": 0,
+      "wall_seconds": 31.996014,
+      "log_sha256": "bb35f288966dbcde38bb1a3612bc60ca63ff6cb7fdea8961ada1695b8a963944",
+      "options": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "QT_PLUGIN_PATH": "/workspace/work/deps/usr/lib/x86_64-linux-gnu/qt6/plugins"
+      },
+      "status": "passed",
+      "category": "native_qt_cpu_v2_mining_over_pq"
+    },
+    {
+      "name": "lsan-environment-check",
+      "command": [
+        "/workspace/work/build-integrated/bin/pq_b1_sanitizer_tests",
+        "--run_test=pq_identity_tests/throwing_rng_clears_replaced_key_outputs",
+        "--report_level=detailed"
+      ],
+      "cwd": "/workspace/Mercatura-Core",
+      "source_commit": "dd56bc38be3a1f4062bd590b0c8c24627a84fbd5",
+      "exit_code": 1,
+      "wall_seconds": 0.145358,
+      "log_sha256": "746e3b357cfe4408d5c0d88f38fe40de69408796d25458a644824558b5ad8906",
+      "options": {
+        "ASAN_OPTIONS": "detect_leaks=1:halt_on_error=1",
+        "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"
+      },
+      "status": "environment-limited",
+      "category": "sanitizer_environment_capability"
+    }
+  ],
+  "allocation_matrix": [
+    {
+      "phase": "send",
+      "allocation_index": 0,
+      "exit": 0,
+      "seconds": 0.131833,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "send",
+      "allocation_index": 1,
+      "exit": 0,
+      "seconds": 0.159491,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "send",
+      "allocation_index": 2,
+      "exit": 0,
+      "seconds": 0.132392,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "send",
+      "allocation_index": 3,
+      "exit": 0,
+      "seconds": 0.162471,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "send",
+      "allocation_index": 4,
+      "exit": 0,
+      "seconds": 0.111296,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "send",
+      "allocation_index": 5,
+      "exit": 0,
+      "seconds": 0.128018,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "send",
+      "allocation_index": 6,
+      "exit": 0,
+      "seconds": 0.163721,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "send",
+      "allocation_index": 7,
+      "exit": 0,
+      "seconds": 0.126872,
+      "stderr": "",
+      "allocation_injected": false,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "keys",
+      "allocation_index": 0,
+      "exit": 0,
+      "seconds": 0.118715,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "keys",
+      "allocation_index": 1,
+      "exit": 0,
+      "seconds": 0.149178,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "keys",
+      "allocation_index": 2,
+      "exit": 0,
+      "seconds": 0.124633,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "keys",
+      "allocation_index": 3,
+      "exit": 0,
+      "seconds": 0.120707,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "keys",
+      "allocation_index": 4,
+      "exit": 0,
+      "seconds": 0.166898,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "keys",
+      "allocation_index": 5,
+      "exit": 0,
+      "seconds": 0.129916,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "keys",
+      "allocation_index": 6,
+      "exit": 0,
+      "seconds": 0.15105,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "keys",
+      "allocation_index": 7,
+      "exit": 0,
+      "seconds": 0.11968,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "keys",
+      "allocation_index": 8,
+      "exit": 0,
+      "seconds": 0.117754,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "keys",
+      "allocation_index": 9,
+      "exit": 0,
+      "seconds": 0.157239,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "keys",
+      "allocation_index": 10,
+      "exit": 0,
+      "seconds": 0.118266,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "keys",
+      "allocation_index": 11,
+      "exit": 0,
+      "seconds": 0.121843,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "keys",
+      "allocation_index": 12,
+      "exit": 0,
+      "seconds": 0.167962,
+      "stderr": "",
+      "allocation_injected": false,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "info",
+      "allocation_index": 0,
+      "exit": 0,
+      "seconds": 0.131517,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "info",
+      "allocation_index": 1,
+      "exit": 0,
+      "seconds": 0.173286,
+      "stderr": "",
+      "allocation_injected": false,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "receive",
+      "allocation_index": 0,
+      "exit": 0,
+      "seconds": 0.121937,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "receive",
+      "allocation_index": 1,
+      "exit": 0,
+      "seconds": 0.122283,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "receive",
+      "allocation_index": 2,
+      "exit": 0,
+      "seconds": 0.163084,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "receive",
+      "allocation_index": 3,
+      "exit": 0,
+      "seconds": 0.119797,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "receive",
+      "allocation_index": 4,
+      "exit": 0,
+      "seconds": 0.125686,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "receive",
+      "allocation_index": 5,
+      "exit": 0,
+      "seconds": 0.155426,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "receive",
+      "allocation_index": 6,
+      "exit": 0,
+      "seconds": 0.120554,
+      "stderr": "",
+      "allocation_injected": false,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "message",
+      "allocation_index": 0,
+      "exit": 0,
+      "seconds": 0.157326,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "message",
+      "allocation_index": 1,
+      "exit": 0,
+      "seconds": 0.146839,
+      "stderr": "",
+      "allocation_injected": false,
+      "returned": true,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "queue",
+      "allocation_index": 0,
+      "exit": 0,
+      "seconds": 0.112857,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "queue",
+      "allocation_index": 1,
+      "exit": 0,
+      "seconds": 0.144132,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "queue",
+      "allocation_index": 2,
+      "exit": 0,
+      "seconds": 0.109768,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "queue",
+      "allocation_index": 3,
+      "exit": 0,
+      "seconds": 0.115412,
+      "stderr": "",
+      "allocation_injected": true,
+      "returned": false,
+      "pending_after_cleanup": 0
+    },
+    {
+      "phase": "queue",
+      "allocation_index": 4,
+      "exit": 0,
+      "seconds": 0.11619,
+      "stderr": "",
+      "allocation_injected": false,
+      "returned": true,
+      "pending_after_cleanup": 0
+    }
+  ],
+  "real_node": {
+    "network": "isolated loopback regtest",
+    "txid": "825a828d86498f718eb4eb2d7dc3cd0f34850d5dd7e35f1a4e5b3e156bbb9326",
+    "relayed_block": "a78f47bd2444bb51010f440f6877e3589bf3803a1ec73d1dac7362e5731c65ff",
+    "height": 103,
+    "handshake_bytes": 15488,
+    "ephemeral_reconnect_changed_identities": true,
+    "wrong_pin_rejected_without_fallback": true,
+    "mercahash_v2_height": 0,
+    "explicit_rotation_and_pin_update": true,
+    "post_restart_tip": "797ececcb0bfe72fdfdcbbbf91c4c6ee8195f0c36c2ce49953d72e3e58b60d99",
+    "confirmed_receiver_balance": "1.00",
+    "connection_including_version_pong_ms": 391.2839669992536,
+    "reconnection_including_version_pong_ms": 109.80287299935299,
+    "peers": [
+      {
+        "transport_protocol_type": "pq-v1",
+        "session_id": "05ac24d2d9bebb94bcee1dd490d049b5aac8217b532c43a8579de44a5c7b4e4d",
+        "inbound": true,
+        "pq_encrypted": true,
+        "pq_authenticated": true,
+        "pq_identity_verified": false,
+        "pq_identity": "mcapq1:ded6ac969a8a703a6dcaed91b60cf59a4b289223ba078741ee3b5f9546136862abb3f33ba2d7cf7b03cf70912315d0c2",
+        "pq_kem": "ML-KEM-768",
+        "pq_auth_algorithm": "ML-DSA-65",
+        "bytesrecv": 9008,
+        "bytesrecv_per_msg": {
+          "feefilter": 29,
+          "getaddr": 33,
+          "getdata": 58,
+          "getheaders": 634,
+          "headers": 103,
+          "ping": 29,
+          "pong": 29,
+          "sendaddrv2": 33,
+          "sendcmpct": 60,
+          "sendheaders": 33,
+          "verack": 33,
+          "version": 151,
+          "wtxidrelay": 33
+        }
+      },
+      {
+        "transport_protocol_type": "pq-v1",
+        "session_id": "05ac24d2d9bebb94bcee1dd490d049b5aac8217b532c43a8579de44a5c7b4e4d",
+        "inbound": false,
+        "pq_encrypted": true,
+        "pq_authenticated": true,
+        "pq_identity_verified": true,
+        "pq_identity": "mcapq1:4294031f01e829b4486f18e3b810601a29ab9abf3f670a2d41d76219238e053611b7e058a702fc8e786f6a76a16badcc",
+        "pq_kem": "ML-KEM-768",
+        "pq_auth_algorithm": "ML-DSA-65",
+        "bytesrecv": 9270,
+        "bytesrecv_per_msg": {
+          "cmpctblock": 292,
+          "feefilter": 29,
+          "getheaders": 634,
+          "headers": 206,
+          "ping": 29,
+          "pong": 29,
+          "sendaddrv2": 33,
+          "sendcmpct": 30,
+          "sendheaders": 33,
+          "verack": 33,
+          "version": 151,
+          "wtxidrelay": 33
+        }
+      }
+    ]
+  },
+  "native_mining": {
+    "build_dir": "/workspace/work/build-integrated",
+    "mode": "cpu",
+    "schedule": "v2",
+    "harder": false,
+    "workers": 1,
+    "device": "",
+    "contexts": 0,
+    "seconds": 10,
+    "deadline": 180,
+    "output_parent": "/workspace/work/build-integrated/test/mining-pq",
+    "offscreen": true,
+    "pq": true,
+    "status": "PASSED",
+    "pq_observed_endpoints": [
+      "client",
+      "peer"
+    ],
+    "mining_node_restarted": true,
+    "restart_pq_session": "805eda4c8c12e66bbb3dd05b4a7f670d2e50280fdcef29677db24239e8d565a8",
+    "observed_mining_height": 47,
+    "observed_mining_hash": "26759c2755227469ab43d41e6be1afbec3a3c24ab270fa91309b0d5a394fd74c",
+    "peer_prefix_matches": true,
+    "restart_tip_matches": true,
+    "restarted_client_verifychain": true,
+    "peer_height": 47,
+    "peer_verifychain": true,
+    "qt_result": {
+      "accepted": "42",
+      "activation": 0,
+      "close_backlog": 0,
+      "close_complete_ms": 225,
+      "close_handler_ms": 128,
+      "cpu_hashes": "69",
+      "event": "result",
+      "gpu_hashes": "0",
+      "harder": false,
+      "heartbeat_gap_ms": 641,
+      "mode": "cpu",
+      "rapid_wallet": false,
+      "result": 0,
+      "session_destroyed": true,
+      "stop_backlog": 0,
+      "stop_complete_ms": 114,
+      "stop_dispatch_ms": 54,
+      "stop_handler_ms": 0,
+      "wallet_reopened": false,
+      "wallet_verified": false,
+      "workers": 1
+    },
+    "elapsed_seconds": 31.764
+  },
+  "native_mining_fixture": "/workspace/work/build-integrated/test/mining-pq/mercahash-v2-cpu-s30_z4fm",
+  "commits": [
+    {
+      "sha": "1278fefad08cd4ea4e8de788fcd989c9b860b5fa",
+      "subject": "docs: inventory B1 identity and lifecycle qualification gaps"
+    },
+    {
+      "sha": "b0ac733c11c5eebc3e228dd6d15542b4d53b5cc3",
+      "subject": "fix: clear PQ generation outputs before fallible randomness"
+    },
+    {
+      "sha": "55885cc044def667566c333df157111b8b864c26",
+      "subject": "test: add deterministic PQ lifecycle and filesystem fault harness"
+    },
+    {
+      "sha": "94bd65713a08416775a9ccfdfdf2d71a807f5f61",
+      "subject": "fix: contain allocation failures at PQ transport boundaries"
+    },
+    {
+      "sha": "ac8b4af29ab5de6532cfffd960a46bf285f155d0",
+      "subject": "fix: report PQ identity cleanup and publication outcomes"
+    },
+    {
+      "sha": "2fbb1da11f08e33a43d4def36c7e2a9ed7e0b4bd",
+      "subject": "test: qualify B1 pin and identity path configuration failures"
+    },
+    {
+      "sha": "9e1832574b6c95c2fcef2183e15fe70a26a3ebed",
+      "subject": "fix: discard failed and abandoned PQ jobs before publication"
+    },
+    {
+      "sha": "dd56bc38be3a1f4062bd590b0c8c24627a84fbd5",
+      "subject": "fix: make PQ context shutdown terminal and serialize joins"
+    },
+    {
+      "sha": "760df129c6d78b7855c0bc774379ae692e47e9bc",
+      "subject": "test: qualify PQ secret ownership and pinned session cleanup"
+    }
+  ],
+  "frozen_artifacts": {
+    "doc/design/mercatura-pq-transport-v1.md": "5960a8a1f032280f3a4bacb9aad07331eb1cae975e566e657e58d8d84ddc2e42",
+    "src/test/data/pq_p2p_candidate1.json": "6222abf5163ee34a987fe383a8e10b07e50abf1a3ab93f2a0e031a50dd9415f5"
+  },
+  "audit_checks": {
+    "ordinary_node_hook_symbols_absent": true,
+    "no_protocol_consensus_vendor_crypto_changes": true,
+    "file_lint_passed": true,
+    "test_lint_passed": true,
+    "diff_check_passed": true
+  },
+  "pre_fix_evidence": [
+    {
+      "name": "rng-exception-before.log",
+      "result": "five assertions failed; preexisting key/signature outputs survived a throwing RNG",
+      "exit_code": 201
+    },
+    {
+      "name": "transport-allocation-before.json",
+      "result": "six phase-zero failures: send/keys/info terminated (86); receive/message/queue escaped (1)"
+    },
+    {
+      "name": "storage-cleanup-before.log",
+      "result": "cleanup-failure diagnostic regression failed once",
+      "exit_code": 201
+    },
+    {
+      "name": "worker-before.log",
+      "result": "failed/queued jobs retained secrets/leases; completed results could authenticate after Stop; existing sessions retained assurance. Concurrent join serialization was source-audited and tested only after the fix, avoiding an actual invalid double join.",
+      "exit_code": 201
+    }
+  ],
+  "limitations": [
+    "Finite deterministic scenarios do not prove all interleavings race-free.",
+    "No forcibly interruptible native crypto; Stop waits for workers to return.",
+    "Persistent identities remain owned while legitimate shared Context owners retain them; successful unconsumed work is released by its transport/caller owners.",
+    "No whole-process, register, spill, swap, core-dump or filesystem secure-erasure guarantee.",
+    "POSIX storage tested on Linux only; Windows persistent storage remains fail-closed.",
+    "Injected fsync failures are not power-loss/crash consistency proof. Same-user/root/ancestor path trust remains a storage assumption.",
+    "No sustained B2 saturation/churn/soak/RSS/fairness campaign, no B3 broad adversarial matrix or independent AKE approval.",
+    "No new whole-node sanitizer, full-suite CI, GPU runtime or public-network qualification."
+  ],
+  "raw_evidence_location": "/workspace/work/b1/evidence; isolated node data and earlier integration evidence retained locally; private datadirs are not published.",
+  "findings": [
+    {
+      "id": "B1-F1",
+      "category": "exception_output_cleanup",
+      "regression_commit": "b0ac733c11c5eebc3e228dd6d15542b4d53b5cc3",
+      "regressions": [
+        "pq_identity_tests/throwing_rng_clears_replaced_key_outputs"
+      ],
+      "pre_fix_exit": 201,
+      "validated_runs": [
+        "final-focused",
+        "asan-ubsan-lsan",
+        "tsan",
+        "final-adjacent"
+      ]
+    },
+    {
+      "id": "B1-F2",
+      "category": "transport_allocation_exception_containment",
+      "regression_commit": "94bd65713a08416775a9ccfdfdf2d71a807f5f61",
+      "regressions": [
+        "pq_resource_probe --transport-allocation=PHASE:INDEX"
+      ],
+      "pre_fix_exit_by_phase": {
+        "send": 86,
+        "keys": 86,
+        "info": 86,
+        "receive": 1,
+        "message": 1,
+        "queue": 1
+      },
+      "validated_runs": [
+        "final-allocation-matrix",
+        "final-focused",
+        "asan-ubsan-lsan",
+        "tsan"
+      ]
+    },
+    {
+      "id": "B1-F3",
+      "category": "filesystem_cleanup_publication_diagnostics",
+      "regression_commit": "ac8b4af29ab5de6532cfffd960a46bf285f155d0",
+      "regressions": [
+        "pq_lifecycle_tests/storage_cleanup_error_reports_residual_temporary",
+        "pq_lifecycle_tests/storage_postpublication_failure_preserves_identity"
+      ],
+      "pre_fix_exit": 201,
+      "validated_runs": [
+        "final-focused",
+        "asan-ubsan-lsan",
+        "tsan",
+        "final-real-node"
+      ]
+    },
+    {
+      "id": "B1-F4",
+      "category": "failed_and_abandoned_work_secret_lifetime",
+      "regression_commit": "9e1832574b6c95c2fcef2183e15fe70a26a3ebed",
+      "regressions": [
+        "pq_lifecycle_tests/failed_worker_discards_owned_secrets_before_publication",
+        "pq_lifecycle_tests/stop_discards_queued_handshake_even_with_external_job_owner"
+      ],
+      "pre_fix_exit": 201,
+      "validated_runs": [
+        "final-focused",
+        "asan-ubsan-lsan",
+        "tsan",
+        "final-real-node"
+      ]
+    },
+    {
+      "id": "B1-F5",
+      "category": "terminal_and_repeatable_context_shutdown",
+      "regression_commit": "dd56bc38be3a1f4062bd590b0c8c24627a84fbd5",
+      "regressions": [
+        "pq_lifecycle_tests/stop_prevents_late_completed_result_from_authenticating",
+        "pq_lifecycle_tests/stop_revokes_established_transport_assurance",
+        "pq_lifecycle_tests/concurrent_stop_serializes_worker_joins"
+      ],
+      "pre_fix_status": "Late-result/assurance regressions failed (201); unsafe concurrent double join not executed before the fix.",
+      "validated_runs": [
+        "final-focused",
+        "asan-ubsan-lsan",
+        "tsan",
+        "final-real-node",
+        "final-native-mining"
+      ]
+    }
+  ],
+  "ownership_contracts": [
+    "Submit fresh Work only once; no non-atomic caller access while executing; acquire-observe done before consuming fields.",
+    "Stop and destruction run on external owner threads; production workers never call Stop on themselves."
+  ]
+}
