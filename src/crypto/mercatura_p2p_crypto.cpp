@@ -18,6 +18,8 @@ bool ValidKEMPublic(std::span<const uint8_t> pub)
 }
 bool KEMKey::Generate(const Random& rng)
 {
+    // A throwing RNG must not leave a previous key usable as the new result.
+    priv.Clear(); pub.fill(0);
     Secret<64> coins;
     if (rng(coins.bytes) && PQCP_MLKEM_NATIVE_MLKEM768_keypair_derand(pub.data(), priv.bytes.data(), coins.bytes.data()) == 0) return true;
     priv.Clear(); pub.fill(0); return false;
@@ -44,12 +46,14 @@ bool Identity::FromSeed(std::span<const uint8_t> seed)
 }
 bool Identity::Generate(const Random& rng)
 {
+    priv.Clear(); pub.fill(0);
     Secret<32> seed;
     if (rng(seed.bytes)) return FromSeed(seed.bytes);
     priv.Clear(); pub.fill(0); return false;
 }
 bool Identity::Sign(std::span<const uint8_t> msg, Signature& sig, const Random& rng) const
 {
+    sig.fill(0);
     Secret<32> rnd;
     if (rng(rnd.bytes) && mercatura_mldsa65_sign(sig.data(), sig.size(), msg.data(), msg.size(), reinterpret_cast<const uint8_t*>(CONTEXT.data()), CONTEXT.size(), rnd.bytes.data(), rnd.bytes.size(), priv.bytes.data(), priv.bytes.size())) return true;
     sig.fill(0); return false;

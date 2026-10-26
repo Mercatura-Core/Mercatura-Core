@@ -3,6 +3,7 @@
 #include <net_pq_identity_format.h>
 #include <boost/test/unit_test.hpp>
 #include <new>
+#include <stdexcept>
 
 using namespace pq;
 BOOST_AUTO_TEST_SUITE(pq_identity_tests)
@@ -84,5 +85,32 @@ BOOST_AUTO_TEST_CASE(secret_move_failure_and_destruction_cleanup)
     BOOST_CHECK(!id.Generate(failing));
     BOOST_CHECK(std::ranges::all_of(id.priv.bytes,[](auto b) { return b==0; }));
     BOOST_CHECK(std::ranges::all_of(id.pub,[](auto b) { return b==0; }));
+}
+BOOST_AUTO_TEST_CASE(throwing_rng_clears_replaced_key_outputs)
+{
+    auto good = [](std::span<uint8_t> out) { std::fill(out.begin(), out.end(), 42); return true; };
+    auto throwing = [](std::span<uint8_t> out) -> bool {
+        std::fill(out.begin(), out.end(), 99);
+        throw std::runtime_error("synthetic RNG failure");
+    };
+    Identity identity;
+    BOOST_REQUIRE(identity.FromSeed(std::array<uint8_t,32>{}));
+    BOOST_CHECK_THROW(identity.Generate(throwing), std::runtime_error);
+    BOOST_CHECK(std::ranges::all_of(identity.priv.bytes, [](auto b) { return b == 0; }));
+    BOOST_CHECK(std::ranges::all_of(identity.pub, [](auto b) { return b == 0; }));
+    KEMKey kem;
+    BOOST_REQUIRE(kem.Generate(good));
+    BOOST_CHECK_THROW(kem.Generate(throwing), std::runtime_error);
+    BOOST_CHECK(std::ranges::all_of(kem.priv.bytes, [](auto b) { return b == 0; }));
+    BOOST_CHECK(std::ranges::all_of(kem.pub, [](auto b) { return b == 0; }));
+    BOOST_REQUIRE(identity.FromSeed(std::array<uint8_t,32>{}));
+    Signature signature; signature.fill(42);
+    BOOST_CHECK_THROW(identity.Sign({}, signature, throwing), std::runtime_error);
+    BOOST_CHECK(std::ranges::all_of(signature, [](auto b) { return b == 0; }));
+    KEMCiphertext ciphertext; ciphertext.fill(42);
+    Secret<32> shared; shared.bytes.fill(42);
+    BOOST_CHECK_THROW(Encapsulate(kem.pub, ciphertext, shared, throwing), std::runtime_error);
+    BOOST_CHECK(std::ranges::all_of(ciphertext, [](auto b) { return b == 0; }));
+    BOOST_CHECK(std::ranges::all_of(shared.bytes, [](auto b) { return b == 0; }));
 }
 BOOST_AUTO_TEST_SUITE_END()
