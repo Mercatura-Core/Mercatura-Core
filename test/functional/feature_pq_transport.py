@@ -114,7 +114,9 @@ class PQTransportTest(BitcoinTestFramework):
             self.nodes[2].addnode(f'127.0.0.1:{p2p_port(0)}', 'onetry')
         self.wait_until(lambda: self.nodes[2].getpeerinfo() == [])
         self.check_session()
-        fixture = json.loads((Path(__file__).resolve().parents[2] / 'src/test/data/pq_p2p_candidate1.json').read_text())
+        # Windows stages copies of the tests in the build tree. The generated
+        # config identifies the authoritative source fixtures on every platform.
+        fixture = json.loads((Path(self.config['environment']['SRCDIR']) / 'src/test/data/pq_p2p_candidate1.json').read_text())
         for malformed in [b'not-a-pq-preface!', bytes.fromhex(fixture['preface']) + bytes.fromhex('0100010001000100b50c0000')]:
             with socket.create_connection(('127.0.0.1', p2p_port(0)), timeout=5) as wire:
                 wire.sendall(malformed)
