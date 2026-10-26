@@ -15,10 +15,15 @@
 #include <stdexcept>
 #include <charconv>
 #include <exception>
+#include <util/fs.h>
+#include <fstream>
+#include <sstream>
+#include <ctime>
 
 namespace allocation_probe {
 struct Counters {
-    std::atomic<size_t> live{0},peak{0},count{0};
+    std::atomic<size_t> live{0},peak{0},count{0},budget{0};
+    std::atomic<bool> budget_exceeded{false};
 };
 constinit std::array<Counters,8> counters;
 constinit std::atomic<Counters*> active{nullptr};
@@ -30,14 +35,19 @@ void* Allocate(size_t size,size_t alignment)
     if (fail_after>0) --fail_after;
     alignment=std::max(alignment,alignof(Header));
     if (size>std::numeric_limits<size_t>::max()-sizeof(Header)-alignment) throw std::bad_alloc();
+    auto* owner=active.load(std::memory_order_acquire);
+    size_t live{0};
+    if (owner) {
+        live=owner->live.fetch_add(size)+size;
+        const auto budget=owner->budget.load();
+        if (budget && live>budget) { owner->budget_exceeded=true; owner->live.fetch_sub(size); throw std::bad_alloc(); }
+    }
     void* raw=std::malloc(std::max(size,size_t{1})+sizeof(Header)+alignment);
-    if (!raw) throw std::bad_alloc();
+    if (!raw) { if (owner) owner->live.fetch_sub(size); throw std::bad_alloc(); }
     auto address=(reinterpret_cast<uintptr_t>(raw)+sizeof(Header)+alignment-1)&~(uintptr_t(alignment)-1);
     auto* header=reinterpret_cast<Header*>(address)-1;
-    auto* owner=active.load(std::memory_order_acquire);
     *header={raw,size,owner};
     if (owner) {
-        auto live=owner->live.fetch_add(size)+size;
         auto peak=owner->peak.load();
         while (live>peak && !owner->peak.compare_exchange_weak(peak,live)) {}
         ++owner->count;
@@ -52,7 +62,7 @@ void Free(void* ptr) noexcept
     std::free(header->original);
 }
 struct Window {
-    explicit Window(size_t index) { active.store(&counters[index],std::memory_order_release); }
+    explicit Window(size_t index,size_t budget=0) { counters[index].budget=budget; counters[index].budget_exceeded=false; active.store(&counters[index],std::memory_order_release); }
     ~Window() { active.store(nullptr,std::memory_order_release); }
 };
 }
@@ -176,11 +186,153 @@ int TransportAllocation(std::string_view phase, int allocation)
              <<",\"returned\":"<<(returned ? "true" : "false")<<",\"pending_after_cleanup\":0}\n";
     return 0;
 }
+int BoundedNumber(std::string_view text,int low,int high)
+{
+    int number{-1}; const auto result=std::from_chars(text.data(),text.data()+text.size(),number);
+    Require(result.ec==std::errc{} && result.ptr==text.data()+text.size() && number>=low && number<=high,"invalid bounded probe option");
+    return number;
+}
+UniValue ProcessSnapshot()
+{
+    UniValue out{UniValue::VOBJ};
+#ifdef __linux__
+    {
+    std::ifstream input{"/proc/self/status"}; std::string line;
+    Require(input.is_open(),"cannot read process status");
+    while (std::getline(input,line)) {
+        std::istringstream fields{line}; fields.imbue(std::locale::classic());
+        std::string key; uint64_t value; fields>>key;
+        if (key=="VmRSS:" || key=="VmHWM:" || key=="VmSize:" || key=="Threads:") {
+            fields>>value; out.pushKV(key=="Threads:" ? "threads" : key.substr(0,key.size()-1)+"_kib",value);
+        }
+    }
+    }
+    size_t descriptors{0}; for ([[maybe_unused]] const auto& entry : fs::directory_iterator{"/proc/self/fd"}) ++descriptors;
+    // The iterator contributes one descriptor to its own /proc scan.
+    out.pushKV("file_descriptors",uint64_t(descriptors-1));
+#endif
+    return out;
+}
+int Churn(unsigned sessions,unsigned cycles)
+{
+#ifndef __linux__
+    throw std::runtime_error("B2 process-resource churn qualification requires Linux /proc");
+#endif
+    const unsigned pacing_ms=std::max(1100U,250*sessions+100);
+    const size_t heap_budget=2*sessions*65536+256*1024;
+    const auto started=Clock::now(); const auto cpu_started=std::clock();
+    const auto before=ProcessSnapshot();
+    std::vector<double> latency; latency.reserve(sessions*cycles);
+    std::vector<std::optional<uint256>> previous_id(sessions);
+    std::vector<std::array<char,103>> previous_identity(sessions);
+    std::vector<uint64_t> retained_by_cycle; retained_by_cycle.reserve(cycles);
+    double packet_seconds{0}; uint64_t wire_bytes{0};
+    Context::ResourceStats stats;
+    {
+        allocation_probe::Window window{3,heap_budget};
+        auto context=std::make_shared<Context>(RegtestNetwork());
+        for (unsigned cycle=0;cycle<cycles;++cycle) {
+            const auto cycle_start=Clock::now();
+            Require(Clock::now()-started<std::chrono::seconds(cycles*3+15),"bounded churn watchdog expired");
+            std::vector<std::unique_ptr<PQTransport>> initiators,responders;
+            for (unsigned n=0;n<sessions;++n) {
+                initiators.push_back(std::make_unique<PQTransport>(context,true,std::nullopt,"churn-i"+util::ToString(n)));
+                responders.push_back(std::make_unique<PQTransport>(context,false,std::nullopt,"churn-r"+util::ToString(n)));
+            }
+            std::vector<bool> observed(sessions,false);
+            for (;;) {
+                bool ready=true;
+                Require(Clock::now()-cycle_start<5s,"bounded handshake deadline exceeded");
+                for (unsigned n=0;n<sessions;++n) {
+                    Require(initiators[n]->Poll() && responders[n]->Poll(),"churn handshake failed");
+                    Transfer(*initiators[n],*responders[n]); Transfer(*responders[n],*initiators[n]);
+                    auto i=initiators[n]->GetInfo(),r=responders[n]->GetInfo();
+                    const bool established=i.pq_authenticated && r.pq_authenticated;
+                    ready &= established;
+                    if (established && !observed[n]) {
+                        Require(i.pq_encrypted && r.pq_encrypted && !i.pq_identity_verified && !r.pq_identity_verified,"incorrect unpinned assurance");
+                        Require(i.session_id==r.session_id && i.session_id.has_value(),"session IDs disagree");
+                        Require(i.pq_identity.size()==previous_identity[n].size(),"unexpected fingerprint encoding");
+                        Require(i.session_id!=previous_id[n] && !std::ranges::equal(i.pq_identity,previous_identity[n]),"stale ephemeral session identity");
+                        previous_id[n]=i.session_id; std::copy(i.pq_identity.begin(),i.pq_identity.end(),previous_identity[n].begin());
+                        observed[n]=true; latency.push_back(std::chrono::duration<double,std::milli>(Clock::now()-cycle_start).count());
+                    }
+                }
+                Require(!allocation_probe::counters[3].budget_exceeded.load(),"requested C++ heap budget exceeded");
+                if (ready) break;
+                std::this_thread::sleep_for(100us);
+            }
+            Require(context->Pending()==0,"established churn retained pending quota");
+            const auto packets_start=Clock::now();
+            for (unsigned packet=0;packet<300;++packet) for (unsigned n=0;n<sessions;++n) {
+                for (bool reverse : {false,true}) {
+                    auto& sender=reverse ? responders[n] : initiators[n];
+                    auto& receiver=reverse ? initiators[n] : responders[n];
+                    CSerializedNetMsg ping; ping.m_type="ping"; ping.data.resize(8,42);
+                    Require(sender->SetMessageToSend(ping),"churn packet send failed");
+                    wire_bytes+=std::get<0>(sender->GetBytesToSend(false)).size(); Transfer(*sender,*receiver);
+                    Require(receiver->ReceivedMessageComplete(),"churn message missing"); bool reject{false};
+                    auto message=receiver->GetReceivedMessage(1us,reject);
+                    Require(!reject && message.m_type=="ping" && message.m_message_size==8,"churn packet rejected");
+                }
+            }
+            packet_seconds+=std::chrono::duration<double>(Clock::now()-packets_start).count();
+            initiators.clear(); responders.clear(); Require(context->Pending()==0,"churn teardown retained admission");
+            retained_by_cycle.push_back(allocation_probe::counters[3].live.load());
+            stats=context->Resources(); Require(stats.active<=2 && stats.queued<=32,"worker/queue bound exceeded");
+            Require(ProcessSnapshot()["VmHWM_kib"].getInt<uint64_t>()<=512*1024,"process RSS budget exceeded");
+            if (cycle+1<cycles) std::this_thread::sleep_until(cycle_start+std::chrono::milliseconds(pacing_ms));
+        }
+        context->Stop(); Require(context->Pending()==0,"churn Stop retained admission"); context.reset();
+    }
+    Require(allocation_probe::counters[3].live.load()==0,"churn retains requested heap");
+    Require(!allocation_probe::counters[3].budget_exceeded.load(),"requested C++ heap budget exceeded");
+    const auto after=ProcessSnapshot();
+    std::vector<double> steady(latency.begin()+sessions,latency.end()); std::sort(steady.begin(),steady.end());
+    const auto first_cycle_max=*std::max_element(latency.begin(),latency.begin()+sessions);
+    std::sort(latency.begin(),latency.end());
+    Require(before["threads"].getInt<int>()==after["threads"].getInt<int>(),"churn retained worker threads");
+    Require(before["file_descriptors"].getInt<int>()==after["file_descriptors"].getInt<int>(),"churn retained descriptors");
+    UniValue report{UniValue::VOBJ}; report.pushKV("sessions_per_cycle",sessions); report.pushKV("cycles",cycles);
+    report.pushKV("completed_handshakes",sessions*cycles); report.pushKV("packets_each_direction_per_session",300);
+    report.pushKV("pacing_ms",pacing_ms); report.pushKV("max_duration_seconds",cycles*3+15);
+    report.pushKV("max_pending_endpoints",2*sessions); report.pushKV("workers",2);
+    report.pushKV("requested_cpp_heap_budget_bytes",uint64_t(heap_budget)); report.pushKV("process_rss_budget_mib",512);
+    std::ifstream cpu_limit{"/sys/fs/cgroup/cpu.max"}; std::string cpu_max; std::getline(cpu_limit,cpu_max);
+    report.pushKV("cgroup_cpu_max",cpu_max);
+    report.pushKV("heap",Snapshot(3)); report.pushKV("before",before); report.pushKV("after",after);
+    UniValue retained{UniValue::VARR}; for (auto bytes : retained_by_cycle) retained.push_back(bytes);
+    report.pushKV("requested_heap_after_each_cycle_with_context_alive",retained);
+    UniValue sizes{UniValue::VOBJ}; sizes.pushKV("context",uint64_t(sizeof(Context))); sizes.pushKV("work",uint64_t(sizeof(Work)));
+    sizes.pushKV("transport",uint64_t(sizeof(PQTransport))); sizes.pushKV("handshake",uint64_t(sizeof(Handshake)));
+    sizes.pushKV("identity",uint64_t(sizeof(Identity))); sizes.pushKV("packet_cipher",uint64_t(sizeof(PacketCipher)));
+    report.pushKV("logical_object_sizes_bytes",sizes);
+    report.pushKV("wall_seconds",std::chrono::duration<double>(Clock::now()-started).count());
+    report.pushKV("process_cpu_seconds",double(std::clock()-cpu_started)/CLOCKS_PER_SEC);
+    report.pushKV("active_packet_exchange_seconds",packet_seconds); report.pushKV("wire_bytes_exchanged",wire_bytes);
+    report.pushKV("active_packet_wire_mib_per_second",wire_bytes/(1024.0*1024.0)/packet_seconds);
+    report.pushKV("packet_measurement","8-byte ping payloads, adapter/new-delete instrumentation included; pacing and handshake excluded");
+    report.pushKV("completed_jobs",stats.completed_jobs); report.pushKV("total_job_us",stats.total_job_us);
+    report.pushKV("max_job_us",stats.max_job_us); report.pushKV("peak_pending",stats.peak_pending); report.pushKV("peak_queue",stats.peak_queued);
+    report.pushKV("stack_reservations_bytes",uint64_t(stats.stack_reservations[0]+stats.stack_reservations[1]));
+    report.pushKV("handshake_samples",uint64_t(latency.size()));
+    report.pushKV("handshake_median_ms",(latency[(latency.size()-1)/2]+latency[latency.size()/2])/2);
+    if (latency.size()>=20) report.pushKV("handshake_p95_ms",latency[(95*latency.size()+99)/100-1]);
+    report.pushKV("handshake_max_ms",latency.back());
+    report.pushKV("first_cycle_max_ms",first_cycle_max); report.pushKV("steady_handshake_samples",uint64_t(steady.size()));
+    if (!steady.empty()) report.pushKV("steady_handshake_median_ms",(steady[(steady.size()-1)/2]+steady[steady.size()/2])/2);
+    std::cout<<report.write(2)<<std::endl; return 0;
+}
 }
 int main(int argc,char** argv)
 {
     try {
         BasicTestingSetup setup{ChainType::REGTEST};
+        if (argc==2 && std::string_view(argv[1]).starts_with("--churn=")) {
+            const auto text=std::string_view(argv[1]).substr(8); const auto colon=text.find(':');
+            Require(colon!=std::string_view::npos,"expected bounded --churn=sessions:cycles");
+            return Churn(BoundedNumber(text.substr(0,colon),1,8),BoundedNumber(text.substr(colon+1),1,64));
+        }
         if (argc==2 && std::string_view(argv[1]).starts_with("--transport-allocation=")) {
             auto argument=std::string_view(argv[1]).substr(23);
             const auto colon=argument.find(':');
