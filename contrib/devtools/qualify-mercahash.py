@@ -31,7 +31,8 @@ def port():
 
 def rpc(datadir, rpc_port, method, params=(), *, timeout=2):
     cookie = (datadir / "regtest" / ".cookie").read_text().strip()
-    data = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": list(params)}).encode()
+    data = json.dumps({"jsonrpc": "2.0", "id": 1, "method": method,
+                       "params": params if isinstance(params, dict) else list(params)}).encode()
     request = urllib.request.Request(f"http://127.0.0.1:{rpc_port}/", data=data,
         headers={"Authorization": "Basic " + base64.b64encode(cookie.encode()).decode(), "Content-Type": "application/json"})
     # Explicitly bypass environment proxies for localhost RPC.
@@ -52,6 +53,22 @@ def stop_owned(process):
     except subprocess.TimeoutExpired:
         os.killpg(process.pid, signal.SIGKILL)
         process.wait(timeout=5)
+
+
+def process_metrics(process):
+    """Sample the owned Linux process; virtual reservations are not RSS."""
+    path = Path('/proc') / str(process.pid)
+    values = {'pid': process.pid}
+    for line in (path / 'status').read_text().splitlines():
+        key, _, value = line.partition(':')
+        if key in ('VmRSS', 'VmHWM', 'VmSize', 'Threads'):
+            values[key] = int(value.split()[0])
+    if 'VmRSS' not in values:
+        raise ProcessLookupError('Owned process exited during resource sampling')
+    values['file_descriptors'] = len(list((path / 'fd').iterdir()))
+    fields = (path / 'stat').read_text().rsplit(')', 1)[1].split()
+    values['cpu_seconds'] = (int(fields[11]) + int(fields[12])) / os.sysconf('SC_CLK_TCK')
+    return values
 
 
 def capture_threads(process, destination):
@@ -90,11 +107,20 @@ def main():
     parser.add_argument("--output-parent", type=Path, default=Path("work/hardware-qualification"))
     parser.add_argument("--offscreen", action="store_true")
     parser.add_argument("--pq", action="store_true", help="Require isolated regtest PQ transport on both nodes")
+    parser.add_argument("--relay-transaction", action="store_true", help="Require a mature native-mining wallet payment to propagate over PQ and confirm")
+    parser.add_argument("--memory-budget-mib", type=int, default=0, help="Optional aggregate Linux RSS watchdog; 0 preserves the original qualification")
+    parser.add_argument("--validation-threads", type=int, default=0, help="0 preserves automatic script validation; 1..16 sets the same -par budget on both nodes")
     args = parser.parse_args()
     if os.name != "posix":
         parser.error("Run this process-group watchdog under Linux or WSL")
     if args.harder and args.schedule != "v2":
         parser.error("--harder requires --schedule v2")
+    if args.relay_transaction and (not args.pq or args.seconds < 60):
+        parser.error("--relay-transaction requires --pq and at least 60 seconds for native coinbase maturity")
+    if not 0 <= args.memory_budget_mib <= 8192 or (args.memory_budget_mib and not Path('/proc/self/status').is_file()):
+        parser.error("Use a 0..8192MiB RSS budget; nonzero budgets require Linux /proc")
+    if not 0 <= args.validation_threads <= 16:
+        parser.error("Use automatic validation threads (0) or an explicit 1..16 thread budget")
     if not 1 <= args.workers <= 2147483647 or not 0 <= args.contexts <= 2147483647:
         parser.error("Invalid worker/context count")
     if not 2 <= args.seconds <= 3600 or not args.seconds + 15 <= args.deadline <= 7200:
@@ -137,12 +163,18 @@ def main():
     peer_dir, app_dir = root / "peer", root / "wallet"
     peer_dir.mkdir()
     app_dir.mkdir()
+    if args.validation_threads:
+        # The Qt test reads its fresh datadir configuration before node init.
+        # Match the verifier's normal -par setting without changing consensus.
+        (app_dir / 'mercatura.conf').write_text(f'par={args.validation_threads}\n')
     activation = {"v1": -1, "v2": 0, "transition": 20}[args.schedule]
     peer_rpc, app_rpc, p2p = port(), port(), port()
     while len({peer_rpc, app_rpc, p2p}) != 3:
         peer_rpc, app_rpc, p2p = port(), port(), port()
     common = ["-regtest", f"-mercahashv2height={activation}", "-listenonion=0", "-dnsseed=0",
               "-fixedseeds=0", "-discover=0", "-natpmp=0", "-rpcbind=127.0.0.1", "-rpcallowip=127.0.0.1"]
+    if args.validation_threads:
+        common.append(f'-par={args.validation_threads}')
     if args.pq:
         common.append("-pqp2p=required")
     if args.harder:
@@ -176,6 +208,9 @@ def main():
     last_client_height = 0
     last_client_hash = None
     pq_observed = set()
+    relay_txid = relay_block = None
+    reconnect_began = old_mining_session = None
+    resource_samples = []
     try:
         with (root / "peer.log").open("w") as peer_log, (root / "qt.log").open("w") as app_log, (root / "rpc-observation.jsonl").open("w") as observations:
             peer = subprocess.Popen([str(binaries / "mercaturad"), f"-datadir={peer_dir}", *common,
@@ -202,6 +237,21 @@ def main():
                 if records.exists() and records.stat().st_size and time.time() - records.stat().st_mtime > 10:
                     raise RuntimeError("Qt statistics heartbeat stopped for over 10 seconds")
                 observation = {"elapsed_seconds": round(elapsed, 3)}
+                if args.memory_budget_mib:
+                    measurements = []
+                    for process in (peer, app):
+                        if process.poll() is None:
+                            try:
+                                measurements.append(process_metrics(process))
+                            except (FileNotFoundError, ProcessLookupError):
+                                if process.poll() is None:
+                                    raise
+                    resource_samples.append(measurements)
+                    observation['process_resources'] = measurements
+                    if sum(item['VmRSS'] for item in measurements) > args.memory_budget_mib * 1024:
+                        raise RuntimeError("Aggregate native qualification RSS budget exceeded")
+                    if any(item['Threads'] > 256 or item['file_descriptors'] > 512 for item in measurements):
+                        raise RuntimeError("Native qualification thread/descriptor budget exceeded")
                 for name, directory, rpc_port in (("client", app_dir, app_rpc), ("peer", peer_dir, peer_rpc)):
                     try:
                         info = rpc(directory, rpc_port, "getblockchaininfo")
@@ -223,6 +273,48 @@ def main():
                         observation[name] = "starting or shutting down"
                 observations.write(json.dumps(observation) + "\n")
                 observations.flush()
+                current_sessions = [set(observation[name].get('pq_sessions', [])) if isinstance(observation.get(name), dict) else set()
+                                    for name in ('client', 'peer')]
+                if args.relay_transaction and current_sessions[0] & current_sessions[1]:
+                    if relay_txid is None and isinstance(observation.get('client'), dict) and last_client_height >= 101:
+                        # The Qt test owns exactly one wallet. Funding comes
+                        # from its native mined blocks, not RPC generation.
+                        destination = rpc(app_dir, app_rpc, 'getnewaddress')
+                        if not destination.startswith('mcrt1z'):
+                            raise RuntimeError("Mining payment destination is not native PQ")
+                        relay_txid = rpc(app_dir, app_rpc, 'sendtoaddress',
+                                         {'address': destination, 'amount': 1, 'fee_rate': 1})
+                        metadata['relay_transaction_id'] = relay_txid
+                        metadata['relay_pq_session'] = sorted(current_sessions[0] & current_sessions[1])[0]
+                    if relay_txid is not None and relay_block is None:
+                        payment = rpc(app_dir, app_rpc, 'gettransaction', (relay_txid,))
+                        if payment.get('confirmations', 0) > 0:
+                            candidate = payment['blockhash']
+                            # A peer block at the same hash must contain the
+                            # exact transaction, even if the mempool interval
+                            # was shorter than the sampling interval.
+                            if rpc(peer_dir, peer_rpc, 'getblockcount') >= payment['blockheight']:
+                                block = rpc(peer_dir, peer_rpc, 'getblock', (candidate, 1))
+                                if relay_txid not in block['tx']:
+                                    raise RuntimeError("Mining peer block omitted the payment")
+                                relay_block = candidate
+                                metadata['relay_confirmed_block'] = candidate
+                    if relay_block is not None and not metadata.get('reconnected_while_mining'):
+                        qt_samples = [json.loads(line) for line in records.read_text().splitlines()]
+                        mining_sample = next(row for row in reversed(qt_samples) if row['event'] == 'sample')
+                        if mining_sample['busy'] and int(mining_sample['cpu_hashes']) > 0:
+                            if reconnect_began is None:
+                                old_mining_session = sorted(current_sessions[0] & current_sessions[1])[0]
+                                endpoint = next(p for p in rpc(peer_dir, peer_rpc, 'getpeerinfo')
+                                                if p.get('session_id') == old_mining_session)
+                                reconnect_began = time.monotonic()
+                                rpc(peer_dir, peer_rpc, 'disconnectnode', {'nodeid': endpoint['id']})
+                                metadata['mining_reconnect_start_sample'] = mining_sample
+                            elif fresh_sessions := (current_sessions[0] & current_sessions[1]) - {old_mining_session}:
+                                metadata['reconnected_while_mining'] = True
+                                metadata['mining_reconnect_seconds'] = time.monotonic() - reconnect_began
+                                metadata['mining_reconnect_session'] = sorted(fresh_sessions)[0]
+                                metadata['mining_reconnect_end_sample'] = mining_sample
                 time.sleep(0.5)
             if app.returncode:
                 if app.returncode == 77:
@@ -232,6 +324,10 @@ def main():
                 raise RuntimeError(f"Native Qt qualification failed with exit code {app.returncode}")
             if args.pq and pq_observed != {"client", "peer"}:
                 raise RuntimeError("Did not observe authenticated PQ transport on both mining nodes")
+            if args.relay_transaction and relay_block is None:
+                raise RuntimeError("Native-funded PQ payment did not confirm on the independent peer")
+            if args.relay_transaction and not metadata.get('reconnected_while_mining'):
+                raise RuntimeError("Did not qualify a fresh matching PQ session while native CPU mining remained active")
             metadata["pq_observed_endpoints"] = sorted(pq_observed)
             if args.pq:
                 # Close deliberately stops the producer while mining. A peer
@@ -317,6 +413,20 @@ def main():
         stop_owned(app)
         stop_owned(peer)
         metadata["elapsed_seconds"] = round(time.monotonic() - began, 3)
+        metadata['sampling_interval_seconds'] = 0.5
+        if resource_samples:
+            measurements = [item for sample in resource_samples for item in sample]
+            metadata['resource_summary'] = {
+                'samples': len(resource_samples),
+                'aggregate_peak_sampled_rss_kib': max(sum(item['VmRSS'] for item in sample) for sample in resource_samples),
+                'peak_threads_per_process': max(item['Threads'] for item in measurements),
+                'peak_fds_per_process': max(item['file_descriptors'] for item in measurements),
+                'per_pid': {str(pid): {'peak_rss_kib': max(item['VmRSS'] for item in measurements if item['pid'] == pid),
+                                     'peak_virtual_kib': max(item['VmSize'] for item in measurements if item['pid'] == pid),
+                                     'observed_cpu_seconds': max(item['cpu_seconds'] for item in measurements if item['pid'] == pid) -
+                                                             min(item['cpu_seconds'] for item in measurements if item['pid'] == pid)}
+                            for pid in {item['pid'] for item in measurements}}}
+        metadata['all_children_exited'] = all(process is None or process.poll() is not None for process in (peer, app, restarted_client))
         summary_path.write_text(json.dumps(metadata, indent=2) + "\n")
 
 
