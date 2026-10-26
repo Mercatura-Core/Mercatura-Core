@@ -18,8 +18,9 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'test/functional'))
-from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal, get_rpc_proxy
+# Direct execution outside test/functional requires the source-tree bootstrap.
+from test_framework.test_framework import BitcoinTestFramework  # noqa: E402
+from test_framework.util import assert_equal, get_rpc_proxy  # noqa: E402
 
 
 def process_metrics(node):

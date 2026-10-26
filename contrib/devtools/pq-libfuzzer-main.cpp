@@ -22,9 +22,9 @@ extern "C" int LLVMFuzzerInitialize(int*, char***)
     const char* name=std::getenv("FUZZ");
     auto found=Targets().find(name ? name : "");
     if (found==Targets().end()) {
-        std::fprintf(stderr,"Set FUZZ to one of:");
-        for (const auto& [key,value]:Targets()) std::fprintf(stderr," %s",key.c_str());
-        std::fprintf(stderr,"\n"); std::abort();
+        std::fputs("Set FUZZ to one of:",stderr);
+        for (const auto& [key,value]:Targets()) { std::fputc(' ',stderr); std::fputs(key.c_str(),stderr); }
+        std::fputc('\n',stderr); std::abort();
     }
     found->second.options.init(); selected=found->second.run; return 0;
 }

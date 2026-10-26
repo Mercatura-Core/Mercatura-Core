@@ -12,8 +12,9 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'test/functional'))
-from test_framework.crypto.chacha20 import FSChaCha20
-from test_framework.crypto.bip324_cipher import FSChaCha20Poly1305
+# Direct execution outside test/functional requires the source-tree bootstrap.
+from test_framework.crypto.chacha20 import FSChaCha20  # noqa: E402
+from test_framework.crypto.bip324_cipher import FSChaCha20Poly1305  # noqa: E402
 
 
 def derive():

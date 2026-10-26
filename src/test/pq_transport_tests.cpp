@@ -1,5 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
+#include <util/string.h>
 #include <net_pq.h>
 #include <test/util/setup_common.h>
 #include <util/fs.h>
@@ -136,10 +137,10 @@ BOOST_AUTO_TEST_CASE(source_groups_global_cap_and_recovery)
     auto v6a=LookupHost("2001:db8:1:2::1",false), v6b=LookupHost("2001:db8:1:2::2",false), v6c=LookupHost("2001:db8:1:3::1",false);
     BOOST_REQUIRE(v6a && v6b && v6c); BOOST_CHECK(SourceGroup(*v6a,false)==SourceGroup(*v6b,false)); BOOST_CHECK(SourceGroup(*v6a,false)!=SourceGroup(*v6c,false));
     auto context=std::make_shared<Context>(RegtestNetwork()); std::vector<std::shared_ptr<void>> leases;
-    for (int i=0;i<32;++i) { auto token=context->Admit(std::to_string(i)); BOOST_REQUIRE(token); leases.push_back(token); }
+    for (int i=0;i<32;++i) { auto token=context->Admit(util::ToString(i)); BOOST_REQUIRE(token); leases.push_back(token); }
     BOOST_CHECK(!context->Admit("rate-overflow"));
     std::this_thread::sleep_for(4050ms);
-    for (int i=32;i<64;++i) { auto token=context->Admit(std::to_string(i)); BOOST_REQUIRE(token); leases.push_back(token); }
+    for (int i=32;i<64;++i) { auto token=context->Admit(util::ToString(i)); BOOST_REQUIRE(token); leases.push_back(token); }
     BOOST_CHECK_EQUAL(context->Pending(),64U); BOOST_CHECK(!context->Admit("global-overflow"));
     leases.clear(); BOOST_CHECK_EQUAL(context->Pending(),0U);
     std::this_thread::sleep_for(150ms); BOOST_CHECK(context->Admit("recovery"));
@@ -154,7 +155,7 @@ BOOST_AUTO_TEST_CASE(worker_queue_bound_and_cancelled_publication)
     auto blocking_rng=[&](std::span<uint8_t>) { std::unique_lock lock(mutex); ++entered; cv.notify_all(); cv.wait(lock,[&] { return release; }); return false; };
     std::vector<std::shared_ptr<Work>> jobs;
     for (int i=0;i<2;++i) {
-        auto job=std::make_shared<Work>(1); job->admission=context->Admit("active"+std::to_string(i)); BOOST_REQUIRE(job->admission);
+        auto job=std::make_shared<Work>(1); job->admission=context->Admit("active"+util::ToString(i)); BOOST_REQUIRE(job->admission);
         job->handshake=std::make_unique<Handshake>(true,RegtestNetwork(),std::nullopt,id,blocking_rng);
         BOOST_REQUIRE(context->Submit(job)); jobs.push_back(job);
     }
@@ -163,7 +164,7 @@ BOOST_AUTO_TEST_CASE(worker_queue_bound_and_cancelled_publication)
     PQTransport queued_transport(context,true,{},"pending-transport");
     PQTransport shutdown_transport(context,true,{},"shutdown-transport");
     for (int i=0;i<30;++i) {
-        auto job=std::make_shared<Work>(1); job->admission=context->Admit("queued"+std::to_string(i)); BOOST_REQUIRE(job->admission);
+        auto job=std::make_shared<Work>(1); job->admission=context->Admit("queued"+util::ToString(i)); BOOST_REQUIRE(job->admission);
         job->cancelled=true; BOOST_REQUIRE(context->Submit(job)); jobs.push_back(job);
     }
     auto overflow=std::make_shared<Work>(1); overflow->admission=jobs[0]->admission;
@@ -243,8 +244,8 @@ BOOST_AUTO_TEST_CASE(benchmark, *boost::unit_test::disabled())
             const auto start=Clock::now();
             std::unique_ptr<Transport> i,r;
             if (pq_mode) {
-                i=std::make_unique<PQTransport>(context,true,std::nullopt,"i"+std::to_string(sample));
-                r=std::make_unique<PQTransport>(context,false,std::nullopt,"r"+std::to_string(sample));
+                i=std::make_unique<PQTransport>(context,true,std::nullopt,"i"+util::ToString(sample));
+                r=std::make_unique<PQTransport>(context,false,std::nullopt,"r"+util::ToString(sample));
             } else { i=std::make_unique<V2Transport>(1,true); r=std::make_unique<V2Transport>(2,false); }
             size_t bytes=0;
             while (!(i->GetInfo().session_id && r->GetInfo().session_id)) {
@@ -304,8 +305,8 @@ BOOST_AUTO_TEST_CASE(benchmark, *boost::unit_test::disabled())
     std::vector<std::unique_ptr<PQTransport>> initiators,responders;
     const auto concurrent_start=Clock::now(); const auto concurrent_cpu=std::clock(); unsigned peak_active{0};
     for (unsigned n=0;n<4;++n) {
-        initiators.push_back(std::make_unique<PQTransport>(concurrent,true,std::nullopt,"parallel-i"+std::to_string(n)));
-        responders.push_back(std::make_unique<PQTransport>(concurrent,false,std::nullopt,"parallel-r"+std::to_string(n)));
+        initiators.push_back(std::make_unique<PQTransport>(concurrent,true,std::nullopt,"parallel-i"+util::ToString(n)));
+        responders.push_back(std::make_unique<PQTransport>(concurrent,false,std::nullopt,"parallel-r"+util::ToString(n)));
     }
     for (;;) {
         bool complete=true; size_t moved=0;

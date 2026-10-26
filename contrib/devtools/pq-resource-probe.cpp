@@ -3,6 +3,7 @@
 // Dedicated test executable: allocation interposition is never linked into a
 // node or ordinary unit/sanitizer runner. Requested C++ heap bytes are measured;
 // libc/pthread/allocator arenas and native crypto stack storage are separate.
+#include <util/string.h>
 #include <net_pq.h>
 #include <test/util/setup_common.h>
 #include <univalue.h>
@@ -189,7 +190,12 @@ int main(int argc,char** argv)
             Require(result.ec==std::errc{} && result.ptr==number.data()+number.size() && allocation>=0 && allocation<=32,"invalid bounded allocation index");
             return TransportAllocation(argument.substr(0,colon),allocation);
         }
-        if (argc==2 && std::string_view(argv[1]).starts_with("--allocation-failure=")) return FaultInjection(std::stoi(argv[1]+21));
+        if (argc==2 && std::string_view(argv[1]).starts_with("--allocation-failure=")) {
+            const std::string_view number{argv[1]+21}; int allocation{-1};
+            const auto result=std::from_chars(number.data(),number.data()+number.size(),allocation);
+            Require(result.ec==std::errc{} && result.ptr==number.data()+number.size() && allocation>=0 && allocation<=32,"invalid bounded allocation index");
+            return FaultInjection(allocation);
+        }
         UniValue report{UniValue::VOBJ};
         report.pushKV("measurement","Dedicated global new/delete interposition, requested C++ heap only; excludes probe headers, malloc metadata, libc/pthread and native crypto stack allocations");
         {
@@ -217,8 +223,8 @@ int main(int argc,char** argv)
             allocation_probe::Window window{2};
             std::vector<std::unique_ptr<PQTransport>> initiators,responders;
             for (unsigned n=0;n<4;++n) {
-                initiators.push_back(std::make_unique<PQTransport>(context,true,std::nullopt,"i"+std::to_string(n)));
-                responders.push_back(std::make_unique<PQTransport>(context,false,std::nullopt,"r"+std::to_string(n)));
+                initiators.push_back(std::make_unique<PQTransport>(context,true,std::nullopt,"i"+util::ToString(n)));
+                responders.push_back(std::make_unique<PQTransport>(context,false,std::nullopt,"r"+util::ToString(n)));
             }
             const auto deadline=Clock::now()+10s;
             for (;;) {

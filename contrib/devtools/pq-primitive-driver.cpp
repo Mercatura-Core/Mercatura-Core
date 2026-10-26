@@ -3,6 +3,7 @@
 // Standalone TEST driver. Never link this command interpreter into a node.
 // All input and output must be public deterministic test material.
 
+#include <util/string.h>
 #include <crypto/hkdf_sha3_384.h>
 #include <crypto/hmac_sha3_384.h>
 #include <crypto/mercatura_mldsa.h>
@@ -96,14 +97,14 @@ static std::string Run(std::istringstream& in)
         auto sk = Read(in, 4032);
         std::array<unsigned char, 3309> sig{};
         int rc = mercatura_mldsa65_sign(sig.data(), sig.size(), msg.data(), msg.size(), ctx.data(), ctx.size(), rnd.data(), rnd.size(), sk.data(), sk.size());
-        return std::to_string(rc) + " " + Hex(sig);
+        return util::ToString(rc) + " " + Hex(sig);
     }
     if (op == "dsa-verify") {
         auto sig = Read(in);
         auto msg = Read(in);
         auto ctx = Read(in);
         auto pk = Read(in);
-        return std::to_string(mercatura_mldsa65_verify(sig.data(), sig.size(), msg.data(), msg.size(), ctx.data(), ctx.size(), pk.data(), pk.size()));
+        return util::ToString(mercatura_mldsa65_verify(sig.data(), sig.size(), msg.data(), msg.size(), ctx.data(), ctx.size(), pk.data(), pk.size()));
     }
 #ifdef PQ_CHECK_MLKEM
     if (op == "kem-keygen") {
@@ -111,7 +112,7 @@ static std::string Run(std::istringstream& in)
         std::array<unsigned char, 1184> pk{};
         std::array<unsigned char, 2400> sk{};
         int rc = PQCP_MLKEM_NATIVE_MLKEM768_keypair_derand(pk.data(), sk.data(), coins.data());
-        return std::to_string(rc) + " " + Hex(pk) + " " + Hex(sk);
+        return util::ToString(rc) + " " + Hex(pk) + " " + Hex(sk);
     }
     if (op == "kem-enc") {
         auto pk = Read(in, 1184);
@@ -119,22 +120,22 @@ static std::string Run(std::istringstream& in)
         std::array<unsigned char, 1088> ct{};
         std::array<unsigned char, 32> ss{};
         int rc = PQCP_MLKEM_NATIVE_MLKEM768_enc_derand(ct.data(), ss.data(), pk.data(), coins.data());
-        return std::to_string(rc) + " " + Hex(ct) + " " + Hex(ss);
+        return util::ToString(rc) + " " + Hex(ct) + " " + Hex(ss);
     }
     if (op == "kem-dec") {
         auto sk = Read(in, 2400);
         auto ct = Read(in, 1088);
         std::array<unsigned char, 32> ss{};
         int rc = PQCP_MLKEM_NATIVE_MLKEM768_dec(ss.data(), ct.data(), sk.data());
-        return std::to_string(rc) + " " + Hex(ss);
+        return util::ToString(rc) + " " + Hex(ss);
     }
     if (op == "kem-check-pk") {
         auto pk = Read(in, 1184);
-        return std::to_string(PQCP_MLKEM_NATIVE_MLKEM768_check_pk(pk.data()));
+        return util::ToString(PQCP_MLKEM_NATIVE_MLKEM768_check_pk(pk.data()));
     }
     if (op == "kem-check-sk") {
         auto sk = Read(in, 2400);
-        return std::to_string(PQCP_MLKEM_NATIVE_MLKEM768_check_sk(sk.data()));
+        return util::ToString(PQCP_MLKEM_NATIVE_MLKEM768_check_sk(sk.data()));
     }
 #endif
     throw std::runtime_error("unknown test operation");
