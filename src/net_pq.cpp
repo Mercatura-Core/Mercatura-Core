@@ -8,6 +8,9 @@
 #include <util/chaintype.h>
 #include <algorithm>
 #include <stdexcept>
+#ifdef MERCATURA_PQ_TESTING
+#include <test/util/pq_lifecycle.h>
+#endif
 #ifdef __linux__
 #include <pthread.h>
 #endif
@@ -95,6 +98,9 @@ void Context::Run(size_t index)
         job->started_us = Micros(Clock::now()); job->started = true;
         if (!job->cancelled && Clock::now() - job->queued <= std::chrono::seconds(2)) {
             try {
+#ifdef MERCATURA_PQ_TESTING
+                test::LifecyclePoint(test::Event::BEFORE_CALCULATE, job.get());
+#endif
                 auto rng = SecureRandom();
                 if (!job->handshake) {
                     // An invalid public encoding must not cause an avoidable
@@ -116,6 +122,9 @@ void Context::Run(size_t index)
                 job->ok = job->record.empty() ? job->handshake->Start(job->response) : job->handshake->Advance(job->record, job->response);
             } catch (...) { job->ok = false; }
         }
+#ifdef MERCATURA_PQ_TESTING
+        test::LifecyclePoint(test::Event::AFTER_CALCULATE, job.get());
+#endif
         if (job->cancelled || Micros(Clock::now()) - job->started_us > 5'000'000) {
             job->ok = false; job->handshake.reset(); job->response.clear();
         }
@@ -125,6 +134,9 @@ void Context::Run(size_t index)
             std::lock_guard lock(m_mutex); m_running[index].reset();
             ++m_stats.completed_jobs; m_stats.total_job_us += elapsed; m_stats.max_job_us = std::max(m_stats.max_job_us, elapsed);
         }
+#ifdef MERCATURA_PQ_TESTING
+        test::LifecyclePoint(test::Event::BEFORE_PUBLISH, job.get());
+#endif
         job->done.store(true, std::memory_order_release);
     }
 }

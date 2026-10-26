@@ -232,6 +232,43 @@ endif()
 add_executable(pq_resource_probe EXCLUDE_FROM_ALL ../../contrib/devtools/pq-resource-probe.cpp)
 target_link_libraries(pq_resource_probe PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
 
+# Round B1 fault injection and barriers are absent from ordinary node binaries.
+# GNU linker wrapping observes real cleansing and injects bounded syscall faults.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT SANITIZERS)
+  add_library(pq_b1_main OBJECT EXCLUDE_FROM_ALL ../../contrib/devtools/pq-stagea-test-main.cpp)
+  target_link_libraries(pq_b1_main PRIVATE core_interface Boost::headers)
+  foreach(b1_target IN ITEMS pq_b1_tests pq_b1_sanitizer_tests pq_b1_tsan_tests)
+    add_executable(${b1_target} EXCLUDE_FROM_ALL
+      $<TARGET_OBJECTS:pq_b1_main>
+      pq_lifecycle_tests.cpp
+      util/pq_lifecycle.cpp
+      pq_identity_tests.cpp
+      pq_p2p_tests.cpp
+      pq_transport_tests.cpp
+      ../crypto/mercatura_p2p_crypto.cpp
+      ../net_pq.cpp
+      ../net_pq_protocol.cpp
+      ../net_pq_identity.cpp
+      ../net_pq_identity_format.cpp
+    )
+    target_compile_definitions(${b1_target} PRIVATE MERCATURA_PQ_TESTING)
+    target_compile_options(${b1_target} PRIVATE -g1)
+    target_include_directories(${b1_target} PRIVATE ${PROJECT_SOURCE_DIR}/src/crypto/mlkem_native/mlkem)
+    target_link_libraries(${b1_target} PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
+    target_json_data_sources(${b1_target} data/pq_p2p_candidate1.json data/pq_p2p_packets.json)
+    foreach(wrapped_call IN ITEMS open openat lstat fstat read __read_chk write fsync linkat unlinkat close pthread_create pthread_join _Z14memory_cleansePvm)
+      target_link_options(${b1_target} PRIVATE "LINKER:--wrap=${wrapped_call}")
+    endforeach()
+    if(b1_target STREQUAL "pq_b1_sanitizer_tests")
+      target_compile_options(${b1_target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+      target_link_options(${b1_target} PRIVATE -fsanitize=address,undefined)
+    elseif(b1_target STREQUAL "pq_b1_tsan_tests")
+      target_compile_options(${b1_target} PRIVATE -fsanitize=thread -fno-omit-frame-pointer)
+      target_link_options(${b1_target} PRIVATE -fsanitize=thread)
+    endif()
+  endforeach()
+endif()
+
 add_executable(pq_fuzz_smoke EXCLUDE_FROM_ALL
   ../../contrib/devtools/pq-fuzz-smoke.cpp
   fuzz/pq_transport.cpp

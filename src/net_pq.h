@@ -17,6 +17,7 @@
 #endif
 
 namespace pq {
+namespace test { struct Access; }
 using Clock = std::chrono::steady_clock;
 struct Work {
     const uint64_t generation;
@@ -34,6 +35,7 @@ struct Work {
 
 /** Shared by a single CConnman; absent entirely with default options. */
 class Context {
+    friend struct test::Access;
 public:
     struct ResourceStats {
         unsigned pending{0}, queued{0}, active{0}, peak_pending{0}, peak_queued{0};
@@ -95,6 +97,7 @@ std::shared_ptr<const Identity> LoadIdentity(const std::string& path, bool creat
 std::string SourceGroup(const CNetAddr& address, bool anonymous);
 
 class PQTransport final : public Transport {
+    friend struct test::Access;
     std::shared_ptr<Context> m_context;
     const bool m_initiator;
     const std::optional<Digest> m_pin;

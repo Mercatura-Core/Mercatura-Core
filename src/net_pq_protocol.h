@@ -14,6 +14,7 @@
 #include <vector>
 
 namespace pq {
+namespace test { struct Access; }
 using Bytes = std::vector<uint8_t>;
 using Network = std::array<uint8_t, 85>;
 inline constexpr std::string_view PREFACE{"Mercatura/P2P/PQ"};
@@ -35,6 +36,7 @@ struct SessionKeys {
 
 /** Worker-owned: never access while the job is running. No sockets or locks. */
 class Handshake {
+    friend struct test::Access;
     const bool m_initiator;
     const Network m_network;
     const std::optional<Digest> m_pin;
