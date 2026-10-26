@@ -59,6 +59,12 @@ Context::Context(Network net, std::shared_ptr<const Identity> id, std::map<std::
     } catch (...) { Stop(); throw; }
 }
 Context::~Context() { Stop(); }
+void Work::Discard()
+{
+    ok = false;
+    if (handshake) pin_mismatch = handshake->PinMismatch();
+    handshake.reset(); record.clear(); response.clear(); admission.reset();
+}
 void Context::Stop()
 {
     { std::lock_guard lock(m_quota->mutex); m_quota->stopped = true; }
@@ -68,6 +74,9 @@ void Context::Stop()
         for (auto& weak : m_running) if (auto job = weak.lock()) job->cancelled = true;
         for (auto& job : m_queue) job->cancelled = true;
         abandoned.swap(m_queue);
+    }
+    for (auto& job : abandoned) {
+        job->Discard(); job->done.store(true, std::memory_order_release);
     }
     m_cv.notify_all(); abandoned.clear();
     for (auto& worker : m_workers) {
@@ -125,9 +134,8 @@ void Context::Run(size_t index)
 #ifdef MERCATURA_PQ_TESTING
         test::LifecyclePoint(test::Event::AFTER_CALCULATE, job.get());
 #endif
-        if (job->cancelled || Micros(Clock::now()) - job->started_us > 5'000'000) {
-            job->ok = false; job->handshake.reset(); job->response.clear();
-        }
+        if (job->cancelled || Micros(Clock::now()) - job->started_us > 5'000'000) job->ok = false;
+        if (!job->ok) job->Discard();
         job->record.clear();
         const auto elapsed = uint64_t(std::max(int64_t{0}, Micros(Clock::now())-job->started_us));
         {
@@ -278,7 +286,7 @@ bool PQTransport::Poll()
         }
         auto result = std::move(m_work);
         if (result->generation != m_generation || result->cancelled || !result->ok) {
-            m_context->ReportFailure(result->handshake && result->handshake->PinMismatch() ? "expected identity mismatch (pin is never replaced)" : "authentication or cancelled crypto job");
+            m_context->ReportFailure(result->pin_mismatch ? "expected identity mismatch (pin is never replaced)" : "authentication or cancelled crypto job");
             return Fail(false);
         }
         m_handshake = std::move(result->handshake); m_expected = m_handshake->Next();

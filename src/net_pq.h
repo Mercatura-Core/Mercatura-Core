@@ -25,12 +25,15 @@ struct Work {
     std::atomic<bool> cancelled{false}, started{false}, done{false};
     std::atomic<int64_t> started_us{0};
     bool ok{false};
+    bool pin_mismatch{false};
     bool initiator{false};
     std::optional<Digest> pin;
     std::unique_ptr<Handshake> handshake;
     Bytes record, response;
     std::shared_ptr<void> admission;
     Work(uint64_t gen) : generation(gen) {}
+    // Only the exclusive worker, or Stop after removing a queued job, may call.
+    void Discard();
 };
 
 /** Shared by a single CConnman; absent entirely with default options. */

@@ -275,6 +275,47 @@ BOOST_AUTO_TEST_CASE(worker_exception_then_recovery)
     Drive(i,r,[&] { return i.GetInfo().pq_encrypted && r.GetInfo().pq_encrypted; });
     i.Disconnect(); r.Disconnect(); context->Stop(); BOOST_CHECK_EQUAL(context->Pending(),0U);
 }
+BOOST_AUTO_TEST_CASE(failed_worker_discards_owned_secrets_before_publication)
+{
+    auto context=std::make_shared<Context>(RegtestNetwork());
+    auto identity=std::make_shared<Identity>(); BOOST_REQUIRE(identity->FromSeed(std::array<uint8_t,32>{}));
+    std::weak_ptr<const Identity> owner=identity;
+    unsigned draws{0};
+    auto rng=[&](std::span<uint8_t> bytes) {
+        if (++draws==2) throw std::runtime_error("synthetic nonce RNG failure after KEM generation");
+        std::fill(bytes.begin(),bytes.end(),42); return true;
+    };
+    auto job=std::make_shared<Work>(1); job->initiator=true;
+    job->admission=context->Admit("failed-secret-owner");
+    job->handshake=std::make_unique<Handshake>(true,RegtestNetwork(),std::nullopt,identity,rng);
+    identity.reset(); BOOST_REQUIRE(context->Submit(job)); WaitDone(job);
+    BOOST_CHECK(!job->ok); BOOST_CHECK(!job->handshake); BOOST_CHECK(job->response.empty());
+    BOOST_CHECK(!job->admission); BOOST_CHECK(owner.expired()); BOOST_CHECK_EQUAL(context->Pending(),0U);
+    context->Stop();
+}
+BOOST_AUTO_TEST_CASE(stop_discards_queued_handshake_even_with_external_job_owner)
+{
+    Gate gate,joining; Hooks hooks;
+    hooks.point=[&](Event event,Work*) { if (event==Event::BEFORE_CALCULATE) gate.Hold(); };
+    hooks.joining=[&] { joining.Release(); };
+    ScopedHooks scope(hooks); auto context=std::make_shared<Context>(RegtestNetwork());
+    Cleanup cleanup{[&] { gate.Release(); context->Stop(); }};
+    PQTransport first(context,true,std::nullopt,"busy-a"),second(context,true,std::nullopt,"busy-b");
+    BOOST_REQUIRE(gate.Wait(2));
+    auto identity=std::make_shared<Identity>(); BOOST_REQUIRE(identity->FromSeed(std::array<uint8_t,32>{}));
+    std::weak_ptr<const Identity> owner=identity;
+    auto rng=[](std::span<uint8_t> out) { std::fill(out.begin(),out.end(),42); return true; };
+    auto job=std::make_shared<Work>(1); job->admission=context->Admit("queued-secret-owner");
+    job->handshake=std::make_unique<Handshake>(true,RegtestNetwork(),std::nullopt,identity,rng);
+    BOOST_REQUIRE(job->handshake->Start(job->response)); identity.reset();
+    BOOST_REQUIRE(context->Submit(job));
+    auto stopping=std::async(std::launch::async,[&] { context->Stop(); });
+    { std::unique_lock lock(joining.mutex); BOOST_CHECK(joining.cv.wait_for(lock,3s,[&] { return joining.released; })); }
+    gate.Release(); stopping.get();
+    BOOST_CHECK(job->cancelled.load()); BOOST_CHECK(job->done.load()); BOOST_CHECK(!job->ok);
+    BOOST_CHECK(!job->handshake); BOOST_CHECK(job->response.empty()); BOOST_CHECK(!job->admission); BOOST_CHECK(owner.expired());
+    first.Disconnect(); second.Disconnect(); BOOST_CHECK_EQUAL(context->Pending(),0U);
+}
 BOOST_AUTO_TEST_CASE(shared_persistent_identity_concurrent_sessions_are_isolated)
 {
     auto identity = std::make_shared<Identity>(); BOOST_REQUIRE(identity->FromSeed(std::array<uint8_t,32>{}));
