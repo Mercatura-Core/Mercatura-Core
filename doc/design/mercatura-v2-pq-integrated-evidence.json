@@ -1,0 +1,688 @@
+{
+  "validated_source_head": "c2e6f1a9d1136ceed19ba8083ed52b7a0dff5b11",
+  "branch": "validation/pq-v2-integrated-hardening",
+  "integration_base": "bfc8f3bf5d4559be591655c867c33100c4c3fa48",
+  "environment": {
+    "os": "Linux-6.18.55-x86_64-with-glibc2.41",
+    "machine": "x86_64",
+    "gcc": "g++ (Debian 14.2.0-19) 14.2.0",
+    "cmake": "3.31.6",
+    "clang": "19.1.7",
+    "qt": "6.8.2",
+    "boost": "1.83.0",
+    "libevent": "2.1.12-stable",
+    "sqlite_headers": "3.46.1",
+    "cpu_quota": "200000 100000",
+    "memory_limit_bytes": 8589934592,
+    "cpu_model": "Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz"
+  },
+  "unit_groups": [
+    {
+      "group": "consensus",
+      "suites": "crypto_tests,mercahash_v2_tests,mercahash_activation_tests,mercahash_activation_tests_transition,pow_tests,block_capacity_tests,witness_resource_tests,witness_resource_tests_chain,witness_resource_tests_net",
+      "exit": 0,
+      "seconds": 182.4186788500001,
+      "passed_cases": 95,
+      "passed_assertions": 38736
+    },
+    {
+      "group": "pq-network",
+      "suites": "pq_p2p_tests,pq_identity_tests,pq_transport_tests,bip324_tests,key_tests,script_tests",
+      "exit": 0,
+      "seconds": 15.787231164999866,
+      "passed_cases": 57,
+      "passed_assertions": 565634
+    },
+    {
+      "group": "native-mining",
+      "suites": "cpu_miner_tests,mining_tests_wallet,mining_tests_solo,mining_tests_v2,mercahash_gpu_tests,mercahash_gpu_sync_tests,cuda_binding_tests,gpu_capacity_tests,gpu_scheduling_tests,gpu_miner_tests,mining_statistics_tests",
+      "exit": 0,
+      "seconds": 192.39664894499992,
+      "passed_cases": 69,
+      "passed_assertions": 68361
+    },
+    {
+      "group": "wallet",
+      "suites": "wallet_crypto_tests,encryption_persistence_tests,scriptpubkeyman_tests",
+      "exit": 0,
+      "seconds": 19.550835992999964,
+      "passed_cases": 13,
+      "passed_assertions": 3657
+    },
+    {
+      "group": "adjacent-network",
+      "suites": "net_tests,netbase_tests,protocol_tests,blockencodings_tests",
+      "exit": 0,
+      "seconds": 17.856987799999843,
+      "passed_cases": 42,
+      "passed_assertions": 135373
+    }
+  ],
+  "real_nodes": [
+    {
+      "schedule": "v2",
+      "network": "isolated loopback regtest",
+      "txid": "abe04b50609d50ff3a5c31021e360f76db2136816d16ad07e0ee4b1042b47bad",
+      "relayed_block": "d4b3a8c9186a225bb446eacec4c7cb610785e2e2210c899394e5dfa4744c0e10",
+      "height": 103,
+      "handshake_bytes": 15488,
+      "ephemeral_reconnect_changed_identities": true,
+      "wrong_pin_rejected_without_fallback": true,
+      "mercahash_v2_height": 0,
+      "explicit_rotation_and_pin_update": true,
+      "post_restart_tip": "6f59fa37e23c7817828899070cc50bf9712f53ff8ac8a868bdebae34a7fd248d",
+      "confirmed_receiver_balance": "1.00",
+      "connection_including_version_pong_ms": 213.89455200005614,
+      "reconnection_including_version_pong_ms": 210.32438200018078,
+      "peers": [
+        {
+          "transport_protocol_type": "pq-v1",
+          "session_id": "e67e79d96d6336eeb93231b67bb4976e740b83571e408b04b5596b7517a0c08d",
+          "inbound": true,
+          "pq_encrypted": true,
+          "pq_authenticated": true,
+          "pq_identity_verified": false,
+          "pq_identity": "mcapq1:00115eb91defa78d05d973a31ddcdb05f303de4da3714d8a52f52fb43ea9e4903bb6c2624b0dd529bdf9bd5ad5aed61e",
+          "pq_kem": "ML-KEM-768",
+          "pq_auth_algorithm": "ML-DSA-65",
+          "bytesrecv": 9008,
+          "bytesrecv_per_msg": {
+            "feefilter": 29,
+            "getaddr": 33,
+            "getdata": 58,
+            "getheaders": 634,
+            "headers": 103,
+            "ping": 29,
+            "pong": 29,
+            "sendaddrv2": 33,
+            "sendcmpct": 60,
+            "sendheaders": 33,
+            "verack": 33,
+            "version": 151,
+            "wtxidrelay": 33
+          }
+        },
+        {
+          "transport_protocol_type": "pq-v1",
+          "session_id": "e67e79d96d6336eeb93231b67bb4976e740b83571e408b04b5596b7517a0c08d",
+          "inbound": false,
+          "pq_encrypted": true,
+          "pq_authenticated": true,
+          "pq_identity_verified": true,
+          "pq_identity": "mcapq1:783fe4f13b585aac58ec4f12ab555a142aac2f12bac454810491efd4931ac0178bc5e8a7ee0c01d08147139b56912d32",
+          "pq_kem": "ML-KEM-768",
+          "pq_auth_algorithm": "ML-DSA-65",
+          "bytesrecv": 9270,
+          "bytesrecv_per_msg": {
+            "cmpctblock": 292,
+            "feefilter": 29,
+            "getheaders": 634,
+            "headers": 206,
+            "ping": 29,
+            "pong": 29,
+            "sendaddrv2": 33,
+            "sendcmpct": 30,
+            "sendheaders": 33,
+            "verack": 33,
+            "version": 151,
+            "wtxidrelay": 33
+          }
+        }
+      ]
+    },
+    {
+      "schedule": "transition",
+      "network": "isolated loopback regtest",
+      "txid": "5db502c62d8ece632c85d1f1074c6d51cb2ce90b1cf7c4e8ff41bb43fe0fda7e",
+      "relayed_block": "69abb28d3bcfcc7a574331fc095d5374afc1bf9a511344478eabb547bdb9f2a8",
+      "height": 103,
+      "handshake_bytes": 15488,
+      "ephemeral_reconnect_changed_identities": true,
+      "wrong_pin_rejected_without_fallback": true,
+      "mercahash_v2_height": 20,
+      "explicit_rotation_and_pin_update": true,
+      "post_restart_tip": "55c0c9d79edbc9c49a89dd80c7fb7345f13b07524f3e8991cd65f12d466d12ff",
+      "confirmed_receiver_balance": "1.00",
+      "connection_including_version_pong_ms": 270.5383959998926,
+      "reconnection_including_version_pong_ms": 265.7235860001492,
+      "peers": [
+        {
+          "transport_protocol_type": "pq-v1",
+          "session_id": "ce2d4cdcaa5661e9938b2ef17afab0b1365f183b7cc25abe45e0381c53a96192",
+          "inbound": true,
+          "pq_encrypted": true,
+          "pq_authenticated": true,
+          "pq_identity_verified": false,
+          "pq_identity": "mcapq1:a9c2a1d89bee931ce7f41fa06a802be4e41b452ebbd76b70edf9db60d1ff8694748256a09cbffd53b8daa83090d37a1d",
+          "pq_kem": "ML-KEM-768",
+          "pq_auth_algorithm": "ML-DSA-65",
+          "bytesrecv": 9008,
+          "bytesrecv_per_msg": {
+            "feefilter": 29,
+            "getaddr": 33,
+            "getdata": 58,
+            "getheaders": 634,
+            "headers": 103,
+            "ping": 29,
+            "pong": 29,
+            "sendaddrv2": 33,
+            "sendcmpct": 60,
+            "sendheaders": 33,
+            "verack": 33,
+            "version": 151,
+            "wtxidrelay": 33
+          }
+        },
+        {
+          "transport_protocol_type": "pq-v1",
+          "session_id": "ce2d4cdcaa5661e9938b2ef17afab0b1365f183b7cc25abe45e0381c53a96192",
+          "inbound": false,
+          "pq_encrypted": true,
+          "pq_authenticated": true,
+          "pq_identity_verified": true,
+          "pq_identity": "mcapq1:fcf4602705e9d74e30cb9f094dfdbef36d2f1cdc2d44287e85b5e9a8ff785d26ad0f44373d70ddd9a32fc2abea9d82b1",
+          "pq_kem": "ML-KEM-768",
+          "pq_auth_algorithm": "ML-DSA-65",
+          "bytesrecv": 9270,
+          "bytesrecv_per_msg": {
+            "cmpctblock": 292,
+            "feefilter": 29,
+            "getheaders": 634,
+            "headers": 206,
+            "ping": 29,
+            "pong": 29,
+            "sendaddrv2": 33,
+            "sendcmpct": 30,
+            "sendheaders": 33,
+            "verack": 33,
+            "version": 151,
+            "wtxidrelay": 33
+          }
+        }
+      ]
+    },
+    {
+      "schedule": "v1",
+      "network": "isolated loopback regtest",
+      "txid": "98066a7badae62bbf625d61e14d8777b17f8c84ae89918dceba1c281b975cd92",
+      "relayed_block": "e6ed926e5866b4bdf57f71ceda21eb5600cf5e45975150a42f048640021cd312",
+      "height": 103,
+      "handshake_bytes": 15488,
+      "ephemeral_reconnect_changed_identities": true,
+      "wrong_pin_rejected_without_fallback": true,
+      "mercahash_v2_height": -1,
+      "explicit_rotation_and_pin_update": true,
+      "post_restart_tip": "b108714ca1c7b62de4289fb9a32f5844a91a670542c23b30b08ed1850be5db97",
+      "confirmed_receiver_balance": "1.00",
+      "connection_including_version_pong_ms": 167.53607600003306,
+      "reconnection_including_version_pong_ms": 263.71945000005326,
+      "peers": [
+        {
+          "transport_protocol_type": "pq-v1",
+          "session_id": "9b408cdcde9dfc775c5a49436ad250bce42f791b1fd9949cd6b84cff520f08c8",
+          "inbound": true,
+          "pq_encrypted": true,
+          "pq_authenticated": true,
+          "pq_identity_verified": false,
+          "pq_identity": "mcapq1:e02f5e5effe9e1821db2b0bfd799df240d3f2408e93e9f204783e6f2033512f66a10abf4f4b3c8a41640a6264225ca49",
+          "pq_kem": "ML-KEM-768",
+          "pq_auth_algorithm": "ML-DSA-65",
+          "bytesrecv": 9066,
+          "bytesrecv_per_msg": {
+            "feefilter": 29,
+            "getaddr": 33,
+            "getdata": 58,
+            "getheaders": 634,
+            "headers": 103,
+            "ping": 58,
+            "pong": 58,
+            "sendaddrv2": 33,
+            "sendcmpct": 60,
+            "sendheaders": 33,
+            "verack": 33,
+            "version": 151,
+            "wtxidrelay": 33
+          }
+        },
+        {
+          "transport_protocol_type": "pq-v1",
+          "session_id": "9b408cdcde9dfc775c5a49436ad250bce42f791b1fd9949cd6b84cff520f08c8",
+          "inbound": false,
+          "pq_encrypted": true,
+          "pq_authenticated": true,
+          "pq_identity_verified": true,
+          "pq_identity": "mcapq1:565e08fb262a847136d51255d17f38d8609b0b677502039b62ef2b2411fdbaafcf8887d284345943e0976ad030d1e09f",
+          "pq_kem": "ML-KEM-768",
+          "pq_auth_algorithm": "ML-DSA-65",
+          "bytesrecv": 9328,
+          "bytesrecv_per_msg": {
+            "cmpctblock": 292,
+            "feefilter": 29,
+            "getheaders": 634,
+            "headers": 206,
+            "ping": 58,
+            "pong": 58,
+            "sendaddrv2": 33,
+            "sendcmpct": 30,
+            "sendheaders": 33,
+            "verack": 33,
+            "version": 151,
+            "wtxidrelay": 33
+          }
+        }
+      ]
+    }
+  ],
+  "guided_fuzz": [
+    {
+      "target": "pq_handshake",
+      "command": [
+        "/workspace/work/build-pq-sanitized/bin/pq_fuzz",
+        "/workspace/work/fuzz-integrated/pq_handshake",
+        "-max_total_time=120",
+        "-max_len=16384",
+        "-timeout=10",
+        "-rss_limit_mb=1024",
+        "-seed=1000",
+        "-print_final_stats=1",
+        "-artifact_prefix=/workspace/work/fuzz-integrated/pq_handshake-artifacts/"
+      ],
+      "wall_seconds": 121.19090667800003,
+      "returncode": 0,
+      "executions": 5035,
+      "edge_coverage_counter": 2087,
+      "feature_counter": 5317,
+      "corpus_files": 71,
+      "corpus_bytes": 618,
+      "crash_artifacts": [],
+      "leak_check_requested": true
+    },
+    {
+      "target": "pq_packet",
+      "command": [
+        "/workspace/work/build-pq-sanitized/bin/pq_fuzz",
+        "/workspace/work/fuzz-integrated/pq_packet",
+        "-max_total_time=120",
+        "-max_len=16384",
+        "-timeout=10",
+        "-rss_limit_mb=1024",
+        "-seed=1001",
+        "-print_final_stats=1",
+        "-artifact_prefix=/workspace/work/fuzz-integrated/pq_packet-artifacts/"
+      ],
+      "wall_seconds": 121.70054368499996,
+      "returncode": 0,
+      "executions": 1590756,
+      "edge_coverage_counter": 525,
+      "feature_counter": 1326,
+      "corpus_files": 69,
+      "corpus_bytes": 26689,
+      "crash_artifacts": [],
+      "leak_check_requested": true
+    },
+    {
+      "target": "pq_packet_stream",
+      "command": [
+        "/workspace/work/build-pq-sanitized/bin/pq_fuzz",
+        "/workspace/work/fuzz-integrated/pq_packet_stream",
+        "-max_total_time=120",
+        "-max_len=16384",
+        "-timeout=10",
+        "-rss_limit_mb=1024",
+        "-seed=1002",
+        "-print_final_stats=1",
+        "-artifact_prefix=/workspace/work/fuzz-integrated/pq_packet_stream-artifacts/"
+      ],
+      "wall_seconds": 121.83900282199988,
+      "returncode": 0,
+      "executions": 10765,
+      "edge_coverage_counter": 497,
+      "feature_counter": 1745,
+      "corpus_files": 43,
+      "corpus_bytes": 690,
+      "crash_artifacts": [],
+      "leak_check_requested": true
+    },
+    {
+      "target": "pq_identity",
+      "command": [
+        "/workspace/work/build-pq-sanitized/bin/pq_fuzz",
+        "/workspace/work/fuzz-integrated/pq_identity",
+        "-max_total_time=120",
+        "-max_len=16384",
+        "-timeout=10",
+        "-rss_limit_mb=1024",
+        "-seed=1003",
+        "-print_final_stats=1",
+        "-artifact_prefix=/workspace/work/fuzz-integrated/pq_identity-artifacts/"
+      ],
+      "wall_seconds": 121.20232806100012,
+      "returncode": 0,
+      "executions": 88595,
+      "edge_coverage_counter": 1000,
+      "feature_counter": 1660,
+      "corpus_files": 85,
+      "corpus_bytes": 6713,
+      "crash_artifacts": [],
+      "leak_check_requested": true
+    },
+    {
+      "target": "pq_headers",
+      "command": [
+        "/workspace/work/build-pq-sanitized/bin/pq_fuzz",
+        "/workspace/work/fuzz-integrated/pq_headers",
+        "-max_total_time=120",
+        "-max_len=16384",
+        "-timeout=10",
+        "-rss_limit_mb=1024",
+        "-seed=1004",
+        "-print_final_stats=1",
+        "-artifact_prefix=/workspace/work/fuzz-integrated/pq_headers-artifacts/"
+      ],
+      "wall_seconds": 121.74733710999999,
+      "returncode": 0,
+      "executions": 19126418,
+      "edge_coverage_counter": 45,
+      "feature_counter": 53,
+      "corpus_files": 10,
+      "corpus_bytes": 83,
+      "crash_artifacts": [],
+      "leak_check_requested": true
+    },
+    {
+      "target": "pq_command",
+      "command": [
+        "/workspace/work/build-pq-sanitized/bin/pq_fuzz",
+        "/workspace/work/fuzz-integrated/pq_command",
+        "-max_total_time=120",
+        "-max_len=16384",
+        "-timeout=10",
+        "-rss_limit_mb=1024",
+        "-seed=1005",
+        "-print_final_stats=1",
+        "-artifact_prefix=/workspace/work/fuzz-integrated/pq_command-artifacts/"
+      ],
+      "wall_seconds": 121.975218262,
+      "returncode": 0,
+      "executions": 30994713,
+      "edge_coverage_counter": 60,
+      "feature_counter": 114,
+      "corpus_files": 273,
+      "corpus_bytes": 477,
+      "crash_artifacts": [],
+      "leak_check_requested": true
+    }
+  ],
+  "adapter_sanitizers": [
+    {
+      "sanitizer": "asan-ubsan",
+      "exit": 0,
+      "seconds": 12.461784598999657
+    },
+    {
+      "sanitizer": "tsan",
+      "exit": 0,
+      "seconds": 12.713897531000384
+    }
+  ],
+  "resource_probe": {
+    "measurement": "Dedicated global new/delete interposition, requested C++ heap only; excludes probe headers, malloc metadata, libc/pthread and native crypto stack allocations",
+    "idle_context_lifecycle": {
+      "peak_requested_cpp_heap_bytes": 1832,
+      "retained_requested_cpp_heap_bytes": 0,
+      "cpp_allocations": 8
+    },
+    "partial_m1_one_endpoint": {
+      "peak_requested_cpp_heap_bytes": 3998,
+      "retained_requested_cpp_heap_bytes": 0,
+      "cpp_allocations": 18
+    },
+    "four_concurrent_sessions_eight_endpoints": {
+      "peak_requested_cpp_heap_bytes": 135659,
+      "retained_requested_cpp_heap_bytes": 0,
+      "cpp_allocations": 874
+    }
+  },
+  "allocation_faults": [
+    {
+      "allocation_failure_caught": true,
+      "pending_after_failed_allocation": 0
+    },
+    {
+      "allocation_failure_caught": true,
+      "pending_after_failed_allocation": 0
+    }
+  ],
+  "native_qt_mining": [
+    {
+      "build_dir": "/workspace/work/build-integrated",
+      "mode": "cpu",
+      "schedule": "transition",
+      "harder": false,
+      "workers": 1,
+      "device": "",
+      "contexts": 0,
+      "seconds": 10,
+      "deadline": 180,
+      "output_parent": "/workspace/work/build-integrated/test/mining-pq",
+      "offscreen": true,
+      "pq": true,
+      "status": "PASSED",
+      "pq_observed_endpoints": [
+        "client",
+        "peer"
+      ],
+      "mining_node_restarted": true,
+      "restart_pq_session": "a39cd8c63646295b2d2423dbf6fdef5caca343dc7b001029afeb246ccde14ee8",
+      "observed_mining_height": 39,
+      "observed_mining_hash": "5acb39ffaeaebaa3c27f2ca432845638aed31638414dd845537d092a3190ad2c",
+      "peer_prefix_matches": true,
+      "restart_tip_matches": true,
+      "restarted_client_verifychain": true,
+      "peer_height": 39,
+      "peer_verifychain": true,
+      "qt_result": {
+        "accepted": "19",
+        "activation": 20,
+        "close_backlog": 0,
+        "close_complete_ms": 114,
+        "close_handler_ms": 8,
+        "cpu_hashes": "36",
+        "event": "result",
+        "gpu_hashes": "0",
+        "harder": false,
+        "heartbeat_gap_ms": 62,
+        "mode": "cpu",
+        "rapid_wallet": false,
+        "result": 0,
+        "session_destroyed": true,
+        "stop_backlog": 0,
+        "stop_complete_ms": 30,
+        "stop_dispatch_ms": 1,
+        "stop_handler_ms": 0,
+        "wallet_reopened": false,
+        "wallet_verified": false,
+        "workers": 1
+      },
+      "elapsed_seconds": 34.699
+    },
+    {
+      "build_dir": "/workspace/work/build-integrated",
+      "mode": "cpu",
+      "schedule": "v2",
+      "harder": false,
+      "workers": 1,
+      "device": "",
+      "contexts": 0,
+      "seconds": 10,
+      "deadline": 180,
+      "output_parent": "/workspace/work/build-integrated/test/mining-pq",
+      "offscreen": true,
+      "pq": true,
+      "status": "PASSED",
+      "pq_observed_endpoints": [
+        "client",
+        "peer"
+      ],
+      "mining_node_restarted": true,
+      "restart_pq_session": "718727afa879feeae57a7d1fc51c11ca38b498c3f52723b606381b22c653073c",
+      "observed_mining_height": 112,
+      "observed_mining_hash": "98a638dae9302e72cf7c3d5b30f6a8af08c95417c44bf897bdc90251c2149301",
+      "peer_prefix_matches": true,
+      "restart_tip_matches": true,
+      "restarted_client_verifychain": true,
+      "peer_height": 112,
+      "peer_verifychain": true,
+      "qt_result": {
+        "accepted": "96",
+        "activation": 0,
+        "close_backlog": 0,
+        "close_complete_ms": 118,
+        "close_handler_ms": 40,
+        "cpu_hashes": "208",
+        "event": "result",
+        "gpu_hashes": "0",
+        "harder": false,
+        "heartbeat_gap_ms": 123,
+        "mode": "cpu",
+        "rapid_wallet": false,
+        "result": 0,
+        "session_destroyed": true,
+        "stop_backlog": 0,
+        "stop_complete_ms": 19,
+        "stop_dispatch_ms": 1,
+        "stop_handler_ms": 0,
+        "wallet_reopened": false,
+        "wallet_verified": false,
+        "workers": 1
+      },
+      "elapsed_seconds": 26.749
+    },
+    {
+      "build_dir": "/workspace/work/build-integrated",
+      "mode": "cpu",
+      "schedule": "v2",
+      "harder": false,
+      "workers": 2,
+      "device": "",
+      "contexts": 0,
+      "seconds": 10,
+      "deadline": 180,
+      "output_parent": "/workspace/work/qt-two-worker",
+      "offscreen": true,
+      "pq": true,
+      "status": "PASSED",
+      "pq_observed_endpoints": [
+        "client",
+        "peer"
+      ],
+      "mining_node_restarted": true,
+      "restart_pq_session": "1cded890ece20a366966a0ed978d85c7848f98f12e6b014832f1ba72db89d8bd",
+      "observed_mining_height": 70,
+      "observed_mining_hash": "b760074e44cf4c622bb44f4cb40040e7c61325ab71a2688ebcc5f8d5383b46c0",
+      "peer_prefix_matches": true,
+      "restart_tip_matches": true,
+      "restarted_client_verifychain": true,
+      "peer_height": 70,
+      "peer_verifychain": true,
+      "qt_result": {
+        "accepted": "51",
+        "activation": 0,
+        "close_backlog": 0,
+        "close_complete_ms": 108,
+        "close_handler_ms": 84,
+        "cpu_hashes": "170",
+        "event": "result",
+        "gpu_hashes": "0",
+        "harder": false,
+        "heartbeat_gap_ms": 212,
+        "mode": "cpu",
+        "rapid_wallet": false,
+        "result": 0,
+        "session_destroyed": true,
+        "stop_backlog": 0,
+        "stop_complete_ms": 57,
+        "stop_dispatch_ms": 1,
+        "stop_handler_ms": 0,
+        "wallet_reopened": false,
+        "wallet_verified": false,
+        "workers": 2
+      },
+      "elapsed_seconds": 23.982
+    }
+  ],
+  "initial_mining_fixture_failures": [
+    {
+      "build_dir": "/workspace/work/build-integrated",
+      "mode": "cpu",
+      "schedule": "transition",
+      "harder": false,
+      "workers": 1,
+      "device": "",
+      "contexts": 0,
+      "seconds": 10,
+      "deadline": 180,
+      "output_parent": "/workspace/work/build-integrated/test/mining-pq",
+      "offscreen": true,
+      "pq": true,
+      "status": "FAILED",
+      "pq_observed_endpoints": [
+        "client",
+        "peer"
+      ],
+      "reason": "Independent peer did not synchronize the mined chain",
+      "elapsed_seconds": 44.821
+    },
+    {
+      "build_dir": "/workspace/work/build-integrated",
+      "mode": "cpu",
+      "schedule": "v2",
+      "harder": false,
+      "workers": 1,
+      "device": "",
+      "contexts": 0,
+      "seconds": 10,
+      "deadline": 180,
+      "output_parent": "/workspace/work/build-integrated/test/mining-pq",
+      "offscreen": true,
+      "pq": true,
+      "status": "FAILED",
+      "pq_observed_endpoints": [
+        "client",
+        "peer"
+      ],
+      "reason": "Independent peer did not synchronize the mined chain",
+      "elapsed_seconds": 36.59
+    }
+  ],
+  "source_commits": [
+    {
+      "sha": "344c2cc73099598d986dacd6549462c80b1e9df0",
+      "title": "lint: preserve pinned ML-KEM source conventions"
+    },
+    {
+      "sha": "d86a8d798b1ab121be786c9e82c07f355d4e63b0",
+      "title": "lint: mark PQ developer and functional scripts executable"
+    },
+    {
+      "sha": "7fdacea0b30432044ceb42146e698c5d2a9baa9e",
+      "title": "lint: complete PQ header guard comments"
+    },
+    {
+      "sha": "339136629a39ee6abbe8fa37cf8243069c97ad3b",
+      "title": "test: reject PQ cross-session and network-domain substitutions"
+    },
+    {
+      "sha": "71419e5d09a1e7ff7618faf6e1dd64672b1ad3f9",
+      "title": "test: qualify PQ relay across V2 schedules and explicit identity rotation"
+    },
+    {
+      "sha": "0dd3de768de820409d5ca10a3b9802028b865dba",
+      "title": "test: qualify PQ adapter and storage with ASan UBSan and TSan"
+    },
+    {
+      "sha": "c2e6f1a9d1136ceed19ba8083ed52b7a0dff5b11",
+      "title": "test: qualify native V2 mining over PQ with restart recovery"
+    }
+  ]
+}
