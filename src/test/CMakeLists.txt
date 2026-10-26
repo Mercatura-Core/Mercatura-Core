@@ -203,6 +203,32 @@ add_executable(pq_transport_runner EXCLUDE_FROM_ALL
 )
 target_link_libraries(pq_transport_runner PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
 
+# Instrument the complete PQ adapter/storage boundary without rebuilding every
+# Core dependency. The explicitly listed objects satisfy the PQ symbols before
+# bitcoin_node is searched. Other Core libraries remain uninstrumented; this is
+# an adapter qualification target, not a whole-node sanitizer build.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT WIN32 AND NOT SANITIZERS)
+  foreach(adapter_target IN ITEMS pq_adapter_sanitizer_tests pq_adapter_tsan_tests)
+    add_executable(${adapter_target} EXCLUDE_FROM_ALL
+      ../../contrib/devtools/pq-stagea-test-main.cpp
+      pq_transport_tests.cpp
+      ../net_pq.cpp
+      ../net_pq_protocol.cpp
+      ../net_pq_identity.cpp
+      ../net_pq_identity_format.cpp
+    )
+    if(adapter_target STREQUAL "pq_adapter_tsan_tests")
+      set(adapter_sanitizers thread)
+    else()
+      set(adapter_sanitizers address,undefined)
+    endif()
+    target_compile_options(${adapter_target} PRIVATE -fsanitize=${adapter_sanitizers} -fno-omit-frame-pointer)
+    target_link_options(${adapter_target} PRIVATE -fsanitize=${adapter_sanitizers})
+    target_link_libraries(${adapter_target} PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
+  endforeach()
+  unset(adapter_sanitizers)
+endif()
+
 add_executable(pq_resource_probe EXCLUDE_FROM_ALL ../../contrib/devtools/pq-resource-probe.cpp)
 target_link_libraries(pq_resource_probe PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
 
