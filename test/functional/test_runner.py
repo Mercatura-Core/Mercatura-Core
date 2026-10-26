@@ -106,6 +106,8 @@ MERCATURA_SCRIPTS = [
     'mercatura_network_identity.py',
     'mercatura_p2p_propagation.py',
     'feature_pq_transport.py',
+    'feature_pq_transport.py --mercahash-v2-height=0',
+    'feature_pq_transport.py --mercahash-v2-height=20',
     'feature_pq_transport_negative.py',
     'mercatura_coinbase_template.py',
     'mercatura_pq_address_enforcement.py',

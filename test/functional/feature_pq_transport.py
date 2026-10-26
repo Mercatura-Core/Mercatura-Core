@@ -20,11 +20,16 @@ PQ = ['-pqp2p=required', '-dnsseed=0', '-fixedseeds=0', '-discover=0', '-natpmp=
 
 
 class PQTransportTest(BitcoinTestFramework):
+    def add_options(self, parser):
+        parser.add_argument('--mercahash-v2-height', type=int, choices=(-1, 0, 20), default=-1,
+                            help='Isolated regtest V1, V2 from genesis, or height-20 transition')
+
     def set_test_params(self):
         self.num_nodes = 3
         self.setup_clean_chain = True
         self.uses_wallet = True
-        self.extra_args = [PQ, PQ, ['-connect=0', '-dnsseed=0', '-discover=0', '-natpmp=0']]
+        self.pq_args = PQ + [f'-mercahashv2height={self.options.mercahash_v2_height}']
+        self.extra_args = [self.pq_args, self.pq_args, ['-connect=0', '-dnsseed=0', '-discover=0', '-natpmp=0']]
 
     def skip_test_if_missing_module(self):
         self.skip_if_no_wallet()
@@ -57,9 +62,9 @@ class PQTransportTest(BitcoinTestFramework):
         assert_equal(len(peers0[0]['session_id']), 64)
         return peers0[0]['session_id'], peers0[0]['pq_identity'], peers1[0]['pq_identity']
 
-    def public_fingerprint(self, node):
+    def public_fingerprint(self, node, filename='pq_identity.dat'):
         # Read only the network and public-key fields, never the stored seed.
-        with (node.chain_path / 'pq_identity.dat').open('rb') as stream:
+        with (node.chain_path / filename).open('rb') as stream:
             stream.seek(10)
             network = stream.read(85)
             stream.seek(127)
@@ -122,7 +127,7 @@ class PQTransportTest(BitcoinTestFramework):
         self.log.info('Creating explicit persistent identities in temporary regtest datadirs')
         self.stop_node(1)
         self.stop_node(0)
-        persistent = PQ + ['-pqp2pidentity=pq_identity.dat']
+        persistent = self.pq_args + ['-pqp2pidentity=pq_identity.dat']
         self.start_node(0, persistent + ['-pqp2pidentitycreate=1'])
         self.start_node(1, persistent + ['-pqp2pidentitycreate=1'])
         fp0, fp1 = self.public_fingerprint(self.nodes[0]), self.public_fingerprint(self.nodes[1])
@@ -148,8 +153,33 @@ class PQTransportTest(BitcoinTestFramework):
         self.connect_nodes(1, 0)
         self.check_session(pinned_outbound=True)
         self.log.info('Wrong pin disconnected without fallback; corrected explicit pin reconnected')
+
+        self.log.info('Explicit identity rotation requires an explicit trusted pin update')
+        self.restart_node(0, self.pq_args + ['-pqp2pidentity=rotated.dat', '-pqp2pidentitycreate=1'])
+        self.wait_until(lambda: not self.nodes[1].getpeerinfo() and not self.nodes[0].getpeerinfo())
+        rotated_fp = self.public_fingerprint(self.nodes[0], 'rotated.dat')
+        assert rotated_fp != fp0
+        assert_equal(self.public_fingerprint(self.nodes[0]), fp0)
+        with self.nodes[1].assert_debug_log(['expected identity mismatch'], timeout=5):
+            self.nodes[1].addnode(f'127.0.0.1:{p2p_port(0)}', 'onetry')
+        self.wait_until(lambda: not self.nodes[1].getpeerinfo() and not self.nodes[0].getpeerinfo())
+        self.restart_node(1, persistent + [f'-pqp2ppin=127.0.0.1:{p2p_port(0)}={rotated_fp}'])
+        self.connect_nodes(1, 0)
+        self.check_session(pinned_outbound=True)
+        # Restarted wallets and nodes retain the confirmed transaction and chain.
+        if 'receiver' not in self.nodes[1].listwallets():
+            self.nodes[1].loadwallet('receiver')
+        assert_equal(self.nodes[1].get_wallet_rpc('receiver').getbalance(), Decimal('1.00'))
+        tip = self.generatetoaddress(self.nodes[0], 1, address, sync_fun=self.no_op)[0]
+        self.sync_blocks(self.nodes[:2])
+        for node in self.nodes[:2]:
+            assert_equal(node.getbestblockhash(), tip)
+            assert_equal(node.getblockchaininfo()['headers'], node.getblockcount())
+            assert node.verifychain(4, 0)
         public_fields = ['transport_protocol_type', 'session_id', 'inbound', 'pq_encrypted', 'pq_authenticated', 'pq_identity_verified', 'pq_identity', 'pq_kem', 'pq_auth_algorithm', 'bytesrecv', 'bytesrecv_per_msg']
         evidence = {'network': 'isolated loopback regtest', 'txid': txid, 'relayed_block': block, 'height': self.nodes[0].getblockcount(), 'handshake_bytes': 15488, 'ephemeral_reconnect_changed_identities': True, 'wrong_pin_rejected_without_fallback': True,
+                    'mercahash_v2_height': self.options.mercahash_v2_height, 'explicit_rotation_and_pin_update': True,
+                    'post_restart_tip': tip, 'confirmed_receiver_balance': '1.00',
                     'connection_including_version_pong_ms': initial_connection_ms, 'reconnection_including_version_pong_ms': reconnect_ms,
                     'peers': [{field: peer[field] for field in public_fields} for peer in self.nodes[0].getpeerinfo() + self.nodes[1].getpeerinfo()]}
         (Path(self.options.tmpdir) / 'pq-stagea-evidence.json').write_text(json.dumps(evidence, indent=2) + '\n')
