@@ -72,9 +72,8 @@ Coherent recovery commits:
 - `990c7a17cae484e72354963ad3ea17a01ff29da6`: deterministic tool conversions/import lint.
 - `98da2fd2ea03a0fbfc0352d74808e0bae4f03fe4`: pinned-vendor lint registry alignment.
 
-**GitHub CI recovery remains pending until a new run's actual job conclusions
-are recorded.** Local results are not substitutes for native Windows/macOS CI.
-Extended B2 execution has not started at this checkpoint.
+The initial checkpoint above preceded native GitHub verification. The completed
+recovery gate and its exact source revision are recorded below.
 
 ## First recovery run: newly exposed Windows platform contract
 
@@ -99,5 +98,42 @@ and exact tip validation. POSIX continues executing the complete persistent
 pinning/rotation path. A test-only `--ephemeral-only` option exercises that
 restart path on Linux without claiming to emulate Windows ACL/storage behavior.
 The ephemeral V2 path and full POSIX B1 V2 path both passed locally after this
-change. The next native Windows CI run must verify the platform-specific
-fail-closed assertions themselves.
+change. The next native Windows CI run verified the platform-specific
+fail-closed assertions themselves, as recorded below.
+
+## Verified recovery gate
+
+[Run 40298481160](https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/40298481160)
+at `c0cd6f3f0091d2e8c6e119cf7b07e3ef1661525e` completed successfully.
+GitHub's run and job conclusions were checked at 2026-10-26 10:25:09 UTC.
+All seven required jobs passed; the runner-selection metadata job also passed.
+
+| Required job | Job ID | Actual conclusion |
+| --- | --- | --- |
+| Linux native x86_64 headless | `121490328033` | Success |
+| Windows native x86_64 MSVC | `121490262517` | Success |
+| macOS native ARM64 | `121490262888` | Success |
+| Lint | `121490327983` | Success |
+| Windows x86_64 UCRT cross-compile | `121490328040` | Success |
+| macOS Intel x86_64 cross-compile | `121490328101` | Success |
+| macOS ARM64 cross-compile | `121490328207` | Success |
+
+All three native jobs completed the 184-entry CTest catalog and all 49 selected
+functional cases, including ordinary PQ, V2-from-genesis, height-20 transition,
+B1 lifecycle and negative transport tests. The existing optional script-assets
+CTest entry remains an explicit skip, not an executed pass. Ordinary PQ test
+durations were 156s Linux, 134s Windows and 152s macOS. Full validation remains
+level 4 over all blocks. Windows confirms fail-closed persistent storage plus
+ephemeral recovery; POSIX confirms persistent identity/pin/rotation behavior.
+Native Windows persistent storage remains a separate platform qualification.
+
+Commit `c0cd6f3f0091d2e8c6e119cf7b07e3ef1661525e` adds these explicit Windows
+contract assertions and the ephemeral restart test path. No storage restriction
+was removed to obtain green CI. The prior CI audit/ledger commit is
+`9c6ab92c8361b57329c6b3fd9f5e7e11a54e7b65`.
+
+The verified gate receipt and decoded Linux/Windows/macOS job logs are retained
+locally with SHA-256 identifiers in the final B2 evidence. A 120-second
+three-node attempt before this gate was rejected by automatic approval review
+and did not execute. Sustained B2 workloads started only after the successful
+gate was recorded; the rejected action was not bypassed.
