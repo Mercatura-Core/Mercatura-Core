@@ -198,6 +198,9 @@ add_executable(pq_transport_runner EXCLUDE_FROM_ALL
 )
 target_link_libraries(pq_transport_runner PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
 
+add_executable(pq_resource_probe EXCLUDE_FROM_ALL ../../contrib/devtools/pq-resource-probe.cpp)
+target_link_libraries(pq_resource_probe PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
+
 add_executable(pq_fuzz_smoke EXCLUDE_FROM_ALL
   ../../contrib/devtools/pq-fuzz-smoke.cpp
   fuzz/pq_transport.cpp

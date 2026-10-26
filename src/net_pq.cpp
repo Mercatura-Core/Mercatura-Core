@@ -127,6 +127,7 @@ std::shared_ptr<void> Context::Admit(const std::string& source)
     auto now = Clock::now();
     quota.tokens = std::min(32.0, quota.tokens + 8.0 * std::chrono::duration<double>(now - quota.last).count()); quota.last = now;
     if (quota.stopped || quota.pending >= 64 || quota.tokens < 1 || (source.empty() && quota.anonymous >= 16)) return {};
+    Source* entry{nullptr};
     if (!source.empty()) {
         for (auto it = quota.sources.begin(); it != quota.sources.end();) {
             if (!it->second.pending && now - it->second.last > std::chrono::seconds(120)) it = quota.sources.erase(it); else ++it;
@@ -137,17 +138,19 @@ std::shared_ptr<void> Context::Admit(const std::string& source)
             if (quota.sources.size() >= 256) return {};
             it = quota.sources.emplace(source, Source{}).first;
         }
-        auto& entry = it->second;
-        entry.tokens = std::min(4.0, entry.tokens + std::chrono::duration<double>(now - entry.last).count()); entry.last = now;
-        if (entry.pending >= 4 || entry.tokens < 1) return {};
-        --entry.tokens; ++entry.pending;
-    } else { ++quota.anonymous; }
+        entry = &it->second;
+        entry->tokens = std::min(4.0, entry->tokens + std::chrono::duration<double>(now - entry->last).count()); entry->last = now;
+        if (entry->pending >= 4 || entry->tokens < 1) return {};
+    }
+    // All potentially throwing lease/control-block/string allocations precede
+    // charging. The previous custom deleter could reenter Release while this
+    // mutex was held if shared_ptr's control-block allocation failed.
+    auto admission=std::make_shared<Admission>(m_quota,source);
+    if (entry) { --entry->tokens; ++entry->pending; } else { ++quota.anonymous; }
     --quota.tokens; ++quota.pending;
     quota.peak_pending = std::max(quota.peak_pending, quota.pending);
-    return std::shared_ptr<void>(new std::string(source), [accounting = m_quota](void* ptr) {
-        std::unique_ptr<std::string> name(static_cast<std::string*>(ptr));
-        Release(accounting, *name);
-    });
+    admission->charged=true;
+    return admission;
 }
 void Context::Release(const std::shared_ptr<Quota>& quota, const std::string& source)
 {

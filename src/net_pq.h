@@ -49,6 +49,13 @@ private:
         double tokens{32}; Clock::time_point last{Clock::now()};
         bool stopped{false};
     };
+    struct Admission {
+        const std::shared_ptr<Quota> quota;
+        const std::string source;
+        bool charged{false};
+        Admission(const std::shared_ptr<Quota>& q,const std::string& s) : quota(q),source(s) {}
+        ~Admission() { if (charged) Release(quota,source); }
+    };
     // Leases keep only accounting alive. A worker releasing the last lease
     // must never become the owner/destructor of its own thread pool.
     const std::shared_ptr<Quota> m_quota{std::make_shared<Quota>()};
