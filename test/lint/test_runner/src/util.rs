@@ -74,6 +74,9 @@ pub fn get_external_sources() -> Vec<&'static str> {
         "src/crc32c",
         "src/crypto/ctaes",
         "src/crypto/mldsa_native",
+        // Pinned source subset retains links to examples not vendored here.
+        // Mercatura wrappers and documentation remain covered by normal lint.
+        "src/crypto/mlkem_native",
         "src/ipc/libmultiprocess",
         "src/leveldb",
         "src/minisketch",
