@@ -19,6 +19,8 @@ add_library(bitcoin_crypto STATIC EXCLUDE_FROM_ALL
   mercahash.cpp
   mercahash_v2.cpp
   mercatura_mldsa.c
+  mercatura_p2p_crypto.cpp
+  mlkem_native/mlkem/mlkem_native.c
   mercatura_pqderive.cpp
   hmac_sha3_384.cpp
   hkdf_sha3_384.cpp
@@ -37,6 +39,8 @@ target_link_libraries(bitcoin_crypto
 )
 
 target_include_directories(bitcoin_crypto PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/mldsa_native/mldsa)
+target_include_directories(bitcoin_crypto PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/mlkem_native/mlkem)
+set_property(SOURCE mercatura_p2p_crypto.cpp mlkem_native/mlkem/mlkem_native.c APPEND PROPERTY COMPILE_DEFINITIONS MLK_CONFIG_PARAMETER_SET=768 MLK_CONFIG_NO_RANDOMIZED_API)
 
 set_property(SOURCE mercatura_mldsa.c APPEND PROPERTY COMPILE_DEFINITIONS MLD_CONFIG_PARAMETER_SET=65)
 

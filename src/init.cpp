@@ -6,6 +6,8 @@
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
 #include <init.h>
+#include <net_pq.h>
+#include <net_pq_identity_format.h>
 
 #include <kernel/checks.h>
 
@@ -567,6 +569,10 @@ void SetupServerArgs(ArgsManager& argsman, bool can_listen_ipc)
     argsman.AddArg("-i2pacceptincoming", strprintf("Whether to accept inbound I2P connections (default: %i). Ignored if -i2psam is not set. Listening for inbound I2P connections is done through the SAM proxy, not by binding to a local address and port.", DEFAULT_I2P_ACCEPT_INCOMING), ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-onlynet=<net>", "Make automatic outbound connections only to network <net> (" + Join(GetNetworkNames(), ", ") + "). Inbound and manual connections are not affected by this option. It can be specified multiple times to allow multiple networks.", ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-v2transport", strprintf("Support v2 transport (default: %u)", DEFAULT_V2_TRANSPORT), ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
+    argsman.AddArg("-pqp2p=<mode>", "Experimental isolated regtest PQ transport: off (default) or required. Required disables all classical P2P fallback.", ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
+    argsman.AddArg("-pqp2pidentity=<file>", "Explicit unencrypted networking identity seed file under the network datadir (owner-only directory/file). Default: fresh identity per connection. Persistent identities are visible and correlatable on the wire.", ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
+    argsman.AddArg("-pqp2pidentitycreate", "Explicitly create a new persistent experimental PQ identity; fail if the file already exists. Requires -pqp2pidentity.", ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
+    argsman.AddArg("-pqp2ppin=<destination=mcapq1:fingerprint>", "Expected PQ identity for an exact outbound destination including port; may be repeated. Requires -pqp2p=required. No TOFU or automatic replacement.", ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-peerbloomfilters", strprintf("Support filtering of blocks and transaction with bloom filters (default: %u)", DEFAULT_PEERBLOOMFILTERS), ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-peerblockfilters", strprintf("Serve compact block filters to peers per BIP 157 (default: %u)", DEFAULT_PEERBLOCKFILTERS), ArgsManager::ALLOW_ANY, OptionsCategory::CONNECTION);
     argsman.AddArg("-txreconciliation", strprintf("Enable transaction reconciliations per BIP 330 (default: %d)", DEFAULT_TXRECONCILIATION_ENABLE), ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::CONNECTION);
@@ -978,6 +984,11 @@ bool AppInitParameterInteraction(const ArgsManager& args)
     }
 
     // Signal NODE_P2P_V2 if BIP324 v2 transport is enabled.
+    const auto pq_mode = args.GetArg("-pqp2p", "off");
+    if (pq_mode != "off" && pq_mode != "required") return InitError(_("-pqp2p must be off or required (Stage A)."));
+    if (pq_mode != "off" && chainparams.GetChainType() != ChainType::REGTEST) return InitError(_("Experimental PQ P2P is restricted to isolated regtest; public networks are not approved."));
+    if (pq_mode == "off" && (args.IsArgSet("-pqp2pidentity") || args.GetBoolArg("-pqp2pidentitycreate", false) || args.IsArgSet("-pqp2ppin"))) return InitError(_("PQ identity options require -pqp2p=required."));
+    if (args.GetBoolArg("-pqp2pidentitycreate", false) && !args.IsArgSet("-pqp2pidentity")) return InitError(_("-pqp2pidentitycreate requires an explicit -pqp2pidentity path."));
     if (args.GetBoolArg("-v2transport", DEFAULT_V2_TRANSPORT)) {
         g_local_services = ServiceFlags(g_local_services | NODE_P2P_V2);
     }
@@ -2102,6 +2113,28 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
     StartMapPort(args.GetBoolArg("-natpmp", DEFAULT_NATPMP));
 
     CConnman::Options connOptions;
+    if (args.GetArg("-pqp2p", "off") == "required") {
+        try {
+            auto network = pq::RegtestNetwork();
+            std::shared_ptr<const pq::Identity> identity;
+            if (args.IsArgSet("-pqp2pidentity")) {
+                const auto name = fs::PathFromString(args.GetArg("-pqp2pidentity", ""));
+                if (name.empty() || name.is_absolute() || name.has_parent_path()) return InitError(_("-pqp2pidentity must be a filename in the selected network datadir."));
+                identity = pq::LoadIdentity(fs::PathToString(args.GetDataDirNet() / name), args.GetBoolArg("-pqp2pidentitycreate", false), network);
+                LogInfo("Experimental unencrypted persistent PQ identity: %s (cleartext, correlatable)", "mcapq1:" + HexStr(pq::Fingerprint(network, identity->pub)));
+            }
+            std::map<std::string, pq::Digest> pins;
+            for (const auto& binding : args.GetArgs("-pqp2ppin")) {
+                auto parsed=pq::ParsePinBinding(binding);
+                if (!parsed) return InitError(_("Invalid -pqp2ppin: require exact host:port (bracket IPv6), '=' and mcapq1: with 96 lowercase hex digits."));
+                if (!pins.emplace(std::move(parsed->destination), parsed->fingerprint).second) return InitError(_("Duplicate PQ pin destination."));
+            }
+            connOptions.pq_context = std::make_shared<pq::Context>(network, std::move(identity), std::move(pins));
+            // A required-only listener must not advertise classical V2 acceptance.
+            g_local_services = ServiceFlags(uint64_t(g_local_services) & ~uint64_t(NODE_P2P_V2));
+            LogInfo("Experimental PQ P2P required on isolated regtest; no classical fallback; default identities are ephemeral");
+        } catch (const std::exception& e) { return InitError(Untranslated(e.what())); }
+    }
     connOptions.m_local_services = g_local_services;
     connOptions.m_max_automatic_connections = nMaxConnections;
     connOptions.uiInterface = &uiInterface;

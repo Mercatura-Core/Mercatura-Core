@@ -48,6 +48,8 @@
 #include <unordered_set>
 #include <vector>
 
+namespace pq { class Context; }
+
 class AddrMan;
 class BanMan;
 class CChainParams;
@@ -227,6 +229,8 @@ public:
     TransportProtocolType m_transport_type;
     /** BIP324 session id string in hex, if any. */
     std::string m_session_id;
+    bool m_pq_encrypted{false}, m_pq_authenticated{false}, m_pq_identity_verified{false};
+    std::string m_pq_identity;
 };
 
 
@@ -261,11 +265,18 @@ public:
 class Transport {
 public:
     virtual ~Transport() = default;
+    /** Publish bounded asynchronous results and check absolute deadlines. */
+    virtual bool Poll() { return true; }
+    virtual void Disconnect() {}
 
     struct Info
     {
         TransportProtocolType transport_type;
         std::optional<uint256> session_id;
+        bool pq_encrypted{false};
+        bool pq_authenticated{false};
+        bool pq_identity_verified{false};
+        std::string pq_identity{};
     };
 
     /** Retrieve information about this transport. */
@@ -674,6 +685,7 @@ struct CNodeOptions
     bool prefer_evict = false;
     size_t recv_flood_size{DEFAULT_MAXRECEIVEBUFFER * 1000};
     bool use_v2transport = false;
+    std::shared_ptr<pq::Context> pq_context{};
 };
 
 /** Information about a peer */
@@ -1104,6 +1116,7 @@ public:
         bool whitelist_forcerelay = DEFAULT_WHITELISTFORCERELAY;
         bool whitelist_relay = DEFAULT_WHITELISTRELAY;
         bool m_capture_messages = false;
+        std::shared_ptr<pq::Context> pq_context{};
     };
 
     void Init(const Options& connOptions) EXCLUSIVE_LOCKS_REQUIRED(!m_added_nodes_mutex, !m_total_bytes_sent_mutex)
@@ -1142,6 +1155,7 @@ public:
         whitelist_forcerelay = connOptions.whitelist_forcerelay;
         whitelist_relay = connOptions.whitelist_relay;
         m_capture_messages = connOptions.m_capture_messages;
+        m_pq_context = connOptions.pq_context;
     }
 
     // test only
@@ -1764,6 +1778,7 @@ private:
      * flag for whether messages are captured
      */
     bool m_capture_messages{false};
+    std::shared_ptr<pq::Context> m_pq_context{};
 
     /**
      * Mutex protecting m_i2p_sam_sessions.

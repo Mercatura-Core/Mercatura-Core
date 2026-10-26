@@ -1,0 +1,251 @@
+{
+  "mlkem_release": "v2.0.0",
+  "mlkem_commit": "d1b2fe782888bdb761a50336012923180be7f502",
+  "mlkem_files": [
+    {
+      "path": "LICENSE",
+      "blob": "79c71b1fdcc53cc17b1df99a0f4d4d48121ac174",
+      "sha256": "1c730e3c2cd4f70e058519ef3e910d8bdd4ed822ae2ce689f3c63d32fc52314b"
+    },
+    {
+      "path": "META.yml",
+      "blob": "92926de45a186f552a197c1b9e9bbd2f0a29d367",
+      "sha256": "8432ca69ec12d53410f6841382bef17af08108f54271a406359946881faf8b61"
+    },
+    {
+      "path": "SECURITY.md",
+      "blob": "6b80d996275b679f8e98f4b9dfa81b54912a5d7f",
+      "sha256": "14154fa4c36fadbdee6419cbc6c44a6734d656d463f592282008b1ac60503126"
+    },
+    {
+      "path": "mlkem/README.md",
+      "blob": "e648c436a517728cfd3a0c1c11ab2cc998cc73d6",
+      "sha256": "561c05fceefb56416fa1360adcaa71a1e9697ab9d0a4bb1cc00eaedcea07371a"
+    },
+    {
+      "path": "mlkem/mlkem_native.c",
+      "blob": "66aed07ece8cc1f398cf9de432f7151e99e83599",
+      "sha256": "e533497ae0c31d5023d00cdb25ae5f8646727eee53323fba4107818231ad8956"
+    },
+    {
+      "path": "mlkem/mlkem_native.h",
+      "blob": "fe8060aa8debd21106fa6d27c6df0fb62d5bb1ce",
+      "sha256": "3546f0f7318fc08d007097add98a77d48a8c1f670e0d8db2c5222e1acaa88ce1"
+    },
+    {
+      "path": "mlkem/mlkem_native_config.h",
+      "blob": "a4b204b68e1e8d4460c8c6684e4631a41d8e8c9d",
+      "sha256": "710b09e8003d19d13167af89575499ca2790668e87b0dce7cdc6c590c32daafa"
+    },
+    {
+      "path": "mlkem/src/cbmc.h",
+      "blob": "cb24bb52a6a8369b6a6e8f119d5f0ec77de5faed",
+      "sha256": "180bf239c5d7b84fa451727546d4fbc9595008382cfc86d4ae5791e0e5a6b910"
+    },
+    {
+      "path": "mlkem/src/common.h",
+      "blob": "96e0676feef51bc621fbce5a2d2b0287438dcb78",
+      "sha256": "833c4d8e52822d5a209fdc72ef655f6eb7801fd712c515805d2c5360e58bdaab"
+    },
+    {
+      "path": "mlkem/src/compress.c",
+      "blob": "b42c2584fa526bc31b617d941802cf83db7968df",
+      "sha256": "a13d44b3a96962ae982722fba8b1ff6744f16e7b3b760883edfe762061cb26b5"
+    },
+    {
+      "path": "mlkem/src/compress.h",
+      "blob": "19e1d402b26a81585c0b6b070ec4d3caf4716dd6",
+      "sha256": "746ce7e55d088f75220ca0a5b08fc515c033167cbcacfd74be127e14f1f5e128"
+    },
+    {
+      "path": "mlkem/src/context.h",
+      "blob": "9a07ef2846a3b6a0d203545d9895b475700bcb47",
+      "sha256": "e6788b29f4883f57752fd8327a80dfc978eb21ad72a0055cbbaaa7b433637edf"
+    },
+    {
+      "path": "mlkem/src/debug.c",
+      "blob": "386f5264fff057a1b8fb3f7dac5f6ee6f2a652ad",
+      "sha256": "263ac19f2b2bf5c784cbf04fd4c968762abedc6961d44f507c8953b52a38827e"
+    },
+    {
+      "path": "mlkem/src/debug.h",
+      "blob": "ce4a33a373919b1007ef448e4938cda746e1ed96",
+      "sha256": "d1fab329b439fc6dd9c4234f3fe053e74b000d416e0f4e4464542813667f3750"
+    },
+    {
+      "path": "mlkem/src/fips202/fips202.c",
+      "blob": "33883aa9f8f8e41e8c9e56e34ec77f1c448c54fe",
+      "sha256": "fb0654c0b33c45c929fdb2af2287807a7b8f312ac7f3baa3ddfaef0c030ef0b2"
+    },
+    {
+      "path": "mlkem/src/fips202/fips202.h",
+      "blob": "99eaccc0fe60e3d7656b1cf13fc5b775d7d94906",
+      "sha256": "a5efcf58893aa589dfe25a1069e11ab58408b2ad14e389014a785205300468a1"
+    },
+    {
+      "path": "mlkem/src/fips202/fips202x4.c",
+      "blob": "400ca071091b2263710fe5792896a5b4cc1fa564",
+      "sha256": "2e481ccbafc00765b210725c8e454f2b4dc622844eccf6a0c1e025657fcb5fe8"
+    },
+    {
+      "path": "mlkem/src/fips202/fips202x4.h",
+      "blob": "a0490a09747f3819393982a55b4d10945e7a4f4a",
+      "sha256": "c8d2e50f7ccce19822030786a1a99f0892db63ebe5b020fa91a5383c9700dd22"
+    },
+    {
+      "path": "mlkem/src/fips202/keccakf1600.c",
+      "blob": "b3cec2eabaa9c316062db3ec2e803f24ef0bc8fa",
+      "sha256": "461c278b0abb9fde098ee6b34a47056445573cb7aa5c4362d59e35041d0997e5"
+    },
+    {
+      "path": "mlkem/src/fips202/keccakf1600.h",
+      "blob": "c26c36a0844503f4cad43c261ba3c7d2f56e3e19",
+      "sha256": "88c06d4c546f46920a65001bcfad8cabb6173fb01ae071e02412c46043bdf54f"
+    },
+    {
+      "path": "mlkem/src/fips202/native/api.h",
+      "blob": "8ef7383e2549f67a6c8574dc1045a7d0496cd78a",
+      "sha256": "aae13759c11d342a2431f8b03f4d3026fb3e4b07357dc9589be60ddc222e5fac"
+    },
+    {
+      "path": "mlkem/src/fips202/native/auto.h",
+      "blob": "e5a681940296621b3f870c5b1e5a7be8a8586362",
+      "sha256": "590e5d36ce4e9d699501b458ea0653a365e12bbd9f63a6abc7bbdaab2d6b2cfd"
+    },
+    {
+      "path": "mlkem/src/indcpa.c",
+      "blob": "98060e37420763f2629c9ea68d0497bee841473a",
+      "sha256": "526505cbf09ab80e9644563eb808373c502aad2270a0b53c8370510ea4c0b70d"
+    },
+    {
+      "path": "mlkem/src/indcpa.h",
+      "blob": "82315c2ef2c6ec23f2099d656a02bd75cae083af",
+      "sha256": "ac6f47c959fdc97aa1882bca5f78ecfcee595ff21769f937866f2c1d1bf29109"
+    },
+    {
+      "path": "mlkem/src/kem.c",
+      "blob": "57e767fd51f1a17c0867a5f3853966a819306398",
+      "sha256": "3922156826521429eb250ccb3d54d7beacce14adce26bb3be6d1ef7864342dd3"
+    },
+    {
+      "path": "mlkem/src/kem.h",
+      "blob": "2de960c9c08299a686add0108b5451440f0a3004",
+      "sha256": "ba22bd6de66141138329aaf53aedc73350c4ceaa241a341d0e5136c5df493dbd"
+    },
+    {
+      "path": "mlkem/src/native/api.h",
+      "blob": "f8578763b699bdc4cdcdb23f841d81e1ce49c04b",
+      "sha256": "320b8cb7fd40caa77294a6bca54421b103c9c058df4ef8d0d88610ee978c7781"
+    },
+    {
+      "path": "mlkem/src/native/meta.h",
+      "blob": "dbd07a5bda0dafc38afeee32926e0bb959361d88",
+      "sha256": "c0b008cc2e0031dfd734b6c00f32a7c3c66eb8135e3545c9589c62454ad722d7"
+    },
+    {
+      "path": "mlkem/src/params.h",
+      "blob": "04598539c440a1875e4edd727c310f430e956aad",
+      "sha256": "450fe3e0e50496921920473ae4321660f178c23d51f1453f3c537ee63c4158cb"
+    },
+    {
+      "path": "mlkem/src/poly.c",
+      "blob": "edc17a2b18c1ec3812a6438bb4b01737f0291838",
+      "sha256": "f0e0643a2c3743181b7927a9d47af0930ce7870a9d79671f64e6089fe028982e"
+    },
+    {
+      "path": "mlkem/src/poly.h",
+      "blob": "3def4394f18c8921a52ac4fb7bae609aded7120f",
+      "sha256": "86224c6d1e7ec5a4c0dcd829ae90c0cb43b4855d84dd719973d47e71b8e962d4"
+    },
+    {
+      "path": "mlkem/src/poly_k.c",
+      "blob": "60380e34f32bf2fc36a40b09676119388f6a2a30",
+      "sha256": "56130249963b5b62e97dc6413adeed21f4e542da6531e34cf640baca161fa5ff"
+    },
+    {
+      "path": "mlkem/src/poly_k.h",
+      "blob": "1eba9fea672bd5f30009ac01cae22c84c23267f5",
+      "sha256": "839852fd9c8d155f37a7a07dc1116c2ea18fade754b1d882f73c4affef5e62d3"
+    },
+    {
+      "path": "mlkem/src/randombytes.h",
+      "blob": "46274422b08df00d711b50e4b8671d658baebe88",
+      "sha256": "137eb6e5854b8e58c2caec6eea86530c8e7495706f6f5b3e007e25a9875e164f"
+    },
+    {
+      "path": "mlkem/src/sampling.c",
+      "blob": "b01ac5619e387bcc33da16e13a137954f4606f84",
+      "sha256": "9263037c401d0cc4130a6f0dba76299d170b498c330f5d5c32b5ae5921bacd5f"
+    },
+    {
+      "path": "mlkem/src/sampling.h",
+      "blob": "24462aeb03155a5c77a8bfcdfbac9558d18fa44d",
+      "sha256": "d25df90afc96a02a794dcb737236b2cb42cbd2db411ccaf274cf5ea3bf5e3c87"
+    },
+    {
+      "path": "mlkem/src/symmetric.h",
+      "blob": "68d7e1a0cda28e3ba329b3625dcc05021688a440",
+      "sha256": "168d0ec3bf50bd45cb0a103d7984e9ccf52f78697718b7e85efdf1beda7abc95"
+    },
+    {
+      "path": "mlkem/src/sys.h",
+      "blob": "c430f77b0d32e8c809d2a87959b3f9bca4295594",
+      "sha256": "0ead27bb8c8879b62b29b9bb86c36aeaac270598d42ee2f2258a478eed8efa5c"
+    },
+    {
+      "path": "mlkem/src/verify.c",
+      "blob": "db760f727173a98397d783fcf910296d559e851e",
+      "sha256": "f8f89f1b8c8e5811ce134c0d90fb7828027336afeed231dc3ccb7ee6b73b9335"
+    },
+    {
+      "path": "mlkem/src/verify.h",
+      "blob": "8302a1c41bdaf9e4cb180f4634ec8bbbe0fa0fd0",
+      "sha256": "76fd0af32577f9118d1ea90a66ff77e18cdf99d08dcf1c9df137833041e8492f"
+    },
+    {
+      "path": "mlkem/src/zetas.inc",
+      "blob": "00316daf6708fae87985e822fe7935c1b7bb9b22",
+      "sha256": "303d1abccc4757d49a5c8df5f88080fefef617b7360056db5311bd94354096d4"
+    },
+    {
+      "path": "test/src/test_mlkem.c",
+      "blob": "0d63a3800052f2a88b6f04020fce418e9e5e0203",
+      "sha256": "b81864797821f4dc0b04fb6d9788655819e2c34861a93fffe685f09b3c929704"
+    },
+    {
+      "path": "test/test_vectors/expected_test_vectors.h",
+      "blob": "2774e6416fb6c29ea8a8ca7cc6c4faa038b4d3d6",
+      "sha256": "af87225bf785ac824d06a2cadd0a9d1c79ee9a505b3ebce0b444c59b79a6d2c7"
+    }
+  ],
+  "mldsa_release": "v2.0.0",
+  "mldsa_commit": "834a90d5e846ffa1e1611bd24e160bb2e9b86d35",
+  "acvp_commit": "975de31eb83d87039ec88934fdc47d8c312b892d",
+  "note": "ML-KEM is evaluated externally only; this manifest does not integrate it into production.",
+  "nist_files": [
+    {
+      "path": "gen-val/json-files/ML-KEM-keyGen-FIPS203/prompt.json",
+      "blob": "0d701155b53e0da51cfffebd81abc6deb5be4878"
+    },
+    {
+      "path": "gen-val/json-files/ML-KEM-keyGen-FIPS203/expectedResults.json",
+      "blob": "883e318345b68382d09df05530c5209f4e509d54"
+    },
+    {
+      "path": "gen-val/json-files/ML-KEM-encapDecap-FIPS203/prompt.json",
+      "blob": "a83226e0214b68a36f1519b45e70d6a307e6dc66"
+    },
+    {
+      "path": "gen-val/json-files/ML-KEM-encapDecap-FIPS203/expectedResults.json",
+      "blob": "4e8d43e59d1f2d66512e8d725572ea9877f723ef"
+    },
+    {
+      "path": "gen-val/json-files/ML-DSA-keyGen-FIPS204/prompt.json",
+      "blob": "f53809df5fefee2c1b80da1122885a2e0e843e32"
+    },
+    {
+      "path": "gen-val/json-files/ML-DSA-keyGen-FIPS204/expectedResults.json",
+      "blob": "38213cd71c20c019cc49bf140f616ed86c81ad98"
+    }
+  ]
+}

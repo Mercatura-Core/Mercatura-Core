@@ -56,7 +56,8 @@ const std::vector<std::string> CONNECTION_TYPE_DOC{
 const std::vector<std::string> TRANSPORT_TYPE_DOC{
     "detecting (peer could be v1 or v2)",
     "v1 (plaintext transport protocol)",
-    "v2 (BIP324 encrypted transport protocol)"
+    "v2 (BIP324 encrypted transport protocol)",
+    "pq-v1 (experimental isolated-regtest Mercatura PQ transport)"
 };
 
 static RPCHelpMan getconnectioncount()
@@ -195,7 +196,13 @@ static RPCHelpMan getpeerinfo()
                                                               "Please note this output is unlikely to be stable in upcoming releases as we iterate to\n"
                                                               "best capture connection behaviors."},
                     {RPCResult::Type::STR, "transport_protocol_type", "Type of transport protocol: \n" + Join(TRANSPORT_TYPE_DOC, ",\n") + ".\n"},
-                    {RPCResult::Type::STR, "session_id", "The session ID for this connection, or \"\" if there is none (\"v2\" transport protocol only).\n"},
+                    {RPCResult::Type::STR, "session_id", "The session ID for an established encrypted connection, or empty if none.\n"},
+                    {RPCResult::Type::BOOL, "pq_encrypted", "PQ authentication and local key confirmation completed; encryption established."},
+                    {RPCResult::Type::BOOL, "pq_authenticated", "Presented ML-DSA identity-key possession verified; unpinned identities do not verify an expected remote node."},
+                    {RPCResult::Type::BOOL, "pq_identity_verified", "Completed PQ session also matches an operator-configured expected identity."},
+                    {RPCResult::Type::STR, "pq_identity", "Presented public fingerprint for an established PQ session; empty otherwise."},
+                    {RPCResult::Type::STR, "pq_kem", "ML-KEM-768 for established PQ sessions; empty otherwise."},
+                    {RPCResult::Type::STR, "pq_auth_algorithm", "ML-DSA-65 for established PQ sessions; empty otherwise."},
                 }},
             }},
         },
@@ -306,6 +313,12 @@ static RPCHelpMan getpeerinfo()
         obj.pushKV("connection_type", ConnectionTypeAsString(stats.m_conn_type));
         obj.pushKV("transport_protocol_type", TransportTypeAsString(stats.m_transport_type));
         obj.pushKV("session_id", stats.m_session_id);
+        obj.pushKV("pq_encrypted", stats.m_pq_encrypted);
+        obj.pushKV("pq_authenticated", stats.m_pq_authenticated);
+        obj.pushKV("pq_identity_verified", stats.m_pq_identity_verified);
+        obj.pushKV("pq_identity", stats.m_pq_identity);
+        obj.pushKV("pq_kem", stats.m_pq_encrypted ? "ML-KEM-768" : "");
+        obj.pushKV("pq_auth_algorithm", stats.m_pq_encrypted ? "ML-DSA-65" : "");
 
         ret.push_back(std::move(obj));
     }

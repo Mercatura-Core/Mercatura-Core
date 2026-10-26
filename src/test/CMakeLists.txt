@@ -82,6 +82,9 @@ add_executable(test_bitcoin
   net_peer_connection_tests.cpp
   net_peer_eviction_tests.cpp
   net_tests.cpp
+  pq_p2p_tests.cpp
+  pq_identity_tests.cpp
+  pq_transport_tests.cpp
   netbase_tests.cpp
   node_init_tests.cpp
   node_warnings_tests.cpp
@@ -161,6 +164,8 @@ add_executable(test_bitcoin
 
 include(TargetDataSources)
 target_json_data_sources(test_bitcoin
+  data/pq_p2p_candidate1.json
+  data/pq_p2p_packets.json
   data/base58_encode_decode.json
   data/bip341_wallet_vectors.json
   data/blockfilters.json
@@ -176,6 +181,51 @@ target_raw_data_sources(test_bitcoin NAMESPACE test::data
 )
 
 add_windows_application_manifest(test_bitcoin)
+
+# Small independent runner: exercises the very same permanent protocol tests
+# without waiting for the complete node/unit-test executable to link.
+add_executable(pq_stagea_tests EXCLUDE_FROM_ALL
+  ../../contrib/devtools/pq-stagea-test-main.cpp
+  pq_p2p_tests.cpp
+  pq_identity_tests.cpp
+  ../net_pq_protocol.cpp
+  ../net_pq_identity_format.cpp
+)
+target_link_libraries(pq_stagea_tests PRIVATE core_interface bitcoin_crypto univalue Boost::headers)
+target_json_data_sources(pq_stagea_tests
+  data/pq_p2p_candidate1.json
+  data/pq_p2p_packets.json
+)
+
+add_executable(pq_transport_runner EXCLUDE_FROM_ALL
+  ../../contrib/devtools/pq-stagea-test-main.cpp
+  pq_transport_tests.cpp
+)
+target_link_libraries(pq_transport_runner PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
+
+add_executable(pq_resource_probe EXCLUDE_FROM_ALL ../../contrib/devtools/pq-resource-probe.cpp)
+target_link_libraries(pq_resource_probe PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
+
+add_executable(pq_fuzz_smoke EXCLUDE_FROM_ALL
+  ../../contrib/devtools/pq-fuzz-smoke.cpp
+  fuzz/pq_transport.cpp
+  ../net_pq_protocol.cpp
+  ../net_pq_identity_format.cpp
+)
+target_link_libraries(pq_fuzz_smoke PRIVATE core_interface bitcoin_crypto)
+
+# A focused genuine libFuzzer binary. Configure a separate build with Clang and
+# -DBUILD_FUZZ_BINARY=ON -DSANITIZERS=fuzzer,address,undefined.
+# Normal node builds do not build this.
+if(BUILD_FUZZ_BINARY AND SANITIZERS MATCHES "(^|,)fuzzer(,|$)")
+  add_executable(pq_fuzz EXCLUDE_FROM_ALL
+    ../../contrib/devtools/pq-libfuzzer-main.cpp
+    fuzz/pq_transport.cpp
+    ../net_pq_protocol.cpp
+    ../net_pq_identity_format.cpp
+  )
+  target_link_libraries(pq_fuzz PRIVATE core_interface bitcoin_crypto fuzzer_interface)
+endif()
 
 target_link_libraries(test_bitcoin
   core_interface

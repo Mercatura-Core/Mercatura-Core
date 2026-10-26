@@ -1,0 +1,9 @@
+Upstream mlkem-native v2.0.0
+Commit d1b2fe782888bdb761a50336012923180be7f502
+https://github.com/pq-code-package/mlkem-native
+
+Portable C ML-KEM-768 only, deterministic upstream API. Mercatura supplies
+secure random coins through its narrow C++ P2P wrapper. No upstream mathematics
+has been modified. All 43 files are verified against the committed blob and
+SHA-256 manifest in doc/design/mercatura-pq-dependencies.json. Native backends
+are not enabled. Upstream LICENSE, META.yml and SECURITY.md are included.
