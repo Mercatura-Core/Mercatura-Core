@@ -135,6 +135,21 @@ BOOST_AUTO_TEST_CASE(handshake_mutations_fail_closed)
     Pair q; auto m = q.Record(1); m.push_back(0); BOOST_CHECK(!q.r->Advance(m, out));
     Pair s; m = s.Record(1); m.pop_back(); BOOST_CHECK(!s.r->Advance(m, out));
 }
+BOOST_AUTO_TEST_CASE(invalid_kem_public_keys_fail_before_avoidable_work)
+{
+    Pair p; auto network=Array<85>(p.v["N"]);
+    unsigned draws{0};
+    auto rng=[&](std::span<uint8_t> bytes) { ++draws; std::fill(bytes.begin(),bytes.end(),42); return true; };
+    Handshake responder(false,network,std::nullopt,p.idr,rng);
+    auto m1=p.Record(1); std::fill(m1.begin()+129,m1.begin()+1313,255);
+    Bytes response;
+    BOOST_CHECK(!responder.Advance(m1,response));
+    BOOST_CHECK_EQUAL(draws,0U);
+    BOOST_REQUIRE(p.i->Start(response));
+    auto m2=p.Record(2); std::fill(m2.begin()+129,m2.begin()+1313,255);
+    BOOST_CHECK(!p.i->Advance(m2,response));
+    BOOST_CHECK_EQUAL(p.i->Decapsulations(),0U);
+}
 BOOST_AUTO_TEST_CASE(packet_reference_and_multiple_rekeys)
 {
     UniValue fixture; BOOST_REQUIRE(fixture.read(json_tests::pq_p2p_packets));

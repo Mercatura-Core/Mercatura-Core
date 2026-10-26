@@ -27,6 +27,7 @@ using KEMPublic = std::array<uint8_t, 1184>;
 using KEMCiphertext = std::array<uint8_t, 1088>;
 using IdentityPublic = std::array<uint8_t, 1952>;
 using Signature = std::array<uint8_t, 3309>;
+bool ValidKEMPublic(std::span<const uint8_t> pub);
 struct KEMKey {
     KEMPublic pub{};
     Secret<2400> priv;

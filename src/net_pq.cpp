@@ -97,6 +97,14 @@ void Context::Run(size_t index)
             try {
                 auto rng = SecureRandom();
                 if (!job->handshake) {
+                    // An invalid public encoding must not cause an avoidable
+                    // identity keygen before the handshake's identical check.
+                    if (!job->initiator && (job->record.size()!=RECORD_SIZES[1] ||
+                        !ValidHeader(std::span{job->record}.first(12),1) ||
+                        !Equal(std::span{job->record}.subspan(12,85),network) ||
+                        !ValidKEMPublic(std::span{job->record}.subspan(129,1184)))) {
+                        throw std::runtime_error("Invalid PQ hello");
+                    }
                     std::shared_ptr<const Identity> id = identity;
                     if (!id) {
                         auto fresh = std::make_shared<Identity>();

@@ -12,6 +12,10 @@ namespace pq {
 namespace {
 constexpr std::string_view CONTEXT{"Mercatura/P2PAuth/v1"};
 }
+bool ValidKEMPublic(std::span<const uint8_t> pub)
+{
+    return pub.size()==1184 && PQCP_MLKEM_NATIVE_MLKEM768_check_pk(pub.data())==0;
+}
 bool KEMKey::Generate(const Random& rng)
 {
     Secret<64> coins;

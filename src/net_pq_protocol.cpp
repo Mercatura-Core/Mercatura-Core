@@ -132,7 +132,7 @@ bool Handshake::Advance(std::span<const uint8_t> record, Bytes& out)
     if ((m_initiator && !m_started) || m_failed || m_ready || m_next < 1 || m_next > 5 || record.size() != RECORD_SIZES[m_next] || !ValidHeader(record.first(12), m_next)) return Fail();
     auto body = record.subspan(12);
     if (m_next == 1 || m_next == 2) {
-        if (!Equal(body.first(85), m_network) || !CheckPeer(body.last(1952))) return Fail();
+        if (!Equal(body.first(85), m_network) || !CheckPeer(body.last(1952)) || !ValidKEMPublic(body.subspan(117,1184))) return Fail();
     }
     if (m_next == 1) {
         Add(record);
