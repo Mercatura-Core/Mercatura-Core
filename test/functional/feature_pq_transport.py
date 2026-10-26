@@ -8,6 +8,7 @@ The 101-block fixture is solely coinbase-maturity setup, not a cadence benchmark
 """
 import hashlib
 import json
+import os
 from pathlib import Path
 import socket
 import time
@@ -21,6 +22,7 @@ PQ = ['-pqp2p=required', '-dnsseed=0', '-fixedseeds=0', '-discover=0', '-natpmp=
 
 class PQTransportTest(BitcoinTestFramework):
     def add_options(self, parser):
+        parser.add_argument('--ephemeral-only', action='store_true', help='Exercise ephemeral restart/recovery without POSIX persistence')
         parser.add_argument('--mercahash-v2-height', type=int, choices=(-1, 0, 20), default=-1,
                             help='Isolated regtest V1, V2 from genesis, or height-20 transition')
 
@@ -72,6 +74,83 @@ class PQTransportTest(BitcoinTestFramework):
         label = b'Mercatura/P2PIdentity/v1'
         value = len(label).to_bytes(2, 'little') + label + b'\x01\x00' + network + (1952).to_bytes(2, 'little') + public
         return 'mcapq1:' + hashlib.sha3_384(value).hexdigest()
+
+    def persistent_identity_lifecycle(self):
+        self.log.info('Creating explicit persistent identities in temporary regtest datadirs')
+        self.stop_node(1)
+        self.stop_node(0)
+        persistent = self.pq_args + ['-pqp2pidentity=pq_identity.dat']
+        self.start_node(0, persistent + ['-pqp2pidentitycreate=1'])
+        self.start_node(1, persistent + ['-pqp2pidentitycreate=1'])
+        fp0, fp1 = self.public_fingerprint(self.nodes[0]), self.public_fingerprint(self.nodes[1])
+        self.stop_node(1)
+        pin = f'-pqp2ppin=127.0.0.1:{p2p_port(0)}={fp0}'
+        self.start_node(1, persistent + [pin])
+        self.connect_nodes(1, 0)
+        pinned = self.check_session(pinned_outbound=True)
+        assert_equal(pinned[1], fp1)
+        assert_equal(pinned[2], fp0)
+        self.disconnect_nodes(1, 0)
+        self.connect_nodes(1, 0)
+        pinned_again = self.check_session(pinned_outbound=True)
+        assert pinned_again[0] != pinned[0]
+        assert_equal(pinned_again[1:], pinned[1:])
+        self.stop_node(1)
+        bad_fp = fp0[:-1] + ('0' if fp0[-1] != '0' else '1')
+        self.start_node(1, persistent + [f'-pqp2ppin=127.0.0.1:{p2p_port(0)}={bad_fp}'])
+        with self.nodes[1].assert_debug_log(['expected identity mismatch'], timeout=5):
+            self.nodes[1].addnode(f'127.0.0.1:{p2p_port(0)}', 'onetry')
+        self.wait_until(lambda: not self.nodes[1].getpeerinfo() and not self.nodes[0].getpeerinfo())
+        self.restart_node(1, persistent + [pin])
+        self.connect_nodes(1, 0)
+        self.check_session(pinned_outbound=True)
+        self.log.info('Wrong pin disconnected without fallback; corrected explicit pin reconnected')
+
+        self.log.info('Explicit identity rotation requires an explicit trusted pin update')
+        self.restart_node(0, self.pq_args + ['-pqp2pidentity=rotated.dat', '-pqp2pidentitycreate=1'])
+        self.wait_until(lambda: not self.nodes[1].getpeerinfo() and not self.nodes[0].getpeerinfo())
+        rotated_fp = self.public_fingerprint(self.nodes[0], 'rotated.dat')
+        assert rotated_fp != fp0
+        assert_equal(self.public_fingerprint(self.nodes[0]), fp0)
+        with self.nodes[1].assert_debug_log(['expected identity mismatch'], timeout=5):
+            self.nodes[1].addnode(f'127.0.0.1:{p2p_port(0)}', 'onetry')
+        self.wait_until(lambda: not self.nodes[1].getpeerinfo() and not self.nodes[0].getpeerinfo())
+        self.restart_node(1, persistent + [f'-pqp2ppin=127.0.0.1:{p2p_port(0)}={rotated_fp}'])
+        self.connect_nodes(1, 0)
+        self.check_session(pinned_outbound=True)
+
+    def ephemeral_identity_lifecycle(self):
+        before = self.check_session()
+        self.stop_node(1)
+        self.stop_node(0)
+        if os.name == 'nt':
+            # Windows persistence deliberately fails closed pending owner-only
+            # ACL/publication qualification. Assert that contract rather than
+            # skipping the supported networking and restart validation.
+            for index in (0, 1):
+                for create in (False, True):
+                    args = self.pq_args + ['-pqp2pidentity=unsupported.dat']
+                    if create:
+                        args += ['-pqp2pidentitycreate=1']
+                    self.nodes[index].assert_start_raises_init_error(
+                        extra_args=args, expected_msg='Error: Stage A persistent PQ identity storage is not yet supported on Windows; use ephemeral identities')
+                    assert not (self.nodes[index].chain_path / 'unsupported.dat').exists()
+            self.log.info('Windows persistent identity requests failed closed without creating a seed file')
+        self.start_node(0, self.pq_args)
+        self.start_node(1, self.pq_args)
+        self.connect_nodes(1, 0)
+        fresh = self.check_session()
+        assert all(a != b for a, b in zip(before, fresh))
+        self.stop_node(1)
+        bad_fp = fresh[2][:-1] + ('0' if fresh[2][-1] != '0' else '1')
+        self.start_node(1, self.pq_args + [f'-pqp2ppin=127.0.0.1:{p2p_port(0)}={bad_fp}'])
+        with self.nodes[1].assert_debug_log(['expected identity mismatch'], timeout=5):
+            self.nodes[1].addnode(f'127.0.0.1:{p2p_port(0)}', 'onetry')
+        self.wait_until(lambda: not self.nodes[1].getpeerinfo() and not self.nodes[0].getpeerinfo())
+        self.restart_node(1, self.pq_args)
+        self.connect_nodes(1, 0)
+        self.check_session()
+        self.log.info('Ephemeral restart and wrong-pin recovery passed; trusted persistence is not claimed')
 
     def run_test(self):
         start = time.monotonic()
@@ -126,48 +205,12 @@ class PQTransportTest(BitcoinTestFramework):
                     pass
         self.check_session()
 
-        self.log.info('Creating explicit persistent identities in temporary regtest datadirs')
-        self.stop_node(1)
-        self.stop_node(0)
-        persistent = self.pq_args + ['-pqp2pidentity=pq_identity.dat']
-        self.start_node(0, persistent + ['-pqp2pidentitycreate=1'])
-        self.start_node(1, persistent + ['-pqp2pidentitycreate=1'])
-        fp0, fp1 = self.public_fingerprint(self.nodes[0]), self.public_fingerprint(self.nodes[1])
-        self.stop_node(1)
-        pin = f'-pqp2ppin=127.0.0.1:{p2p_port(0)}={fp0}'
-        self.start_node(1, persistent + [pin])
-        self.connect_nodes(1, 0)
-        pinned = self.check_session(pinned_outbound=True)
-        assert_equal(pinned[1], fp1)
-        assert_equal(pinned[2], fp0)
-        self.disconnect_nodes(1, 0)
-        self.connect_nodes(1, 0)
-        pinned_again = self.check_session(pinned_outbound=True)
-        assert pinned_again[0] != pinned[0]
-        assert_equal(pinned_again[1:], pinned[1:])
-        self.stop_node(1)
-        bad_fp = fp0[:-1] + ('0' if fp0[-1] != '0' else '1')
-        self.start_node(1, persistent + [f'-pqp2ppin=127.0.0.1:{p2p_port(0)}={bad_fp}'])
-        with self.nodes[1].assert_debug_log(['expected identity mismatch'], timeout=5):
-            self.nodes[1].addnode(f'127.0.0.1:{p2p_port(0)}', 'onetry')
-        self.wait_until(lambda: not self.nodes[1].getpeerinfo() and not self.nodes[0].getpeerinfo())
-        self.restart_node(1, persistent + [pin])
-        self.connect_nodes(1, 0)
-        self.check_session(pinned_outbound=True)
-        self.log.info('Wrong pin disconnected without fallback; corrected explicit pin reconnected')
+        ephemeral_only = os.name == 'nt' or self.options.ephemeral_only
+        if ephemeral_only:
+            self.ephemeral_identity_lifecycle()
+        else:
+            self.persistent_identity_lifecycle()
 
-        self.log.info('Explicit identity rotation requires an explicit trusted pin update')
-        self.restart_node(0, self.pq_args + ['-pqp2pidentity=rotated.dat', '-pqp2pidentitycreate=1'])
-        self.wait_until(lambda: not self.nodes[1].getpeerinfo() and not self.nodes[0].getpeerinfo())
-        rotated_fp = self.public_fingerprint(self.nodes[0], 'rotated.dat')
-        assert rotated_fp != fp0
-        assert_equal(self.public_fingerprint(self.nodes[0]), fp0)
-        with self.nodes[1].assert_debug_log(['expected identity mismatch'], timeout=5):
-            self.nodes[1].addnode(f'127.0.0.1:{p2p_port(0)}', 'onetry')
-        self.wait_until(lambda: not self.nodes[1].getpeerinfo() and not self.nodes[0].getpeerinfo())
-        self.restart_node(1, persistent + [f'-pqp2ppin=127.0.0.1:{p2p_port(0)}={rotated_fp}'])
-        self.connect_nodes(1, 0)
-        self.check_session(pinned_outbound=True)
         # Restarted wallets and nodes retain the confirmed transaction and chain.
         if 'receiver' not in self.nodes[1].listwallets():
             self.nodes[1].loadwallet('receiver')
@@ -188,7 +231,9 @@ class PQTransportTest(BitcoinTestFramework):
                           node.getblockcount(), self.options.mercahash_v2_height, time.monotonic() - validation_start)
         public_fields = ['transport_protocol_type', 'session_id', 'inbound', 'pq_encrypted', 'pq_authenticated', 'pq_identity_verified', 'pq_identity', 'pq_kem', 'pq_auth_algorithm', 'bytesrecv', 'bytesrecv_per_msg']
         evidence = {'network': 'isolated loopback regtest', 'txid': txid, 'relayed_block': block, 'height': self.nodes[0].getblockcount(), 'handshake_bytes': 15488, 'ephemeral_reconnect_changed_identities': True, 'wrong_pin_rejected_without_fallback': True,
-                    'mercahash_v2_height': self.options.mercahash_v2_height, 'explicit_rotation_and_pin_update': True,
+                    'mercahash_v2_height': self.options.mercahash_v2_height, 'explicit_rotation_and_pin_update': not ephemeral_only,
+                    'identity_lifecycle': 'ephemeral_restart' if ephemeral_only else 'persistent_rotation',
+                    'windows_persistent_storage_fail_closed': os.name == 'nt',
                     'post_restart_tip': tip, 'confirmed_receiver_balance': '1.00',
                     'connection_including_version_pong_ms': initial_connection_ms, 'reconnection_including_version_pong_ms': reconnect_ms,
                     'peers': [{field: peer[field] for field in public_fields} for peer in self.nodes[0].getpeerinfo() + self.nodes[1].getpeerinfo()]}

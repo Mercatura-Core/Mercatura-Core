@@ -75,3 +75,29 @@ Coherent recovery commits:
 **GitHub CI recovery remains pending until a new run's actual job conclusions
 are recorded.** Local results are not substitutes for native Windows/macOS CI.
 Extended B2 execution has not started at this checkpoint.
+
+## First recovery run: newly exposed Windows platform contract
+
+[Run 40290213197](https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/40290213197)
+at `9c6ab92c8361b57329c6b3fd9f5e7e11a54e7b65` completed with Linux, macOS native,
+all three cross-compilers and lint successful. Native macOS full functional
+validation therefore passed with the scoped verification timeout. Windows again
+passed all 184 CTest entries, then failed the four positive PQ functional cases.
+
+Windows job `121463229425` confirms that fixture discovery is fixed: transaction
+relay, block relay, reconnect and malformed-preface checks now complete. The
+next operation tries POSIX persistent identity creation, and correctly receives
+`Stage A persistent PQ identity storage is not yet supported on Windows; use
+ephemeral identities`. This platform boundary was previously masked by the
+fixture error. Native Windows persistent storage is intentionally a later task;
+it must not be enabled merely to make these tests pass.
+
+The functional test now asserts Windows load/create requests fail closed and
+create no identity file, while retaining actual ephemeral reconnect/restart,
+wrong-pin rejection/recovery, wallet/chain persistence, full `verifychain(4, 0)`
+and exact tip validation. POSIX continues executing the complete persistent
+pinning/rotation path. A test-only `--ephemeral-only` option exercises that
+restart path on Linux without claiming to emulate Windows ACL/storage behavior.
+The ephemeral V2 path and full POSIX B1 V2 path both passed locally after this
+change. The next native Windows CI run must verify the platform-specific
+fail-closed assertions themselves.
