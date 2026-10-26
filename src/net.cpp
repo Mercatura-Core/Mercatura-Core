@@ -6,7 +6,7 @@
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
 #include <net.h>
-#include <net_pq.h>
+#include <net_pq_context.h>
 
 #include <addrdb.h>
 #include <addrman.h>
@@ -4057,13 +4057,7 @@ ServiceFlags CConnman::GetLocalServices() const
 static std::unique_ptr<Transport> MakeTransport(NodeId id, bool use_v2transport, bool inbound, const std::shared_ptr<pq::Context>& pq_context, const CAddress& address, const std::string& name, bool anonymous) noexcept
 {
     if (pq_context) {
-        std::optional<pq::Digest> pin;
-        if (!inbound) {
-            const auto dest = name.empty() ? address.ToStringAddrPort() : name;
-            auto it = pq_context->pins.find(dest);
-            if (it != pq_context->pins.end()) pin = it->second;
-        }
-        return std::make_unique<pq::PQTransport>(pq_context, !inbound, pin, pq::SourceGroup(address, anonymous));
+        return pq::MakePQTransport(pq_context, !inbound, address, name, anonymous);
     }
     if (use_v2transport) {
         return std::make_unique<V2Transport>(id, /*initiating=*/!inbound);

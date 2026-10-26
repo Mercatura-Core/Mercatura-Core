@@ -229,6 +229,17 @@ std::string SourceGroup(const CNetAddr& address, bool anonymous)
     // Network tag prevents an IPv4 address colliding with an IPv6 /64 prefix.
     return std::string(address.IsIPv4() ? "4:" : "6:") + HexStr(address.IsIPv4() ? std::span{bytes}.last(4) : std::span{bytes}.first(8));
 }
+std::unique_ptr<Transport> MakePQTransport(const std::shared_ptr<Context>& context, bool initiator,
+                                           const CService& address, const std::string& name, bool anonymous)
+{
+    std::optional<Digest> pin;
+    if (initiator) {
+        const auto destination = name.empty() ? address.ToStringAddrPort() : name;
+        auto it = context->pins.find(destination);
+        if (it != context->pins.end()) pin = it->second;
+    }
+    return std::make_unique<PQTransport>(context, initiator, pin, SourceGroup(address, anonymous));
+}
 PQTransport::PQTransport(std::shared_ptr<Context> context, bool initiator, std::optional<Digest> pin, std::string source)
     : m_context(std::move(context)), m_initiator(initiator), m_pin(pin), m_source(std::move(source)), m_expected(initiator ? 2 : 1)
 {
