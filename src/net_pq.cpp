@@ -266,122 +266,144 @@ void PQTransport::InstallKeys()
 bool PQTransport::Poll()
 {
     std::lock_guard lock(m_mutex);
-    if (m_failed) return false;
-    const auto now = Clock::now();
-    if (!m_established && (now - m_created > std::chrono::seconds(120) || now - m_wait > std::chrono::seconds(30) || (m_preface && now - m_created > std::chrono::seconds(5)))) return Fail();
-    if (!m_work) return true;
-    if (m_work->cancelled) return Fail(false);
-    if (!m_work->done.load(std::memory_order_acquire)) {
-        if ((!m_work->started && now - m_work->queued > std::chrono::seconds(2)) || (m_work->started && Micros(now) - m_work->started_us > 5'000'000)) return Fail();
+    try {
+        if (m_failed) return false;
+        const auto now = Clock::now();
+        if (!m_established && (now - m_created > std::chrono::seconds(120) || now - m_wait > std::chrono::seconds(30) || (m_preface && now - m_created > std::chrono::seconds(5)))) return Fail();
+        if (!m_work) return true;
+        if (m_work->cancelled) return Fail(false);
+        if (!m_work->done.load(std::memory_order_acquire)) {
+            if ((!m_work->started && now - m_work->queued > std::chrono::seconds(2)) || (m_work->started && Micros(now) - m_work->started_us > 5'000'000)) return Fail();
+            return true;
+        }
+        auto result = std::move(m_work);
+        if (result->generation != m_generation || result->cancelled || !result->ok) {
+            m_context->ReportFailure(result->handshake && result->handshake->PinMismatch() ? "expected identity mismatch (pin is never replaced)" : "authentication or cancelled crypto job");
+            return Fail(false);
+        }
+        m_handshake = std::move(result->handshake); m_expected = m_handshake->Next();
+        assert(m_send.empty()); m_send = std::move(result->response); m_send_pos = 0; m_wait = now;
+        if (m_handshake->Ready()) {
+            if (m_initiator) { m_final_send = true; }
+            else { InstallKeys(); m_established = true; }
+        }
         return true;
-    }
-    auto result = std::move(m_work);
-    if (result->generation != m_generation || result->cancelled || !result->ok) {
-        m_context->ReportFailure(result->handshake && result->handshake->PinMismatch() ? "expected identity mismatch (pin is never replaced)" : "authentication or cancelled crypto job");
+    } catch (...) {
         return Fail(false);
     }
-    m_handshake = std::move(result->handshake); m_expected = m_handshake->Next();
-    assert(m_send.empty()); m_send = std::move(result->response); m_send_pos = 0; m_wait = now;
-    if (m_handshake->Ready()) {
-        if (m_initiator) { m_final_send = true; }
-        else { InstallKeys(); m_established = true; }
-    }
-    return true;
 }
 Transport::Info PQTransport::GetInfo() const noexcept
 {
     std::lock_guard lock(m_mutex);
-    Info info{.transport_type = TransportProtocolType::PQ_V1, .session_id = {}};
-    if (m_established) {
-        info.session_id = uint256{m_session}; info.pq_encrypted = true; info.pq_authenticated = true;
-        info.pq_identity_verified = m_pin.has_value(); info.pq_identity = m_peer_fp;
+    try {
+        Info info{.transport_type = TransportProtocolType::PQ_V1, .session_id = {}};
+        if (m_established) {
+            info.session_id = uint256{m_session}; info.pq_encrypted = true; info.pq_authenticated = true;
+            info.pq_identity_verified = m_pin.has_value(); info.pq_identity = m_peer_fp;
+        }
+        return info;
+    } catch (...) {
+        return Info{.transport_type = TransportProtocolType::PQ_V1, .session_id = {}};
     }
-    return info;
 }
 bool PQTransport::ReceivedMessageComplete() const { std::lock_guard lock(m_mutex); return m_established && m_message && !m_failed; }
 bool PQTransport::ReceivedBytes(std::span<const uint8_t>& bytes)
 {
     if (!Poll()) return false;
     std::lock_guard lock(m_mutex);
-    if (m_failed || m_work || (!m_established && !m_send.empty()) || m_message) return Fail();
-    while (!bytes.empty()) {
-        if (!m_established) {
-            if (m_preface) {
-                if (bytes.front() != uint8_t(PREFACE[m_preface_pos++])) return Fail();
-                bytes = bytes.subspan(1);
-                if (m_preface_pos == PREFACE.size()) { m_preface = false; m_wait = Clock::now(); }
-                continue;
-            }
-            size_t target = m_recv.size() < 12 ? 12 : RECORD_SIZES[m_expected];
-            const auto count = std::min(bytes.size(), target - m_recv.size());
-            m_recv.insert(m_recv.end(), bytes.begin(), bytes.begin()+count); bytes = bytes.subspan(count);
-            if (m_recv.size() == 12) {
-                if (!ValidHeader(m_recv, m_expected)) return Fail();
-                if (!m_admission) return Fail();
-                m_recv.reserve(RECORD_SIZES[m_expected]);
-            }
-            if ((m_expected == 1 || m_expected == 2) && m_recv.size() > 12) {
-                const auto network_bytes = std::min(size_t{85}, m_recv.size()-12);
-                if (!Equal(std::span{m_recv}.subspan(12, network_bytes), std::span{m_context->network}.first(network_bytes))) return Fail();
-            }
-            if (m_recv.size() == RECORD_SIZES[m_expected]) {
-                // M5 performs only MAC/HKDF and cipher initialization; no KEM or
-                // signature operation. Verify it inline so a coalesced first
-                // packet can be consumed without an unbounded deferred queue.
-                if (m_expected == 5) {
-                    Bytes response;
-                    if (!m_handshake || !m_handshake->Advance(m_recv, response) || !m_handshake->Ready() || !response.empty()) return Fail();
-                    m_recv.clear(); InstallKeys(); m_established = true;
+    try {
+        if (m_failed || m_work || (!m_established && !m_send.empty()) || m_message) return Fail();
+        while (!bytes.empty()) {
+            if (!m_established) {
+                if (m_preface) {
+                    if (bytes.front() != uint8_t(PREFACE[m_preface_pos++])) return Fail();
+                    bytes = bytes.subspan(1);
+                    if (m_preface_pos == PREFACE.size()) { m_preface = false; m_wait = Clock::now(); }
                     continue;
                 }
-                if (!bytes.empty()) return Fail();
-                auto record = std::move(m_recv); m_recv.clear();
-                if (!Queue(std::move(record))) return Fail();
-                return true;
-            }
-        } else {
-            const size_t target = m_packet_length ? size_t{*m_packet_length}+20 : 3;
-            const auto count = std::min(bytes.size(), target - m_recv.size());
-            m_recv.insert(m_recv.end(), bytes.begin(), bytes.begin()+count); bytes = bytes.subspan(count);
-            if (!m_packet_length && m_recv.size() == 3) {
-                m_packet_length = m_recv_cipher->DecryptLength(m_recv);
-                if (!m_packet_length) return Fail();
-                m_recv.reserve(size_t{*m_packet_length}+20);
-            }
-            if (m_packet_length && m_recv.size() == size_t{*m_packet_length}+20) {
-                bool decoy{false};
-                if (!m_recv_cipher->Decrypt(std::span{m_recv}.subspan(3), m_decoded, decoy)) return Fail();
-                Bytes{}.swap(m_recv); m_packet_length.reset();
-                if (!decoy) { m_message = true; return true; }
+                size_t target = m_recv.size() < 12 ? 12 : RECORD_SIZES[m_expected];
+                const auto count = std::min(bytes.size(), target - m_recv.size());
+                m_recv.insert(m_recv.end(), bytes.begin(), bytes.begin()+count); bytes = bytes.subspan(count);
+                if (m_recv.size() == 12) {
+                    if (!ValidHeader(m_recv, m_expected)) return Fail();
+                    if (!m_admission) return Fail();
+                    m_recv.reserve(RECORD_SIZES[m_expected]);
+                }
+                if ((m_expected == 1 || m_expected == 2) && m_recv.size() > 12) {
+                    const auto network_bytes = std::min(size_t{85}, m_recv.size()-12);
+                    if (!Equal(std::span{m_recv}.subspan(12, network_bytes), std::span{m_context->network}.first(network_bytes))) return Fail();
+                }
+                if (m_recv.size() == RECORD_SIZES[m_expected]) {
+                    // M5 performs only MAC/HKDF and cipher initialization; no KEM or
+                    // signature operation. Verify it inline so a coalesced first
+                    // packet can be consumed without an unbounded deferred queue.
+                    if (m_expected == 5) {
+                        Bytes response;
+                        if (!m_handshake || !m_handshake->Advance(m_recv, response) || !m_handshake->Ready() || !response.empty()) return Fail();
+                        m_recv.clear(); InstallKeys(); m_established = true;
+                        continue;
+                    }
+                    if (!bytes.empty()) return Fail();
+                    auto record = std::move(m_recv); m_recv.clear();
+                    if (!Queue(std::move(record))) return Fail();
+                    return true;
+                }
+            } else {
+                const size_t target = m_packet_length ? size_t{*m_packet_length}+20 : 3;
+                const auto count = std::min(bytes.size(), target - m_recv.size());
+                m_recv.insert(m_recv.end(), bytes.begin(), bytes.begin()+count); bytes = bytes.subspan(count);
+                if (!m_packet_length && m_recv.size() == 3) {
+                    m_packet_length = m_recv_cipher->DecryptLength(m_recv);
+                    if (!m_packet_length) return Fail();
+                    m_recv.reserve(size_t{*m_packet_length}+20);
+                }
+                if (m_packet_length && m_recv.size() == size_t{*m_packet_length}+20) {
+                    bool decoy{false};
+                    if (!m_recv_cipher->Decrypt(std::span{m_recv}.subspan(3), m_decoded, decoy)) return Fail();
+                    Bytes{}.swap(m_recv); m_packet_length.reset();
+                    if (!decoy) { m_message = true; return true; }
+                }
             }
         }
+        return true;
+    } catch (...) {
+        return Fail(false);
     }
-    return true;
 }
 CNetMessage PQTransport::GetReceivedMessage(std::chrono::microseconds time, bool& reject)
 {
-    std::lock_guard lock(m_mutex); assert(m_established && m_message && !m_failed);
-    std::span<const uint8_t> contents{m_decoded}; auto command = DecodeCommand(contents);
-    CNetMessage msg{DataStream{}}; msg.m_raw_message_size = m_decoded.size()+20;
-    reject = !command.has_value() || contents.size() > MAX_PROTOCOL_MESSAGE_LENGTH;
-    if (!reject) {
-        msg.m_type = *command; msg.m_time = time; msg.m_message_size = contents.size(); msg.m_recv.resize(contents.size());
-        std::copy(contents.begin(), contents.end(), reinterpret_cast<uint8_t*>(msg.m_recv.data()));
+    std::lock_guard lock(m_mutex);
+    try {
+        assert(m_established && m_message && !m_failed);
+        std::span<const uint8_t> contents{m_decoded}; auto command = DecodeCommand(contents);
+        CNetMessage msg{DataStream{}}; msg.m_raw_message_size = m_decoded.size()+20;
+        reject = !command.has_value() || contents.size() > MAX_PROTOCOL_MESSAGE_LENGTH;
+        if (!reject) {
+            msg.m_type = *command; msg.m_time = time; msg.m_message_size = contents.size(); msg.m_recv.resize(contents.size());
+            std::copy(contents.begin(), contents.end(), reinterpret_cast<uint8_t*>(msg.m_recv.data()));
+        }
+        m_message = false; Bytes{}.swap(m_decoded); return msg;
+    } catch (...) {
+        Fail(false); reject = true;
+        return CNetMessage{DataStream{}};
     }
-    m_message = false; Bytes{}.swap(m_decoded); return msg;
 }
 bool PQTransport::SetMessageToSend(CSerializedNetMsg& msg) noexcept
 {
     std::lock_guard lock(m_mutex);
-    if (!m_established || m_failed || !m_send.empty()) return false;
-    if (msg.data.size() > MAX_PROTOCOL_MESSAGE_LENGTH || msg.m_type.empty() || msg.m_type.size() > 12 || !std::ranges::all_of(msg.m_type, [](unsigned char c) { return c >= 32 && c <= 127; })) { Fail(); return false; }
-    Bytes contents;
-    auto it = std::find(COMMANDS.begin()+1, COMMANDS.end(), msg.m_type);
-    if (it != COMMANDS.end()) contents.push_back(it - COMMANDS.begin());
-    else { contents.resize(13); std::copy(msg.m_type.begin(), msg.m_type.end(), contents.begin()+1); }
-    contents.insert(contents.end(), msg.data.begin(), msg.data.end());
-    if (!m_send_cipher->Encrypt(contents, 0, m_send)) { Fail(); return false; }
-    m_type = msg.m_type; msg.data.clear(); return true;
+    try {
+        if (!m_established || m_failed || !m_send.empty()) return false;
+        if (msg.data.size() > MAX_PROTOCOL_MESSAGE_LENGTH || msg.m_type.empty() || msg.m_type.size() > 12 || !std::ranges::all_of(msg.m_type, [](unsigned char c) { return c >= 32 && c <= 127; })) { Fail(); return false; }
+        Bytes contents;
+        auto it = std::find(COMMANDS.begin()+1, COMMANDS.end(), msg.m_type);
+        if (it != COMMANDS.end()) contents.push_back(it - COMMANDS.begin());
+        else { contents.resize(13); std::copy(msg.m_type.begin(), msg.m_type.end(), contents.begin()+1); }
+        contents.insert(contents.end(), msg.data.begin(), msg.data.end());
+        if (!m_send_cipher->Encrypt(contents, 0, m_send)) { Fail(); return false; }
+        m_type = msg.m_type; msg.data.clear(); return true;
+    } catch (...) {
+        return Fail(false);
+    }
 }
 Transport::BytesToSend PQTransport::GetBytesToSend(bool have_next) const noexcept
 {
@@ -392,11 +414,15 @@ Transport::BytesToSend PQTransport::GetBytesToSend(bool have_next) const noexcep
 void PQTransport::MarkBytesSent(size_t count) noexcept
 {
     std::lock_guard lock(m_mutex);
-    if (m_failed || !count) return;
-    assert(count <= m_send.size()-m_send_pos); m_send_pos += count;
-    if (m_send_pos == m_send.size()) {
-        Bytes{}.swap(m_send); m_send_pos = 0; m_type.clear(); m_wait = Clock::now();
-        if (m_final_send) { m_final_send = false; InstallKeys(); m_established = true; }
+    try {
+        if (m_failed || !count) return;
+        assert(count <= m_send.size()-m_send_pos); m_send_pos += count;
+        if (m_send_pos == m_send.size()) {
+            Bytes{}.swap(m_send); m_send_pos = 0; m_type.clear(); m_wait = Clock::now();
+            if (m_final_send) { m_final_send = false; InstallKeys(); m_established = true; }
+        }
+    } catch (...) {
+        Fail(false);
     }
 }
 size_t PQTransport::GetSendMemoryUsage() const noexcept { std::lock_guard lock(m_mutex); return m_send.capacity(); }

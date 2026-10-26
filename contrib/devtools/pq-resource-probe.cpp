@@ -12,6 +12,8 @@
 #include <limits>
 #include <new>
 #include <stdexcept>
+#include <charconv>
+#include <exception>
 
 namespace allocation_probe {
 struct Counters {
@@ -111,11 +113,82 @@ int FaultInjection(int fail_after)
     std::cout<<"{\"allocation_failure_caught\":"<<(caught ? "true" : "false")<<",\"pending_after_failed_allocation\":"<<pending<<"}\n";
     return pending==0 ? 0 : 1;
 }
+int TransportAllocation(std::string_view phase, int allocation)
+{
+    // A failing noexcept boundary is recorded without a core dump. This handler
+    // and allocation interposition exist only in this excluded probe binary.
+    std::set_terminate([] { std::_Exit(86); });
+    auto context=std::make_shared<Context>(RegtestNetwork());
+    auto i=std::make_unique<PQTransport>(context,true,std::nullopt,"probe-i");
+    auto r=std::make_unique<PQTransport>(context,false,std::nullopt,"probe-r");
+    const bool keys=phase=="keys", queue=phase=="queue";
+    Require(keys || queue || phase=="send" || phase=="info" || phase=="receive" || phase=="message","unknown allocation phase");
+    const auto deadline=Clock::now()+5s;
+    for (;;) {
+        Require(Clock::now()<deadline,"transport allocation setup timed out");
+        Require(i->Poll() && r->Poll(),"transport setup failed");
+        if (queue && !std::get<0>(i->GetBytesToSend(false)).empty()) break;
+        if (keys && std::get<0>(i->GetBytesToSend(false)).size()==60) break;
+        if (!keys && !queue && i->GetInfo().pq_encrypted && r->GetInfo().pq_encrypted) break;
+        Transfer(*i,*r); Transfer(*r,*i); std::this_thread::sleep_for(100us);
+    }
+    bool injected{false}, returned{false};
+    if (phase=="send") {
+        CSerializedNetMsg message; message.m_type="ping"; message.data.resize(64,42);
+        allocation_probe::fail_after=allocation;
+        returned=i->SetMessageToSend(message);
+        injected=allocation_probe::fail_after<0; allocation_probe::fail_after=-1;
+        Require(returned!=injected,"send did not fail closed");
+        if (injected) Require(!i->Poll() && !i->GetInfo().pq_authenticated && message.data.size()==64,"failed send retained state or consumed input");
+        Require(r->GetInfo().pq_authenticated,"send failure damaged unrelated endpoint ownership");
+    } else if (keys) {
+        allocation_probe::fail_after=allocation; i->MarkBytesSent(60); returned=true;
+        injected=allocation_probe::fail_after<0; allocation_probe::fail_after=-1;
+        Require(i->GetInfo().pq_authenticated!=injected,"key-install failure published authentication");
+        if (injected) Require(!i->Poll(),"failed key installation stayed usable");
+    } else if (phase=="info") {
+        allocation_probe::fail_after=allocation; const auto info=i->GetInfo(); returned=true;
+        injected=allocation_probe::fail_after<0; allocation_probe::fail_after=-1;
+        Require(info.pq_authenticated!=injected,"status allocation failure published assurance");
+        if (injected) Require(!info.session_id && info.pq_identity.empty(),"failed status retained details");
+        Require(i->Poll() && r->Poll(),"status query failure damaged live transport");
+    } else {
+        CSerializedNetMsg message; message.m_type="ping"; message.data.resize(64,42);
+        if (!queue) Require(i->SetMessageToSend(message),"receive setup failed");
+        auto wire=std::get<0>(i->GetBytesToSend(false));
+        if (phase=="message") { Transfer(*i,*r); Require(r->ReceivedMessageComplete(),"message setup failed"); }
+        bool escaped{false}, reject{false};
+        allocation_probe::fail_after=allocation;
+        try {
+            if (phase=="message") { auto decoded=r->GetReceivedMessage(1us,reject); returned=!reject; }
+            else { returned=r->ReceivedBytes(wire); }
+        } catch (const std::bad_alloc&) { escaped=true; }
+        injected=allocation_probe::fail_after<0; allocation_probe::fail_after=-1;
+        Require(!escaped,"allocation exception escaped the transport boundary");
+        Require(returned!=injected,"receive did not fail closed");
+        if (injected) Require(!r->Poll() && !r->GetInfo().pq_authenticated,"receive failure retained live state");
+    }
+    i.reset(); r.reset(); context->Stop();
+    Require(context->Pending()==0,"transport allocation failure retained admission");
+    std::cout<<"{\"phase\":\""<<phase<<"\",\"allocation_index\":"<<allocation
+             <<",\"allocation_injected\":"<<(injected ? "true" : "false")
+             <<",\"returned\":"<<(returned ? "true" : "false")<<",\"pending_after_cleanup\":0}\n";
+    return 0;
+}
 }
 int main(int argc,char** argv)
 {
     try {
         BasicTestingSetup setup{ChainType::REGTEST};
+        if (argc==2 && std::string_view(argv[1]).starts_with("--transport-allocation=")) {
+            auto argument=std::string_view(argv[1]).substr(23);
+            const auto colon=argument.find(':');
+            Require(colon!=std::string_view::npos,"expected phase:index");
+            int allocation{-1}; const auto number=argument.substr(colon+1);
+            const auto result=std::from_chars(number.data(),number.data()+number.size(),allocation);
+            Require(result.ec==std::errc{} && result.ptr==number.data()+number.size() && allocation>=0 && allocation<=32,"invalid bounded allocation index");
+            return TransportAllocation(argument.substr(0,colon),allocation);
+        }
         if (argc==2 && std::string_view(argv[1]).starts_with("--allocation-failure=")) return FaultInjection(std::stoi(argv[1]+21));
         UniValue report{UniValue::VOBJ};
         report.pushKV("measurement","Dedicated global new/delete interposition, requested C++ heap only; excludes probe headers, malloc metadata, libc/pthread and native crypto stack allocations");
