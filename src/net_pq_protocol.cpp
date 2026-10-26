@@ -48,6 +48,25 @@ bool ValidHeader(std::span<const uint8_t> header, uint8_t expected)
     if (expected < 1 || expected > 5 || header.size() != 12) return false;
     return std::ranges::equal(header, Header(expected));
 }
+std::optional<std::string> DecodeCommand(std::span<const uint8_t>& contents)
+{
+    if (contents.empty()) return {};
+    uint8_t id = contents.front(); contents = contents.subspan(1);
+    if (id) {
+        if (id >= COMMANDS.size()) return {};
+        return std::string{COMMANDS[id]};
+    }
+    if (contents.size() < 12) return {};
+    size_t length = 0;
+    while (length < 12 && contents[length]) {
+        if (contents[length] < 32 || contents[length] > 127) return {};
+        ++length;
+    }
+    if (!length) return {};
+    for (size_t i = length; i < 12; ++i) if (contents[i]) return {};
+    std::string result(reinterpret_cast<const char*>(contents.data()), length);
+    contents = contents.subspan(12); return result;
+}
 Handshake::Handshake(bool initiator, Network network, std::optional<Digest> pin, std::shared_ptr<const Identity> identity, Random rng)
     : m_initiator(initiator), m_network(network), m_pin(pin), m_identity(std::move(identity)), m_rng(std::move(rng)), m_next(initiator ? 2 : 1)
 {

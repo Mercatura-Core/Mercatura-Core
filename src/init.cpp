@@ -7,6 +7,7 @@
 
 #include <init.h>
 #include <net_pq.h>
+#include <net_pq_identity_format.h>
 
 #include <kernel/checks.h>
 
@@ -2124,14 +2125,9 @@ bool AppInitMain(NodeContext& node, interfaces::BlockAndHeaderTipInfo* tip_info)
             }
             std::map<std::string, pq::Digest> pins;
             for (const auto& binding : args.GetArgs("-pqp2ppin")) {
-                const auto equal = binding.rfind('=');
-                if (equal == std::string::npos || equal == 0) return InitError(_("Invalid -pqp2ppin destination binding."));
-                const auto value = binding.substr(equal+1);
-                if (value.size() != 103 || !value.starts_with("mcapq1:")) return InitError(_("Invalid PQ fingerprint; require mcapq1: and 96 lowercase hex digits."));
-                const auto raw = ParseHex(value.substr(7));
-                if (raw.size() != 48 || HexStr(raw) != value.substr(7)) return InitError(_("Invalid canonical PQ fingerprint."));
-                pq::Digest pin; std::copy(raw.begin(), raw.end(), pin.begin());
-                if (!pins.emplace(binding.substr(0,equal), pin).second) return InitError(_("Duplicate PQ pin destination."));
+                auto parsed=pq::ParsePinBinding(binding);
+                if (!parsed) return InitError(_("Invalid -pqp2ppin: require exact host:port (bracket IPv6), '=' and mcapq1: with 96 lowercase hex digits."));
+                if (!pins.emplace(std::move(parsed->destination), parsed->fingerprint).second) return InitError(_("Duplicate PQ pin destination."));
             }
             connOptions.pq_context = std::make_shared<pq::Context>(network, std::move(identity), std::move(pins));
             // A required-only listener must not advertise classical V2 acceptance.

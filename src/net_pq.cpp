@@ -32,26 +32,6 @@ Random SecureRandom()
     };
 }
 int64_t Micros(Clock::time_point time) { return std::chrono::duration_cast<std::chrono::microseconds>(time.time_since_epoch()).count(); }
-constexpr std::array<std::string_view, 29> COMMANDS{"", "addr", "block", "blocktxn", "cmpctblock", "feefilter", "filteradd", "filterclear", "filterload", "getblocks", "getblocktxn", "getdata", "getheaders", "headers", "inv", "mempool", "merkleblock", "notfound", "ping", "pong", "sendcmpct", "tx", "getcfilters", "cfilter", "getcfheaders", "cfheaders", "getcfcheckpt", "cfcheckpt", "addrv2"};
-std::optional<std::string> DecodeCommand(std::span<const uint8_t>& contents)
-{
-    if (contents.empty()) return {};
-    uint8_t id = contents.front(); contents = contents.subspan(1);
-    if (id) {
-        if (id >= COMMANDS.size()) return {};
-        return std::string{COMMANDS[id]};
-    }
-    if (contents.size() < 12) return {};
-    size_t length = 0;
-    while (length < 12 && contents[length]) {
-        if (contents[length] < 32 || contents[length] > 127) return {};
-        ++length;
-    }
-    if (!length) return {};
-    for (size_t i = length; i < 12; ++i) if (contents[i]) return {};
-    std::string result(reinterpret_cast<const char*>(contents.data()), length);
-    contents = contents.subspan(12); return result;
-}
 }
 Context::Context(Network net, std::shared_ptr<const Identity> id, std::map<std::string, Digest> expected)
     : network(net), identity(std::move(id)), pins(std::move(expected))

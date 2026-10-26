@@ -10,6 +10,7 @@
 #include <memory>
 #include <optional>
 #include <string_view>
+#include <string>
 #include <vector>
 
 namespace pq {
@@ -23,6 +24,8 @@ Digest Hash(std::span<const uint8_t> bytes);
 Digest Fingerprint(const Network& network, std::span<const uint8_t> pub);
 Bytes Header(uint8_t type);
 bool ValidHeader(std::span<const uint8_t> header, uint8_t expected);
+inline constexpr std::array<std::string_view, 29> COMMANDS{"", "addr", "block", "blocktxn", "cmpctblock", "feefilter", "filteradd", "filterclear", "filterload", "getblocks", "getblocktxn", "getdata", "getheaders", "headers", "inv", "mempool", "merkleblock", "notfound", "ping", "pong", "sendcmpct", "tx", "getcfilters", "cfilter", "getcfheaders", "cfheaders", "getcfcheckpt", "cfcheckpt", "addrv2"};
+std::optional<std::string> DecodeCommand(std::span<const uint8_t>& contents);
 
 struct SessionKeys {
     Secret<32> i_length, i_payload, r_length, r_payload;
