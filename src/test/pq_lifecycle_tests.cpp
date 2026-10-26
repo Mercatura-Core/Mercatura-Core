@@ -161,6 +161,46 @@ BOOST_AUTO_TEST_CASE(storage_postpublication_failure_preserves_identity)
         BOOST_CHECK_EQUAL(Temporaries(dir),0U);
     }
 }
+BOOST_AUTO_TEST_CASE(storage_format_errors_do_not_modify_existing_files)
+{
+    constexpr std::array<const char*,7> names{"empty","truncated","trailing","version","network","checksum","key-binding"};
+    Secret<32> seed; seed.bytes.fill(42); Identity identity; BOOST_REQUIRE(identity.FromSeed(seed.bytes));
+    for (unsigned kind=0;kind<names.size();++kind) {
+        const auto dir=Directory(m_path_root,names[kind]); const auto file=dir/"identity.dat";
+        IdentityFile contents; auto network=RegtestNetwork(); auto public_key=identity.pub;
+        if (kind==4) network[5]^=1;
+        if (kind==6) public_key[0]^=1;
+        EncodeIdentityFile(network,seed.bytes,public_key,contents);
+        if (kind==3) contents.bytes[8]=2;
+        if (kind==5) contents.bytes.back()^=1;
+        const size_t count=kind==0 ? 0 : kind==1 ? 2126 : 2127;
+        {
+            // Public synthetic fixture material; never an operational seed.
+            std::ofstream stream(fs::PathToString(file),std::ios::binary);
+            stream.write(reinterpret_cast<const char*>(contents.bytes.data()),count);
+            if (kind==2) stream.put(0);
+        }
+        fs::permissions(file,fs::perms::owner_read|fs::perms::owner_write);
+        const auto size=fs::file_size(file); FileFaults faults;
+        { ScopedFiles scope(faults); BOOST_CHECK_THROW(LoadIdentity(fs::PathToString(file),false,RegtestNetwork()),std::runtime_error); }
+        BOOST_CHECK_EQUAL(fs::file_size(file),size); BOOST_CHECK_EQUAL(faults.OpenCount(),0U);
+        BOOST_CHECK_EQUAL(faults.calls[size_t(Op::WRITE)],0U);
+        if (faults.read_buffer) { BOOST_CHECK(faults.buffers_zeroed); BOOST_CHECK_EQUAL(faults.cleansed_buffers,1U); }
+    }
+}
+BOOST_AUTO_TEST_CASE(storage_cleanup_error_reports_residual_temporary)
+{
+    const auto dir=Directory(m_path_root,"residual-temporary"); const auto name=fs::PathToString(dir/"identity.dat");
+    FileFaults faults; faults.rules={{Op::WRITE,1,Action::SHORT,113},{Op::WRITE,2,Action::ERROR,EIO},{Op::UNLINK,1,Action::ERROR,EACCES}};
+    std::string message;
+    { ScopedFiles scope(faults); try { LoadIdentity(name,true,RegtestNetwork()); } catch (const std::runtime_error& error) { message=error.what(); } }
+    BOOST_CHECK(message.find("cleanup failed")!=std::string::npos);
+    BOOST_CHECK_EQUAL(faults.OpenCount(),0U); BOOST_CHECK(!fs::exists(fs::PathFromString(name)));
+    BOOST_CHECK_EQUAL(Temporaries(dir),1U); BOOST_CHECK(faults.buffers_zeroed);
+    BOOST_CHECK_THROW(LoadIdentity(name,false,RegtestNetwork()),std::runtime_error);
+    RemoveTemporaries(dir);
+    BOOST_CHECK(LoadIdentity(name,true,RegtestNetwork()));
+}
 BOOST_AUTO_TEST_CASE(partial_worker_startup_is_joined)
 {
     for (int failed : {0,1}) {

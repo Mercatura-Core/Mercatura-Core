@@ -44,6 +44,7 @@ std::shared_ptr<const Identity> LoadIdentity(const std::string& path, bool creat
         for (auto b : random) { temp += hex[b >> 4]; temp += hex[b & 15]; }
         FD output{openat(directory, temp.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600)};
         if (output.fd < 0) throw std::runtime_error("Cannot exclusively create PQ identity temporary");
+        bool published{false}, temporary_exists{true};
         try {
             // open(0600) is filtered by umask. Set and validate the permissions
             // on the opened inode before writing any secret, so an unusually
@@ -64,8 +65,22 @@ std::shared_ptr<const Identity> LoadIdentity(const std::string& path, bool creat
             if (fsync(output.fd)) throw std::runtime_error("Cannot sync PQ identity");
             // linkat publishes without replacing an existing name on POSIX.
             if (linkat(directory, temp.c_str(), directory, name.c_str(), 0)) throw std::runtime_error("Cannot publish PQ identity (existing identity is never replaced)");
-            if (unlinkat(directory, temp.c_str(), 0) || fsync(directory)) throw std::runtime_error("Cannot durably publish PQ identity; inspect the requested path before retrying");
-        } catch (...) { unlinkat(directory, temp.c_str(), 0); throw; }
+            published = true;
+            if (unlinkat(directory, temp.c_str(), 0)) throw std::runtime_error("Cannot remove PQ identity temporary");
+            temporary_exists = false;
+            if (fsync(directory)) throw std::runtime_error("Cannot sync PQ identity directory");
+        } catch (...) {
+            // Never roll back a published identity or hide a leftover seed
+            // temporary. A later explicit load/recovery must inspect the result;
+            // creation failure is not permission to replace a published key.
+            if (temporary_exists && unlinkat(directory, temp.c_str(), 0) && errno != ENOENT) {
+                throw std::runtime_error(published ?
+                    "PQ identity was published but temporary cleanup failed; inspect the protected directory before retrying" :
+                    "PQ identity creation failed and temporary cleanup failed; inspect the protected directory before retrying");
+            }
+            if (published) throw std::runtime_error("PQ identity was published but directory durability was not confirmed; inspect the requested path before retrying");
+            throw;
+        }
         return id;
     }
     FD input{openat(directory, name.c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)};
