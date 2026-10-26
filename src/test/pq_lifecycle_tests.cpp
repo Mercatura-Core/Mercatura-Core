@@ -410,6 +410,32 @@ BOOST_AUTO_TEST_CASE(handshake_failures_release_identity_and_secret_state)
         wire.pop_back(); BOOST_CHECK(!receiver.Advance(wire,next)); BOOST_CHECK(!receiver.Ready());
         BOOST_CHECK(Access::SecretsCleared(receiver));
     }
+    // Reach real signature/confirmation checks with intact record lengths.
+    for (unsigned kind=0;kind<4;++kind) {
+        const unsigned stage=kind==0 ? 3 : kind==3 ? 5 : 4;
+        Handshake i(true,RegtestNetwork(),{},identity,rng),r(false,RegtestNetwork(),{},identity,rng);
+        Bytes wire,next; BOOST_REQUIRE(i.Start(wire)); wire.erase(wire.begin(),wire.begin()+16);
+        for (unsigned type=1;type<stage;++type) {
+            BOOST_REQUIRE((type%2 ? r : i).Advance(wire,next)); wire=std::move(next);
+            if (type==1) wire.erase(wire.begin(),wire.begin()+16);
+        }
+        wire[kind==1 ? 12 : wire.size()-1]^=1;
+        auto& receiver=stage%2 ? r : i;
+        BOOST_CHECK(!receiver.Advance(wire,next)); BOOST_CHECK(!receiver.Ready());
+        BOOST_CHECK(Access::SecretsCleared(receiver));
+    }
+    {
+        Handshake i(true,RegtestNetwork(),{},identity,rng),r(false,RegtestNetwork(),{},identity,rng);
+        Bytes wire,next; BOOST_REQUIRE(i.Start(wire)); wire.erase(wire.begin(),wire.begin()+16);
+        for (unsigned type=1;type<=5;++type) {
+            BOOST_REQUIRE((type%2 ? r : i).Advance(wire,next)); wire=std::move(next);
+            if (type==1) wire.erase(wire.begin(),wire.begin()+16);
+        }
+        auto keys=i.TakeKeys(); BOOST_CHECK(Access::SecretsCleared(i));
+        auto moved=std::move(keys);
+        BOOST_CHECK(std::ranges::all_of(keys.i_payload.bytes,[](auto b) { return b==0; }));
+        BOOST_CHECK(!std::ranges::all_of(moved.i_payload.bytes,[](auto b) { return b==0; }));
+    }
     {
         Secret<32> secret; const void* watched=secret.bytes.data(); std::atomic<unsigned> cleared{0};
         Hooks hooks; hooks.cleansed=[&](const void* p,size_t size) { if (p==watched && size==32) { BOOST_CHECK(std::ranges::all_of(secret.bytes,[](auto b) { return b==0; })); ++cleared; } };
@@ -417,5 +443,26 @@ BOOST_AUTO_TEST_CASE(handshake_failures_release_identity_and_secret_state)
         auto& alias = secret;
         secret=std::move(alias); BOOST_CHECK(std::ranges::all_of(secret.bytes,[](auto b) { return b==0; }));
     }
+}
+BOOST_AUTO_TEST_CASE(network_bound_pin_and_pinned_admission_remain_fail_closed)
+{
+    auto identity=std::make_shared<Identity>(); BOOST_REQUIRE(identity->FromSeed(std::array<uint8_t,32>{}));
+    auto network=RegtestNetwork(),other=network; other[5]^=1;
+    auto rng=[](std::span<uint8_t> out) { std::fill(out.begin(),out.end(),42); return true; };
+    Handshake i(true,network,{},identity,rng),r(false,network,Fingerprint(other,identity->pub),identity,rng);
+    Bytes hello,response; BOOST_REQUIRE(i.Start(hello));
+    BOOST_CHECK(!r.Advance(std::span{hello}.subspan(16),response));
+    BOOST_CHECK(r.PinMismatch()); BOOST_CHECK_EQUAL(r.Decapsulations(),0U); BOOST_CHECK(Access::SecretsCleared(r));
+    auto context=std::make_shared<Context>(network,identity);
+    const auto pin=Fingerprint(network,identity->pub);
+    std::array<std::unique_ptr<PQTransport>,4> peers;
+    for (auto& peer : peers) peer=std::make_unique<PQTransport>(context,false,pin,"same-pinned-source");
+    BOOST_CHECK_EQUAL(context->Pending(),4U);
+    PQTransport overflow(context,false,pin,"same-pinned-source"); BOOST_CHECK(!overflow.Poll()); NoAssurance(overflow);
+    std::vector<std::future<void>> failures;
+    for (auto& peer : peers) failures.push_back(std::async(std::launch::async,[p=peer.get()] { p->Disconnect(); p->Disconnect(); }));
+    for (auto& failure : failures) failure.get();
+    for (auto& peer : peers) NoAssurance(*peer);
+    BOOST_CHECK_EQUAL(context->Pending(),0U); context->Stop();
 }
 BOOST_AUTO_TEST_SUITE_END()
