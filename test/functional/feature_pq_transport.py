@@ -14,7 +14,7 @@ import time
 from decimal import Decimal
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal, p2p_port
+from test_framework.util import assert_equal, get_rpc_proxy, p2p_port
 
 PQ = ['-pqp2p=required', '-dnsseed=0', '-fixedseeds=0', '-discover=0', '-natpmp=0', '-connect=0']
 
@@ -177,7 +177,15 @@ class PQTransportTest(BitcoinTestFramework):
         for node in self.nodes[:2]:
             assert_equal(node.getbestblockhash(), tip)
             assert_equal(node.getblockchaininfo()['headers'], node.getblockcount())
-            assert node.verifychain(4, 0)
+            # Full V1 MercaHash verification of the maturity fixture can exceed
+            # the generic 30s RPC timeout on ARM64 CI with concurrent tests.
+            # Keep level 4/all blocks and a bounded timeout for this call only.
+            validation = get_rpc_proxy(node.url, node.index, timeout=180 * self.options.timeout_factor,
+                                       coveragedir=node.coverage_dir)
+            validation_start = time.monotonic()
+            assert validation.verifychain(4, 0)
+            self.log.info('Node %d verified all %d blocks (V2 height %d) in %.3fs', node.index,
+                          node.getblockcount(), self.options.mercahash_v2_height, time.monotonic() - validation_start)
         public_fields = ['transport_protocol_type', 'session_id', 'inbound', 'pq_encrypted', 'pq_authenticated', 'pq_identity_verified', 'pq_identity', 'pq_kem', 'pq_auth_algorithm', 'bytesrecv', 'bytesrecv_per_msg']
         evidence = {'network': 'isolated loopback regtest', 'txid': txid, 'relayed_block': block, 'height': self.nodes[0].getblockcount(), 'handshake_bytes': 15488, 'ephemeral_reconnect_changed_identities': True, 'wrong_pin_rejected_without_fallback': True,
                     'mercahash_v2_height': self.options.mercahash_v2_height, 'explicit_rotation_and_pin_update': True,
