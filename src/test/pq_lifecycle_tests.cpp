@@ -11,9 +11,20 @@
 #include <fstream>
 #include <future>
 #include <type_traits>
+#include <univalue.h>
+#include <util/string.h>
 
 namespace pq::test {
 struct Access {
+    static size_t Sources(Context& context) {
+        std::lock_guard lock(context.m_quota->mutex); return context.m_quota->sources.size();
+    }
+    // Model elapsed admission time without changing tokens, charges or bounds.
+    // Real token refill is checked separately; no production clock hook exists.
+    static void AgeAdmission(Context& context, std::chrono::seconds elapsed, bool sources=false) {
+        std::lock_guard lock(context.m_quota->mutex); context.m_quota->last -= elapsed;
+        if (sources) for (auto& [name,source] : context.m_quota->sources) source.last -= elapsed;
+    }
     static std::shared_ptr<Work> Job(PQTransport& transport) {
         std::lock_guard lock(transport.m_mutex); return transport.m_work;
     }
@@ -464,5 +475,101 @@ BOOST_AUTO_TEST_CASE(network_bound_pin_and_pinned_admission_remain_fail_closed)
     for (auto& failure : failures) failure.get();
     for (auto& peer : peers) NoAssurance(*peer);
     BOOST_CHECK_EQUAL(context->Pending(),0U); context->Stop();
+}
+BOOST_AUTO_TEST_SUITE_END()
+
+// Explicitly selected B2 qualification only; ordinary B1 runs stay short.
+BOOST_FIXTURE_TEST_SUITE(pq_lifecycle_tests_capacity, Fixture)
+BOOST_AUTO_TEST_CASE(source_fairness_refill_and_bounded_table_expiry, *boost::unit_test::disabled())
+{
+    auto context=std::make_shared<Context>(RegtestNetwork());
+    std::vector<std::shared_ptr<void>> held;
+    for (unsigned n=0;n<4;++n) { auto lease=context->Admit("shared-nat"); BOOST_REQUIRE(lease); held.push_back(lease); }
+    BOOST_CHECK(!context->Admit("shared-nat"));
+    BOOST_CHECK(context->Admit("independent-ipv4"));
+    for (unsigned n=0;n<16;++n) { auto lease=context->Admit(""); BOOST_REQUIRE(lease); held.push_back(lease); }
+    BOOST_CHECK(!context->Admit("")); BOOST_CHECK_EQUAL(context->Pending(),20U);
+    held.clear(); BOOST_CHECK_EQUAL(context->Pending(),0U);
+    BOOST_CHECK(!context->Admit("shared-nat")); // Returning capacity does not refund pacing tokens.
+    std::this_thread::sleep_for(1100ms);
+    BOOST_CHECK(context->Admit("shared-nat")); // Actual wall-clock source refill.
+    auto live=context->Admit("live-source"); BOOST_REQUIRE(live);
+    unsigned entries=0;
+    while (Access::Sources(*context)<256) {
+        Access::AgeAdmission(*context,5s);
+        auto lease=context->Admit("table-"+util::ToString(entries++)); BOOST_REQUIRE(lease);
+        BOOST_CHECK_LE(Access::Sources(*context),256U);
+    }
+    Access::AgeAdmission(*context,5s);
+    BOOST_CHECK(!context->Admit("table-overflow")); BOOST_CHECK_EQUAL(Access::Sources(*context),256U);
+    Access::AgeAdmission(*context,121s,true);
+    auto recovered=context->Admit("after-expiry"); BOOST_REQUIRE(recovered);
+    BOOST_CHECK_EQUAL(Access::Sources(*context),2U); // Retain the charged live source.
+    BOOST_CHECK_EQUAL(context->Pending(),2U);
+    recovered.reset(); live.reset(); context->Stop(); BOOST_CHECK_EQUAL(context->Pending(),0U);
+    UniValue report{UniValue::VOBJ}; report.pushKV("shared_source_limit",4); report.pushKV("anonymous_limit",16);
+    report.pushKV("source_entries_peak",256); report.pushKV("source_entries_after_expiry",2);
+    report.pushKV("real_refill_wait_ms",1100); report.pushKV("expiry_clock","test-only timestamp aging, not a 121-second wall-clock run");
+    report.pushKV("pending_after_cleanup",0);
+    BOOST_TEST_MESSAGE("B2_FAIRNESS " << report.write());
+}
+BOOST_AUTO_TEST_CASE(full_capacity_cancellation_preserves_healthy_packet_path, *boost::unit_test::disabled())
+{
+    Gate gate,joining; std::atomic<bool> armed{false}; Hooks hooks;
+    std::atomic<int64_t> queued_terminal_us{0};
+    hooks.point=[&](Event event,Work*) { if (event==Event::BEFORE_CALCULATE && armed.load()) gate.Hold(); };
+    hooks.joining=[&] {
+        int64_t expected{0}; queued_terminal_us.compare_exchange_strong(expected,
+            std::chrono::duration_cast<std::chrono::microseconds>(Clock::now().time_since_epoch()).count());
+        joining.Release();
+    };
+    ScopedHooks scope(hooks); auto context=std::make_shared<Context>(RegtestNetwork());
+    Cleanup cleanup{[&] { gate.Release(); context->Stop(); }};
+    PQTransport healthy_i(context,true,std::nullopt,"healthy-i"),healthy_r(context,false,std::nullopt,"healthy-r");
+    Drive(healthy_i,healthy_r,[&] { return healthy_i.GetInfo().pq_encrypted && healthy_r.GetInfo().pq_encrypted; });
+    Access::AgeAdmission(*context,5s);
+    std::vector<std::shared_ptr<void>> leases;
+    for (unsigned n=0;n<64;++n) {
+        if (n==32) Access::AgeAdmission(*context,5s);
+        auto lease=context->Admit("capacity-"+util::ToString(n)); BOOST_REQUIRE(lease); leases.push_back(lease);
+    }
+    Access::AgeAdmission(*context,5s);
+    BOOST_CHECK(!context->Admit("global-overflow")); BOOST_CHECK_EQUAL(context->Pending(),64U);
+    armed=true;
+    std::vector<std::shared_ptr<Work>> jobs;
+    for (unsigned n=0;n<34;++n) {
+        auto job=std::make_shared<Work>(1); job->initiator=true; job->admission=leases[n];
+        BOOST_REQUIRE(context->Submit(job)); jobs.push_back(job);
+        if (n==1) BOOST_REQUIRE(gate.Wait(2));
+    }
+    auto overflow=std::make_shared<Work>(1); overflow->admission=leases[34];
+    BOOST_CHECK(!context->Submit(overflow)); overflow.reset();
+    const auto stats=context->Resources();
+    BOOST_CHECK_EQUAL(stats.pending,64U); BOOST_CHECK_EQUAL(stats.active,2U); BOOST_CHECK_EQUAL(stats.queued,32U);
+    CSerializedNetMsg ping; ping.m_type="ping"; ping.data.resize(8,42);
+    BOOST_REQUIRE(healthy_i.SetMessageToSend(ping)); Transfer(healthy_i,healthy_r);
+    BOOST_REQUIRE(healthy_r.ReceivedMessageComplete()); bool reject{false};
+    const auto received=healthy_r.GetReceivedMessage(1us,reject);
+    BOOST_CHECK(!reject); BOOST_CHECK_EQUAL(received.m_type,"ping"); BOOST_CHECK_EQUAL(received.m_message_size,8U);
+    auto stopping=std::async(std::launch::async,[&] { context->Stop(); });
+    { std::unique_lock lock(joining.mutex); BOOST_CHECK(joining.cv.wait_for(lock,3s,[&] { return joining.released; })); }
+    gate.Release(); stopping.get();
+    for (const auto& job : jobs) {
+        BOOST_CHECK(job->done.load(std::memory_order_acquire)); BOOST_CHECK(job->cancelled.load());
+        BOOST_CHECK(!job->ok && !job->handshake && !job->admission); BOOST_CHECK(job->response.empty());
+    }
+    int64_t queue_wait_upper_us{0};
+    // Queue entries have all published cancellation before the first join.
+    // This measures their residence until that observation, not crypto runtime.
+    for (unsigned n=2;n<34;++n) queue_wait_upper_us=std::max(queue_wait_upper_us,queued_terminal_us.load()-
+        std::chrono::duration_cast<std::chrono::microseconds>(jobs[n]->queued.time_since_epoch()).count());
+    NoAssurance(healthy_i); NoAssurance(healthy_r); leases.clear(); jobs.clear();
+    BOOST_CHECK_EQUAL(context->Pending(),0U);
+    UniValue report{UniValue::VOBJ}; report.pushKV("peak_pending",stats.peak_pending);
+    report.pushKV("active_workers",stats.active); report.pushKV("queued_jobs",stats.queued);
+    report.pushKV("cancelled_jobs",34); report.pushKV("healthy_packet_delivered",true);
+    report.pushKV("cancelled_queue_residence_upper_us",queue_wait_upper_us);
+    report.pushKV("worker_stack_reservation_bytes",uint64_t(stats.stack_reservations[0]+stats.stack_reservations[1]));
+    report.pushKV("pending_after_cleanup",0); BOOST_TEST_MESSAGE("B2_CAPACITY " << report.write());
 }
 BOOST_AUTO_TEST_SUITE_END()
