@@ -67,6 +67,7 @@ void Work::Discard()
 }
 void Context::Stop()
 {
+    std::lock_guard stop_lock(m_stop_mutex);
     { std::lock_guard lock(m_quota->mutex); m_quota->stopped = true; }
     std::deque<std::shared_ptr<Work>> abandoned;
     {
@@ -187,6 +188,7 @@ void Context::Release(const std::shared_ptr<Quota>& quota, const std::string& so
     else { auto it = quota->sources.find(source); assert(it != quota->sources.end() && it->second.pending); --it->second.pending; }
 }
 unsigned Context::Pending() { std::lock_guard lock(m_quota->mutex); return m_quota->pending; }
+bool Context::Stopped() const { std::lock_guard lock(m_quota->mutex); return m_quota->stopped; }
 Context::ResourceStats Context::Resources()
 {
     std::lock_guard lock(m_mutex); auto stats = m_stats;
@@ -275,6 +277,7 @@ bool PQTransport::Poll()
 {
     std::lock_guard lock(m_mutex);
     try {
+        if (m_context->Stopped()) return Fail(false);
         if (m_failed) return false;
         const auto now = Clock::now();
         if (!m_established && (now - m_created > std::chrono::seconds(120) || now - m_wait > std::chrono::seconds(30) || (m_preface && now - m_created > std::chrono::seconds(5)))) return Fail();
@@ -305,7 +308,7 @@ Transport::Info PQTransport::GetInfo() const noexcept
     std::lock_guard lock(m_mutex);
     try {
         Info info{.transport_type = TransportProtocolType::PQ_V1, .session_id = {}};
-        if (m_established) {
+        if (m_established && !m_context->Stopped()) {
             info.session_id = uint256{m_session}; info.pq_encrypted = true; info.pq_authenticated = true;
             info.pq_identity_verified = m_pin.has_value(); info.pq_identity = m_peer_fp;
         }
@@ -314,12 +317,13 @@ Transport::Info PQTransport::GetInfo() const noexcept
         return Info{.transport_type = TransportProtocolType::PQ_V1, .session_id = {}};
     }
 }
-bool PQTransport::ReceivedMessageComplete() const { std::lock_guard lock(m_mutex); return m_established && m_message && !m_failed; }
+bool PQTransport::ReceivedMessageComplete() const { std::lock_guard lock(m_mutex); return m_established && m_message && !m_failed && !m_context->Stopped(); }
 bool PQTransport::ReceivedBytes(std::span<const uint8_t>& bytes)
 {
     if (!Poll()) return false;
     std::lock_guard lock(m_mutex);
     try {
+        if (m_context->Stopped()) return Fail(false);
         if (m_failed || m_work || (!m_established && !m_send.empty()) || m_message) return Fail();
         while (!bytes.empty()) {
             if (!m_established) {
@@ -382,6 +386,7 @@ CNetMessage PQTransport::GetReceivedMessage(std::chrono::microseconds time, bool
 {
     std::lock_guard lock(m_mutex);
     try {
+        if (m_context->Stopped()) { Fail(false); reject = true; return CNetMessage{DataStream{}}; }
         assert(m_established && m_message && !m_failed);
         std::span<const uint8_t> contents{m_decoded}; auto command = DecodeCommand(contents);
         CNetMessage msg{DataStream{}}; msg.m_raw_message_size = m_decoded.size()+20;
@@ -400,6 +405,7 @@ bool PQTransport::SetMessageToSend(CSerializedNetMsg& msg) noexcept
 {
     std::lock_guard lock(m_mutex);
     try {
+        if (m_context->Stopped()) return Fail(false);
         if (!m_established || m_failed || !m_send.empty()) return false;
         if (msg.data.size() > MAX_PROTOCOL_MESSAGE_LENGTH || msg.m_type.empty() || msg.m_type.size() > 12 || !std::ranges::all_of(msg.m_type, [](unsigned char c) { return c >= 32 && c <= 127; })) { Fail(); return false; }
         Bytes contents;
@@ -416,13 +422,14 @@ bool PQTransport::SetMessageToSend(CSerializedNetMsg& msg) noexcept
 Transport::BytesToSend PQTransport::GetBytesToSend(bool have_next) const noexcept
 {
     std::lock_guard lock(m_mutex);
-    if (m_failed) return {{}, false, m_type};
+    if (m_failed || m_context->Stopped()) return {{}, false, m_type};
     return {std::span{m_send}.subspan(m_send_pos), m_established && have_next, m_type};
 }
 void PQTransport::MarkBytesSent(size_t count) noexcept
 {
     std::lock_guard lock(m_mutex);
     try {
+        if (m_context->Stopped()) { Fail(false); return; }
         if (m_failed || !count) return;
         assert(count <= m_send.size()-m_send_pos); m_send_pos += count;
         if (m_send_pos == m_send.size()) {

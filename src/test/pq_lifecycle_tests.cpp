@@ -316,6 +316,51 @@ BOOST_AUTO_TEST_CASE(stop_discards_queued_handshake_even_with_external_job_owner
     BOOST_CHECK(!job->handshake); BOOST_CHECK(job->response.empty()); BOOST_CHECK(!job->admission); BOOST_CHECK(owner.expired());
     first.Disconnect(); second.Disconnect(); BOOST_CHECK_EQUAL(context->Pending(),0U);
 }
+BOOST_AUTO_TEST_CASE(stop_prevents_late_completed_result_from_authenticating)
+{
+    Gate gate,joining; Hooks hooks;
+    hooks.point=[&](Event event,Work* job) { if (event==Event::BEFORE_PUBLISH && job->handshake && job->handshake->Ready()) gate.Hold(); };
+    hooks.joining=[&] { joining.Release(); };
+    ScopedHooks scope(hooks); auto context=std::make_shared<Context>(RegtestNetwork());
+    Cleanup cleanup{[&] { gate.Release(); context->Stop(); }};
+    PQTransport i(context,true,std::nullopt,"late-i"),r(context,false,std::nullopt,"late-r");
+    Drive(i,r,[&] { return gate.Hit(); }); BOOST_REQUIRE(gate.Wait());
+    auto job=Access::Job(i); BOOST_REQUIRE(job);
+    auto stopping=std::async(std::launch::async,[&] { context->Stop(); });
+    { std::unique_lock lock(joining.mutex); BOOST_CHECK(joining.cv.wait_for(lock,3s,[&] { return joining.released; })); }
+    gate.Release(); stopping.get(); WaitDone(job);
+    // A completed M4 must not install keys after the context has stopped.
+    const bool polled=i.Poll();
+    if (polled) { const auto [bytes,more,type]=i.GetBytesToSend(false); i.MarkBytesSent(bytes.size()); }
+    BOOST_CHECK(!polled); NoAssurance(i); BOOST_CHECK(std::get<0>(i.GetBytesToSend(false)).empty());
+    i.Disconnect(); r.Disconnect(); job.reset(); BOOST_CHECK_EQUAL(context->Pending(),0U);
+}
+BOOST_AUTO_TEST_CASE(stop_revokes_established_transport_assurance)
+{
+    auto context=std::make_shared<Context>(RegtestNetwork());
+    PQTransport i(context,true,std::nullopt,"stop-i"),r(context,false,std::nullopt,"stop-r");
+    Drive(i,r,[&] { return i.GetInfo().pq_encrypted && r.GetInfo().pq_encrypted; });
+    context->Stop(); NoAssurance(i); NoAssurance(r);
+    CSerializedNetMsg message; message.m_type="ping"; message.data.resize(8);
+    BOOST_CHECK(!i.SetMessageToSend(message)); BOOST_CHECK(!i.Poll()); BOOST_CHECK(!r.Poll());
+    i.Disconnect(); r.Disconnect(); BOOST_CHECK_EQUAL(context->Pending(),0U);
+}
+BOOST_AUTO_TEST_CASE(concurrent_stop_serializes_worker_joins)
+{
+    Gate join_gate,second_entered; std::atomic<unsigned> joins{0}; Hooks hooks;
+    hooks.joining=[&] { if (++joins==1) join_gate.Hold(); };
+    ScopedHooks scope(hooks); auto context=std::make_shared<Context>(RegtestNetwork());
+    // Hold the first Stop before its first join. The second Stop must remain
+    // serialized behind it, rather than touching either worker's join state.
+    auto first=std::async(std::launch::async,[&] { context->Stop(); });
+    const bool waiting=join_gate.Wait();
+    auto second=std::async(std::launch::async,[&] { second_entered.Release(); context->Stop(); });
+    { std::unique_lock lock(second_entered.mutex); second_entered.cv.wait(lock,[&] { return second_entered.released; }); }
+    const bool serialized=second.wait_for(100ms)==std::future_status::timeout;
+    join_gate.Release(); first.get(); second.get();
+    BOOST_CHECK(waiting); BOOST_CHECK(serialized); BOOST_CHECK_EQUAL(joins.load(),2U);
+    context->Stop(); BOOST_CHECK_EQUAL(joins.load(),2U); BOOST_CHECK_EQUAL(context->Pending(),0U);
+}
 BOOST_AUTO_TEST_CASE(shared_persistent_identity_concurrent_sessions_are_isolated)
 {
     auto identity = std::make_shared<Identity>(); BOOST_REQUIRE(identity->FromSeed(std::array<uint8_t,32>{}));

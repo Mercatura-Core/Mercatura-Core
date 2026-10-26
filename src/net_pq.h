@@ -64,6 +64,8 @@ private:
     // Leases keep only accounting alive. A worker releasing the last lease
     // must never become the owner/destructor of its own thread pool.
     const std::shared_ptr<Quota> m_quota{std::make_shared<Quota>()};
+    // Stop may be requested by more than one owner. Serialize thread joins.
+    std::mutex m_stop_mutex;
     std::mutex m_mutex;
     std::condition_variable m_cv;
     std::deque<std::shared_ptr<Work>> m_queue;
@@ -88,6 +90,7 @@ public:
     Context(Network net, std::shared_ptr<const Identity> id = {}, std::map<std::string, Digest> expected = {});
     ~Context();
     void Stop();
+    bool Stopped() const;
     std::shared_ptr<void> Admit(const std::string& source);
     bool Submit(const std::shared_ptr<Work>& job);
     unsigned Pending();
