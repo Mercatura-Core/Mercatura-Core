@@ -30,19 +30,19 @@ struct SyntheticParams : CChainParams {
 BOOST_FIXTURE_TEST_SUITE(pq_policy_tests, Fixture)
 BOOST_AUTO_TEST_CASE(compulsory_policy_has_no_weakening_override)
 {
-    for (const auto chain : CHAINS) {
-        const bool compulsory = chain == ChainType::MAIN || chain == ChainType::TESTNET;
-        BOOST_CHECK_EQUAL(RequiredMode(chain), compulsory);
+    for (const bool enforced : {false, true}) for (const auto chain : CHAINS) {
+        const bool compulsory = chain == ChainType::MAIN || (chain == ChainType::TESTNET && enforced);
+        BOOST_CHECK_EQUAL(RequiredMode(chain, {}, enforced), compulsory);
         for (const auto bad : {"", "on", "optional", "prefer", "Required", "required,off"}) {
-            BOOST_CHECK_THROW(RequiredMode(chain, bad), std::runtime_error);
+            BOOST_CHECK_THROW(RequiredMode(chain, bad, enforced), std::runtime_error);
         }
         if (compulsory) {
-            BOOST_CHECK(RequiredMode(chain, "required"));
-            BOOST_CHECK_THROW(RequiredMode(chain, "off"), std::runtime_error);
+            BOOST_CHECK(RequiredMode(chain, "required", enforced));
+            BOOST_CHECK_THROW(RequiredMode(chain, "off", enforced), std::runtime_error);
         } else {
-            BOOST_CHECK(!RequiredMode(chain, "off"));
-            if (chain == ChainType::REGTEST) BOOST_CHECK(RequiredMode(chain, "required"));
-            else BOOST_CHECK_THROW(RequiredMode(chain, "required"), std::runtime_error);
+            BOOST_CHECK(!RequiredMode(chain, "off", enforced));
+            if (chain == ChainType::REGTEST || chain == ChainType::TESTNET) BOOST_CHECK(RequiredMode(chain, "required", enforced));
+            else BOOST_CHECK_THROW(RequiredMode(chain, "required", enforced), std::runtime_error);
         }
     }
     BOOST_CHECK_THROW(RequiredMode(static_cast<ChainType>(255)), std::runtime_error);
@@ -130,7 +130,7 @@ BOOST_AUTO_TEST_CASE(connection_manager_rejects_policy_bypass_before_binding)
         const auto params=CreateChainParams(args,chain);
         CConnman connman{0,0,addresses,groups,*params,false};
         CConnman::Options options;
-        BOOST_CHECK(!connman.Start(scheduler,options)); // Missing compulsory context.
+        if (RequiredMode(chain)) BOOST_CHECK(!connman.Start(scheduler,options)); // Missing compulsory context.
         options.pq_context=std::make_shared<Context>(SelectedNetwork());
         BOOST_CHECK(!connman.Start(scheduler,options)); // Wrong network, no bind.
     }

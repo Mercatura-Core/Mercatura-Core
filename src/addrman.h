@@ -136,6 +136,10 @@ public:
     //! Mark an entry as connection attempted to.
     void Attempt(const CService& addr, bool fCountFailure, NodeSeconds time = Now<NodeSeconds>());
 
+    /** Whether recorded success is at least as recent as the last attempt.
+     * Second-resolution availability bookkeeping, not identity verification. */
+    bool HasSuccessSinceLastAttempt(const CService& addr) const;
+
     //! See if any to-be-evicted tried table entries have been tested and if so resolve the collisions.
     void ResolveCollisions();
 

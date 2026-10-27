@@ -392,7 +392,7 @@ CNode* CConnman::ConnectNode(CAddress addrConnect,
     }
 
     LogDebug(BCLog::NET, "trying %s connection (%s) to %s, lastseen=%.1fhrs\n",
-        use_v2transport ? "v2" : "v1",
+        m_pq_context ? "pq-v1" : use_v2transport ? "v2" : "v1",
         ConnectionTypeAsString(conn_type),
         pszDest ? pszDest : addrConnect.ToStringAddrPort(),
         Ticks<HoursDouble>(pszDest ? 0h : Now<NodeSeconds>() - addrConnect.nTime));
@@ -2847,7 +2847,9 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect, std
                     // address as Good(). We won't be able to initiate the
                     // connection anyway, so this avoids inadvertently evicting
                     // a currently-connected peer.
-                    addrman.get().Good(addr);
+                    bool established = !m_pq_context;
+                    if (!established) ForEachNode([&](CNode* node) { established |= node->addr == addr; });
+                    if (established) addrman.get().Good(addr);
                     // Select a new table address for our feeler instead.
                     std::tie(addr, addr_last_try) = addrman.get().Select(true, reachable_nets);
                 }
@@ -2875,10 +2877,11 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect, std
                 continue;
             }
 
-            // Required PQ retains the ten-minute candidate backoff even in a
-            // small address pool. Repeated selection must not busy-retry an
-            // incompatible endpoint after the inherited 30-selection escape.
-            if (current_time - addr_last_try < 10min && (m_pq_context || nTries < 30)) {
+            // Keep the existing ten-minute delay for failed PQ candidates even
+            // after many selections. Previously successful peers retain the
+            // ordinary escape so a small healthy network can reconnect promptly.
+            if (current_time - addr_last_try < 10min && (nTries < 30 ||
+                (m_pq_context && !addrman.get().HasSuccessSinceLastAttempt(addr)))) {
                 continue;
             }
 

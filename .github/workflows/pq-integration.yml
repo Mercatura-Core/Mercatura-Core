@@ -1,0 +1,164 @@
+# Copyright (c) 2026 The Mercatura Core developers
+# Distributed under the MIT software license, see the accompanying file COPYING.
+name: PQ P9-P11 native qualification (no publication)
+on:
+  workflow_dispatch:
+  push:
+    branches: [integration/pq-p2p-p9-p11-required-testnet]
+    paths: ['src/**', 'test/**', 'cmake/**', 'CMakeLists.txt', 'contrib/devtools/**', 'contrib/seeds/**',
+            'vcpkg*.json', 'CMakePresets.json', 'contrib/vcpkg-ports/**', 'depends/**', '.github/workflows/pq-integration.yml']
+permissions:
+  contents: read
+concurrency:
+  group: pq-integration-${{ github.ref }}
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+jobs:
+  native:
+    name: PQ native ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, platform: linux-x86_64}
+          - {runner: ubuntu-24.04-arm, platform: linux-arm64}
+          - {runner: macos-15, platform: macos-arm64}
+          - {runner: windows-2025-vs2026, platform: windows-msvc}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential cmake ninja-build python3 \
+            libboost-dev libevent-dev qt6-base-dev qt6-tools-dev qt6-tools-dev-tools libsqlite3-dev
+      - name: macOS native dependencies
+        if: runner.os == 'macOS'
+        run: brew install cmake ninja boost libevent qt@6
+      - name: Windows package cache location
+        if: runner.os == 'Windows'
+        id: windows-cache
+        shell: pwsh
+        run: |
+          'path=' + (Join-Path $env:LOCALAPPDATA 'vcpkg/archives') >> $env:GITHUB_OUTPUT
+          'image=' + $env:ImageVersion >> $env:GITHUB_OUTPUT
+      - name: Restore Windows native dependencies
+        if: runner.os == 'Windows'
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.windows-cache.outputs.path }}
+          key: pq-qt-vcpkg-${{ steps.windows-cache.outputs.image }}-${{ hashFiles('vcpkg*.json', 'CMakePresets.json', 'contrib/vcpkg-ports/**') }}-${{ github.run_id }}
+          restore-keys: |
+            pq-qt-vcpkg-${{ steps.windows-cache.outputs.image }}-${{ hashFiles('vcpkg*.json', 'CMakePresets.json', 'contrib/vcpkg-ports/**') }}-
+      - name: Configure Unix native GUI
+        if: runner.os != 'Windows'
+        run: |
+          pq_prefix=()
+          if [[ "$RUNNER_OS" == macOS ]]; then pq_prefix=(-DCMAKE_PREFIX_PATH="$(brew --prefix qt@6)"); fi
+          cmake -S . -B work/build -G Ninja -DCMAKE_BUILD_TYPE=Release "${pq_prefix[@]}" \
+            -DBUILD_GUI=ON -DBUILD_GUI_TESTS=ON -DBUILD_TESTS=ON -DENABLE_WALLET=ON \
+            -DENABLE_IPC=OFF -DWITH_ZMQ=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=OFF \
+            -DWITH_OPENCL_MINING=OFF -DWITH_CUDA_MINING=OFF -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
+      - name: Configure Windows native GUI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
+          cmake -B work/build --preset vs2026 `
+            -DVCPKG_INSTALL_OPTIONS=--clean-after-build `
+            -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON '-DVCPKG_MANIFEST_FEATURES=qt;wallet;tests' `
+            -DBUILD_GUI=ON -DBUILD_GUI_TESTS=ON -DBUILD_TESTS=ON -DENABLE_IPC=OFF `
+            -DWITH_ZMQ=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=OFF `
+            -DWITH_OPENCL_MINING=OFF -DWITH_CUDA_MINING=OFF -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Build native integration targets
+        run: |
+          cmake --build work/build --config Release --parallel 3 --target \
+            bitcoind bitcoin-cli bitcoin-qt test_bitcoin test_peersecurity-qt test_mining-qt test_mining_app-qt
+      - name: Native policy, transport and Qt regressions
+        env:
+          QT_QPA_PLATFORM: ${{ runner.os == 'Windows' && 'windows' || 'offscreen' }}
+        run: |
+          ctest --test-dir work/build -C Release --output-on-failure -j 1 \
+            -R '^(pq_policy_tests|pq_p2p_tests|pq_assurance_tests|pq_identity_tests|pq_transport_tests|test_peersecurity-qt|test_mining-qt)$'
+      - name: Offline bootstrap inventory regressions
+        run: |
+          pq_python=python3
+          if [[ "$RUNNER_OS" == Windows ]]; then pq_python=python; fi
+          "$pq_python" contrib/seeds/test_mercatura_bootstrap.py
+          "$pq_python" test/functional/test_framework/test_pq_lab_cleanup.py
+      - name: Native controlled connections and bootstrap
+        run: |
+          pq_python=python3
+          if [[ "$RUNNER_OS" == Windows ]]; then pq_python=python; fi
+          "$pq_python" work/build/test/functional/test_runner.py --jobs=2 \
+            feature_pq_required.py feature_pq_activation.py feature_pq_discovery.py feature_pq_b1_lifecycle.py feature_pq_b3_assurance.py
+      - name: Published-release upgrade and rollback rehearsal
+        if: matrix.platform == 'linux-x86_64'
+        run: |
+          mkdir -p "$RUNNER_TEMP/pq-prior/bin"
+          curl --fail --location --proto '=https' --max-time 180 \
+            --output "$RUNNER_TEMP/pq-prior/release.tar.gz" \
+            https://github.com/Mercatura-Core/Mercatura-Core/releases/download/v0.1.2-testnet/Mercatura-Core-v0.1.2-testnet-linux-x86_64.tar.gz
+          python3 - "$RUNNER_TEMP/pq-prior" <<'PY_RELEASE'
+          import hashlib, pathlib, sys, tarfile
+          root = pathlib.Path(sys.argv[1])
+          archive = root / 'release.tar.gz'
+          assert hashlib.sha256(archive.read_bytes()).hexdigest() == '858f087d41defba5d2db718fc2c1bc78e5d865ac98df41ba59408f87b2f118f0'
+          with tarfile.open(archive) as package:
+              assert all(m.isfile() and m.name in {'mercaturad','mercatura-cli','mercatura-qt'} for m in package.getmembers())
+              package.extractall(root / 'bin', filter='data')
+          PY_RELEASE
+          python3 contrib/devtools/pq-upgrade-rehearsal.py --configfile=work/build/test/config.ini \
+            --previous-bindir="$RUNNER_TEMP/pq-prior/bin" --tmpdir="$RUNNER_TEMP/pq-upgrade-reg" --nocleanup
+          python3 contrib/devtools/pq-upgrade-rehearsal.py --public-testnet --configfile=work/build/test/config.ini \
+            --previous-bindir="$RUNNER_TEMP/pq-prior/bin" --tmpdir="$RUNNER_TEMP/pq-upgrade-public" --nocleanup
+      - name: Prepare Unix public-testnet GUI development package
+        if: runner.os != 'Windows'
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          cmake -S . -B work/build -DMERCATURA_PUBLIC_TESTNET_RELEASE=ON -DMERCATURA_REQUIRE_PQ_TESTNET=ON
+          cmake --build work/build --parallel 3 --target bitcoin-qt bitcoind bitcoin-cli
+          if [[ "$RUNNER_OS" == macOS ]]; then cmake --build work/build --parallel 3 --target deploy; fi
+          python3 contrib/devtools/package-pq-candidate.py --build-dir work/build \
+            --output-dir "$RUNNER_TEMP/pq-candidate" --smoke
+      - name: Prepare Windows public-testnet GUI development package
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: windows
+        run: |
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
+          cmake -S . -B work/build -DMERCATURA_PUBLIC_TESTNET_RELEASE=ON -DMERCATURA_REQUIRE_PQ_TESTNET=ON
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --build work/build --config Release --parallel 3 --target bitcoin-qt bitcoind bitcoin-cli
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $plugin = Get-ChildItem work/build/vcpkg_installed -Recurse -Filter qwindows.dll |
+            Where-Object { $_.FullName -notmatch '[\\/]debug[\\/]' } | Select-Object -First 1
+          if (!$plugin) { throw 'Missing native Windows Qt platform plugin' }
+          python contrib/devtools/package-pq-candidate.py --build-dir work/build `
+            --output-dir "$env:RUNNER_TEMP/pq-candidate" --qt-plugin-dir $plugin.Directory.Parent.FullName --smoke
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Verify enforcing profile runtime
+        run: |
+          pq_python=python3
+          if [[ "$RUNNER_OS" == Windows ]]; then pq_python=python; fi
+          "$pq_python" work/build/test/functional/test_runner.py --jobs=1 'feature_pq_required.py --public-testnet'
+      # Packages and receipts remain local to the disposable runner. The founder
+      # builds/exports candidate artifacts manually; CI never publishes them.
+      - name: Collect public upgrade receipts
+        if: matrix.platform == 'linux-x86_64'
+        run: |
+          cp "$RUNNER_TEMP/pq-upgrade-reg/pq-upgrade-evidence.json" "$RUNNER_TEMP/pq-candidate/UPGRADE-REGTEST.json"
+          cp "$RUNNER_TEMP/pq-upgrade-public/pq-upgrade-evidence.json" "$RUNNER_TEMP/pq-candidate/UPGRADE-PUBLIC-GENESIS.json"
+      - name: Save completed Windows native dependency packages
+        if: always() && runner.os == 'Windows' && steps.windows-cache.outcome == 'success'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ steps.windows-cache.outputs.path }}
+          key: pq-qt-vcpkg-${{ steps.windows-cache.outputs.image }}-${{ hashFiles('vcpkg*.json', 'CMakePresets.json', 'contrib/vcpkg-ports/**') }}-${{ github.run_id }}

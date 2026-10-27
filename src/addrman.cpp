@@ -1260,6 +1260,13 @@ void AddrManImpl::SetServices(const CService& addr, ServiceFlags nServices)
     Check();
 }
 
+bool AddrManImpl::HasSuccessSinceLastAttempt(const CService& addr)
+{
+    LOCK(cs);
+    const auto* info=Find(addr);
+    return info && info->m_last_success > NodeSeconds{0s} && info->m_last_success >= info->m_last_try;
+}
+
 std::optional<AddressPosition> AddrManImpl::FindAddressEntry(const CAddress& addr)
 {
     LOCK(cs);
@@ -1352,4 +1359,9 @@ void AddrMan::SetServices(const CService& addr, ServiceFlags nServices)
 std::optional<AddressPosition> AddrMan::FindAddressEntry(const CAddress& addr)
 {
     return m_impl->FindAddressEntry(addr);
+}
+
+bool AddrMan::HasSuccessSinceLastAttempt(const CService& addr) const
+{
+    return m_impl->HasSuccessSinceLastAttempt(addr);
 }

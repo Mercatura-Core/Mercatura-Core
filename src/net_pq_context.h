@@ -107,9 +107,12 @@ public:
     ResourceStats Resources();
 };
 
-/** Compulsory on Mercatura main/test; explicit opt-in on regtest only.
- * Invalid modes and attempts to weaken compulsory policy throw. */
-bool RequiredMode(ChainType chain, std::optional<std::string_view> option = {});
+/** Immutable build profile, not an approved public-testnet activation decision. */
+bool TestnetEnforcedBuild();
+/** Mainnet required; testnet pending unless explicitly built for enforcement.
+ * Pending testnet/regtest allow isolated opt-in. Enforcing profiles reject off.
+ * The explicit profile parameter lets unit tests cover both build profiles. */
+bool RequiredMode(ChainType chain, std::optional<std::string_view> option = {}, bool testnet_enforced = TestnetEnforcedBuild());
 Network NetworkForChain(const CChainParams& params);
 Network SelectedNetwork();
 std::shared_ptr<const Identity> LoadIdentity(const std::string& path, bool create, const Network& network);

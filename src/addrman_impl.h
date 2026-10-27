@@ -150,6 +150,8 @@ public:
     std::optional<AddressPosition> FindAddressEntry(const CAddress& addr)
         EXCLUSIVE_LOCKS_REQUIRED(!cs);
 
+    bool HasSuccessSinceLastAttempt(const CService& addr) EXCLUSIVE_LOCKS_REQUIRED(!cs);
+
     friend class AddrManDeterministic;
 
 private:

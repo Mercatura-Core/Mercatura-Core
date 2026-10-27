@@ -25,6 +25,9 @@ CAPACITY = 4_194_304
 
 
 class MercaturaPQCapacityTest(BitcoinTestFramework):
+    def add_options(self, parser):
+        parser.add_argument("--pq", action="store_true", help="Require PQ transport for actual large-block chunk relay")
+
     def set_test_params(self):
         self.num_nodes = 2
         self.setup_clean_chain = True
@@ -33,6 +36,9 @@ class MercaturaPQCapacityTest(BitcoinTestFramework):
         # Block-only receiver verifies without warming its mempool/script caches.
         self.extra_args = [["-debug=bench", "-debug=net", "-maxsigcachesize=0", "-assumevalid=0"] for _ in range(2)]
         self.extra_args[1].append("-blocksonly")
+        if self.options.pq:
+            for args in self.extra_args:
+                args.append("-pqp2p=required")
 
     def skip_test_if_missing_module(self):
         self.skip_if_no_wallet()
@@ -72,6 +78,8 @@ class MercaturaPQCapacityTest(BitcoinTestFramework):
             self.generatetoaddress(node, 10, source_address)
         self.generatetoaddress(node, 2, source_address)
         self.sync_blocks()
+        if self.options.pq:
+            assert all(p["pq_encrypted"] and p["pq_authenticated"] for n in self.nodes for p in n.getpeerinfo())
         coins = sender.listunspent(101)
         counts = [384, 784]
         assert len(coins) >= len(counts)

@@ -1,12 +1,10 @@
-name: macOS Public Testnet Release
+name: macOS Public Testnet Development Package
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - v0.1
-    paths:
-      - '.github/workflows/macos-release.yml'
+# Manual development validation only. No artifact upload or release publication.
+permissions:
+  contents: read
 
 jobs:
   macos-arm64-release:
@@ -29,6 +27,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6)" \
             -DMERCATURA_PUBLIC_TESTNET_RELEASE=ON \
+            -DMERCATURA_REQUIRE_PQ_TESTNET=ON \
             -DBUILD_GUI=ON \
             -DWITH_ZMQ=OFF \
             -DENABLE_IPC=OFF \
@@ -53,12 +52,4 @@ jobs:
           shasum -a 256 build-macos-release/mercatura-macos-app.zip
 
           mv build-macos-release/mercatura-macos-app.zip \
-            Mercatura-Core-v0.1.2-testnet-macos-arm64.zip
-
-      - name: Upload macOS release artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Mercatura-Core-v0.1.2-testnet-macos-arm64
-          path: Mercatura-Core-v0.1.2-testnet-macos-arm64.zip
-          if-no-files-found: error
-          retention-days: 14
+            Mercatura-Core-p9p11-dev-${{ github.sha }}-macos-arm64.zip

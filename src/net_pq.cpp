@@ -1,6 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
 #include <net_pq.h>
+#include <mercatura-pq-config.h>
 #include <chainparams.h>
 #include <random.h>
 #include <logging.h>
@@ -214,14 +215,20 @@ bool Context::Submit(const std::shared_ptr<Work>& job)
     if (m_stop || !job->admission || m_queue.size() >= 32) return false;
     m_queue.push_back(job); m_stats.peak_queued = std::max(m_stats.peak_queued, unsigned(m_queue.size())); m_cv.notify_one(); return true;
 }
-bool RequiredMode(ChainType chain, std::optional<std::string_view> option)
+bool TestnetEnforcedBuild() { return MERCATURA_REQUIRE_PQ_TESTNET; }
+bool RequiredMode(ChainType chain, std::optional<std::string_view> option, bool testnet_enforced)
 {
     if (option && *option != "off" && *option != "required") throw std::runtime_error("-pqp2p must be off or required.");
     switch (chain) {
     case ChainType::MAIN:
-    case ChainType::TESTNET:
-        if (option && *option == "off") throw std::runtime_error("PQ P2P is compulsory on Mercatura mainnet and public testnet; -pqp2p=off is forbidden.");
+        if (option && *option == "off") throw std::runtime_error("PQ P2P is compulsory on Mercatura mainnet; -pqp2p=off is forbidden.");
         return true;
+    case ChainType::TESTNET:
+        if (testnet_enforced) {
+            if (option && *option == "off") throw std::runtime_error("This qualification build requires public-testnet PQ; -pqp2p=off is forbidden. Public activation remains pending.");
+            return true;
+        }
+        return option && *option == "required";
     case ChainType::REGTEST:
         return option && *option == "required";
     case ChainType::SIGNET:

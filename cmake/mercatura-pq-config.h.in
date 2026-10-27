@@ -1,0 +1,9 @@
+// Copyright (c) 2026 The Mercatura Core developers
+// Distributed under the MIT software license, see the accompanying file COPYING.
+#ifndef MERCATURA_PQ_CONFIG_H
+#define MERCATURA_PQ_CONFIG_H
+
+// Qualification capability only. No production activation height or date.
+#cmakedefine01 MERCATURA_REQUIRE_PQ_TESTNET
+
+#endif // MERCATURA_PQ_CONFIG_H

@@ -1161,9 +1161,12 @@ void RPCConsole::updatePeerSecurity(const CNodeStats* stats)
     const bool session = stats && (pq || stats->m_transport_type == TransportProtocolType::V2);
     ui->peerSessionIdLabel->setVisible(session);
     ui->peerSessionId->setVisible(session);
-    ui->peerSessionId->setText(session && (!pq || established) ? QString::fromStdString(stats->m_session_id) : QString{});
-    ui->peerSessionId->setCursorPosition(0);
-    ui->peerSessionId->setToolTip(ui->peerSessionId->text());
+    const auto session_text = session && (!pq || established) ? QString::fromStdString(stats->m_session_id) : QString{};
+    if (ui->peerSessionId->text() != session_text) {
+        ui->peerSessionId->setText(session_text);
+        ui->peerSessionId->setCursorPosition(0);
+        ui->peerSessionId->setToolTip(session_text);
+    }
     ui->peerPQEncryptionLabel->setVisible(pq); ui->peerPQEncryption->setVisible(pq);
     ui->peerPQAuthenticationLabel->setVisible(pq); ui->peerPQAuthentication->setVisible(pq);
     ui->peerPQVerificationLabel->setVisible(pq); ui->peerPQVerification->setVisible(pq);
@@ -1172,9 +1175,12 @@ void RPCConsole::updatePeerSecurity(const CNodeStats* stats)
     ui->peerPQAuthentication->setText(authenticated ? ts.yes : ts.no);
     ui->peerPQVerification->setText(!pq ? ts.na : failed ? (stats->m_pq_pin_mismatch ? tr("Mismatch") : tr("Unavailable")) : !authenticated ? tr("Pending") :
         stats->m_pq_identity_verified ? tr("Verified") : tr("Not configured"));
-    ui->peerPQIdentity->setText(authenticated ? QString::fromStdString(stats->m_pq_identity) : QString{});
-    ui->peerPQIdentity->setCursorPosition(0);
-    ui->peerPQIdentity->setToolTip(ui->peerPQIdentity->text());
+    const auto fingerprint = authenticated ? QString::fromStdString(stats->m_pq_identity) : QString{};
+    if (ui->peerPQIdentity->text() != fingerprint) {
+        ui->peerPQIdentity->setText(fingerprint);
+        ui->peerPQIdentity->setCursorPosition(0);
+        ui->peerPQIdentity->setToolTip(fingerprint);
+    }
 }
 
 void RPCConsole::updateDetailWidget()

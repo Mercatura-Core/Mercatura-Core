@@ -90,6 +90,7 @@ TEST_FRAMEWORK_UNIT_TESTS = 'feature_framework_unit_tests.py'
 MERCATURA_SCRIPTS = [
     'mercatura_block_capacity.py',
     'mercatura_pq_capacity.py',
+    'mercatura_pq_capacity.py --pq',
     'mercatura_testnet_capacity.py',
     'mercatura_witness_resource.py',
     'mercatura_chain_reorg.py',
@@ -113,6 +114,9 @@ MERCATURA_SCRIPTS = [
     'feature_pq_b3_assurance.py',
     'feature_pq_required.py',
     'feature_pq_required.py --public-testnet',
+    'feature_pq_activation.py',
+    'feature_pq_discovery.py',
+    'feature_pq_discovery.py --public-testnet',
     'mercatura_coinbase_template.py',
     'mercatura_pq_address_enforcement.py',
     'mercatura_pq_auth_commitments.py',

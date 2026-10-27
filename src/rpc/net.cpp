@@ -13,6 +13,7 @@
 #include <consensus/consensus.h>
 #include <net_permissions.h>
 #include <net_processing.h>
+#include <net_pq_context.h>
 #include <net_types.h>
 #include <netbase.h>
 #include <node/context.h>
@@ -706,6 +707,8 @@ static RPCHelpMan getnetworkinfo()
                         {
                             {RPCResult::Type::STR, "chain", "Selected local chain"},
                             {RPCResult::Type::STR, "build", "Full development/release build identifier"},
+                            {RPCResult::Type::BOOL, "testnet_enforced_build", "Immutable qualification build profile; not public activation approval"},
+                            {RPCResult::Type::STR, "testnet_activation", "pending: mechanism/height and official release await founder approval"},
                             {RPCResult::Type::STR_HEX, "network_discriminator", "Canonical 85-byte local PQ network discriminator, or empty when PQ is off"},
                             {RPCResult::Type::BOOL, "required", "All connections require authenticated PQ; no classical fallback"},
                             {RPCResult::Type::STR, "transport", "pq-v1 when required; otherwise classical"},
@@ -790,6 +793,8 @@ static RPCHelpMan getnetworkinfo()
         UniValue pq_info(UniValue::VOBJ), failures(UniValue::VOBJ);
         pq_info.pushKV("chain", Params().GetChainTypeString());
         pq_info.pushKV("build", FormatFullVersion());
+        pq_info.pushKV("testnet_enforced_build", pq::TestnetEnforcedBuild());
+        pq_info.pushKV("testnet_activation", "pending");
         pq_info.pushKV("network_discriminator", status.required ? HexStr(status.network) : "");
         pq_info.pushKV("required", status.required);
         pq_info.pushKV("transport", status.required ? "pq-v1" : "classical");

@@ -25,6 +25,15 @@
   <key>CFBundleVersion</key>
   <string>@MERCATURA_VERSION_MAJOR@.@MERCATURA_VERSION_MINOR@.@MERCATURA_VERSION_BUILD@</string>
 
+  <key>CFBundleGetInfoString</key>
+  <string>@MERCATURA_VERSION_STRING@</string>
+
+  <key>MercaturaApplicationVersion</key>
+  <string>@MERCATURA_VERSION_STRING@</string>
+
+  <key>MercaturaPQP2PPolicy</key>
+  <string>Mainnet required; testnet @MERCATURA_PQ_TESTNET_PROFILE@; protocol v1 suite 1</string>
+
   <key>CFBundleSignature</key>
   <string>????</string>
 

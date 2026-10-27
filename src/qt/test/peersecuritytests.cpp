@@ -121,7 +121,10 @@ private Q_SLOTS:
         QCOMPARE(value("peerSessionId")->text(),QString::fromStdString(stats.m_session_id));
         QCOMPARE(value("peerPQIdentity")->text(),QString::fromStdString(stats.m_pq_identity));
         QVERIFY(value("peerPQIdentity")->isReadOnly());
-        value("peerPQIdentity")->selectAll(); value("peerPQIdentity")->copy();
+        value("peerPQIdentity")->selectAll();
+        console.updatePeerSecurity(&stats); // Polling must preserve exact-value selection.
+        QCOMPARE(value("peerPQIdentity")->selectedText(),QString::fromStdString(stats.m_pq_identity));
+        value("peerPQIdentity")->copy();
         QCOMPARE(QApplication::clipboard()->text(),QString::fromStdString(stats.m_pq_identity));
         stats.m_pq_identity_verified=true; console.updatePeerSecurity(&stats);
         QCOMPARE(label("peerPQVerification")->text(),QString{"Verified"});

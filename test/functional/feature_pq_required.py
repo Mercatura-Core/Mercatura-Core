@@ -14,6 +14,7 @@ import threading
 import time
 
 from feature_pq_transport import PQTransportTest
+from test_framework.pq_lab_proxy import run_owned_test
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, assert_raises_rpc_error, p2p_port
 
@@ -48,6 +49,11 @@ class ClassicalEndpoint:
                         preface += part
                     self.prefaces.append(preface)
                     peer.sendall(b'\xd7\xdb\xee\xa4version\x00\x00\x00\x00\x00')
+                    try:
+                        while peer.recv(4096):
+                            pass
+                    except ConnectionResetError:
+                        pass
         except Exception as error:
             self.error = error
 
@@ -73,8 +79,7 @@ class PQRequiredTest(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.chain = 'testnet' if self.options.public_testnet else 'regtest'
         self.common = ['-dnsseed=0', '-fixedseeds=0', '-discover=0', '-natpmp=0', '-maxconnections=16']
-        if not self.options.public_testnet:
-            self.common += ['-pqp2p=required']
+        self.common += ['-pqp2p=required']
         self.extra_args = [self.common + ['-connect=0']] * self.num_nodes
 
     def setup_network(self):
@@ -194,10 +199,24 @@ class PQRequiredTest(BitcoinTestFramework):
         self.stop_node(1)
         for args, error in [
             (self.extra_args[1] + ['-v2transport=1'], '-v2transport=1 contradicts required PQ; classical P2P transports are disabled.'),
-            (['-regtest=0', '-testnet=0', '-chain=main', '-listen=0', '-connect=0', '-pqp2p=off'], 'PQ P2P is compulsory on Mercatura mainnet and public testnet; -pqp2p=off is forbidden.'),
-            (['-regtest=0', '-testnet=0', '-chain=test', '-listen=0', '-connect=0', '-pqp2p=off'], 'PQ P2P is compulsory on Mercatura mainnet and public testnet; -pqp2p=off is forbidden.'),
+            (['-regtest=0', '-testnet=0', '-chain=main', '-listen=0', '-connect=0', '-pqp2p=off'], 'PQ P2P is compulsory on Mercatura mainnet; -pqp2p=off is forbidden.'),
         ]:
             self.nodes[1].assert_start_raises_init_error(extra_args=args, expected_msg='Error: ' + error)
+        if self.options.public_testnet:
+            default_args = [a for a in self.extra_args[1] if not a.startswith('-pqp2p=')]
+            enforced = self.status(0)['testnet_enforced_build']
+            self.start_node(1, default_args)
+            assert_equal(self.status()['required'], enforced)
+            assert_equal(self.status()['testnet_activation'], 'pending')
+            self.stop_node(1)
+            if enforced:
+                self.nodes[1].assert_start_raises_init_error(extra_args=default_args + ['-pqp2p=off'],
+                    expected_msg='Error: This qualification build requires public-testnet PQ; -pqp2p=off is forbidden. Public activation remains pending.')
+            else:
+                self.start_node(1, default_args + ['-pqp2p=off'])
+                assert not self.status()['required']
+                self.stop_node(1)
+            events.append({'default_profile_required': enforced, 'activation': 'pending'})
         self.start_node(1, self.extra_args[1])
         assert_equal(self.nodes[0].getblockcount(), 0)
         (Path(self.options.tmpdir) / 'pq-required-evidence.json').write_text(json.dumps({
@@ -208,4 +227,4 @@ class PQRequiredTest(BitcoinTestFramework):
 
 
 if __name__ == '__main__':
-    PQRequiredTest(__file__).main()
+    run_owned_test(PQRequiredTest(__file__))

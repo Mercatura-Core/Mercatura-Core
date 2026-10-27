@@ -49,6 +49,26 @@ static CService ResolveService(const std::string& ip, uint16_t port = 0)
 
 BOOST_FIXTURE_TEST_SUITE(addrman_tests, BasicTestingSetup)
 
+BOOST_AUTO_TEST_CASE(successful_retry_history_excludes_unanswered_attempts)
+{
+    AddrMan addresses{EMPTY_NETGROUPMAN,DETERMINISTIC,GetCheckRatio(m_node)};
+    const auto target=ResolveService("11.1.0.1",27778);
+    const auto unknown=ResolveService("12.2.0.1",27778);
+    const auto now=Now<NodeSeconds>();
+    CAddress address{target,NODE_NETWORK}; address.nTime=now;
+    BOOST_CHECK(!addresses.HasSuccessSinceLastAttempt(unknown));
+    BOOST_REQUIRE(addresses.Add({address},target));
+    BOOST_CHECK(!addresses.HasSuccessSinceLastAttempt(target));
+    addresses.Attempt(target,false,now);
+    BOOST_CHECK(!addresses.HasSuccessSinceLastAttempt(target));
+    BOOST_REQUIRE(addresses.Good(target,now+1s));
+    BOOST_CHECK(addresses.HasSuccessSinceLastAttempt(target));
+    addresses.Attempt(target,false,now+2s); // TCP/crypto failure, even when not counted as an addrman failure.
+    BOOST_CHECK(!addresses.HasSuccessSinceLastAttempt(target));
+    addresses.Good(target,now+3s);
+    BOOST_CHECK(addresses.HasSuccessSinceLastAttempt(target));
+}
+
 BOOST_AUTO_TEST_CASE(addrman_simple)
 {
     auto addrman = std::make_unique<AddrMan>(EMPTY_NETGROUPMAN, DETERMINISTIC, GetCheckRatio(m_node));
