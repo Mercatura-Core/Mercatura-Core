@@ -137,3 +137,41 @@ locally with SHA-256 identifiers in the final B2 evidence. A 120-second
 three-node attempt before this gate was rejected by automatic approval review
 and did not execute. Sustained B2 workloads started only after the successful
 gate was recorded; the rejected action was not bypassed.
+
+## B2 source confirmation
+
+After the B2 tooling/test commits were published,
+[run 40311265804](https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/40311265804)
+at `61d7009edc1950a8294ac0133349fd7e75bf2fef` also completed successfully.
+All seven required jobs passed, as did runner selection. The run and job
+conclusions were independently retrieved after completion. Native Linux,
+Windows and macOS again passed their 184-entry catalog (one optional
+script-assets skip) and all 49 selected functional cases.
+
+| Required job | Job ID | Actual conclusion |
+| --- | --- | --- |
+| Linux native x86_64 headless | `121532778656` | Success |
+| Windows native x86_64 MSVC | `121532742825` | Success |
+| macOS native ARM64 | `121532742181` | Success |
+| Lint | `121532778646` | Success |
+| Windows x86_64 UCRT cross-compile | `121532778738` | Success |
+| macOS Intel x86_64 cross-compile | `121532778526` | Success |
+| macOS ARM64 cross-compile | `121532778605` | Success |
+
+The B2 fault/barrier/capacity runners remain excluded Linux-only developer
+targets; their normal and sanitizer results are local qualification, not
+additional Windows/macOS CI coverage. Ordinary cross-platform PQ and lifecycle
+functional coverage remains enabled. No CI job or validation assertion was
+disabled to obtain these results.
+
+B2 commits after the recovery gate:
+
+- `0c27687fc5ca7da23babbc197f8323ba0c463dfd`: admission fairness and worker/queue capacity cases.
+- `76f27806a038e44c72ecd6323c841ad7e1e5c6f7`: bounded churn and per-cycle allocation accounting.
+- `1b11cdb6b7ddd487329b2c85db1dd39cc6f70bea`: bounded multi-node endurance/recovery workload.
+- `b79debb7dba36cca0babc34a5894a96f35a3c769`: verified recovery ledger and resource model.
+- `61d7009edc1950a8294ac0133349fd7e75bf2fef`: native-funded payment, mining-time reconnect and explicit validation-thread budget.
+
+The final validation/evidence documents are a documentation-only descendant of
+that qualified source. Git history and the separate publication receipt identify
+the exact publication SHA without attempting a self-referential evidence hash.
