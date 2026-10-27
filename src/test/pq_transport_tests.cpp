@@ -36,6 +36,24 @@ void Establish(PQTransport& i, PQTransport& r, size_t fragment)
         if (!moved) std::this_thread::sleep_for(1ms);
     }
 }
+void WaitRecord(PQTransport& i, PQTransport& r, unsigned type)
+{
+    auto& sender = type % 2 ? i : r;
+    const size_t length = RECORD_SIZES[type] + (type <= 2 ? PREFACE.size() : 0);
+    const auto deadline = Clock::now() + 5s;
+    for (;;) {
+        BOOST_REQUIRE(Clock::now() < deadline); BOOST_REQUIRE(i.Poll()); BOOST_REQUIRE(r.Poll());
+        if (std::get<0>(sender.GetBytesToSend(false)).size() == length) return;
+        Transfer(i,r,65536); Transfer(r,i,65536); std::this_thread::sleep_for(1ms);
+    }
+}
+void NoAssurance(PQTransport& transport)
+{
+    const auto info = transport.GetInfo();
+    BOOST_CHECK(!info.pq_encrypted && !info.pq_authenticated && !info.pq_identity_verified);
+    BOOST_CHECK(!info.session_id); BOOST_CHECK(info.pq_identity.empty());
+    BOOST_CHECK(!transport.ReceivedMessageComplete()); BOOST_CHECK(!transport.ShouldReconnectV1());
+}
 struct Fixture : BasicTestingSetup {
     Fixture() : BasicTestingSetup(ChainType::REGTEST) {}
 };
@@ -93,6 +111,89 @@ BOOST_AUTO_TEST_CASE(m5_coalesced_packet_and_no_early_application)
     auto [wire, more, type] = i.GetBytesToSend(false); m5.insert(m5.end(),wire.begin(),wire.end()); i.MarkBytesSent(wire.size());
     std::span<const uint8_t> combined{m5}; BOOST_REQUIRE(r.ReceivedBytes(combined)); BOOST_CHECK(combined.empty());
     BOOST_CHECK(r.GetInfo().pq_encrypted); BOOST_CHECK(r.ReceivedMessageComplete());
+}
+BOOST_AUTO_TEST_CASE(each_outbound_record_must_be_fully_marked_sent)
+{
+    for (unsigned type = 1; type <= 4; ++type) {
+        auto context = std::make_shared<Context>(RegtestNetwork());
+        PQTransport i(context,true,{},"send-i"), r(context,false,{},"send-r");
+        WaitRecord(i,r,type);
+        auto& sender = type % 2 ? i : r;
+        auto& receiver = type % 2 ? r : i;
+        auto wire = std::get<0>(sender.GetBytesToSend(false)); const auto count = wire.size();
+        BOOST_REQUIRE(receiver.ReceivedBytes(wire)); BOOST_REQUIRE(wire.empty());
+        sender.MarkBytesSent(count - 1);
+        CSerializedNetMsg queued; queued.m_type = "version"; queued.data = {1,2,3};
+        BOOST_CHECK(!sender.SetMessageToSend(queued)); BOOST_CHECK(queued.data == (std::vector<uint8_t>{1,2,3}));
+        NoAssurance(sender); NoAssurance(receiver);
+        const auto deadline = Clock::now() + 5s;
+        while (std::get<0>(receiver.GetBytesToSend(false)).empty()) {
+            BOOST_REQUIRE(Clock::now() < deadline); BOOST_REQUIRE(receiver.Poll()); std::this_thread::sleep_for(1ms);
+        }
+        // The remote response is valid; the local send-progress state still
+        // forbids it. Do not let queueing masquerade as completed sending.
+        auto response = std::get<0>(receiver.GetBytesToSend(false));
+        BOOST_CHECK(!sender.ReceivedBytes(response)); NoAssurance(sender);
+        sender.MarkBytesSent(1); BOOST_CHECK(!sender.Poll()); NoAssurance(sender);
+    }
+}
+BOOST_AUTO_TEST_CASE(dependent_record_trailing_bytes_fail_before_worker_submission)
+{
+    for (unsigned type = 1; type <= 4; ++type) {
+        auto context = std::make_shared<Context>(RegtestNetwork());
+        PQTransport i(context,true,{},"trailing-i"), r(context,false,{},"trailing-r");
+        WaitRecord(i,r,type);
+        auto& sender = type % 2 ? i : r;
+        auto& receiver = type % 2 ? r : i;
+        auto wire = std::get<0>(sender.GetBytesToSend(false)); Bytes extra(wire.begin(),wire.end());
+        sender.MarkBytesSent(wire.size()); extra.push_back(0);
+        const auto jobs = context->Resources().completed_jobs;
+        std::span<const uint8_t> input{extra}; BOOST_CHECK(!receiver.ReceivedBytes(input));
+        NoAssurance(receiver); context->Stop();
+        BOOST_CHECK_EQUAL(context->Resources().completed_jobs, jobs);
+    }
+}
+BOOST_AUTO_TEST_CASE(final_confirmation_partial_send_and_failed_sibling_isolation)
+{
+    auto context = std::make_shared<Context>(RegtestNetwork());
+    PQTransport healthy_i(context,true,{},"healthy-i"), healthy_r(context,false,{},"healthy-r");
+    Establish(healthy_i,healthy_r,65536); const auto healthy = healthy_i.GetInfo();
+    PQTransport i(context,true,{},"final-i"), r(context,false,{},"final-r");
+    WaitRecord(i,r,5);
+    auto wire = std::get<0>(i.GetBytesToSend(false)); Bytes invalid(wire.begin(),wire.end());
+    BOOST_REQUIRE_EQUAL(invalid.size(), 60U);
+    for (unsigned sent = 0; sent < 59; ++sent) {
+        NoAssurance(i); NoAssurance(r);
+        CSerializedNetMsg version; version.m_type="version"; version.data={4,5};
+        BOOST_CHECK(!i.SetMessageToSend(version)); BOOST_CHECK(!r.SetMessageToSend(version));
+        BOOST_CHECK_EQUAL(version.data.size(), 2U); i.MarkBytesSent(1);
+    }
+    NoAssurance(i); i.MarkBytesSent(1);
+    BOOST_CHECK(i.GetInfo().pq_authenticated); NoAssurance(r);
+    invalid.back() ^= 1; std::span<const uint8_t> input{invalid};
+    BOOST_CHECK(!r.ReceivedBytes(input)); NoAssurance(r);
+    BOOST_CHECK(!r.Poll());
+    BOOST_CHECK(healthy_i.GetInfo().session_id == healthy.session_id);
+    BOOST_CHECK(healthy_i.GetInfo().pq_authenticated && healthy_r.GetInfo().pq_authenticated);
+    CSerializedNetMsg ping; ping.m_type="ping"; ping.data.resize(8,42);
+    BOOST_REQUIRE(healthy_i.SetMessageToSend(ping)); BOOST_REQUIRE(Transfer(healthy_i,healthy_r,65536));
+    bool reject{false}; auto received=healthy_r.GetReceivedMessage(1us,reject);
+    BOOST_CHECK(!reject); BOOST_CHECK_EQUAL(received.m_type,"ping");
+    i.Disconnect(); NoAssurance(i);
+}
+BOOST_AUTO_TEST_CASE(encrypted_application_packet_cannot_replace_m5)
+{
+    auto context=std::make_shared<Context>(RegtestNetwork());
+    PQTransport i(context,true,{},"early-packet-i"), r(context,false,{},"early-packet-r");
+    WaitRecord(i,r,5);
+    // Complete the local send event, but deliberately withhold M5 from R.
+    // I can now produce a real authenticated packet; R still requires M5.
+    const auto m5=std::get<0>(i.GetBytesToSend(false)); i.MarkBytesSent(m5.size());
+    BOOST_REQUIRE(i.GetInfo().pq_encrypted); NoAssurance(r);
+    CSerializedNetMsg version; version.m_type="version"; version.data.resize(64,42);
+    BOOST_REQUIRE(i.SetMessageToSend(version));
+    auto packet=std::get<0>(i.GetBytesToSend(false));
+    BOOST_CHECK(!r.ReceivedBytes(packet)); NoAssurance(r); BOOST_CHECK(!r.Poll());
 }
 BOOST_AUTO_TEST_CASE(admission_cancellation_and_no_fallback)
 {
@@ -212,6 +313,33 @@ BOOST_AUTO_TEST_CASE(identity_pins_and_wrong_expected_identity)
         Transfer(bad,peer,65536); Transfer(peer,bad,65536); std::this_thread::sleep_for(1ms);
     }
     BOOST_CHECK(failed); BOOST_CHECK(!bad.GetInfo().pq_encrypted); BOOST_CHECK(!bad.ShouldReconnectV1());
+}
+BOOST_AUTO_TEST_CASE(factory_pins_are_exact_destination_bindings)
+{
+    auto identity=std::make_shared<Identity>(); BOOST_REQUIRE(identity->FromSeed(std::array<uint8_t,32>{}));
+    const auto network=RegtestNetwork(); const auto pin=Fingerprint(network,identity->pub);
+    struct Destination { const char* host; uint16_t port; const char* name; bool verified; };
+    for (auto [host,port,name,verified] : std::vector<Destination>{
+            {"127.0.0.1",18444,"",true}, {"127.0.0.1",18445,"",false},
+            {"127.0.0.1",18444,"localhost:18444",false}, {"127.0.0.1",18444,"Node.example:18444",true},
+            {"127.0.0.1",18444,"node.example:18444",false},
+            {"::1",18444,"",true}, {"::1",18445,"",false}, {"::1",18444,"[0:0:0:0:0:0:0:1]:18444",false}}) {
+        auto ip=LookupHost(host,false); BOOST_REQUIRE(ip);
+        auto context=std::make_shared<Context>(network,identity,std::map<std::string,Digest>{
+            {"127.0.0.1:18444",pin}, {"[::1]:18444",pin}, {"Node.example:18444",pin}});
+        auto transport=MakePQTransport(context,true,CService{*ip,port},name,false);
+        auto& i=static_cast<PQTransport&>(*transport);
+        PQTransport r(context,false,{},"destination-peer"); Establish(i,r,65536);
+        BOOST_CHECK_EQUAL(i.GetInfo().pq_identity_verified,verified);
+        BOOST_CHECK(!r.GetInfo().pq_identity_verified);
+        const auto old=i.GetInfo().session_id;
+        i.Disconnect(); r.Disconnect(); NoAssurance(i); NoAssurance(r);
+        auto next=MakePQTransport(context,true,CService{*ip,port},name,false);
+        auto& reconnect=static_cast<PQTransport&>(*next);
+        PQTransport peer(context,false,{},"reconnect-peer"); Establish(reconnect,peer,65536);
+        BOOST_CHECK_EQUAL(reconnect.GetInfo().pq_identity_verified,verified);
+        BOOST_CHECK(reconnect.GetInfo().session_id != old);
+    }
 }
 BOOST_AUTO_TEST_CASE(packet_failure_releases_nothing_and_large_send_memory)
 {
