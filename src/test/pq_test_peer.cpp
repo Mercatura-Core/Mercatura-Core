@@ -126,7 +126,7 @@ int main(int argc, char** argv)
         Require(remote->Connect(reinterpret_cast<sockaddr*>(&local), sizeof(local)) == 0, "owned PQ node unavailable");
         Require(remote->SetNonBlocking(), "test peer mode failed");
         auto context = std::make_shared<pq::Context>(pq::SelectedNetwork());
-        const CService destination{CNetAddr{in_addr{htonl(INADDR_LOOPBACK)}}, uint16_t(port)};
+        const CService destination{CNetAddr{local.sin_addr}, uint16_t(port)};
         auto encrypted = pq::MakePQTransport(context, true, destination, "", false);
         V1Transport envelope{0};
         Direction to_pq{envelope, *encrypted, *plain, {}, {}}, to_python{*encrypted, envelope, *remote, {}, {}};
