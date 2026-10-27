@@ -441,6 +441,9 @@ RPCConsole::RPCConsole(interfaces::Node& node, const PlatformStyle *_platformSty
     platformStyle(_platformStyle)
 {
     ui->setupUi(this);
+    updatePeerSecurity(nullptr);
+    ui->peerSessionId->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);
+    ui->peerPQIdentity->setSizePolicy(QSizePolicy::Ignored,QSizePolicy::Preferred);
     QSettings settings;
 #ifdef ENABLE_WALLET
     if (WalletModel::isWalletEnabled()) {
@@ -449,12 +452,12 @@ RPCConsole::RPCConsole(interfaces::Node& node, const PlatformStyle *_platformSty
             // Restore failed (perhaps missing setting), center the window
             move(QGuiApplication::primaryScreen()->availableGeometry().center() - frameGeometry().center());
         }
-        ui->splitter->restoreState(settings.value("RPCConsoleWindowPeersTabSplitterSizes").toByteArray());
+        if (!ui->splitter->restoreState(settings.value("RPCConsoleWindowPeersTabSplitterSizes").toByteArray())) ui->splitter->setSizes({650,550});
     } else
 #endif // ENABLE_WALLET
     {
         // RPCConsole is a child widget.
-        ui->splitter->restoreState(settings.value("RPCConsoleWidgetPeersTabSplitterSizes").toByteArray());
+        if (!ui->splitter->restoreState(settings.value("RPCConsoleWidgetPeersTabSplitterSizes").toByteArray())) ui->splitter->setSizes({650,550});
     }
 
     m_peer_widget_header_state = settings.value("PeersTabPeerHeaderState").toByteArray();
@@ -747,6 +750,8 @@ void RPCConsole::setClientModel(ClientModel *model, int bestblock_height, int64_
     }
     if (!model) {
         // Client model is being set to 0, this means shutdown() is about to be called.
+        updatePeerSecurity(nullptr);
+        ui->peersTabRightPanel->hide();
         thread.quit();
         thread.wait();
     }
@@ -1145,10 +1150,38 @@ void RPCConsole::updateTrafficStats(quint64 totalBytesIn, quint64 totalBytesOut)
     ui->lblBytesOut->setText(GUIUtil::formatBytes(totalBytesOut));
 }
 
+void RPCConsole::updatePeerSecurity(const CNodeStats* stats)
+{
+    const bool pq = stats && stats->m_transport_type == TransportProtocolType::PQ_V1;
+    const bool failed = pq && stats->m_pq_failed;
+    const bool established = pq && !failed && stats->m_pq_encrypted;
+    const bool authenticated = established && stats->m_pq_authenticated;
+    ui->peerTransportType->setText(!stats ? ts.na : pq ? tr("PQ v1") :
+        QString::fromStdString(TransportTypeAsString(stats->m_transport_type)));
+    const bool session = stats && (pq || stats->m_transport_type == TransportProtocolType::V2);
+    ui->peerSessionIdLabel->setVisible(session);
+    ui->peerSessionId->setVisible(session);
+    ui->peerSessionId->setText(session && (!pq || established) ? QString::fromStdString(stats->m_session_id) : QString{});
+    ui->peerSessionId->setCursorPosition(0);
+    ui->peerSessionId->setToolTip(ui->peerSessionId->text());
+    ui->peerPQEncryptionLabel->setVisible(pq); ui->peerPQEncryption->setVisible(pq);
+    ui->peerPQAuthenticationLabel->setVisible(pq); ui->peerPQAuthentication->setVisible(pq);
+    ui->peerPQVerificationLabel->setVisible(pq); ui->peerPQVerification->setVisible(pq);
+    ui->peerPQIdentityLabel->setVisible(pq); ui->peerPQIdentity->setVisible(pq);
+    ui->peerPQEncryption->setText(!pq ? ts.na : established ? tr("Established") : failed ? tr("Unavailable") : tr("Pending"));
+    ui->peerPQAuthentication->setText(authenticated ? ts.yes : ts.no);
+    ui->peerPQVerification->setText(!pq ? ts.na : failed ? (stats->m_pq_pin_mismatch ? tr("Mismatch") : tr("Unavailable")) : !authenticated ? tr("Pending") :
+        stats->m_pq_identity_verified ? tr("Verified") : tr("Not configured"));
+    ui->peerPQIdentity->setText(authenticated ? QString::fromStdString(stats->m_pq_identity) : QString{});
+    ui->peerPQIdentity->setCursorPosition(0);
+    ui->peerPQIdentity->setToolTip(ui->peerPQIdentity->text());
+}
+
 void RPCConsole::updateDetailWidget()
 {
     const QList<QModelIndex> selected_peers = GUIUtil::getEntryData(ui->peerWidget, PeerTableModel::NetNodeId);
     if (!clientModel || !clientModel->getPeerTableModel() || selected_peers.size() != 1) {
+        updatePeerSecurity(nullptr);
         ui->peersTabRightPanel->hide();
         ui->peerHeading->setText(tr("Select a peer to view detailed information."));
         return;
@@ -1178,15 +1211,7 @@ void RPCConsole::updateDetailWidget()
     ui->peerVersion->setText(stats->nodeStats.nVersion ? QString::number(stats->nodeStats.nVersion) : ts.na);
     ui->peerSubversion->setText(!stats->nodeStats.cleanSubVer.empty() ? QString::fromStdString(stats->nodeStats.cleanSubVer) : ts.na);
     ui->peerConnectionType->setText(GUIUtil::ConnectionTypeToQString(stats->nodeStats.m_conn_type, /*prepend_direction=*/true));
-    ui->peerTransportType->setText(QString::fromStdString(TransportTypeAsString(stats->nodeStats.m_transport_type)));
-    if (stats->nodeStats.m_transport_type == TransportProtocolType::V2) {
-        ui->peerSessionIdLabel->setVisible(true);
-        ui->peerSessionId->setVisible(true);
-        ui->peerSessionId->setText(QString::fromStdString(stats->nodeStats.m_session_id));
-    } else {
-        ui->peerSessionIdLabel->setVisible(false);
-        ui->peerSessionId->setVisible(false);
-    }
+    updatePeerSecurity(&stats->nodeStats);
     ui->peerNetwork->setText(GUIUtil::NetworkToQString(stats->nodeStats.m_network));
     if (stats->nodeStats.m_permission_flags == NetPermissionFlags::None) {
         ui->peerPermissions->setText(ts.na);

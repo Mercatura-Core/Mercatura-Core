@@ -8,6 +8,7 @@
 #include <common/args.h>
 #include <common/system.h>
 #include <logging.h>
+#include <mining/cpu_miner.h>
 #include <node/coins_view_args.h>
 #include <node/database_args.h>
 #include <tinyformat.h>
@@ -22,6 +23,11 @@
 #include <string>
 
 namespace node {
+int ScriptCheckWorkerCount(int64_t requested, unsigned int effective_cpus)
+{
+    const int64_t total = requested <= 0 ? requested + std::max(1U,effective_cpus) : requested;
+    return static_cast<int>(std::clamp<int64_t>(total <= 1 ? 0 : total-1,0,MAX_SCRIPTCHECK_THREADS));
+}
 util::Result<void> ApplyArgsManOptions(const ArgsManager& args, ChainstateManager::Options& opts)
 {
     if (auto value{args.GetIntArg("-checkblockindex")}) {
@@ -50,14 +56,12 @@ util::Result<void> ApplyArgsManOptions(const ArgsManager& args, ChainstateManage
     ReadDatabaseArgs(args, opts.coins_db);
     ReadCoinsViewArgs(args, opts.coins_view);
 
-    int script_threads = args.GetIntArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
-    if (script_threads <= 0) {
-        // -par=0 means autodetect (number of cores - 1 script threads)
-        // -par=-n means "leave n cores free" (number of cores - n - 1 script threads)
-        script_threads += GetNumCores();
-    }
-    // Subtract 1 because the main thread counts towards the par threads.
-    opts.worker_threads_num = script_threads - 1;
+    const auto requested = args.GetIntArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
+    // Share the miner's existing affinity/container/job-aware CPU detection.
+    // Host hardware_concurrency can exceed a container's actual CPU quota by
+    // two orders of magnitude, starving interactive mining and PQ processing.
+    const auto effective_cpus = requested <= 0 ? mining::DetectWorkerLimits().logical_cpus : 1U;
+    opts.worker_threads_num = ScriptCheckWorkerCount(requested,effective_cpus);
 
     if (auto max_size = args.GetIntArg("-maxsigcachesize")) {
         // 1. When supplied with a max_size of 0, both the signature cache and

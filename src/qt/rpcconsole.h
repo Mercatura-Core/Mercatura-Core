@@ -147,6 +147,8 @@ private:
             ban_for{tr("Ban for")}, na{tr("N/A")}, unknown{tr("Unknown")};
     } const ts;
 
+    friend class PeerSecurityTests;
+    void updatePeerSecurity(const CNodeStats* stats);
     void startExecutor();
     void setTrafficGraphRange(int mins);
 

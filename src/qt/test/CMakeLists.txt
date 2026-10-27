@@ -104,3 +104,17 @@ if(ENABLE_WALLET)
       ENVIRONMENT "MERCATURA_TEST_WORKERS=1;MERCATURA_TEST_SECONDS=30;MERCATURA_TEST_STOP_FIRST=1;MERCATURA_TEST_RAPID_WALLET=1")
   endif()
 endif()
+
+# Peer assurance presentation uses actual RPCConsole labels with injected public
+# statistics, without wallets or network listeners.
+add_executable(test_peersecurity-qt peersecuritytests.cpp ../../init/bitcoin-qt.cpp)
+add_windows_application_manifest(test_peersecurity-qt)
+target_link_libraries(test_peersecurity-qt core_interface bitcoinqt test_util bitcoin_node Boost::headers Qt6::Test)
+import_plugins(test_peersecurity-qt)
+add_test(NAME test_peersecurity-qt COMMAND test_peersecurity-qt)
+if(WIN32 AND VCPKG_TARGET_TRIPLET)
+  set(plugin_path "$<SHELL_PATH:$<PATH:GET_PARENT_PATH,$<PATH:GET_PARENT_PATH,$<TARGET_PROPERTY:Qt6::QWindowsIntegrationPlugin,LOCATION_$<CONFIG>>>>>")
+  set_property(TEST test_peersecurity-qt APPEND PROPERTY ENVIRONMENT_MODIFICATION
+    QT_QPA_PLATFORM=set:windows QT_PLUGIN_PATH=set:${plugin_path})
+  unset(plugin_path)
+endif()

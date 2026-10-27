@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying file COPYING.
 
 #include <mining/cpu_miner.h>
+#include <node/chainstatemanager_args.h>
 
 #include <boost/test/unit_test.hpp>
 
@@ -23,6 +24,24 @@ struct LinuxResources {
 } // namespace
 
 BOOST_AUTO_TEST_SUITE(worker_limits_tests)
+
+BOOST_AUTO_TEST_CASE(script_validation_respects_quota_without_overriding_explicit_par)
+{
+    LinuxResources resources;
+    resources.files["/proc/self/cgroup"] = "0::/tenant/session\n";
+    resources.files["/proc/self/mountinfo"] = "1 0 0:1 / /sys/fs/cgroup ro - cgroup2 cgroup rw\n";
+    resources.files["/sys/fs/cgroup/tenant/session/cpu.max"] = "200000 100000\n";
+    const auto budget=resources.Limits(192).logical_cpus;
+    BOOST_CHECK_EQUAL(budget,2U);
+    BOOST_CHECK_EQUAL(node::ScriptCheckWorkerCount(0,budget),1);
+    BOOST_CHECK_EQUAL(node::ScriptCheckWorkerCount(-1,budget),0);
+    BOOST_CHECK_EQUAL(node::ScriptCheckWorkerCount(1,budget),0);
+    BOOST_CHECK_EQUAL(node::ScriptCheckWorkerCount(8,budget),7);
+    BOOST_CHECK_EQUAL(node::ScriptCheckWorkerCount(0,192),MAX_SCRIPTCHECK_THREADS);
+    BOOST_CHECK_EQUAL(node::ScriptCheckWorkerCount(0,0),0);
+    BOOST_CHECK_EQUAL(node::ScriptCheckWorkerCount(std::numeric_limits<int64_t>::min(),budget),0);
+    BOOST_CHECK_EQUAL(node::ScriptCheckWorkerCount(std::numeric_limits<int64_t>::max(),budget),MAX_SCRIPTCHECK_THREADS);
+}
 
 BOOST_AUTO_TEST_CASE(logical_processor_scaling_without_fixed_ceiling)
 {
