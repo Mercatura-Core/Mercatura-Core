@@ -54,14 +54,26 @@ def run_owned_test(test):
         raise SystemExit(128 + signum)
 
     previous = signal.signal(signal.SIGTERM, terminated)
+    owned = []
+    shutdown = getattr(test, 'shutdown', None)
+    if shutdown is not None:
+        def retain_before_shutdown():
+            # Core clears its list before returning from shutdown. Retain
+            # references so failed-run destructors cannot kill without wait().
+            owned.extend(test.nodes)
+            return shutdown()
+        test.shutdown = retain_before_shutdown
     try:
         test.main()
     finally:
         signal.signal(signal.SIGTERM, previous)
-        cleanup_owned_nodes(test.nodes)
+        cleanup_owned_nodes(owned + list(test.nodes))
+        if shutdown is not None:
+            test.shutdown = shutdown
         thread = getattr(test, 'network_thread', None)
         if thread is not None and thread.is_alive():
             thread.close(timeout=10)
+
 
 class PQLabProxy:
     def __init__(self, destinations, *, latency=(0, 0), bytes_per_second=0):

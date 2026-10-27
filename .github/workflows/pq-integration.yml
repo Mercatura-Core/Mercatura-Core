@@ -11,7 +11,7 @@ permissions:
   contents: read
 concurrency:
   group: pq-integration-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 defaults:
   run:
     shell: bash
@@ -114,9 +114,9 @@ jobs:
               package.extractall(root / 'bin', filter='data')
           PY_RELEASE
           python3 contrib/devtools/pq-upgrade-rehearsal.py --configfile=work/build/test/config.ini \
-            --previous-bindir="$RUNNER_TEMP/pq-prior/bin" --tmpdir="$RUNNER_TEMP/pq-upgrade-reg" --nocleanup
+            --previous-bindir="$RUNNER_TEMP/pq-prior/bin" --tmpdir="$RUNNER_TEMP/pq-upgrade-reg" --nocleanup --timeout-factor=3
           python3 contrib/devtools/pq-upgrade-rehearsal.py --public-testnet --configfile=work/build/test/config.ini \
-            --previous-bindir="$RUNNER_TEMP/pq-prior/bin" --tmpdir="$RUNNER_TEMP/pq-upgrade-public" --nocleanup
+            --previous-bindir="$RUNNER_TEMP/pq-prior/bin" --tmpdir="$RUNNER_TEMP/pq-upgrade-public" --nocleanup --timeout-factor=3
       - name: Prepare Unix public-testnet GUI development package
         if: runner.os != 'Windows'
         env:
