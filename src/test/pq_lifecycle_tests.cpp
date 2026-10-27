@@ -272,6 +272,32 @@ BOOST_AUTO_TEST_CASE(stale_completed_generation_cannot_publish_authentication)
     auto job = Access::Job(i); BOOST_REQUIRE(job); Access::NextGeneration(i); gate.Release(); WaitDone(job);
     BOOST_CHECK(!i.Poll()); NoAssurance(i); r.Disconnect(); job.reset(); context->Stop(); BOOST_CHECK_EQUAL(context->Pending(),0U);
 }
+BOOST_AUTO_TEST_CASE(cancelled_completion_at_every_crypto_stage_cannot_publish)
+{
+    // Next() identifies initial M1 creation and each M1..M4 processing result.
+    // Hold exactly before release-publication, after the worker's cancellation
+    // check, to cover a late disconnect at the narrow publication boundary.
+    for (uint8_t next : {2,3,4,5,0}) {
+        Gate gate; Hooks hooks;
+        hooks.point = [&](Event event, Work* job) {
+            if (event == Event::BEFORE_PUBLISH && job->handshake && job->handshake->Next() == next) gate.Hold();
+        };
+        ScopedHooks scope(hooks); auto context=std::make_shared<Context>(RegtestNetwork());
+        Cleanup cleanup{[&] { gate.Release(); context->Stop(); }};
+        PQTransport i(context,true,{},"stage-i"), r(context,false,{},"stage-r");
+        Drive(i,r,[&] { return gate.Hit(); }); BOOST_REQUIRE(gate.Wait());
+        auto& target = next == 3 || next == 5 ? r : i;
+        auto job=Access::Job(target); BOOST_REQUIRE(job);
+        BOOST_CHECK(!job->done.load(std::memory_order_acquire));
+        target.Disconnect(); NoAssurance(target);
+        gate.Release(); WaitDone(job);
+        BOOST_CHECK(job->cancelled.load()); BOOST_CHECK(!target.Poll()); NoAssurance(target);
+        // A deliberately retained external Work owner keeps its completed
+        // result alive until dropped. The disconnected transport cannot use it.
+        job.reset(); i.Disconnect(); r.Disconnect(); context->Stop();
+        BOOST_CHECK_EQUAL(context->Pending(),0U);
+    }
+}
 BOOST_AUTO_TEST_CASE(worker_exception_then_recovery)
 {
     std::atomic<unsigned> calls{0}; Hooks hooks;
