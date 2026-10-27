@@ -12,6 +12,7 @@ import threading
 import time
 
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.pq_lab_proxy import run_owned_test
 from test_framework.util import assert_equal, assert_raises_rpc_error, p2p_port
 
 PREFACE = b'Mercatura/P2P/PQ'
@@ -151,7 +152,7 @@ class PQTransportNegativeTest(BitcoinTestFramework):
     def run_test(self):
         # An explicit classical-v2 request is rejected by RPC validation when
         # the required-only listener does not advertise classical acceptance.
-        assert_raises_rpc_error(-8, 'v2transport requested but not enabled', self.nodes[1].addnode, f'127.0.0.1:{p2p_port(2)}', 'onetry', True)
+        assert_raises_rpc_error(-8, 'Required PQ forbids an explicit BIP324 transport request.', self.nodes[1].addnode, f'127.0.0.1:{p2p_port(2)}', 'onetry', True)
         with Relay(p2p_port(2), p2p_port(0)) as relay:
             self.connect_relay()
             self.wait_until(self.ready_peers)
@@ -218,4 +219,4 @@ class PQTransportNegativeTest(BitcoinTestFramework):
 
 
 if __name__ == '__main__':
-    PQTransportNegativeTest(__file__).main()
+    run_owned_test(PQTransportNegativeTest(__file__))

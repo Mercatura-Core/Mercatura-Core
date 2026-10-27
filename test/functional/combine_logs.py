@@ -85,7 +85,8 @@ def read_logs(tmp_dir):
         case 0:
             chain = 'regtest'  # fallback to regtest
         case 1:
-            chain = re.search(r'node0/(.+?)/debug\.log$', debug_logs[0].as_posix()).group(1)
+            # Mainnet stores debug.log directly in node0, without a chain folder.
+            chain = debug_logs[0].parent.relative_to(pathlib.Path(tmp_dir) / 'node0').as_posix()
         case _:
             raise RuntimeError('Max one debug.log is supported, found several:\n\t' +
                                '\n\t'.join(map(str, debug_logs)))

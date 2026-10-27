@@ -207,6 +207,12 @@ add_executable(pq_transport_runner EXCLUDE_FROM_ALL
 )
 target_link_libraries(pq_transport_runner PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
 
+# Only test builds contain the loopback injector bridge. Never installed or
+# packaged with the three product binaries; production policy has no exception.
+add_executable(pq_test_peer pq_test_peer.cpp)
+set_target_properties(pq_test_peer PROPERTIES OUTPUT_NAME pq-test-peer)
+target_link_libraries(pq_test_peer PRIVATE core_interface bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
+
 # Instrument the complete PQ adapter/storage boundary without rebuilding every
 # Core dependency. The explicitly listed objects satisfy the PQ symbols before
 # bitcoin_node is searched. Other Core libraries remain uninstrumented; this is

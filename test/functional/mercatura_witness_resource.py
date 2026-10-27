@@ -10,6 +10,7 @@ No regtest activation override, external peers, future-height history or PoW stu
 """
 
 from copy import deepcopy
+from contextlib import ExitStack
 import struct
 
 from test_framework.messages import (
@@ -17,8 +18,10 @@ from test_framework.messages import (
     from_hex, msg_block, msg_blocktxn, msg_cmpctblock, msg_headers, ser_uint256,
 )
 from test_framework.p2p import P2PInterface, p2p_lock
+from test_framework.pq_test_peer import PQP2PBridge
+from test_framework.pq_lab_proxy import run_owned_test
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal, assert_raises_rpc_error, initialize_datadir, p2p_port
+from test_framework.util import assert_equal, assert_raises_rpc_error, initialize_datadir
 
 
 class BlockMeta:
@@ -56,8 +59,9 @@ class MercaturaWitnessResourceTest(BitcoinTestFramework):
         self.setup_nodes()  # Deliberately do not connect the real nodes.
 
     def connect_peer(self, node):
+        bridge = self.bridges.enter_context(PQP2PBridge(self, node, 'main'))
         peer = P2PInterface()
-        connect = peer.peer_connect(dstaddr="127.0.0.1", dstport=p2p_port(node.index),
+        connect = peer.peer_connect(dstaddr="127.0.0.1", dstport=bridge.port,
                                     net="mainnet", timeout_factor=self.options.timeout_factor,
                                     supports_v2_p2p=False, send_version=True)
         # The inherited Python default predates Mercatura's chunk protocol.
@@ -67,6 +71,10 @@ class MercaturaWitnessResourceTest(BitcoinTestFramework):
         peer.wait_until(lambda: peer.is_connected, check_connected=False)
         peer.wait_for_verack()
         peer.sync_with_ping()
+        peers = node.getpeerinfo()
+        assert_equal(len(peers), 1)
+        assert peers[0]['pq_encrypted'] and peers[0]['pq_authenticated']
+        assert_equal(peers[0]['transport_protocol_type'], 'pq-v1')
         return peer
 
     @staticmethod
@@ -85,6 +93,10 @@ class MercaturaWitnessResourceTest(BitcoinTestFramework):
         return msg_cmpctblock(compact.to_p2p())
 
     def run_test(self):
+        with ExitStack() as self.bridges:
+            self.run_scenarios()
+
+    def run_scenarios(self):
         miner, receiver, testnet = self.nodes
         for node in (miner, receiver):
             assert_equal(node.getblockchaininfo()["chain"], "main")
@@ -158,4 +170,4 @@ class MercaturaWitnessResourceTest(BitcoinTestFramework):
 
 
 if __name__ == "__main__":
-    MercaturaWitnessResourceTest(__file__).main()
+    run_owned_test(MercaturaWitnessResourceTest(__file__))

@@ -11,7 +11,9 @@ permissions:
   contents: read
 concurrency:
   group: pq-integration-${{ github.ref }}
-  cancel-in-progress: true
+  # Let native dependency builds finish and save their cache before the next
+  # qualification run. These jobs never export or publish candidate artifacts.
+  cancel-in-progress: false
 defaults:
   run:
     shell: bash
@@ -78,7 +80,7 @@ jobs:
       - name: Build native integration targets
         run: |
           cmake --build work/build --config Release --parallel 3 --target \
-            bitcoind bitcoin-cli bitcoin-qt test_bitcoin test_peersecurity-qt test_mining-qt test_mining_app-qt
+            bitcoind bitcoin-cli bitcoin-qt test_bitcoin test_peersecurity-qt test_mining-qt test_mining_app-qt pq_test_peer
       - name: Native policy, transport and Qt regressions
         env:
           QT_QPA_PLATFORM: ${{ runner.os == 'Windows' && 'windows' || 'offscreen' }}
@@ -96,7 +98,7 @@ jobs:
           pq_python=python3
           if [[ "$RUNNER_OS" == Windows ]]; then pq_python=python; fi
           "$pq_python" work/build/test/functional/test_runner.py --jobs=2 \
-            feature_pq_required.py feature_pq_activation.py feature_pq_discovery.py feature_pq_b1_lifecycle.py feature_pq_b3_assurance.py
+            feature_pq_required.py feature_pq_activation.py feature_pq_discovery.py feature_pq_b1_lifecycle.py feature_pq_b3_assurance.py feature_pq_transport_negative.py mercatura_witness_resource.py
       - name: Published-release upgrade and rollback rehearsal
         if: matrix.platform == 'linux-x86_64'
         run: |
