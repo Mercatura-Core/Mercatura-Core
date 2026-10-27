@@ -83,6 +83,7 @@ add_executable(test_bitcoin
   net_peer_eviction_tests.cpp
   net_tests.cpp
   pq_p2p_tests.cpp
+  pq_assurance_tests.cpp
   pq_identity_tests.cpp
   pq_transport_tests.cpp
   netbase_tests.cpp
@@ -187,6 +188,7 @@ add_windows_application_manifest(test_bitcoin)
 add_executable(pq_stagea_tests EXCLUDE_FROM_ALL
   ../../contrib/devtools/pq-stagea-test-main.cpp
   pq_p2p_tests.cpp
+  pq_assurance_tests.cpp
   pq_identity_tests.cpp
   ../net_pq_protocol.cpp
   ../net_pq_identity_format.cpp
@@ -244,6 +246,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Cla
       util/pq_lifecycle.cpp
       pq_identity_tests.cpp
       pq_p2p_tests.cpp
+      pq_assurance_tests.cpp
       pq_transport_tests.cpp
       ../crypto/mercatura_p2p_crypto.cpp
       ../net_pq.cpp
