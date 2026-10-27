@@ -4,6 +4,7 @@
 #define BITCOIN_NET_PQ_CONTEXT_H
 
 #include <net_pq_protocol.h>
+#include <net_pq_status.h>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -15,6 +16,8 @@
 #include <pthread.h>
 #endif
 
+class CChainParams;
+enum class ChainType;
 class CNetAddr;
 class CService;
 class Transport;
@@ -39,12 +42,14 @@ struct Work {
     void Discard();
 };
 
-/** Shared by a single CConnman; absent entirely with default options. */
+/** Shared by a single CConnman; present only when the selected chain policy requires PQ. */
 class Context {
     friend struct test::Access;
 public:
     struct ResourceStats {
         unsigned pending{0}, queued{0}, active{0}, peak_pending{0}, peak_queued{0};
+        uint64_t established{0};
+        std::array<uint64_t, unsigned(Failure::COUNT)> failures{};
         uint64_t completed_jobs{0}, total_job_us{0}, max_job_us{0};
         std::array<size_t, 2> stack_reservations{};
     };
@@ -97,11 +102,16 @@ public:
     std::shared_ptr<void> Admit(const std::string& source);
     bool Submit(const std::shared_ptr<Work>& job);
     unsigned Pending();
-    void ReportFailure(std::string_view reason);
+    void RecordEstablished();
+    void ReportFailure(std::string_view reason, Failure failure = Failure::FRAMING);
     ResourceStats Resources();
 };
 
-Network RegtestNetwork();
+/** Compulsory on Mercatura main/test; explicit opt-in on regtest only.
+ * Invalid modes and attempts to weaken compulsory policy throw. */
+bool RequiredMode(ChainType chain, std::optional<std::string_view> option = {});
+Network NetworkForChain(const CChainParams& params);
+Network SelectedNetwork();
 std::shared_ptr<const Identity> LoadIdentity(const std::string& path, bool create, const Network& network);
 std::string SourceGroup(const CNetAddr& address, bool anonymous);
 

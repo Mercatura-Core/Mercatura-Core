@@ -239,8 +239,8 @@ class PQTransportTest(BitcoinTestFramework):
                     'peers': [{field: peer[field] for field in public_fields} for peer in self.nodes[0].getpeerinfo() + self.nodes[1].getpeerinfo()]}
         (Path(self.options.tmpdir) / 'pq-stagea-evidence.json').write_text(json.dumps(evidence, indent=2) + '\n')
         self.stop_node(2)
-        for chain in ['-testnet=1', '-signet=1', '-chain=main']:
-            self.nodes[2].assert_start_raises_init_error(extra_args=['-regtest=0', chain, '-pqp2p=required'], expected_msg='Error: Experimental PQ P2P is restricted to isolated regtest; public networks are not approved.')
+        for chain in ['-signet=1']:
+            self.nodes[2].assert_start_raises_init_error(extra_args=['-regtest=0', chain, '-pqp2p=required'], expected_msg='Error: PQ P2P is not enabled on signet or testnet4.')
         self.start_node(2)
         self.log.info('Stage A end-to-end qualification passed in %.3f seconds', time.monotonic()-start)
 

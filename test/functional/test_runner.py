@@ -111,6 +111,8 @@ MERCATURA_SCRIPTS = [
     'feature_pq_b1_lifecycle.py --mercahash-v2-height=0',
     'feature_pq_transport_negative.py',
     'feature_pq_b3_assurance.py',
+    'feature_pq_required.py',
+    'feature_pq_required.py --public-testnet',
     'mercatura_coinbase_template.py',
     'mercatura_pq_address_enforcement.py',
     'mercatura_pq_auth_commitments.py',

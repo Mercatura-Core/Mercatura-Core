@@ -24,11 +24,11 @@ class PQTransport final : public Transport {
     Bytes m_send, m_recv, m_decoded;
     size_t m_send_pos{0}, m_preface_pos{0};
     uint8_t m_expected;
-    bool m_preface{true}, m_failed{false}, m_established{false}, m_final_send{false}, m_message{false};
+    bool m_preface{true}, m_failed{false}, m_pin_mismatch{false}, m_established{false}, m_final_send{false}, m_message{false};
     std::optional<uint32_t> m_packet_length;
     std::string m_type, m_peer_fp;
     std::array<uint8_t, 32> m_session{};
-    bool Fail(bool report = true);
+    bool Fail(bool report = true, Failure failure = Failure::FRAMING);
     bool Queue(Bytes record, bool initial = false);
     void InstallKeys();
 public:

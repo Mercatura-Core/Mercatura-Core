@@ -197,10 +197,11 @@ Context::ResourceStats Context::Resources()
     for (auto& weak : m_running) if (!weak.expired()) ++stats.active;
     return stats;
 }
-void Context::ReportFailure(std::string_view reason)
+void Context::RecordEstablished() { std::lock_guard lock(m_mutex); ++m_stats.established; }
+void Context::ReportFailure(std::string_view reason, Failure failure)
 {
     {
-        std::lock_guard lock(m_mutex); auto now = Clock::now();
+        std::lock_guard lock(m_mutex); ++m_stats.failures[unsigned(failure)]; auto now = Clock::now();
         m_log_tokens = std::min(20.0, m_log_tokens + 10.0 * std::chrono::duration<double>(now-m_log_last).count()); m_log_last = now;
         if (m_log_tokens < 1) return;
         --m_log_tokens;
@@ -213,15 +214,43 @@ bool Context::Submit(const std::shared_ptr<Work>& job)
     if (m_stop || !job->admission || m_queue.size() >= 32) return false;
     m_queue.push_back(job); m_stats.peak_queued = std::max(m_stats.peak_queued, unsigned(m_queue.size())); m_cv.notify_one(); return true;
 }
-Network RegtestNetwork()
+bool RequiredMode(ChainType chain, std::optional<std::string_view> option)
 {
-    if (Params().GetChainType() != ChainType::REGTEST) throw std::runtime_error("PQ Stage A requires regtest");
-    Network out{}; out[0] = 3;
-    std::copy(Params().MessageStart().begin(), Params().MessageStart().end(), out.begin()+1);
-    const auto& genesis = Params().GetConsensus().hashGenesisBlock;
-    std::copy(genesis.begin(), genesis.end(), out.begin()+5);
-    auto empty = Hash({}); std::copy(empty.begin(), empty.end(), out.begin()+37); return out;
+    if (option && *option != "off" && *option != "required") throw std::runtime_error("-pqp2p must be off or required.");
+    switch (chain) {
+    case ChainType::MAIN:
+    case ChainType::TESTNET:
+        if (option && *option == "off") throw std::runtime_error("PQ P2P is compulsory on Mercatura mainnet and public testnet; -pqp2p=off is forbidden.");
+        return true;
+    case ChainType::REGTEST:
+        return option && *option == "required";
+    case ChainType::SIGNET:
+    case ChainType::TESTNET4:
+        if (option && *option == "required") throw std::runtime_error("PQ P2P is not enabled on signet or testnet4.");
+        return false;
+    }
+    throw std::runtime_error("Unknown PQ network policy");
 }
+Network NetworkForChain(const CChainParams& params)
+{
+    Network out{};
+    switch (params.GetChainType()) {
+    case ChainType::MAIN: out[0] = 0; break;
+    case ChainType::TESTNET: out[0] = 1; break;
+    case ChainType::SIGNET: out[0] = 2; break;
+    case ChainType::REGTEST: out[0] = 3; break;
+    case ChainType::TESTNET4: out[0] = 4; break;
+    default: throw std::runtime_error("Unknown PQ network discriminator");
+    }
+    std::copy(params.MessageStart().begin(), params.MessageStart().end(), out.begin()+1);
+    const auto& genesis = params.GetConsensus().hashGenesisBlock;
+    std::copy(genesis.begin(), genesis.end(), out.begin()+5);
+    const auto challenge = Hash(params.GetChainType() == ChainType::SIGNET ?
+        std::span<const uint8_t>{params.GetConsensus().signet_challenge} : std::span<const uint8_t>{});
+    std::copy(challenge.begin(), challenge.end(), out.begin()+37);
+    return out;
+}
+Network SelectedNetwork() { return NetworkForChain(Params()); }
 std::string SourceGroup(const CNetAddr& address, bool anonymous)
 {
     if (anonymous || (!address.IsIPv4() && !address.IsIPv6())) return {};
@@ -248,12 +277,13 @@ PQTransport::PQTransport(std::shared_ptr<Context> context, bool initiator, std::
     // limits while waiting for their first complete header. No crypto is queued
     // for an inbound peer until a complete, structurally valid M1 is received.
     m_admission = m_context->Admit(m_source);
-    if (!m_admission || (initiator && !Queue({}))) Fail();
+    if (!m_admission || (initiator && !Queue({}))) Fail(true, Failure::RESOURCE);
 }
 PQTransport::~PQTransport() { Disconnect(); }
-bool PQTransport::Fail(bool report)
+bool PQTransport::Fail(bool report, Failure failure)
 {
-    if (report && !m_failed) m_context->ReportFailure("framing, authentication, deadline or resource policy failure");
+    if (report && !m_failed) m_context->ReportFailure("framing, authentication, deadline or resource policy failure", failure);
+    if (!m_failed) m_pin_mismatch = failure == Failure::PIN;
     m_failed = true; m_established = false; ++m_generation;
     if (m_work) { m_work->cancelled = true; m_work.reset(); }
     m_handshake.reset(); m_admission.reset(); m_send_cipher.reset(); m_recv_cipher.reset();
@@ -283,6 +313,7 @@ void PQTransport::InstallKeys()
     m_send_cipher = std::make_unique<PacketCipher>(send_l.bytes, send_p.bytes, keys.h5, m_initiator ? 0 : 1);
     m_recv_cipher = std::make_unique<PacketCipher>(recv_l.bytes, recv_p.bytes, keys.h5, m_initiator ? 1 : 0);
     m_handshake.reset(); m_admission.reset();
+    m_context->RecordEstablished();
 }
 bool PQTransport::Poll()
 {
@@ -291,17 +322,17 @@ bool PQTransport::Poll()
         if (m_context->Stopped()) return Fail(false);
         if (m_failed) return false;
         const auto now = Clock::now();
-        if (!m_established && (now - m_created > std::chrono::seconds(120) || now - m_wait > std::chrono::seconds(30) || (m_preface && now - m_created > std::chrono::seconds(5)))) return Fail();
+        if (!m_established && (now - m_created > std::chrono::seconds(120) || now - m_wait > std::chrono::seconds(30) || (m_preface && now - m_created > std::chrono::seconds(5)))) return Fail(true, Failure::DEADLINE);
         if (!m_work) return true;
         if (m_work->cancelled) return Fail(false);
         if (!m_work->done.load(std::memory_order_acquire)) {
-            if ((!m_work->started && now - m_work->queued > std::chrono::seconds(2)) || (m_work->started && Micros(now) - m_work->started_us > 5'000'000)) return Fail();
+            if ((!m_work->started && now - m_work->queued > std::chrono::seconds(2)) || (m_work->started && Micros(now) - m_work->started_us > 5'000'000)) return Fail(true, Failure::DEADLINE);
             return true;
         }
         auto result = std::move(m_work);
         if (result->generation != m_generation || result->cancelled || !result->ok) {
-            m_context->ReportFailure(result->pin_mismatch ? "expected identity mismatch (pin is never replaced)" : "authentication or cancelled crypto job");
-            return Fail(false);
+            m_context->ReportFailure(result->pin_mismatch ? "expected identity mismatch (pin is never replaced)" : "authentication or cancelled crypto job", result->pin_mismatch ? Failure::PIN : Failure::AUTHENTICATION_OR_CRYPTO);
+            return Fail(false, result->pin_mismatch ? Failure::PIN : Failure::AUTHENTICATION_OR_CRYPTO);
         }
         m_handshake = std::move(result->handshake); m_expected = m_handshake->Next();
         assert(m_send.empty()); m_send = std::move(result->response); m_send_pos = 0; m_wait = now;
@@ -319,6 +350,7 @@ Transport::Info PQTransport::GetInfo() const noexcept
     std::lock_guard lock(m_mutex);
     try {
         Info info{.transport_type = TransportProtocolType::PQ_V1, .session_id = {}};
+        info.pq_failed = m_failed || m_context->Stopped(); info.pq_pin_mismatch = m_pin_mismatch;
         if (m_established && !m_context->Stopped()) {
             info.session_id = uint256{m_session}; info.pq_encrypted = true; info.pq_authenticated = true;
             info.pq_identity_verified = m_pin.has_value(); info.pq_identity = m_peer_fp;
@@ -362,13 +394,13 @@ bool PQTransport::ReceivedBytes(std::span<const uint8_t>& bytes)
                     // packet can be consumed without an unbounded deferred queue.
                     if (m_expected == 5) {
                         Bytes response;
-                        if (!m_handshake || !m_handshake->Advance(m_recv, response) || !m_handshake->Ready() || !response.empty()) return Fail();
+                        if (!m_handshake || !m_handshake->Advance(m_recv, response) || !m_handshake->Ready() || !response.empty()) return Fail(true, Failure::AUTHENTICATION_OR_CRYPTO);
                         m_recv.clear(); InstallKeys(); m_established = true;
                         continue;
                     }
                     if (!bytes.empty()) return Fail();
                     auto record = std::move(m_recv); m_recv.clear();
-                    if (!Queue(std::move(record))) return Fail();
+                    if (!Queue(std::move(record))) return Fail(true, Failure::RESOURCE);
                     return true;
                 }
             } else {
@@ -377,12 +409,12 @@ bool PQTransport::ReceivedBytes(std::span<const uint8_t>& bytes)
                 m_recv.insert(m_recv.end(), bytes.begin(), bytes.begin()+count); bytes = bytes.subspan(count);
                 if (!m_packet_length && m_recv.size() == 3) {
                     m_packet_length = m_recv_cipher->DecryptLength(m_recv);
-                    if (!m_packet_length) return Fail();
+                    if (!m_packet_length) return Fail(true, Failure::PACKET);
                     m_recv.reserve(size_t{*m_packet_length}+20);
                 }
                 if (m_packet_length && m_recv.size() == size_t{*m_packet_length}+20) {
                     bool decoy{false};
-                    if (!m_recv_cipher->Decrypt(std::span{m_recv}.subspan(3), m_decoded, decoy)) return Fail();
+                    if (!m_recv_cipher->Decrypt(std::span{m_recv}.subspan(3), m_decoded, decoy)) return Fail(true, Failure::PACKET);
                     Bytes{}.swap(m_recv); m_packet_length.reset();
                     if (!decoy) { m_message = true; return true; }
                 }

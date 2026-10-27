@@ -649,10 +649,11 @@ void CNode::CopyStats(CNodeStats& stats)
         X(nRecvBytes);
         Transport::Info info = m_transport->GetInfo();
         stats.m_transport_type = info.transport_type;
-        if (info.session_id) stats.m_session_id = HexStr(*info.session_id);
+        stats.m_session_id = info.session_id ? HexStr(*info.session_id) : std::string{};
         stats.m_pq_encrypted = info.pq_encrypted;
         stats.m_pq_authenticated = info.pq_authenticated;
         stats.m_pq_identity_verified = info.pq_identity_verified;
+        stats.m_pq_failed = info.pq_failed; stats.m_pq_pin_mismatch = info.pq_pin_mismatch;
         stats.m_pq_identity = info.pq_identity;
     }
     X(m_permission_flags);
@@ -1829,7 +1830,7 @@ void CConnman::CreateNodeFromAcceptedSocket(std::unique_ptr<Sock>&& sock,
             // A new TCP peer has not authenticated yet. Stage A must not
             // evict an established peer merely to admit an incomplete PQ
             // handshake; normal capacity becomes available on disconnect.
-            m_pq_context->ReportFailure("inbound capacity reached; incomplete PQ handshake cannot evict existing peers");
+            m_pq_context->ReportFailure("inbound capacity reached; incomplete PQ handshake cannot evict existing peers", pq::Failure::RESOURCE);
             return;
         }
         if (!AttemptToEvictConnection()) {
@@ -1966,7 +1967,7 @@ void CConnman::DisconnectNodes()
                 // Add to reconnection list if appropriate. We don't reconnect right here, because
                 // the creation of a connection is a blocking operation (up to several seconds),
                 // and we don't want to hold up the socket handler thread for that long.
-                if (network_active && pnode->m_transport->ShouldReconnectV1()) {
+                if (network_active && !m_pq_context && pnode->m_transport->ShouldReconnectV1()) {
                     reconnections_to_add.push_back({
                         .proxy_override = pnode->m_proxy_override,
                         .addr_connect = pnode->addr,
@@ -2874,8 +2875,10 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect, std
                 continue;
             }
 
-            // only consider very recently tried nodes after 30 failed attempts
-            if (current_time - addr_last_try < 10min && nTries < 30) {
+            // Required PQ retains the ten-minute candidate backoff even in a
+            // small address pool. Repeated selection must not busy-retry an
+            // incompatible endpoint after the inherited 30-selection escape.
+            if (current_time - addr_last_try < 10min && (m_pq_context || nTries < 30)) {
                 continue;
             }
 
@@ -3508,7 +3511,19 @@ bool CConnman::InitBinds(const Options& options)
 bool CConnman::Start(CScheduler& scheduler, const Options& connOptions)
 {
     AssertLockNotHeld(m_total_bytes_sent_mutex);
+    // Validate before binding any socket. A caller cannot bypass compulsory
+    // chain policy by omitting the context or supplying another network's N.
+    if ((pq::RequiredMode(m_params.GetChainType()) && !connOptions.pq_context) ||
+        (connOptions.pq_context && connOptions.pq_context->network != pq::NetworkForChain(m_params))) {
+        LogError("Connection manager rejected missing or wrong-network required PQ context");
+        return false;
+    }
     Init(connOptions);
+    if (m_pq_context && m_use_addrman_outgoing && addrman.get().Size() == 0 &&
+        m_params.DNSSeeds().empty() && m_params.FixedSeeds().empty() &&
+        connOptions.vSeedNodes.empty() && connOptions.m_added_nodes.empty()) {
+        LogWarning("PQ discovery has no configured seed or operator bootstrap peer; fresh nodes need -seednode or -addnode from a verified operator inventory");
+    }
 
     if (fListen && !InitBinds(connOptions)) {
         if (m_client_interface) {
@@ -4047,6 +4062,21 @@ uint64_t CConnman::GetTotalBytesSent() const
     AssertLockNotHeld(m_total_bytes_sent_mutex);
     LOCK(m_total_bytes_sent_mutex);
     return nTotalBytesSent;
+}
+
+pq::Status CConnman::GetPQStatus() const
+{
+    pq::Status status;
+    status.required = IsPQRequired();
+    status.known_addresses = addrman.get().Size();
+    if (!m_pq_context) return status;
+    status.network = m_pq_context->network;
+    const auto resources = m_pq_context->Resources();
+    status.pending = resources.pending; status.queued = resources.queued; status.active = resources.active;
+    status.established = resources.established; status.failures = resources.failures;
+    LOCK(m_nodes_mutex);
+    for (const auto* node : m_nodes) if (node->m_transport->GetInfo().pq_encrypted) ++status.connected;
+    return status;
 }
 
 ServiceFlags CConnman::GetLocalServices() const

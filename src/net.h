@@ -16,6 +16,7 @@
 #include <i2p.h>
 #include <kernel/messagestartchars.h>
 #include <net_permissions.h>
+#include <net_pq_status.h>
 #include <netaddress.h>
 #include <netbase.h>
 #include <netgroup.h>
@@ -227,9 +228,10 @@ public:
     ConnectionType m_conn_type;
     /** Transport protocol type. */
     TransportProtocolType m_transport_type;
-    /** BIP324 session id string in hex, if any. */
+    /** Public encrypted-transport session id string in hex, if any. */
     std::string m_session_id;
     bool m_pq_encrypted{false}, m_pq_authenticated{false}, m_pq_identity_verified{false};
+    bool m_pq_failed{false}, m_pq_pin_mismatch{false};
     std::string m_pq_identity;
 };
 
@@ -276,6 +278,7 @@ public:
         bool pq_encrypted{false};
         bool pq_authenticated{false};
         bool pq_identity_verified{false};
+        bool pq_failed{false}, pq_pin_mismatch{false};
         std::string pq_identity{};
     };
 
@@ -1387,6 +1390,8 @@ public:
     //! which is used to advertise which services we are offering
     //! that peer during `net_processing.cpp:PushNodeVersion()`.
     ServiceFlags GetLocalServices() const;
+    bool IsPQRequired() const { return bool(m_pq_context); }
+    pq::Status GetPQStatus() const;
 
     //! Updates the local services that this node advertises to other peers
     //! during connection handshake.

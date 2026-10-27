@@ -347,6 +347,10 @@ enum ServiceFlags : uint64_t {
     // NODE_P2P_V2 means the node supports BIP324 transport
     NODE_P2P_V2 = (1 << 11),
 
+    // Experimental Mercatura availability hint, not identity authentication or
+    // a registered global assignment. Required transport never depends on it.
+    NODE_P2P_PQ = (1ULL << 24),
+
     // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
     // isn't getting used, or one not being used much, and notify the
     // bitcoin-development mailing list. Remember that service bits are just

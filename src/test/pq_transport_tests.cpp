@@ -62,7 +62,7 @@ BOOST_FIXTURE_TEST_SUITE(pq_transport_tests, Fixture)
 BOOST_AUTO_TEST_CASE(fragmentation_gates_duplex_and_cleanup)
 {
     for (size_t fragment : {size_t{1}, size_t{7}, size_t{4096}, size_t{65536}}) {
-        auto context = std::make_shared<Context>(RegtestNetwork());
+        auto context = std::make_shared<Context>(SelectedNetwork());
         {
             PQTransport i(context, true, {}, "4:i"), r(context, false, {}, "4:r");
             CSerializedNetMsg early; early.m_type = "version"; early.data = {1,2,3};
@@ -90,7 +90,7 @@ BOOST_AUTO_TEST_CASE(fragmentation_gates_duplex_and_cleanup)
 }
 BOOST_AUTO_TEST_CASE(m5_coalesced_packet_and_no_early_application)
 {
-    auto context = std::make_shared<Context>(RegtestNetwork());
+    auto context = std::make_shared<Context>(SelectedNetwork());
     PQTransport i(context,true,{},"4:i"), r(context,false,{},"4:r");
     Bytes m5;
     auto deadline = Clock::now()+5s;
@@ -115,7 +115,7 @@ BOOST_AUTO_TEST_CASE(m5_coalesced_packet_and_no_early_application)
 BOOST_AUTO_TEST_CASE(each_outbound_record_must_be_fully_marked_sent)
 {
     for (unsigned type = 1; type <= 4; ++type) {
-        auto context = std::make_shared<Context>(RegtestNetwork());
+        auto context = std::make_shared<Context>(SelectedNetwork());
         PQTransport i(context,true,{},"send-i"), r(context,false,{},"send-r");
         WaitRecord(i,r,type);
         auto& sender = type % 2 ? i : r;
@@ -140,7 +140,7 @@ BOOST_AUTO_TEST_CASE(each_outbound_record_must_be_fully_marked_sent)
 BOOST_AUTO_TEST_CASE(dependent_record_trailing_bytes_fail_before_worker_submission)
 {
     for (unsigned type = 1; type <= 4; ++type) {
-        auto context = std::make_shared<Context>(RegtestNetwork());
+        auto context = std::make_shared<Context>(SelectedNetwork());
         PQTransport i(context,true,{},"trailing-i"), r(context,false,{},"trailing-r");
         WaitRecord(i,r,type);
         auto& sender = type % 2 ? i : r;
@@ -155,7 +155,7 @@ BOOST_AUTO_TEST_CASE(dependent_record_trailing_bytes_fail_before_worker_submissi
 }
 BOOST_AUTO_TEST_CASE(final_confirmation_partial_send_and_failed_sibling_isolation)
 {
-    auto context = std::make_shared<Context>(RegtestNetwork());
+    auto context = std::make_shared<Context>(SelectedNetwork());
     PQTransport healthy_i(context,true,{},"healthy-i"), healthy_r(context,false,{},"healthy-r");
     Establish(healthy_i,healthy_r,65536); const auto healthy = healthy_i.GetInfo();
     PQTransport i(context,true,{},"final-i"), r(context,false,{},"final-r");
@@ -183,7 +183,7 @@ BOOST_AUTO_TEST_CASE(final_confirmation_partial_send_and_failed_sibling_isolatio
 }
 BOOST_AUTO_TEST_CASE(encrypted_application_packet_cannot_replace_m5)
 {
-    auto context=std::make_shared<Context>(RegtestNetwork());
+    auto context=std::make_shared<Context>(SelectedNetwork());
     PQTransport i(context,true,{},"early-packet-i"), r(context,false,{},"early-packet-r");
     WaitRecord(i,r,5);
     // Complete the local send event, but deliberately withhold M5 from R.
@@ -197,7 +197,7 @@ BOOST_AUTO_TEST_CASE(encrypted_application_packet_cannot_replace_m5)
 }
 BOOST_AUTO_TEST_CASE(admission_cancellation_and_no_fallback)
 {
-    auto context = std::make_shared<Context>(RegtestNetwork());
+    auto context = std::make_shared<Context>(SelectedNetwork());
     std::vector<std::shared_ptr<void>> leases;
     for (int i=0;i<4;++i) { auto lease=context->Admit("same-source"); BOOST_REQUIRE(lease); leases.push_back(lease); }
     BOOST_CHECK(!context->Admit("same-source")); BOOST_CHECK_EQUAL(context->Pending(),4U);
@@ -211,12 +211,12 @@ BOOST_AUTO_TEST_CASE(admission_cancellation_and_no_fallback)
     context->Stop(); BOOST_CHECK_EQUAL(context->Pending(),0U);
     BOOST_CHECK(!context->Admit("after-stop"));
     BOOST_CHECK(!context->Submit(std::make_shared<Work>(1)));
-    auto c = std::make_shared<Context>(RegtestNetwork()); PQTransport inbound(c,false,{},"source");
+    auto c = std::make_shared<Context>(SelectedNetwork()); PQTransport inbound(c,false,{},"source");
     Bytes wrong(16,0); std::span<const uint8_t> bytes{wrong}; BOOST_CHECK(!inbound.ReceivedBytes(bytes)); BOOST_CHECK(!inbound.ReceivedMessageComplete());
 }
 BOOST_AUTO_TEST_CASE(silent_inbound_connections_reserve_pending_quota)
 {
-    auto context=std::make_shared<Context>(RegtestNetwork());
+    auto context=std::make_shared<Context>(SelectedNetwork());
     std::vector<std::unique_ptr<PQTransport>> silent;
     for (unsigned n=0;n<4;++n) {
         silent.push_back(std::make_unique<PQTransport>(context,false,std::nullopt,"same-source"));
@@ -237,7 +237,7 @@ BOOST_AUTO_TEST_CASE(source_groups_global_cap_and_recovery)
     BOOST_REQUIRE(a && b); BOOST_CHECK(SourceGroup(*a,false)!=SourceGroup(*b,false)); BOOST_CHECK(SourceGroup(*a,true).empty());
     auto v6a=LookupHost("2001:db8:1:2::1",false), v6b=LookupHost("2001:db8:1:2::2",false), v6c=LookupHost("2001:db8:1:3::1",false);
     BOOST_REQUIRE(v6a && v6b && v6c); BOOST_CHECK(SourceGroup(*v6a,false)==SourceGroup(*v6b,false)); BOOST_CHECK(SourceGroup(*v6a,false)!=SourceGroup(*v6c,false));
-    auto context=std::make_shared<Context>(RegtestNetwork()); std::vector<std::shared_ptr<void>> leases;
+    auto context=std::make_shared<Context>(SelectedNetwork()); std::vector<std::shared_ptr<void>> leases;
     for (int i=0;i<32;++i) { auto token=context->Admit(util::ToString(i)); BOOST_REQUIRE(token); leases.push_back(token); }
     BOOST_CHECK(!context->Admit("rate-overflow"));
     std::this_thread::sleep_for(4050ms);
@@ -248,7 +248,7 @@ BOOST_AUTO_TEST_CASE(source_groups_global_cap_and_recovery)
 }
 BOOST_AUTO_TEST_CASE(worker_queue_bound_and_cancelled_publication)
 {
-    auto context=std::make_shared<Context>(RegtestNetwork());
+    auto context=std::make_shared<Context>(SelectedNetwork());
     std::mutex mutex; std::condition_variable cv; bool release{false}; unsigned entered{0};
     auto unblock=[&] { { std::lock_guard lock(mutex); release=true; } cv.notify_all(); };
     std::shared_ptr<void> cleanup(nullptr,[&](void*) { unblock(); });
@@ -257,7 +257,7 @@ BOOST_AUTO_TEST_CASE(worker_queue_bound_and_cancelled_publication)
     std::vector<std::shared_ptr<Work>> jobs;
     for (int i=0;i<2;++i) {
         auto job=std::make_shared<Work>(1); job->admission=context->Admit("active"+util::ToString(i)); BOOST_REQUIRE(job->admission);
-        job->handshake=std::make_unique<Handshake>(true,RegtestNetwork(),std::nullopt,id,blocking_rng);
+        job->handshake=std::make_unique<Handshake>(true,SelectedNetwork(),std::nullopt,id,blocking_rng);
         BOOST_REQUIRE(context->Submit(job)); jobs.push_back(job);
     }
     { std::unique_lock lock(mutex); BOOST_REQUIRE(cv.wait_for(lock,2s,[&] { return entered==2; })); }
@@ -281,14 +281,14 @@ BOOST_AUTO_TEST_CASE(worker_queue_bound_and_cancelled_publication)
 }
 BOOST_AUTO_TEST_CASE(execution_deadline_discards_late_success)
 {
-    auto context=std::make_shared<Context>(RegtestNetwork());
+    auto context=std::make_shared<Context>(SelectedNetwork());
     auto identity=std::make_shared<Identity>(); BOOST_REQUIRE(identity->FromSeed(std::array<uint8_t,32>{}));
     auto delayed_rng=[first=true](std::span<uint8_t> output) mutable {
         if (first) { first=false; std::this_thread::sleep_for(5050ms); }
         std::fill(output.begin(),output.end(),42); return true;
     };
     auto job=std::make_shared<Work>(1); job->admission=context->Admit("deadline-source"); BOOST_REQUIRE(job->admission);
-    job->handshake=std::make_unique<Handshake>(true,RegtestNetwork(),std::nullopt,identity,delayed_rng);
+    job->handshake=std::make_unique<Handshake>(true,SelectedNetwork(),std::nullopt,identity,delayed_rng);
     BOOST_REQUIRE(context->Submit(job));
     const auto deadline=Clock::now()+8s;
     while (!job->done.load(std::memory_order_acquire) && Clock::now()<deadline) std::this_thread::sleep_for(1ms);
@@ -301,7 +301,7 @@ BOOST_AUTO_TEST_CASE(identity_pins_and_wrong_expected_identity)
 {
     auto id = std::make_shared<Identity>();
     BOOST_REQUIRE(id->FromSeed(std::array<uint8_t,32>{}));
-    auto network = RegtestNetwork(); auto expected = Fingerprint(network,id->pub);
+    auto network = SelectedNetwork(); auto expected = Fingerprint(network,id->pub);
     auto context = std::make_shared<Context>(network,id);
     PQTransport i(context,true,expected,"i"), r(context,false,expected,"r"); Establish(i,r,13);
     BOOST_CHECK(i.GetInfo().pq_identity_verified && r.GetInfo().pq_identity_verified);
@@ -317,7 +317,7 @@ BOOST_AUTO_TEST_CASE(identity_pins_and_wrong_expected_identity)
 BOOST_AUTO_TEST_CASE(factory_pins_are_exact_destination_bindings)
 {
     auto identity=std::make_shared<Identity>(); BOOST_REQUIRE(identity->FromSeed(std::array<uint8_t,32>{}));
-    const auto network=RegtestNetwork(); const auto pin=Fingerprint(network,identity->pub);
+    const auto network=SelectedNetwork(); const auto pin=Fingerprint(network,identity->pub);
     struct Destination { const char* host; uint16_t port; const char* name; bool verified; };
     for (auto [host,port,name,verified] : std::vector<Destination>{
             {"127.0.0.1",18444,"",true}, {"127.0.0.1",18445,"",false},
@@ -343,7 +343,7 @@ BOOST_AUTO_TEST_CASE(factory_pins_are_exact_destination_bindings)
 }
 BOOST_AUTO_TEST_CASE(packet_failure_releases_nothing_and_large_send_memory)
 {
-    auto context=std::make_shared<Context>(RegtestNetwork());
+    auto context=std::make_shared<Context>(SelectedNetwork());
     PQTransport i(context,true,{},"i"), r(context,false,{},"r"); Establish(i,r,65536);
     CSerializedNetMsg large; large.m_type="blockchunk"; large.data.resize(2'000'000,42);
     BOOST_REQUIRE(i.SetMessageToSend(large));
@@ -363,7 +363,7 @@ BOOST_AUTO_TEST_CASE(benchmark, *boost::unit_test::disabled())
         BOOST_REQUIRE(to.ReceivedBytes(wire)); BOOST_REQUIRE(wire.empty()); from.MarkBytesSent(count); return count;
     };
     UniValue report(UniValue::VOBJ);
-    auto context=std::make_shared<Context>(RegtestNetwork());
+    auto context=std::make_shared<Context>(SelectedNetwork());
     for (bool pq_mode : {false,true}) {
         std::vector<double> times;
         size_t min_bytes=SIZE_MAX,max_bytes=0;
@@ -429,7 +429,7 @@ BOOST_AUTO_TEST_CASE(benchmark, *boost::unit_test::disabled())
     report.pushKV("peak_pending",stats.peak_pending); report.pushKV("peak_queue",stats.peak_queued);
     report.pushKV("handshake_object_bytes",uint64_t(sizeof(Handshake)));
     report.pushKV("identity_object_bytes",uint64_t(sizeof(Identity)));
-    auto concurrent=std::make_shared<Context>(RegtestNetwork());
+    auto concurrent=std::make_shared<Context>(SelectedNetwork());
     std::vector<std::unique_ptr<PQTransport>> initiators,responders;
     const auto concurrent_start=Clock::now(); const auto concurrent_cpu=std::clock(); unsigned peak_active{0};
     for (unsigned n=0;n<4;++n) {
@@ -463,11 +463,11 @@ BOOST_AUTO_TEST_CASE(persistent_identity_creation_ignores_restrictive_umask)
     fs::create_directory(directory); fs::permissions(directory,fs::perms::owner_all);
     const auto file=directory/"identity.dat";
     struct RestoreUmask { mode_t saved; ~RestoreUmask() { umask(saved); } } restore{umask(0777)};
-    auto created=LoadIdentity(fs::PathToString(file),true,RegtestNetwork());
+    auto created=LoadIdentity(fs::PathToString(file),true,SelectedNetwork());
     struct stat status{};
     BOOST_REQUIRE_EQUAL(stat(fs::PathToString(file).c_str(),&status),0);
     BOOST_CHECK_EQUAL(status.st_mode & 07777,0600);
-    auto loaded=LoadIdentity(fs::PathToString(file),false,RegtestNetwork());
+    auto loaded=LoadIdentity(fs::PathToString(file),false,SelectedNetwork());
     BOOST_CHECK(created->pub==loaded->pub);
 }
 BOOST_AUTO_TEST_CASE(persistent_identity_storage_failures)
@@ -475,7 +475,7 @@ BOOST_AUTO_TEST_CASE(persistent_identity_storage_failures)
     const auto directory=m_path_root/"pq-identities";
     fs::create_directory(directory); fs::permissions(directory,fs::perms::owner_all);
     const auto file=directory/"identity.dat"; const auto name=fs::PathToString(file);
-    auto net=RegtestNetwork(); auto created=LoadIdentity(name,true,net); auto loaded=LoadIdentity(name,false,net);
+    auto net=SelectedNetwork(); auto created=LoadIdentity(name,true,net); auto loaded=LoadIdentity(name,false,net);
     BOOST_CHECK(created->pub == loaded->pub); BOOST_CHECK_EQUAL(fs::file_size(file),2127U);
     BOOST_CHECK_THROW(LoadIdentity(name,true,net),std::runtime_error);
     auto wrong=net; wrong[0]^=1; BOOST_CHECK_THROW(LoadIdentity(name,false,wrong),std::runtime_error);
@@ -493,7 +493,7 @@ BOOST_AUTO_TEST_CASE(identity_filesystem_types_atomic_creation_and_recovery)
     fs::create_directory(directory); fs::permissions(directory,fs::perms::owner_all);
     const auto file=directory/"identity.dat";
     const auto name=fs::PathToString(file);
-    const auto network=RegtestNetwork();
+    const auto network=SelectedNetwork();
     auto original=LoadIdentity(name,true,network);
     auto hard=directory/"hardlink";
     fs::create_hard_link(file,hard);

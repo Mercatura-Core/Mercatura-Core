@@ -112,7 +112,7 @@ UniValue Snapshot(size_t index)
 }
 int FaultInjection(int fail_after)
 {
-    auto context=std::make_shared<Context>(RegtestNetwork());
+    auto context=std::make_shared<Context>(SelectedNetwork());
     const std::string source{"allocation-failure"};
     auto prime=context->Admit(source); Require(bool(prime),"prime admission failed"); prime.reset();
     bool caught{false};
@@ -129,7 +129,7 @@ int TransportAllocation(std::string_view phase, int allocation)
     // A failing noexcept boundary is recorded without a core dump. This handler
     // and allocation interposition exist only in this excluded probe binary.
     std::set_terminate([] { std::_Exit(86); });
-    auto context=std::make_shared<Context>(RegtestNetwork());
+    auto context=std::make_shared<Context>(SelectedNetwork());
     auto i=std::make_unique<PQTransport>(context,true,std::nullopt,"probe-i");
     auto r=std::make_unique<PQTransport>(context,false,std::nullopt,"probe-r");
     const bool keys=phase=="keys", queue=phase=="queue";
@@ -230,7 +230,7 @@ int Churn(unsigned sessions,unsigned cycles)
     Context::ResourceStats stats;
     {
         allocation_probe::Window window{3,heap_budget};
-        auto context=std::make_shared<Context>(RegtestNetwork());
+        auto context=std::make_shared<Context>(SelectedNetwork());
         for (unsigned cycle=0;cycle<cycles;++cycle) {
             const auto cycle_start=Clock::now();
             Require(Clock::now()-started<std::chrono::seconds(cycles*3+15),"bounded churn watchdog expired");
@@ -352,17 +352,17 @@ int main(int argc,char** argv)
         report.pushKV("measurement","Dedicated global new/delete interposition, requested C++ heap only; excludes probe headers, malloc metadata, libc/pthread and native crypto stack allocations");
         {
             allocation_probe::Window window{0};
-            auto context=std::make_shared<Context>(RegtestNetwork());
+            auto context=std::make_shared<Context>(SelectedNetwork());
             context->Stop(); context.reset();
         }
         report.pushKV("idle_context_lifecycle",Snapshot(0));
         {
-            auto context=std::make_shared<Context>(RegtestNetwork());
+            auto context=std::make_shared<Context>(SelectedNetwork());
             allocation_probe::Window window{1};
             auto pending=std::make_unique<PQTransport>(context,false,std::nullopt,"partial-source");
             Bytes wire(PREFACE.begin(),PREFACE.end());
             auto header=Header(1); wire.insert(wire.end(),header.begin(),header.end());
-            auto net=RegtestNetwork(); wire.insert(wire.end(),net.begin(),net.end());
+            auto net=SelectedNetwork(); wire.insert(wire.end(),net.begin(),net.end());
             for (auto byte:wire) {
                 std::span<const uint8_t> part{&byte,1}; Require(pending->ReceivedBytes(part) && part.empty(),"partial handshake failed");
             }
@@ -371,7 +371,7 @@ int main(int argc,char** argv)
         }
         report.pushKV("partial_m1_one_endpoint",Snapshot(1));
         {
-            auto context=std::make_shared<Context>(RegtestNetwork());
+            auto context=std::make_shared<Context>(SelectedNetwork());
             allocation_probe::Window window{2};
             std::vector<std::unique_ptr<PQTransport>> initiators,responders;
             for (unsigned n=0;n<4;++n) {

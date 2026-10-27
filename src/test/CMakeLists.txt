@@ -86,6 +86,7 @@ add_executable(test_bitcoin
   pq_assurance_tests.cpp
   pq_identity_tests.cpp
   pq_transport_tests.cpp
+  pq_policy_tests.cpp
   netbase_tests.cpp
   node_init_tests.cpp
   node_warnings_tests.cpp
@@ -202,6 +203,7 @@ target_json_data_sources(pq_stagea_tests
 add_executable(pq_transport_runner EXCLUDE_FROM_ALL
   ../../contrib/devtools/pq-stagea-test-main.cpp
   pq_transport_tests.cpp
+  pq_policy_tests.cpp
 )
 target_link_libraries(pq_transport_runner PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
 
@@ -214,6 +216,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT WIN32 AND NOT SANITIZERS)
     add_executable(${adapter_target} EXCLUDE_FROM_ALL
       ../../contrib/devtools/pq-stagea-test-main.cpp
       pq_transport_tests.cpp
+      pq_policy_tests.cpp
       ../net_pq.cpp
       ../net_pq_protocol.cpp
       ../net_pq_identity.cpp
@@ -248,6 +251,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Cla
       pq_p2p_tests.cpp
       pq_assurance_tests.cpp
       pq_transport_tests.cpp
+      pq_policy_tests.cpp
       ../crypto/mercatura_p2p_crypto.cpp
       ../net_pq.cpp
       ../net_pq_protocol.cpp

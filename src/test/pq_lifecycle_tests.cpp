@@ -126,11 +126,11 @@ BOOST_AUTO_TEST_CASE(storage_prepublication_faults_release_descriptors)
     }) {
         const auto dir = Directory(m_path_root, item.name); const auto file = dir / "identity.dat";
         FileFaults faults; faults.rules = item.rules;
-        { ScopedFiles scope(faults); BOOST_CHECK_THROW(LoadIdentity(fs::PathToString(file), true, RegtestNetwork()), std::runtime_error); }
+        { ScopedFiles scope(faults); BOOST_CHECK_THROW(LoadIdentity(fs::PathToString(file), true, SelectedNetwork()), std::runtime_error); }
         BOOST_CHECK_EQUAL(faults.OpenCount(), 0U); BOOST_CHECK(!fs::exists(file)); BOOST_CHECK_EQUAL(Temporaries(dir), 0U);
         if (faults.write_buffer) { BOOST_CHECK_EQUAL(faults.cleansed_buffers,1U); BOOST_CHECK(faults.buffers_zeroed); }
-        const auto original = LoadIdentity(fs::PathToString(file), true, RegtestNetwork());
-        BOOST_CHECK(LoadIdentity(fs::PathToString(file), false, RegtestNetwork())->pub == original->pub);
+        const auto original = LoadIdentity(fs::PathToString(file), true, SelectedNetwork());
+        BOOST_CHECK(LoadIdentity(fs::PathToString(file), false, SelectedNetwork())->pub == original->pub);
     }
 }
 BOOST_AUTO_TEST_CASE(storage_short_interrupted_io_and_read_failure_recovery)
@@ -138,19 +138,19 @@ BOOST_AUTO_TEST_CASE(storage_short_interrupted_io_and_read_failure_recovery)
     const auto dir = Directory(m_path_root, "interrupted-io"); const auto name = fs::PathToString(dir / "identity.dat");
     FileFaults writes; writes.rules = {{Op::WRITE,1,Action::INTERRUPT,0},{Op::WRITE,2,Action::SHORT,113}};
     std::shared_ptr<const Identity> created;
-    { ScopedFiles scope(writes); created = LoadIdentity(name, true, RegtestNetwork()); }
+    { ScopedFiles scope(writes); created = LoadIdentity(name, true, SelectedNetwork()); }
     BOOST_CHECK_EQUAL(writes.OpenCount(),0U); BOOST_CHECK_GE(writes.calls[size_t(Op::WRITE)],3U);
     BOOST_CHECK_EQUAL(writes.cleansed_buffers,1U); BOOST_CHECK(writes.buffers_zeroed);
     FileFaults reads; reads.rules = {{Op::READ,1,Action::INTERRUPT,0},{Op::READ,2,Action::SHORT,17}};
-    { ScopedFiles scope(reads); BOOST_CHECK(LoadIdentity(name,false,RegtestNetwork())->pub == created->pub); }
+    { ScopedFiles scope(reads); BOOST_CHECK(LoadIdentity(name,false,SelectedNetwork())->pub == created->pub); }
     BOOST_CHECK_EQUAL(reads.OpenCount(),0U); BOOST_CHECK_GE(reads.calls[size_t(Op::READ)],4U);
     BOOST_CHECK_EQUAL(reads.cleansed_buffers,1U); BOOST_CHECK(reads.buffers_zeroed);
     for (const auto& rule : std::vector<Rule>{{Op::READ,1,Action::ERROR,EIO},{Op::STAT_FILE,1,Action::WRONG_OWNER,0},{Op::STAT_FILE,1,Action::WRONG_MODE,0}}) {
         FileFaults faults; faults.rules = {rule};
-        { ScopedFiles scope(faults); BOOST_CHECK_THROW(LoadIdentity(name,false,RegtestNetwork()),std::runtime_error); }
+        { ScopedFiles scope(faults); BOOST_CHECK_THROW(LoadIdentity(name,false,SelectedNetwork()),std::runtime_error); }
         BOOST_CHECK_EQUAL(faults.OpenCount(),0U);
         if (faults.read_buffer) { BOOST_CHECK_EQUAL(faults.cleansed_buffers,1U); BOOST_CHECK(faults.buffers_zeroed); }
-        BOOST_CHECK(LoadIdentity(name,false,RegtestNetwork())->pub == created->pub);
+        BOOST_CHECK(LoadIdentity(name,false,SelectedNetwork())->pub == created->pub);
     }
 }
 BOOST_AUTO_TEST_CASE(storage_postpublication_failure_preserves_identity)
@@ -159,16 +159,16 @@ BOOST_AUTO_TEST_CASE(storage_postpublication_failure_preserves_identity)
         const auto dir = Directory(m_path_root, cleanup_failure ? "cleanup" : "directory-sync"); const auto name = fs::PathToString(dir / "identity.dat");
         FileFaults faults;
         faults.rules = cleanup_failure ? std::vector<Rule>{{Op::UNLINK,1,Action::ERROR,EACCES},{Op::UNLINK,2,Action::ERROR,EACCES}} : std::vector<Rule>{{Op::SYNC_DIRECTORY,1,Action::ERROR,EIO}};
-        { ScopedFiles scope(faults); BOOST_CHECK_THROW(LoadIdentity(name,true,RegtestNetwork()),std::runtime_error); }
+        { ScopedFiles scope(faults); BOOST_CHECK_THROW(LoadIdentity(name,true,SelectedNetwork()),std::runtime_error); }
         BOOST_CHECK_EQUAL(faults.OpenCount(),0U); BOOST_REQUIRE(fs::exists(fs::PathFromString(name)));
         if (cleanup_failure) {
             BOOST_CHECK_EQUAL(Temporaries(dir),1U);
-            BOOST_CHECK_THROW(LoadIdentity(name,false,RegtestNetwork()),std::runtime_error);
+            BOOST_CHECK_THROW(LoadIdentity(name,false,SelectedNetwork()),std::runtime_error);
             RemoveTemporaries(dir); // Explicit test-owner recovery; never automatic key replacement.
         }
-        auto loaded = LoadIdentity(name,false,RegtestNetwork());
-        BOOST_CHECK_THROW(LoadIdentity(name,true,RegtestNetwork()),std::runtime_error);
-        BOOST_CHECK(LoadIdentity(name,false,RegtestNetwork())->pub == loaded->pub);
+        auto loaded = LoadIdentity(name,false,SelectedNetwork());
+        BOOST_CHECK_THROW(LoadIdentity(name,true,SelectedNetwork()),std::runtime_error);
+        BOOST_CHECK(LoadIdentity(name,false,SelectedNetwork())->pub == loaded->pub);
         BOOST_CHECK_EQUAL(Temporaries(dir),0U);
     }
 }
@@ -178,7 +178,7 @@ BOOST_AUTO_TEST_CASE(storage_format_errors_do_not_modify_existing_files)
     Secret<32> seed; seed.bytes.fill(42); Identity identity; BOOST_REQUIRE(identity.FromSeed(seed.bytes));
     for (unsigned kind=0;kind<names.size();++kind) {
         const auto dir=Directory(m_path_root,names[kind]); const auto file=dir/"identity.dat";
-        IdentityFile contents; auto network=RegtestNetwork(); auto public_key=identity.pub;
+        IdentityFile contents; auto network=SelectedNetwork(); auto public_key=identity.pub;
         if (kind==4) network[5]^=1;
         if (kind==6) public_key[0]^=1;
         EncodeIdentityFile(network,seed.bytes,public_key,contents);
@@ -193,7 +193,7 @@ BOOST_AUTO_TEST_CASE(storage_format_errors_do_not_modify_existing_files)
         }
         fs::permissions(file,fs::perms::owner_read|fs::perms::owner_write);
         const auto size=fs::file_size(file); FileFaults faults;
-        { ScopedFiles scope(faults); BOOST_CHECK_THROW(LoadIdentity(fs::PathToString(file),false,RegtestNetwork()),std::runtime_error); }
+        { ScopedFiles scope(faults); BOOST_CHECK_THROW(LoadIdentity(fs::PathToString(file),false,SelectedNetwork()),std::runtime_error); }
         BOOST_CHECK_EQUAL(fs::file_size(file),size); BOOST_CHECK_EQUAL(faults.OpenCount(),0U);
         BOOST_CHECK_EQUAL(faults.calls[size_t(Op::WRITE)],0U);
         if (faults.read_buffer) { BOOST_CHECK(faults.buffers_zeroed); BOOST_CHECK_EQUAL(faults.cleansed_buffers,1U); }
@@ -204,29 +204,29 @@ BOOST_AUTO_TEST_CASE(storage_cleanup_error_reports_residual_temporary)
     const auto dir=Directory(m_path_root,"residual-temporary"); const auto name=fs::PathToString(dir/"identity.dat");
     FileFaults faults; faults.rules={{Op::WRITE,1,Action::SHORT,113},{Op::WRITE,2,Action::ERROR,EIO},{Op::UNLINK,1,Action::ERROR,EACCES}};
     std::string message;
-    { ScopedFiles scope(faults); try { LoadIdentity(name,true,RegtestNetwork()); } catch (const std::runtime_error& error) { message=error.what(); } }
+    { ScopedFiles scope(faults); try { LoadIdentity(name,true,SelectedNetwork()); } catch (const std::runtime_error& error) { message=error.what(); } }
     BOOST_CHECK(message.find("cleanup failed")!=std::string::npos);
     BOOST_CHECK_EQUAL(faults.OpenCount(),0U); BOOST_CHECK(!fs::exists(fs::PathFromString(name)));
     BOOST_CHECK_EQUAL(Temporaries(dir),1U); BOOST_CHECK(faults.buffers_zeroed);
-    BOOST_CHECK_THROW(LoadIdentity(name,false,RegtestNetwork()),std::runtime_error);
+    BOOST_CHECK_THROW(LoadIdentity(name,false,SelectedNetwork()),std::runtime_error);
     RemoveTemporaries(dir);
-    BOOST_CHECK(LoadIdentity(name,true,RegtestNetwork()));
+    BOOST_CHECK(LoadIdentity(name,true,SelectedNetwork()));
 }
 BOOST_AUTO_TEST_CASE(partial_worker_startup_is_joined)
 {
     for (int failed : {0,1}) {
         WorkerFaults faults; faults.fail_create = failed;
-        { ScopedWorkers scope(faults); BOOST_CHECK_THROW((void)Context{RegtestNetwork()},std::runtime_error); }
+        { ScopedWorkers scope(faults); BOOST_CHECK_THROW((void)Context{SelectedNetwork()},std::runtime_error); }
         BOOST_CHECK_EQUAL(faults.creates,unsigned(failed+1)); BOOST_CHECK_EQUAL(faults.joins,unsigned(failed));
     }
-    auto context = std::make_shared<Context>(RegtestNetwork()); context->Stop(); context->Stop();
+    auto context = std::make_shared<Context>(SelectedNetwork()); context->Stop(); context->Stop();
     BOOST_CHECK(!context->Admit("stopped")); BOOST_CHECK_EQUAL(context->Pending(),0U);
 }
 BOOST_AUTO_TEST_CASE(cancel_before_execution_and_destroy_pending_transport)
 {
     Gate gate; Hooks hooks;
     hooks.point = [&](Event event, Work*) { if (event == Event::BEFORE_CALCULATE) gate.Hold(); };
-    ScopedHooks scope(hooks); auto context = std::make_shared<Context>(RegtestNetwork());
+    ScopedHooks scope(hooks); auto context = std::make_shared<Context>(SelectedNetwork());
     Cleanup cleanup{[&] { gate.Release(); context->Stop(); }};
     auto transport = std::make_unique<PQTransport>(context,true,std::nullopt,"cancelled");
     BOOST_REQUIRE(gate.Wait()); auto job = Access::Job(*transport); BOOST_REQUIRE(job);
@@ -251,7 +251,7 @@ BOOST_AUTO_TEST_CASE(cancelled_worker_keeps_ephemeral_identity_alive_until_clean
             if (!std::ranges::all_of(std::span{static_cast<const uint8_t*>(ptr),size},[](auto b) { return b == 0; })) zero=false;
         }
     };
-    ScopedHooks scope(hooks); auto context=std::make_shared<Context>(RegtestNetwork());
+    ScopedHooks scope(hooks); auto context=std::make_shared<Context>(SelectedNetwork());
     Cleanup cleanup{[&] { gate.Release(); context->Stop(); }};
     auto transport=std::make_unique<PQTransport>(context,true,std::nullopt,"owned-job");
     BOOST_REQUIRE(gate.Wait()); auto job=Access::Job(*transport); BOOST_REQUIRE(job);
@@ -265,7 +265,7 @@ BOOST_AUTO_TEST_CASE(stale_completed_generation_cannot_publish_authentication)
 {
     Gate gate; Hooks hooks;
     hooks.point = [&](Event event, Work* job) { if (event == Event::BEFORE_PUBLISH && job->handshake && job->handshake->Ready()) gate.Hold(); };
-    ScopedHooks scope(hooks); auto context = std::make_shared<Context>(RegtestNetwork());
+    ScopedHooks scope(hooks); auto context = std::make_shared<Context>(SelectedNetwork());
     Cleanup cleanup{[&] { gate.Release(); context->Stop(); }};
     PQTransport i(context,true,std::nullopt,"initiator"), r(context,false,std::nullopt,"responder");
     Drive(i,r,[&] { return gate.Hit(); }); BOOST_REQUIRE(gate.Wait());
@@ -282,7 +282,7 @@ BOOST_AUTO_TEST_CASE(cancelled_completion_at_every_crypto_stage_cannot_publish)
         hooks.point = [&](Event event, Work* job) {
             if (event == Event::BEFORE_PUBLISH && job->handshake && job->handshake->Next() == next) gate.Hold();
         };
-        ScopedHooks scope(hooks); auto context=std::make_shared<Context>(RegtestNetwork());
+        ScopedHooks scope(hooks); auto context=std::make_shared<Context>(SelectedNetwork());
         Cleanup cleanup{[&] { gate.Release(); context->Stop(); }};
         PQTransport i(context,true,{},"stage-i"), r(context,false,{},"stage-r");
         Drive(i,r,[&] { return gate.Hit(); }); BOOST_REQUIRE(gate.Wait());
@@ -302,7 +302,7 @@ BOOST_AUTO_TEST_CASE(worker_exception_then_recovery)
 {
     std::atomic<unsigned> calls{0}; Hooks hooks;
     hooks.point = [&](Event event, Work*) { if (event == Event::BEFORE_CALCULATE && calls.fetch_add(1)==0) throw std::runtime_error("synthetic worker dependency failure"); };
-    ScopedHooks scope(hooks); auto context = std::make_shared<Context>(RegtestNetwork());
+    ScopedHooks scope(hooks); auto context = std::make_shared<Context>(SelectedNetwork());
     {
         PQTransport failed(context,true,std::nullopt,"failed"); auto job = Access::Job(failed); BOOST_REQUIRE(job);
         WaitDone(job); BOOST_CHECK(!failed.Poll()); NoAssurance(failed);
@@ -314,7 +314,7 @@ BOOST_AUTO_TEST_CASE(worker_exception_then_recovery)
 }
 BOOST_AUTO_TEST_CASE(failed_worker_discards_owned_secrets_before_publication)
 {
-    auto context=std::make_shared<Context>(RegtestNetwork());
+    auto context=std::make_shared<Context>(SelectedNetwork());
     auto identity=std::make_shared<Identity>(); BOOST_REQUIRE(identity->FromSeed(std::array<uint8_t,32>{}));
     std::weak_ptr<const Identity> owner=identity;
     unsigned draws{0};
@@ -324,7 +324,7 @@ BOOST_AUTO_TEST_CASE(failed_worker_discards_owned_secrets_before_publication)
     };
     auto job=std::make_shared<Work>(1); job->initiator=true;
     job->admission=context->Admit("failed-secret-owner");
-    job->handshake=std::make_unique<Handshake>(true,RegtestNetwork(),std::nullopt,identity,rng);
+    job->handshake=std::make_unique<Handshake>(true,SelectedNetwork(),std::nullopt,identity,rng);
     identity.reset(); BOOST_REQUIRE(context->Submit(job)); WaitDone(job);
     BOOST_CHECK(!job->ok); BOOST_CHECK(!job->handshake); BOOST_CHECK(job->response.empty());
     BOOST_CHECK(!job->admission); BOOST_CHECK(owner.expired()); BOOST_CHECK_EQUAL(context->Pending(),0U);
@@ -335,7 +335,7 @@ BOOST_AUTO_TEST_CASE(stop_discards_queued_handshake_even_with_external_job_owner
     Gate gate,joining; Hooks hooks;
     hooks.point=[&](Event event,Work*) { if (event==Event::BEFORE_CALCULATE) gate.Hold(); };
     hooks.joining=[&] { joining.Release(); };
-    ScopedHooks scope(hooks); auto context=std::make_shared<Context>(RegtestNetwork());
+    ScopedHooks scope(hooks); auto context=std::make_shared<Context>(SelectedNetwork());
     Cleanup cleanup{[&] { gate.Release(); context->Stop(); }};
     PQTransport first(context,true,std::nullopt,"busy-a"),second(context,true,std::nullopt,"busy-b");
     BOOST_REQUIRE(gate.Wait(2));
@@ -343,7 +343,7 @@ BOOST_AUTO_TEST_CASE(stop_discards_queued_handshake_even_with_external_job_owner
     std::weak_ptr<const Identity> owner=identity;
     auto rng=[](std::span<uint8_t> out) { std::fill(out.begin(),out.end(),42); return true; };
     auto job=std::make_shared<Work>(1); job->admission=context->Admit("queued-secret-owner");
-    job->handshake=std::make_unique<Handshake>(true,RegtestNetwork(),std::nullopt,identity,rng);
+    job->handshake=std::make_unique<Handshake>(true,SelectedNetwork(),std::nullopt,identity,rng);
     BOOST_REQUIRE(job->handshake->Start(job->response)); identity.reset();
     BOOST_REQUIRE(context->Submit(job));
     auto stopping=std::async(std::launch::async,[&] { context->Stop(); });
@@ -358,7 +358,7 @@ BOOST_AUTO_TEST_CASE(stop_prevents_late_completed_result_from_authenticating)
     Gate gate,joining; Hooks hooks;
     hooks.point=[&](Event event,Work* job) { if (event==Event::BEFORE_PUBLISH && job->handshake && job->handshake->Ready()) gate.Hold(); };
     hooks.joining=[&] { joining.Release(); };
-    ScopedHooks scope(hooks); auto context=std::make_shared<Context>(RegtestNetwork());
+    ScopedHooks scope(hooks); auto context=std::make_shared<Context>(SelectedNetwork());
     Cleanup cleanup{[&] { gate.Release(); context->Stop(); }};
     PQTransport i(context,true,std::nullopt,"late-i"),r(context,false,std::nullopt,"late-r");
     Drive(i,r,[&] { return gate.Hit(); }); BOOST_REQUIRE(gate.Wait());
@@ -374,7 +374,7 @@ BOOST_AUTO_TEST_CASE(stop_prevents_late_completed_result_from_authenticating)
 }
 BOOST_AUTO_TEST_CASE(stop_revokes_established_transport_assurance)
 {
-    auto context=std::make_shared<Context>(RegtestNetwork());
+    auto context=std::make_shared<Context>(SelectedNetwork());
     PQTransport i(context,true,std::nullopt,"stop-i"),r(context,false,std::nullopt,"stop-r");
     Drive(i,r,[&] { return i.GetInfo().pq_encrypted && r.GetInfo().pq_encrypted; });
     context->Stop(); NoAssurance(i); NoAssurance(r);
@@ -386,7 +386,7 @@ BOOST_AUTO_TEST_CASE(concurrent_stop_serializes_worker_joins)
 {
     Gate join_gate,second_entered; std::atomic<unsigned> joins{0}; Hooks hooks;
     hooks.joining=[&] { if (++joins==1) join_gate.Hold(); };
-    ScopedHooks scope(hooks); auto context=std::make_shared<Context>(RegtestNetwork());
+    ScopedHooks scope(hooks); auto context=std::make_shared<Context>(SelectedNetwork());
     // Hold the first Stop before its first join. The second Stop must remain
     // serialized behind it, rather than touching either worker's join state.
     auto first=std::async(std::launch::async,[&] { context->Stop(); });
@@ -401,14 +401,14 @@ BOOST_AUTO_TEST_CASE(concurrent_stop_serializes_worker_joins)
 BOOST_AUTO_TEST_CASE(shared_persistent_identity_concurrent_sessions_are_isolated)
 {
     auto identity = std::make_shared<Identity>(); BOOST_REQUIRE(identity->FromSeed(std::array<uint8_t,32>{}));
-    const auto fingerprint = Fingerprint(RegtestNetwork(),identity->pub);
+    const auto fingerprint = Fingerprint(SelectedNetwork(),identity->pub);
     std::weak_ptr<const Identity> weak_identity = identity;
     const void* private_bytes = identity->priv.bytes.data(); std::atomic<unsigned> erased{0}; std::atomic<bool> zero{true};
     Hooks hooks; hooks.cleansed = [&](const void* ptr,size_t size) {
         if (ptr==private_bytes && size==4032) { ++erased; if (!std::ranges::all_of(std::span{static_cast<const uint8_t*>(ptr),size},[](auto b) { return b==0; })) zero=false; }
     };
     ScopedHooks scope(hooks);
-    auto context = std::make_shared<Context>(RegtestNetwork(), identity); identity.reset();
+    auto context = std::make_shared<Context>(SelectedNetwork(), identity); identity.reset();
     {
         std::array<std::unique_ptr<PQTransport>,4> i,r;
         constexpr std::array<const char*,4> sources_i{"i-a","i-b","i-c","i-d"}, sources_r{"r-a","r-b","r-c","r-d"};
@@ -435,7 +435,7 @@ BOOST_AUTO_TEST_CASE(handshake_failures_release_identity_and_secret_state)
     auto identity = std::make_shared<Identity>(); BOOST_REQUIRE(identity->FromSeed(std::array<uint8_t,32>{}));
     auto rng = [](std::span<uint8_t> out) { std::fill(out.begin(),out.end(),42); return true; };
     for (unsigned stage=1;stage<=5;++stage) {
-        Handshake i(true,RegtestNetwork(),{},identity,rng), r(false,RegtestNetwork(),{},identity,rng);
+        Handshake i(true,SelectedNetwork(),{},identity,rng), r(false,SelectedNetwork(),{},identity,rng);
         Bytes wire,next; BOOST_REQUIRE(i.Start(wire)); wire.erase(wire.begin(),wire.begin()+16);
         for (unsigned type=1;type<stage;++type) {
             BOOST_REQUIRE((type%2 ? r : i).Advance(wire,next)); wire=std::move(next);
@@ -450,7 +450,7 @@ BOOST_AUTO_TEST_CASE(handshake_failures_release_identity_and_secret_state)
     // Reach real signature/confirmation checks with intact record lengths.
     for (unsigned kind=0;kind<4;++kind) {
         const unsigned stage=kind==0 ? 3 : kind==3 ? 5 : 4;
-        Handshake i(true,RegtestNetwork(),{},identity,rng),r(false,RegtestNetwork(),{},identity,rng);
+        Handshake i(true,SelectedNetwork(),{},identity,rng),r(false,SelectedNetwork(),{},identity,rng);
         Bytes wire,next; BOOST_REQUIRE(i.Start(wire)); wire.erase(wire.begin(),wire.begin()+16);
         for (unsigned type=1;type<stage;++type) {
             BOOST_REQUIRE((type%2 ? r : i).Advance(wire,next)); wire=std::move(next);
@@ -462,7 +462,7 @@ BOOST_AUTO_TEST_CASE(handshake_failures_release_identity_and_secret_state)
         BOOST_CHECK(Access::SecretsCleared(receiver));
     }
     {
-        Handshake i(true,RegtestNetwork(),{},identity,rng),r(false,RegtestNetwork(),{},identity,rng);
+        Handshake i(true,SelectedNetwork(),{},identity,rng),r(false,SelectedNetwork(),{},identity,rng);
         Bytes wire,next; BOOST_REQUIRE(i.Start(wire)); wire.erase(wire.begin(),wire.begin()+16);
         for (unsigned type=1;type<=5;++type) {
             BOOST_REQUIRE((type%2 ? r : i).Advance(wire,next)); wire=std::move(next);
@@ -484,7 +484,7 @@ BOOST_AUTO_TEST_CASE(handshake_failures_release_identity_and_secret_state)
 BOOST_AUTO_TEST_CASE(network_bound_pin_and_pinned_admission_remain_fail_closed)
 {
     auto identity=std::make_shared<Identity>(); BOOST_REQUIRE(identity->FromSeed(std::array<uint8_t,32>{}));
-    auto network=RegtestNetwork(),other=network; other[5]^=1;
+    auto network=SelectedNetwork(),other=network; other[5]^=1;
     auto rng=[](std::span<uint8_t> out) { std::fill(out.begin(),out.end(),42); return true; };
     Handshake i(true,network,{},identity,rng),r(false,network,Fingerprint(other,identity->pub),identity,rng);
     Bytes hello,response; BOOST_REQUIRE(i.Start(hello));
@@ -508,7 +508,7 @@ BOOST_AUTO_TEST_SUITE_END()
 BOOST_FIXTURE_TEST_SUITE(pq_lifecycle_tests_capacity, Fixture)
 BOOST_AUTO_TEST_CASE(source_fairness_refill_and_bounded_table_expiry, *boost::unit_test::disabled())
 {
-    auto context=std::make_shared<Context>(RegtestNetwork());
+    auto context=std::make_shared<Context>(SelectedNetwork());
     std::vector<std::shared_ptr<void>> held;
     for (unsigned n=0;n<4;++n) { auto lease=context->Admit("shared-nat"); BOOST_REQUIRE(lease); held.push_back(lease); }
     BOOST_CHECK(!context->Admit("shared-nat"));
@@ -549,7 +549,7 @@ BOOST_AUTO_TEST_CASE(full_capacity_cancellation_preserves_healthy_packet_path, *
             std::chrono::duration_cast<std::chrono::microseconds>(Clock::now().time_since_epoch()).count());
         joining.Release();
     };
-    ScopedHooks scope(hooks); auto context=std::make_shared<Context>(RegtestNetwork());
+    ScopedHooks scope(hooks); auto context=std::make_shared<Context>(SelectedNetwork());
     Cleanup cleanup{[&] { gate.Release(); context->Stop(); }};
     PQTransport healthy_i(context,true,std::nullopt,"healthy-i"),healthy_r(context,false,std::nullopt,"healthy-r");
     Drive(healthy_i,healthy_r,[&] { return healthy_i.GetInfo().pq_encrypted && healthy_r.GetInfo().pq_encrypted; });
