@@ -17,7 +17,7 @@ import subprocess
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGETS = ['pq_handshake', 'pq_packet', 'pq_packet_stream', 'pq_identity', 'pq_headers', 'pq_command']
+TARGETS = ['pq_handshake', 'pq_session', 'pq_packet', 'pq_packet_stream', 'pq_identity', 'pq_headers', 'pq_command']
 
 
 def seeds(target):
@@ -32,6 +32,10 @@ def seeds(target):
         return [b'\0\1', fp, b'localhost:18444='+fp, b'[::1]:18444='+fp]
     if target == 'pq_handshake':
         return [bytes(16)+b'\1'+bytes([n]) for n in range(5)]
+    if target == 'pq_session':
+        # FuzzedDataProvider consumes integral controls from the end. Exercise
+        # every record and edit kind with deterministic public session material.
+        return [bytes([1])+bytes(8)+bytes([kind, step]) for step in range(5) for kind in range(4)]
     if target == 'pq_packet_stream':
         return [b'\x12'+bytes([n, role]) for role in range(2) for n in range(8)]
     return [bytes(n) for n in [0, 3, 20, 64, 512]]

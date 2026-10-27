@@ -62,6 +62,59 @@ FUZZ_TARGET(pq_handshake)
     }
 }
 
+// Continue the live exchange after a mutation, rather than fuzzing only one
+// parser call. A valid old-session authentication/confirmation is not authority
+// for the fresh session. All identities and coins here are public test inputs.
+FUZZ_TARGET(pq_session)
+{
+    FuzzedDataProvider data(buffer.data(), buffer.size());
+    const auto step = data.ConsumeIntegralInRange<unsigned>(1,5);
+    const auto kind = data.ConsumeIntegralInRange<unsigned>(0,3);
+    const auto offset = data.ConsumeIntegral<size_t>();
+    const auto mask = data.ConsumeIntegralInRange<uint8_t>(1,255);
+    static const auto identity = [] {
+        auto id = std::make_shared<pq::Identity>();
+        if (!id->FromSeed(std::array<uint8_t,32>{})) std::abort();
+        return id;
+    }();
+    auto random = [](uint8_t session) -> pq::Random {
+        return [session, draw = uint8_t{0}](std::span<uint8_t> out) mutable {
+            std::fill(out.begin(),out.end(),uint8_t(42 + draw++)); out[0] ^= session; return true;
+        };
+    };
+    pq::Network network{}; network[0]=3;
+    pq::Handshake i(true,network,{},identity,random(0)), r(false,network,{},identity,random(0));
+    pq::Handshake old_i(true,network,{},identity,random(1)), old_r(false,network,{},identity,random(1));
+    pq::Bytes wire, old_wire, next, old_next;
+    if (!i.Start(wire) || !old_i.Start(old_wire)) std::abort();
+    wire.erase(wire.begin(),wire.begin()+16); old_wire.erase(old_wire.begin(),old_wire.begin()+16);
+    for (unsigned current=1;current<=5;++current) {
+        auto& receiver=current%2 ? r : i;
+        auto& old_receiver=current%2 ? old_r : old_i;
+        if (current==step) {
+            if (kind==0) wire[offset%wire.size()]^=mask;
+            else if (kind==1) wire.resize(offset%wire.size());
+            else if (kind==2) wire.push_back(mask);
+            else wire=old_wire;
+        }
+        if (!receiver.Advance(wire,next)) {
+            if (receiver.Ready() || !next.empty()) std::abort();
+            // Terminal failure cannot be revived by a well-formed record.
+            if (receiver.Advance(old_wire,next) || receiver.Ready() || !next.empty()) std::abort();
+            auto keys=receiver.TakeKeys();
+            const auto zero=[](const auto& bytes) { return std::ranges::all_of(bytes,[](auto b) { return b==0; }); };
+            if (!zero(keys.i_length.bytes) || !zero(keys.i_payload.bytes) || !zero(keys.r_length.bytes) || !zero(keys.r_payload.bytes)) std::abort();
+            return;
+        }
+        if (!old_receiver.Advance(old_wire,old_next)) std::abort();
+        wire=std::move(next); old_wire=std::move(old_next);
+        if (current==1) { wire.erase(wire.begin(),wire.begin()+16); old_wire.erase(old_wire.begin(),old_wire.begin()+16); }
+    }
+    // Each selected case changes the actual bytes exactly once. Continuing
+    // both authentic endpoints must not produce a mutually accepted session.
+    if (i.Ready() && r.Ready()) std::abort();
+}
+
 FUZZ_TARGET(pq_identity)
 {
     FuzzedDataProvider data(buffer.data(),buffer.size());
