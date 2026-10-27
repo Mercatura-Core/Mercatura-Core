@@ -57,7 +57,7 @@ const std::vector<std::string> TRANSPORT_TYPE_DOC{
     "detecting (peer could be v1 or v2)",
     "v1 (plaintext transport protocol)",
     "v2 (BIP324 encrypted transport protocol)",
-    "pq-v1 (experimental isolated-regtest Mercatura PQ transport)"
+    "pq-v1 (Mercatura authenticated PQ transport; compulsory on mainnet/public testnet)"
 };
 
 static RPCHelpMan getconnectioncount()
@@ -200,6 +200,8 @@ static RPCHelpMan getpeerinfo()
                     {RPCResult::Type::BOOL, "pq_encrypted", "PQ authentication and local key confirmation completed; encryption established."},
                     {RPCResult::Type::BOOL, "pq_authenticated", "Presented ML-DSA identity-key possession verified; unpinned identities do not verify an expected remote node."},
                     {RPCResult::Type::BOOL, "pq_identity_verified", "Completed PQ session also matches an operator-configured expected identity."},
+                    {RPCResult::Type::BOOL, "pq_failed", "PQ endpoint has failed or stopped; false for pending and established sessions. Failed endpoints are normally removed promptly."},
+                    {RPCResult::Type::BOOL, "pq_pin_mismatch", "This failed PQ endpoint mismatched an expected identity pin; never upgrades authentication assurance."},
                     {RPCResult::Type::STR, "pq_identity", "Presented public fingerprint for an established PQ session; empty otherwise."},
                     {RPCResult::Type::STR, "pq_kem", "ML-KEM-768 for established PQ sessions; empty otherwise."},
                     {RPCResult::Type::STR, "pq_auth_algorithm", "ML-DSA-65 for established PQ sessions; empty otherwise."},
@@ -316,6 +318,8 @@ static RPCHelpMan getpeerinfo()
         obj.pushKV("pq_encrypted", stats.m_pq_encrypted);
         obj.pushKV("pq_authenticated", stats.m_pq_authenticated);
         obj.pushKV("pq_identity_verified", stats.m_pq_identity_verified);
+        obj.pushKV("pq_failed", stats.m_pq_failed);
+        obj.pushKV("pq_pin_mismatch", stats.m_pq_pin_mismatch);
         obj.pushKV("pq_identity", stats.m_pq_identity);
         obj.pushKV("pq_kem", stats.m_pq_encrypted ? "ML-KEM-768" : "");
         obj.pushKV("pq_auth_algorithm", stats.m_pq_encrypted ? "ML-DSA-65" : "");
@@ -360,6 +364,9 @@ static RPCHelpMan addnode()
     CConnman& connman = EnsureConnman(node);
 
     const auto node_arg{self.Arg<std::string_view>("node")};
+    if (connman.IsPQRequired() && self.MaybeArg<bool>("v2transport").value_or(false)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Required PQ forbids an explicit BIP324 transport request.");
+    }
     bool node_v2transport = connman.GetLocalServices() & NODE_P2P_V2;
     bool use_v2transport = self.MaybeArg<bool>("v2transport").value_or(node_v2transport);
 
@@ -443,6 +450,9 @@ static RPCHelpMan addconnection()
     NodeContext& node = EnsureAnyNodeContext(request.context);
     CConnman& connman = EnsureConnman(node);
 
+    if (connman.IsPQRequired() && use_v2transport) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Required PQ forbids an explicit BIP324 transport request.");
+    }
     if (use_v2transport && !(connman.GetLocalServices() & NODE_P2P_V2)) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Error: Adding v2transport connections requires -v2transport init flag to be set.");
     }
@@ -692,6 +702,31 @@ static RPCHelpMan getnetworkinfo()
                         {RPCResult::Type::NUM, "connections_in", "the number of inbound connections"},
                         {RPCResult::Type::NUM, "connections_out", "the number of outbound connections"},
                         {RPCResult::Type::BOOL, "networkactive", "whether p2p networking is enabled"},
+                        {RPCResult::Type::OBJ, "pqp2p", "Local PQ policy and bounded process-lifetime diagnostics; snapshots are not atomic across fields",
+                        {
+                            {RPCResult::Type::STR, "chain", "Selected local chain"},
+                            {RPCResult::Type::STR, "build", "Full development/release build identifier"},
+                            {RPCResult::Type::STR_HEX, "network_discriminator", "Canonical 85-byte local PQ network discriminator, or empty when PQ is off"},
+                            {RPCResult::Type::BOOL, "required", "All connections require authenticated PQ; no classical fallback"},
+                            {RPCResult::Type::STR, "transport", "pq-v1 when required; otherwise classical"},
+                            {RPCResult::Type::BOOL, "listening", "PQ required and at least one local P2P listener enabled while network active"},
+                            {RPCResult::Type::NUM, "connected", "Currently encrypted PQ endpoints"},
+                            {RPCResult::Type::NUM, "pending", "Admitted incomplete PQ endpoints (maximum 64)"},
+                            {RPCResult::Type::NUM, "queued", "Queued crypto jobs (maximum 32)"},
+                            {RPCResult::Type::NUM, "active", "Executing crypto jobs (maximum 2)"},
+                            {RPCResult::Type::NUM, "established_total", "Completed local confirmation gates since process startup, including subsequently disconnected endpoints"},
+                            {RPCResult::Type::OBJ, "failures", "Process-lifetime rejected operations, including admission failures; disconnect/cancellation is not an authentication failure",
+                            {
+                                {RPCResult::Type::NUM, "framing", "Invalid preface, record, ordering or network discriminator"},
+                                {RPCResult::Type::NUM, "authentication_or_crypto", "Authentication, confirmation or crypto job failure"},
+                                {RPCResult::Type::NUM, "pin", "Expected identity mismatches"},
+                                {RPCResult::Type::NUM, "deadline", "Endpoint, record, queue or execution deadline exceeded"},
+                                {RPCResult::Type::NUM, "resource", "Admission, socket capacity or queue rejection"},
+                                {RPCResult::Type::NUM, "packet", "Invalid encrypted length or packet authentication"},
+                            }},
+                            {RPCResult::Type::NUM, "known_addresses", "Addrman entries; availability hints do not prove PQ compatibility or identity"},
+                            {RPCResult::Type::STR, "discovery", "not_required, disabled, connected, no_authenticated_peers or no_addresses; connected does not establish operator diversity"},
+                        }},
                         {RPCResult::Type::ARR, "networks", "information per network",
                         {
                             {RPCResult::Type::OBJ, "", "",
@@ -751,6 +786,25 @@ static RPCHelpMan getnetworkinfo()
         obj.pushKV("connections", node.connman->GetNodeCount(ConnectionDirection::Both));
         obj.pushKV("connections_in", node.connman->GetNodeCount(ConnectionDirection::In));
         obj.pushKV("connections_out", node.connman->GetNodeCount(ConnectionDirection::Out));
+        const auto status = node.connman->GetPQStatus();
+        UniValue pq_info(UniValue::VOBJ), failures(UniValue::VOBJ);
+        pq_info.pushKV("chain", Params().GetChainTypeString());
+        pq_info.pushKV("build", FormatFullVersion());
+        pq_info.pushKV("network_discriminator", status.required ? HexStr(status.network) : "");
+        pq_info.pushKV("required", status.required);
+        pq_info.pushKV("transport", status.required ? "pq-v1" : "classical");
+        pq_info.pushKV("listening", status.required && fListen && node.connman->GetNetworkActive());
+        pq_info.pushKV("connected", status.connected); pq_info.pushKV("pending", status.pending);
+        pq_info.pushKV("queued", status.queued); pq_info.pushKV("active", status.active);
+        pq_info.pushKV("established_total", status.established);
+        constexpr std::array names{"framing","authentication_or_crypto","pin","deadline","resource","packet"};
+        static_assert(names.size() == unsigned(pq::Failure::COUNT));
+        for (size_t n=0;n<names.size();++n) failures.pushKV(names[n],status.failures[n]);
+        pq_info.pushKV("failures", std::move(failures));
+        pq_info.pushKV("known_addresses", status.known_addresses);
+        pq_info.pushKV("discovery", !status.required ? "not_required" : !node.connman->GetNetworkActive() ? "disabled" : status.connected ? "connected" :
+            !node.connman->GetUseAddrmanOutgoing() ? "disabled" : status.known_addresses ? "no_authenticated_peers" : "no_addresses");
+        obj.pushKV("pqp2p", std::move(pq_info));
     }
     obj.pushKV("networks",      GetNetworksInfo());
     if (node.mempool) {
