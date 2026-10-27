@@ -163,6 +163,22 @@ BOOST_AUTO_TEST_CASE(pure_mldsa_context_and_role_separation)
     BOOST_CHECK(!Verify(p.idi->pub, reflected, signature));
     BOOST_CHECK(!Verify(p.idr->pub, message, signature));
 }
+BOOST_AUTO_TEST_CASE(both_hellos_check_each_network_byte_before_crypto)
+{
+    Pair p;
+    for (unsigned type : {1U,2U}) for (size_t offset=0;offset<p.network.size();++offset) {
+        unsigned calls{0};
+        auto draws=Draws({"kem_coins_I","nonce_I","enc_coins_I","sign_randomness_I"},0);
+        auto rng=[&](std::span<uint8_t> out) { ++calls; return draws(out); };
+        Handshake receiver(type==2,p.network,{},type==2 ? p.idi : p.idr,rng);
+        Bytes out; if (type==2) BOOST_REQUIRE(receiver.Start(out));
+        auto record=Hex(Vector()["messages"][type-1]["wire"]); record[12+offset]^=1;
+        const auto before=calls;
+        BOOST_CHECK(!receiver.Advance(record,out)); BOOST_CHECK(out.empty());
+        BOOST_CHECK_EQUAL(calls,before); BOOST_CHECK_EQUAL(receiver.Decapsulations(),0U);
+        Dead(receiver,record);
+    }
+}
 BOOST_AUTO_TEST_CASE(all_confirmation_bytes_required_after_valid_signature)
 {
     for (unsigned type : {4U, 5U}) for (size_t byte = 0; byte < 48; ++byte) {
