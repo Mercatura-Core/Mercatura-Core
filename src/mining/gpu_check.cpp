@@ -97,6 +97,8 @@ int main(int argc, char** argv)
         auto backend{mining::CreateGpuBackend(selected, requested)};
         mining::VerifyGpuBackend(*backend, [] { return false; });
         const unsigned contexts{backend->Contexts()};
+        if (const auto description{backend->ExecutionDescription()}; !description.empty())
+            std::cout << description << '\n';
         std::cout << "Permanent MercaHash V" << version << " vectors passed on " << device->id
                   << " (" << contexts << " safe contexts)\n";
         DifferentialCheck check{*backend, repetitions};

@@ -15,7 +15,11 @@ typedef ulong mh_u64;
 #define MH_GLOBAL __global
 #define MH_CONSTANT __constant
 #define MH_INLINE static inline
+#ifdef MH_AMD_SPECIALIZED
+#define MH_KERNEL static inline
+#else
 #define MH_KERNEL __kernel
+#endif
 #define MH_ID ((unsigned)get_group_id(0))
 #define MH_LANE ((unsigned)get_local_id(0))
 #define MH_GROUP_SYNC() barrier(CLK_GLOBAL_MEM_FENCE)
@@ -193,7 +197,7 @@ MH_INLINE Line ReadLine(MH_GLOBAL mh_u64 *scratchpad, mh_u64 line_index, unsigne
 MH_INLINE void WriteLine(MH_GLOBAL mh_u64 *scratchpad, mh_u64 line_index, Line line, unsigned stride, unsigned id)
 {
     (void)stride;
-#if defined(MH_CUDA) || defined(MH_OPENCL)
+#if (defined(MH_CUDA) || defined(MH_OPENCL)) && !defined(MH_AMD_SPECIALIZED)
     // Every lane must finish reading the old line before any lane mutates it.
     // The second barrier publishes the complete replacement to the next step.
     MH_GROUP_SYNC();

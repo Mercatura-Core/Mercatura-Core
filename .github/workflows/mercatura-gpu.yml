@@ -4,7 +4,7 @@ on:
   pull_request:
     paths: ['src/mining/**', 'src/qt/mining*', 'src/test/*gpu*', 'src/test/cuda_*', 'src/wallet/test/mining_tests.cpp', 'src/CMakeLists.txt', 'src/test/CMakeLists.txt', 'vcpkg.json', '.github/workflows/mercatura-gpu.yml']
   push:
-    branches: [feature/qt-gpu-mining, feature/qt-mining-release-hardening, feature/qt-solo-release-qualification, feature/m73-solo-refinement]
+    branches: [feature/mercahash-v2-amd-opencl-optimized, feature/qt-gpu-mining, feature/qt-mining-release-hardening, feature/qt-solo-release-qualification, feature/m73-solo-refinement]
 permissions:
   contents: read
 concurrency:
@@ -32,11 +32,17 @@ jobs:
             -DBUILD_GUI=ON -DENABLE_IPC=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=OFF \
             -DWITH_OPENCL_MINING=${{ matrix.amd }}
           cmake --build work/build -j4 --target bitcoin-qt test_bitcoin test_mining-qt
+          if [[ '${{ matrix.amd }}' == ON ]]; then
+            cmake --build work/build -j4 --target test_opencl_backend_host
+            ctest --test-dir work/build -R '^test_opencl_backend_host$' --output-on-failure
+          fi
       - name: Software and Solo regression gates (no hardware claim)
         run: |
           clang -x cl -cl-std=CL1.2 -DMH_OPENCL -Werror -fsyntax-only src/mining/mercahash_gpu.h
+          clang -x cl -cl-std=CL1.2 -DMH_OPENCL -Isrc -Werror -fsyntax-only src/mining/mercahash_opencl_v2.h
+          clang -x cl -cl-std=CL1.2 -DMH_OPENCL -Isrc -target spir64-unknown-unknown -emit-llvm -c src/mining/mercahash_opencl_v2.h -o work/mercahash-amd-v2.bc
           clang -x cl -cl-std=CL1.2 -DMH_OPENCL -target spir64-unknown-unknown -emit-llvm -c src/mining/mercahash_gpu.h -o work/mercahash-opencl.bc
-          work/build/bin/test_bitcoin --run_test=worker_limits_tests,cpu_miner_tests,mining_statistics_tests,gpu_miner_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,cuda_binding_tests,mining_tests_wallet,mining_tests_solo
+          work/build/bin/test_bitcoin --run_test=worker_limits_tests,cpu_miner_tests,mining_statistics_tests,gpu_miner_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,mercahash_opencl_tests,gpu_capacity_tests,gpu_scheduling_tests,mercahash_v2_tests,cuda_binding_tests,mining_tests_wallet,mining_tests_solo
           work/build/bin/test_bitcoin --run_test=crypto_tests/mercahash_v1_vectors
           QT_QPA_PLATFORM=offscreen work/build/bin/test_mining-qt
       - name: AMD checker reports hardware validation unavailable
@@ -75,3 +81,29 @@ jobs:
           result=$?
           set -e
           test "$result" -eq 77
+
+  windows-opencl:
+    name: Windows native MSVC AMD OpenCL (no hardware)
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v6
+      - name: Configure native OpenCL without Qt dependencies
+        run: |
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
+          cmake -B work/build --preset vs2026 `
+            -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON '-DVCPKG_MANIFEST_FEATURES=wallet;tests;gpu-amd' `
+            -DBUILD_GUI=OFF -DBUILD_TESTS=ON -DENABLE_IPC=OFF -DWITH_OPENCL_MINING=ON
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Compile and execute software qualification
+        run: |
+          cmake --build work/build --config Release --parallel 4 --target test_bitcoin mercatura-gpu-check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & work/build/bin/Release/test_bitcoin.exe --run_test=mercahash_opencl_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,mercahash_v2_tests,gpu_miner_tests,gpu_capacity_tests,gpu_scheduling_tests
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & work/build/bin/Release/mercatura-gpu-check.exe --list
+          if ($LASTEXITCODE -ne 77) { throw 'Expected unavailable physical AMD GPU' }
+          exit 0

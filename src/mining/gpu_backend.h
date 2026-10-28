@@ -93,6 +93,8 @@ class GpuBackend
     virtual uint64_t MemoryBytes() const = 0;
     virtual unsigned int BatchContexts() const { return Contexts(); }
     virtual GpuMemoryBudget Budget() const { return {}; }
+    // Public device execution geometry for the offline parity/check utility.
+    virtual std::string ExecutionDescription() const { return {}; }
     // Empty on cancellation; never return partially executed hashes. The
     // predicate is checked between bounded launches, never by a Qt callback.
     virtual std::vector<GpuHash> Hash(std::span<const GpuHeader> headers, const std::function<bool()> &cancelled) = 0;

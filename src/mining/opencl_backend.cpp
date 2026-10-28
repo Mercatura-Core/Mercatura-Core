@@ -62,7 +62,7 @@ class Api
     X(clGetDeviceIDs)                                                                                                  \
     X(clGetDeviceInfo) X(clCreateContext) X(clReleaseContext) X(clCreateCommandQueue) X(clReleaseCommandQueue)         \
         X(clCreateBuffer) X(clCreateSubBuffer) X(clReleaseMemObject) X(clCreateProgramWithSource) X(clBuildProgram)    \
-            X(clGetProgramBuildInfo) X(clReleaseProgram) X(clCreateKernel) X(clReleaseKernel) X(clSetKernelArg)        \
+            X(clGetKernelWorkGroupInfo) X(clGetProgramBuildInfo) X(clReleaseProgram) X(clCreateKernel) X(clReleaseKernel) X(clSetKernelArg)        \
                 X(clEnqueueNDRangeKernel) X(clEnqueueWriteBuffer) X(clEnqueueReadBuffer) X(clFinish)
 #define DECLARE(name) decltype(&::name) name{nullptr};
     CL_FUNCTIONS(DECLARE)
@@ -190,7 +190,8 @@ class OpenClBackend final : public GpuBackend
     cl_context context{nullptr};
     cl_command_queue queue{nullptr};
     cl_program program{nullptr};
-    cl_kernel init{nullptr}, stage{nullptr};
+    cl_kernel init{nullptr}, stage{nullptr}, fill{nullptr}, bind{nullptr}, mix{nullptr}, final{nullptr};
+    size_t workgroup{8};
     cl_mem headers{nullptr}, states{nullptr}, scratch{nullptr}, outputs{nullptr};
     unsigned int contexts{0}, estimated{0};
     uint64_t memory_bytes{0};
@@ -215,14 +216,14 @@ class OpenClBackend final : public GpuBackend
                     Info<cl_uint>(api, device, CL_DEVICE_ADDRESS_BITS) != 64 || Info<size_t>(api, device, CL_DEVICE_MAX_WORK_GROUP_SIZE) < 8)
                     throw std::runtime_error{"AMD V2 scratchpad alignment or execution geometry is unsupported"};
                 execution_limit = GpuExecutionContexts(std::numeric_limits<unsigned int>::max(),
-                    Info<cl_uint>(api, device, CL_DEVICE_MAX_COMPUTE_UNITS), std::numeric_limits<size_t>::max() / 8);
+                    Info<cl_uint>(api, device, CL_DEVICE_MAX_COMPUTE_UNITS), std::numeric_limits<size_t>::max() / 64);
             }
             cl_int error;
             context = api.clCreateContext(nullptr, 1, &device, nullptr, nullptr, &error);
             Check(error, "Create OpenCL context");
             queue = api.clCreateCommandQueue(context, device, 0, &error);
             Check(error, "Create OpenCL queue");
-            const char *source{OPENCL_MERCAHASH_SOURCE};
+            const char *source{version == mercahash::Version::V2 ? OPENCL_MERCAHASH_V2_SOURCE : OPENCL_MERCAHASH_SOURCE};
             const size_t size{std::strlen(source)};
             program = api.clCreateProgramWithSource(context, 1, &source, &size, &error);
             Check(error, "Create OpenCL program");
@@ -239,10 +240,36 @@ class OpenClBackend final : public GpuBackend
                 throw std::runtime_error{"AMD MercaHash OpenCL compilation failed (" + util::ToString(error) +
                                          "): " + log};
             }
-            init = api.clCreateKernel(program, "mh_init", &error);
+            init = api.clCreateKernel(program, version == mercahash::Version::V2 ? "mh_v2_init" : "mh_init", &error);
             Check(error, "Create OpenCL init kernel");
-            stage = api.clCreateKernel(program, "mh_stage", &error);
-            Check(error, "Create OpenCL stage kernel");
+            if (version == mercahash::Version::V2) {
+                auto create = [&](cl_kernel& kernel, const char* name) {
+                    kernel = api.clCreateKernel(program, name, &error);
+                    Check(error, "Create specialized AMD V2 kernel");
+                };
+                create(fill, "mh_v2_fill"); create(bind, "mh_v2_bind");
+                create(mix, "mh_v2_mix"); create(final, "mh_v2_final");
+                const auto dimensions{Info<cl_uint>(api, device, CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS)};
+                if (!dimensions || dimensions > 16) throw std::runtime_error{"Invalid AMD work-item dimensions"};
+                std::vector<size_t> sizes(dimensions);
+                Check(api.clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_ITEM_SIZES, sizes.size() * sizeof(size_t), sizes.data(), nullptr), "Read AMD work-item sizes");
+                size_t limit{std::min({size_t{64}, sizes[0], Info<size_t>(api, device, CL_DEVICE_MAX_WORK_GROUP_SIZE)})};
+                const auto local_memory{Info<cl_ulong>(api, device, CL_DEVICE_LOCAL_MEM_SIZE)};
+                for (const auto kernel : {init, fill, bind, mix, final}) {
+                    size_t maximum{0}; cl_ulong used{0};
+                    Check(api.clGetKernelWorkGroupInfo(kernel, device, CL_KERNEL_WORK_GROUP_SIZE, sizeof(maximum), &maximum, nullptr), "Read AMD kernel workgroup limit");
+                    Check(api.clGetKernelWorkGroupInfo(kernel, device, CL_KERNEL_LOCAL_MEM_SIZE, sizeof(used), &used, nullptr), "Read AMD kernel local memory");
+                    if (!maximum) throw std::runtime_error{"AMD kernel has no legal workgroup size"};
+                    if (kernel == bind) limit = std::min(limit, maximum);
+                    if (used > local_memory) throw std::runtime_error{"AMD kernel local memory exceeds device capacity"};
+                }
+                if (limit < 8) throw std::runtime_error{"AMD specialized kernels require at least eight work-items"};
+                workgroup = 8;
+                while (workgroup * 2 <= limit) workgroup *= 2;
+            } else {
+                stage = api.clCreateKernel(program, "mh_stage", &error);
+                Check(error, "Create OpenCL stage kernel");
+            }
             const auto allocation{AllocateGpuContexts(requested, [&] {
                 // OpenCL total memory is not measured free VRAM. Retain the
                 // conservative global-pool and single-allocation limits.
@@ -294,6 +321,12 @@ class OpenClBackend final : public GpuBackend
     unsigned int EstimatedContexts() const override { return estimated; }
     unsigned int BatchContexts() const override { return version == mercahash::Version::V2 ? std::min({contexts, execution_limit, contexts - next_context}) : contexts; }
     GpuMemoryBudget Budget() const override { return allocation_budget; }
+    std::string ExecutionDescription() const override
+    {
+        return version == mercahash::Version::V2 ?
+            "OpenCL V2 scalar workgroup=1 binding workgroup=" + util::ToString(workgroup) +
+            " maximum queued kernels=4" : "OpenCL V1 portable workgroup=8";
+    }
     uint64_t MemoryBytes() const override
     {
         return memory_bytes + (version == mercahash::Version::V2 ? uint64_t{contexts} * 240 : 0);
@@ -384,27 +417,40 @@ class OpenClBackend final : public GpuBackend
                 Check(api.clSetKernelArg(kernel, index, sizeof(value), &value), "Set AMD V2 argument");
             };
             argument(init, 0, headers); argument(init, 1, states); argument(init, 2, count);
-            const size_t local{8}, global{size_t{count} * local};
+
+            // In-order queue snapshots arguments on enqueue. Bound outstanding
+            // commands to four, retaining finite cancellation/drain windows.
+            unsigned pending{0};
             const auto launch = [&](cl_kernel kernel) {
-                if (cancelled()) return false;
+                if (cancelled()) {
+                    Check(api.clFinish(queue), "Drain cancelled AMD V2 work");
+                    return false;
+                }
+                const size_t local{kernel == bind ? workgroup : 1}, global{size_t{count} * local};
                 Check(api.clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &global, &local, 0, nullptr, nullptr), "Launch AMD V2 kernel");
-                Check(api.clFinish(queue), "Synchronize AMD V2 kernel");
+                if (++pending == 4) {
+                    Check(api.clFinish(queue), "Synchronize bounded AMD V2 window");
+                    pending = 0;
+                }
                 return !cancelled();
             };
             if (!launch(init)) return {};
-            argument(stage, 0, headers); argument(stage, 1, states); argument(stage, 2, view);
-            argument(stage, 3, outputs); argument(stage, 4, count);
-            const auto advance = [&](cl_uint phase, cl_uint begin, cl_uint end) {
-                argument(stage, 5, phase); argument(stage, 6, begin); argument(stage, 7, end);
-                return launch(stage);
+            for (const auto kernel : {fill, bind, mix, final}) {
+                argument(kernel, 0, headers); argument(kernel, 1, states); argument(kernel, 2, view);
+                argument(kernel, 3, outputs); argument(kernel, 4, count);
+            }
+            const auto advance = [&](cl_kernel kernel, cl_uint begin, cl_uint end) {
+                argument(kernel, 5, begin); argument(kernel, 6, end);
+                return launch(kernel);
             };
             for (cl_uint begin{0}; begin < mercahash::V2_LINE_COUNT; begin += 4096)
-                if (!advance(0, begin, begin + 4096)) return {};
+                if (!advance(fill, begin, begin + 4096)) return {};
             for (cl_uint begin{0}; begin < mercahash::V2_BIND_BLOCK_COUNT; begin += 64)
-                if (!advance(1, begin, begin + 64)) return {};
+                if (!advance(bind, begin, begin + 64)) return {};
             for (cl_uint begin{1}; begin <= mercahash::V2_MIX_STEPS; begin += 256)
-                if (!advance(2, begin, begin + 255)) return {};
-            if (!advance(3, 0, 0)) return {};
+                if (!advance(mix, begin, begin + 255)) return {};
+            if (!advance(final, 0, 0)) return {};
+            Check(api.clFinish(queue), "Complete AMD V2 batch");
             Check(api.clEnqueueReadBuffer(queue, outputs, CL_TRUE, 0, size_t{count} * 32, hashes.data() + completed, 0, nullptr, nullptr), "Read AMD V2 output");
             if (cancelled()) return {};
             completed += count;
@@ -425,11 +471,10 @@ class OpenClBackend final : public GpuBackend
     void Cleanup()
     {
         CleanupBuffers();
-        if (init)
-            api.clReleaseKernel(init);
-        if (stage)
-            api.clReleaseKernel(stage);
-        init = stage = nullptr;
+        for (auto kernel : {&init, &stage, &fill, &bind, &mix, &final}) {
+            if (*kernel) api.clReleaseKernel(*kernel);
+            *kernel = nullptr;
+        }
         if (program)
             api.clReleaseProgram(program);
         program = nullptr;

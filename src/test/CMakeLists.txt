@@ -48,6 +48,7 @@ add_executable(test_bitcoin
   gpu_scheduling_tests.cpp
   gpu_miner_tests.cpp
   mercahash_gpu_tests.cpp
+  mercahash_opencl_tests.cpp
   mercahash_gpu_sync_tests.cpp
   cuda_binding_tests.cpp
   cuckoocache_tests.cpp
