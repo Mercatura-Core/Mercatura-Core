@@ -96,7 +96,8 @@ jobs:
           $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
           cmake -B work/build --preset vs2026 `
             -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON '-DVCPKG_MANIFEST_FEATURES=wallet;tests;gpu-amd' `
-            -DBUILD_GUI=OFF -DBUILD_TESTS=ON -DENABLE_IPC=OFF -DWITH_OPENCL_MINING=ON
+            -DBUILD_GUI=OFF -DBUILD_TESTS=ON -DENABLE_IPC=OFF -DWITH_OPENCL_MINING=ON `
+            -DWITH_ZMQ=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=OFF
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Compile and execute software qualification
         run: |
