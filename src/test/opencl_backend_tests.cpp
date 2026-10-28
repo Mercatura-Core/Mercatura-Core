@@ -146,11 +146,11 @@ void* Symbol(void*, const char* name)
     return nullptr;
 }
 }
-// Override the loader only in this separate Linux test executable. The backend
-// itself is compiled normally as its own translation unit, as in production.
-extern "C" void* dlopen(const char* name, int flags) noexcept { return fake_cl::Open(name, flags); }
-extern "C" void* dlsym(void* library, const char* name) noexcept { return fake_cl::Symbol(library, name); }
-extern "C" int dlclose(void* library) noexcept { return fake_cl::Close(library); }
+// Link-wrap only this executable's loader calls. In particular, do not interpose
+// on a sanitizer runtime's own dynamic loader. Production is compiled normally.
+extern "C" void* __wrap_dlopen(const char* name, int flags) { return fake_cl::Open(name, flags); }
+extern "C" void* __wrap_dlsym(void* library, const char* name) { return fake_cl::Symbol(library, name); }
+extern "C" int __wrap_dlclose(void* library) { return fake_cl::Close(library); }
 
 int main()
 {
