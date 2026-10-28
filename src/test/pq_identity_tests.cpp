@@ -54,7 +54,7 @@ BOOST_AUTO_TEST_CASE(canonical_fingerprint_and_explicit_destination_bindings)
     for (auto invalid:{fingerprint+"\n",fingerprint.substr(0,102),"MCAPQ1:"+std::string(96,'a'),"mcapq1:"+std::string(96,'A'),"mcapq1:"+std::string(96,'g')}) {
         BOOST_CHECK(!ParseFingerprint(invalid));
     }
-    for (const std::string& destination:std::vector<std::string>{"127.0.0.1:18444","localhost:18444","[2001:db8::1]:18444",std::string(56,'a')+".onion:18444"}) {
+    for (const std::string& destination:std::vector<std::string>{"127.0.0.1:18444","localhost:18444","Node.example:18444","node.example:18444","Node.example.:18444","Node.example:018444","[2001:db8::1]:18444","[2001:0db8:0:0:0:0:0:1]:18444",std::string(56,'a')+".onion:18444"}) {
         auto parsed=ParsePinBinding(destination+"="+fingerprint);
         BOOST_REQUIRE(parsed); BOOST_CHECK_EQUAL(parsed->destination,destination);
         BOOST_CHECK(Equal(parsed->fingerprint,*value));

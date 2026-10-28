@@ -1,7 +1,9 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
 #include <util/string.h>
+#include <crypto/hex_base.h>
 #include <net_pq.h>
+#include <net_pq_identity_format.h>
 #include <test/util/setup_common.h>
 #include <util/fs.h>
 #include <boost/test/unit_test.hpp>
@@ -323,12 +325,15 @@ BOOST_AUTO_TEST_CASE(factory_pins_are_exact_destination_bindings)
             {"127.0.0.1",18444,"",true}, {"127.0.0.1",18445,"",false},
             {"127.0.0.1",18444,"localhost:18444",false}, {"127.0.0.1",18444,"Node.example:18444",true},
             {"127.0.0.1",18444,"node.example:18444",false},
+            {"127.0.0.1",18444,"Node.example.:18444",false}, {"127.0.0.1",18444,"Node.example:018444",false},
+            {"127.0.0.1",18444,"Node.example:18445",false}, {"127.0.0.1",18444,"alias.example:18444",false},
             {"::1",18444,"",true}, {"::1",18445,"",false}, {"::1",18444,"[0:0:0:0:0:0:0:1]:18444",false}}) {
         auto ip=LookupHost(host,false); BOOST_REQUIRE(ip);
         auto context=std::make_shared<Context>(network,identity,std::map<std::string,Digest>{
             {"127.0.0.1:18444",pin}, {"[::1]:18444",pin}, {"Node.example:18444",pin}});
         auto transport=MakePQTransport(context,true,CService{*ip,port},name,false);
         auto& i=static_cast<PQTransport&>(*transport);
+        NoAssurance(i);
         PQTransport r(context,false,{},"destination-peer"); Establish(i,r,65536);
         BOOST_CHECK_EQUAL(i.GetInfo().pq_identity_verified,verified);
         BOOST_CHECK(!r.GetInfo().pq_identity_verified);
@@ -336,9 +341,76 @@ BOOST_AUTO_TEST_CASE(factory_pins_are_exact_destination_bindings)
         i.Disconnect(); r.Disconnect(); NoAssurance(i); NoAssurance(r);
         auto next=MakePQTransport(context,true,CService{*ip,port},name,false);
         auto& reconnect=static_cast<PQTransport&>(*next);
+        NoAssurance(reconnect);
         PQTransport peer(context,false,{},"reconnect-peer"); Establish(reconnect,peer,65536);
         BOOST_CHECK_EQUAL(reconnect.GetInfo().pq_identity_verified,verified);
         BOOST_CHECK(reconnect.GetInfo().session_id != old);
+    }
+}
+BOOST_AUTO_TEST_CASE(factory_selects_distinct_configured_pins_and_never_replaces_them)
+{
+    const auto network = SelectedNetwork();
+    auto client = std::make_shared<Identity>();
+    BOOST_REQUIRE(client->FromSeed(std::array<uint8_t,32>{}));
+    auto ip = LookupHost("127.0.0.1", false); BOOST_REQUIRE(ip);
+    const CService address{*ip,18444};
+    std::array<std::shared_ptr<Identity>,3> peers;
+    for (size_t n = 0; n < peers.size(); ++n) {
+        std::array<uint8_t,32> seed{}; seed[0] = n + 1;
+        peers[n] = std::make_shared<Identity>(); BOOST_REQUIRE(peers[n]->FromSeed(seed));
+    }
+    std::map<std::string,Digest> pins;
+    for (const auto& [destination,identity] : std::map<std::string,std::shared_ptr<Identity>>{
+            {"127.0.0.1:18444",peers[0]}, {"Node.example:18444",peers[1]}}) {
+        auto binding = ParsePinBinding(destination + "=mcapq1:" + HexStr(Fingerprint(network,identity->pub)));
+        BOOST_REQUIRE(binding); pins.emplace(binding->destination,binding->fingerprint);
+    }
+    // A name overrides the numeric socket destination. Different bindings must
+    // select different expected identities, even when both resolve to this IP.
+    for (const std::string name : {"", "Node.example:18444"}) {
+        const auto selected = name.empty() ? 0U : 1U;
+        auto context = std::make_shared<Context>(network,client,pins);
+        // Reject both the other configured identity and a wholly unrelated one,
+        // twice each on the same context: failure must not replace/erase the pin.
+        for (unsigned wrong : {1U - selected, 2U, 1U - selected, 2U}) {
+            auto remote = std::make_shared<Context>(network,peers[wrong]);
+            auto transport = MakePQTransport(context,true,address,name,false);
+            auto& i = static_cast<PQTransport&>(*transport);
+            PQTransport r(remote,false,{},"pin-peer");
+            NoAssurance(i); NoAssurance(r);
+            const auto deadline = Clock::now() + 5s;
+            while (i.Poll()) {
+                BOOST_REQUIRE(Clock::now() < deadline); BOOST_REQUIRE(r.Poll());
+                Transfer(i,r,65536); Transfer(r,i,65536); std::this_thread::sleep_for(1ms);
+            }
+            BOOST_CHECK(i.GetInfo().pq_pin_mismatch); BOOST_CHECK(i.GetInfo().pq_failed);
+            NoAssurance(i); BOOST_CHECK(!i.Poll());
+            CSerializedNetMsg early; early.m_type = "version"; early.data = {42};
+            BOOST_CHECK(!i.SetMessageToSend(early)); BOOST_CHECK(early.data == Bytes{42});
+            BOOST_CHECK(context->pins == pins);
+        }
+        // Refill the unchanged per-source bucket (one admission per second).
+        std::this_thread::sleep_for(2050ms);
+        auto remote = std::make_shared<Context>(network,peers[selected]);
+        auto transport = MakePQTransport(context,true,address,name,false);
+        auto& i = static_cast<PQTransport&>(*transport);
+        PQTransport r(remote,false,{},"correct-peer"); Establish(i,r,65536);
+        BOOST_CHECK(i.GetInfo().pq_identity_verified && i.GetInfo().pq_authenticated);
+        BOOST_CHECK_EQUAL(i.GetInfo().pq_identity,"mcapq1:" + HexStr(pins.at(name.empty() ? "127.0.0.1:18444" : name)));
+        BOOST_CHECK(!r.GetInfo().pq_identity_verified);
+        const auto old = i.GetInfo().session_id;
+        // An authenticated packet error must clear the previously verified state.
+        CSerializedNetMsg ping; ping.m_type = "ping"; ping.data.resize(8);
+        BOOST_REQUIRE(r.SetMessageToSend(ping));
+        auto wire = std::get<0>(r.GetBytesToSend(false)); Bytes invalid(wire.begin(),wire.end()); invalid.back() ^= 1;
+        std::span<const uint8_t> input{invalid}; BOOST_CHECK(!i.ReceivedBytes(input));
+        NoAssurance(i); BOOST_CHECK(!i.Poll()); i.Disconnect(); r.Disconnect();
+        auto next = MakePQTransport(context,true,address,name,false);
+        auto& reconnect = static_cast<PQTransport&>(*next);
+        NoAssurance(reconnect);
+        PQTransport peer(remote,false,{},"reconnect-peer"); Establish(reconnect,peer,65536);
+        BOOST_CHECK(reconnect.GetInfo().pq_identity_verified); BOOST_CHECK(reconnect.GetInfo().session_id != old);
+        reconnect.Disconnect(); NoAssurance(reconnect); BOOST_CHECK(context->pins == pins);
     }
 }
 BOOST_AUTO_TEST_CASE(packet_failure_releases_nothing_and_large_send_memory)

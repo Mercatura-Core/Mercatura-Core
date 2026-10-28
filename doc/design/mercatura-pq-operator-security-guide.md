@@ -42,6 +42,12 @@ Configure expected pins only after independently authenticating the destination
 and fingerprint. Syntax is `-pqp2ppin=HOST:PORT=mcapq1:FINGERPRINT_HEX`; bracket IPv6
 hosts. Pins bind exact outbound destination strings including port, not arbitrary
 aliases or inbound operator names. There is no TOFU or automatic replacement.
+Hostname case, aliases, alternate IPv6 spellings and different port spellings
+do not inherit another destination's pin. An unmatched destination can still
+authenticate as an ordinary unpinned peer; it must report
+`pq_identity_verified=false`. For every intended pinned bootstrap connection,
+check `getpeerinfo` for the exact destination and `pq_identity_verified=true`;
+`pq_authenticated=true` alone does not establish the configured operator identity.
 A mismatch terminates the endpoint. Independently confirm planned rotations,
 create a separately named identity, coordinate affected pins and retain protected
 recovery custody. Never disable pinning merely to suppress an unexplained mismatch.

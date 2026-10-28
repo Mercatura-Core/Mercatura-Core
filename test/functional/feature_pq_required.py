@@ -168,7 +168,8 @@ class PQRequiredTest(BitcoinTestFramework):
             pin = '-pqp2ppin=' + destination + '=' + fingerprint
             self.restart_node(1, self.extra_args[1] + [bad])
             origins = ['manual'] if self.options.public_testnet else ['manual', 'outbound-full-relay', 'block-relay-only', 'addr-fetch', 'feeler']
-            for origin in origins:
+            established = self.status()['established_total']
+            for origin in origins + ['manual']:
                 before = self.status()['failures']['pin']
                 if origin == 'manual':
                     self.nodes[1].addnode(destination, 'onetry', False)
@@ -176,11 +177,24 @@ class PQRequiredTest(BitcoinTestFramework):
                     self.nodes[1].addconnection(destination, origin, False)
                 self.wait_until(lambda: self.status()['failures']['pin'] > before)
                 self.wait_until(lambda: not self.nodes[1].getpeerinfo())
+                assert_equal(self.status()['established_total'], established)
                 time.sleep(1.1)
             assert_equal(self.ready(2)[0]['session_id'], healthy)
             self.restart_node(1, self.extra_args[1] + [pin])
             self.connect_nodes(1, 0)
-            self.assert_ready(pinned=True)
+            pinned_session = self.assert_ready(pinned=True)
+            self.clear()
+            # The same socket endpoint with a different destination spelling
+            # remains permissionless; it must not inherit the exact pin.
+            alternate = f'127.0.0.1:0{p2p_port(0)}'
+            self.nodes[1].addnode(alternate, 'onetry', False)
+            unpinned_session = self.assert_ready(pinned=False)
+            assert unpinned_session != pinned_session
+            self.clear()
+            self.connect_nodes(1, 0)
+            assert self.assert_ready(pinned=True) not in (pinned_session, unpinned_session)
+            events.append({'exact_pin_reconnect': True, 'alternate_destination_unverified': True,
+                           'mismatch_retried_without_replacement': True})
             self.clear()
             self.restart_node(0, self.extra_args[0] + ['-pqp2pidentity=operator.dat'])
             assert_equal(PQTransportTest.public_fingerprint(self, self.nodes[0], 'operator.dat'), fingerprint)
