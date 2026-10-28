@@ -60,19 +60,22 @@ implemented in this assignment.
 
 ## Required scenarios and evidence boundaries
 
-| Scenario | Tip-independent enforcing profile expectation | Qualification |
+| Scenario | Tip-independent required-policy expectation | Executed qualification |
 |---|---|---|
-| Synchronized node / miner crosses a synthetic boundary | Existing PQ session remains required | Controlled block relay/mining and model tests; results recorded separately |
-| Peer several blocks behind / temporarily partitioned | PQ handshake first, then normal most-work catchup | Four-node controlled rehearsal |
-| Fresh node at genesis / newly installed IBD client | Same PQ transport from first connection; needs verified bootstrap | Fresh-datadir discovery tests; actual public identity tested at genesis only |
-| Old datadir restore / offline reconnect | No height-derived return to classical; fresh session | Controlled old-release upgrade/rollback fixture; actual public history still unavailable |
-| Full reindex / chainstate reindex | Transport requirement unchanged by transient local chain state | Controlled migration and capacity/reindex tests |
-| Reorg across a proposed H | Policy does not toggle with tip | Explicit activation-policy model/regression; not a public activation rehearsal |
-| Established classical connection at rollout | Enforcing software requires restart and fresh PQ socket; no in-place reinterpretation | Mixed old/new controlled migration fixture |
-| Older independent release | Classical attempt rejected; no PQ-to-classical retry | Actual published v0.1.2 fixture and required-mode rejection tests |
+| Synchronized node / miner crosses a synthetic boundary | Existing PQ session remains required | PASS: feature_pq_activation.py, established PQ session retained while mining through synthetic boundary |
+| Peer several blocks behind / temporarily partitioned | PQ handshake first, then normal most-work catchup | PASS: four-node discovery rehearsal and offline height-2 to height-9 activation fixture |
+| Fresh node at genesis / newly installed IBD client | Same PQ transport from first connection; needs verified bootstrap | PASS: actual fresh-datadir discovery/join; actual public identity at genesis only |
+| Old datadir restore / offline reconnect | No height-derived return to classical; fresh session | PASS: actual v0.1.2 generated-history upgrade/rollback; public historical restore unexecuted |
+| Full reindex / chainstate reindex | Transport requirement unchanged by transient local chain state | PASS: both reindex paths in migration/capacity fixtures; policy independent of transient tip |
+| Reorg across a proposed H | Policy does not toggle with tip | PASS: actual competing-most-work regtest reorg through synthetic boundary; required policy retained |
+| Established classical connection at rollout | Enforcing software requires restart and fresh PQ socket; no in-place reinterpretation | PASS: partial old/new migration rejects classical attempts; healthy PQ backbone retained |
+| Older independent release | Classical attempt rejected; no PQ-to-classical retry | PASS: actual published v0.1.2 fixture and required-mode rejection tests |
 
-Test scenarios are a plan until a matching executed result is present in the
-P9–P11 evidence JSON. A synthetic boundary in a model/regtest is never a proposed
+These controlled cases have matching executed receipts in the P9–P11 evidence
+JSON and passed again in exact-source CI. Actual historical public-testnet data
+was unavailable. The lagging/reorg cases use explicit required regtest policy;
+final native testnet enforcing builds separately pass default/off rejection and
+required connection checks. A synthetic boundary in a model/regtest is never a proposed
 public activation height. Genesis-only public tests do not establish historical
 replay, independently operated public bootstrap, Tor/NAT behavior or deployment.
 

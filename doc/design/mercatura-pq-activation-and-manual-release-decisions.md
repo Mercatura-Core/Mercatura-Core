@@ -48,8 +48,7 @@ DNS/seed updates, service restarts or network cutover.
 7. Separately authorize live deployment and the coordinated cutover plan. Record
    actual outcomes after operators execute it; development CI is not deployment.
 
-Source SHA, candidate filenames/checksums and final test references will be filled
-from the completed engineering evidence. No actual current public height or final
+The engineering source, local candidate and successful exact-source CI references are listed below. No actual current public height or final
 activation parameter is supplied without an authorized observation and founder
 approval.
 
@@ -113,3 +112,52 @@ cutover. Existing blockchain/genesis and capacity height 8,000 remain unchanged;
 MercaHash V2 is a separate pending decision. Operators should confirm readiness,
 platform support and recovery custody through the separately approved channel.
 No date, height, download URL, fingerprint or operator is invented in this draft.
+
+## Local development candidate — not an official release
+
+Source: `fab2b87c5ae5ff2ff3b536974c4e768f62030d16`. Development channel:
+`0.1.2-p9p11-dev`; qualification flags `MERCATURA_REQUIRE_PQ_TESTNET=ON` and
+`MERCATURA_PUBLIC_TESTNET_RELEASE=ON`. Source defaults remain activation-pending.
+
+| Local artifact | Bytes | SHA256 |
+|---|---:|---|
+| Mercatura-Core-p9p11-dev-fab2b87c5ae5-linux-x86_64.zip | 21,536,278 | cee6d47558fca1e34ad111dad190b7bde758d3175396069f22a5a7a7c338df9d |
+| Mercatura-Core-p9p11-dev-fab2b87c5ae5-source.tar | 59,822,080 | 11bc0e9cbbc697d2023ad7848947933e34b0ab68b39ca5c80ba6ba87093a9583 |
+
+BUILD-PROVENANCE.json records GCC 14.2, Release/O2 configuration and individual
+binary hashes. SHA256/ZIP CRC checks, staged offline Qt startup, native CLI/daemon
+version checks and an owned temporary CMake install/uninstall prefix passed. The
+smoke checks required/enforcing policy, pending activation, unchanged genesis,
+zero peers/listeners and clean process exit. This native Linux build depends on
+its host libraries; it is not a portable or signed clean-machine installer.
+
+The test-only injector bridge is absent from the binary bundle and installation.
+CI packages stay local to disposable runners and are not automatically exported.
+These checksums are development evidence, not published official release checksums.
+The founder must choose the final version/configuration, rebuild, review/sign and
+manually publish the approved artifacts after the open gates are resolved.
+
+## Final development qualification references
+
+[Source CI 40530559182](https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/40530559182)
+passed all seven required jobs plus meta; Linux x86_64, native MSVC and macOS
+ARM64 each passed 186 CTests and 56 functional variants. Cross builds passed for
+Windows UCRT and both macOS architectures. [Native GUI CI 40530559236](https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/40530559236)
+passed all four platforms, including Linux ARM64, with the selected seven CTests,
+nine functional variants, staged package smoke and enforcing-profile checks.
+The P11 report gives the complete matrix and failed-attempt ledger.
+
+CI packages were built and validated on disposable runners without artifact
+upload or retention. They are not downloadable deliverables. The Linux candidate
+listed above is retained locally. Package checksums vary by native toolchain;
+the Windows source TAR also has different exported bytes from Unix exports.
+A controlled `git -c core.autocrlf=true archive` reproduction exactly matched
+the Windows TAR checksum, confirming the platform line-ending export difference.
+Use each export's recorded hash and Git commit/tree identity; this work does not
+claim bit-identical cross-platform archives or reproducible binary builds.
+
+Engineering is complete within the controlled scope. Independent security review,
+public-deployment candidate qualification, final activation parameters, manual
+release authorization and live deployment authorization remain separate and open.
+The public-review archive and documentation publication SHA have an external
+checksum/remote-verification receipt to avoid a self-referential Git commit/hash.
