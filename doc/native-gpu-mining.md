@@ -33,7 +33,7 @@ from the system at runtime, so a missing GPU runtime leaves CPU mining available
 
 ## Hashing and work flow
 
-The authoritative implementation is `src/crypto/mercahash.cpp` and its frozen
+The authoritative V1 implementation is `src/crypto/mercahash.cpp` and its frozen
 V1 constants in `mercahash.h`: 128 MiB scratchpad, 2,097,152 fill lines, one binding
 pass, 131,072 mixing steps, SHA3-512 checkpoints and SHA3-256 finalization. The
 informal prompt's mixing-step summary is not used as an algorithm specification.
@@ -43,16 +43,20 @@ and asserts 2,097,152 lines. Its frozen `V1_MIX_STEPS` is 131,072;
 whose loop runs from 1 through the supplied count. The larger number describes
 scratchpad lines and fill iterations, not V1 mixing steps or total memory accesses.
 
-`mercahash_gpu.h` supplies the AMD OpenCL arithmetic and portable C++ tests.
-NVIDIA includes the separately imported `mercahash_gpu_specialized.h`; CMake
-continues to embed only the original shared header for AMD. The specialized
-header preserves the validated device arithmetic; only its include guard is
-renamed for the repository. See
+`mercahash_gpu.h` supplies portable arithmetic and the unchanged AMD V1 path.
+The authoritative V2 implementation is `src/crypto/mercahash_v2.cpp`.
+AMD V2 uses `mercahash_opencl_v2.h`, reusing portable arithmetic with scalar fill/mix
+and a workgroup-local parallel binding reduction. CMake embeds the two AMD
+sources separately. See [AMD V2 optimization and qualification](mining/MERCAHASH-V2-AMD-OPENCL-OPTIMIZATION.md)
+for the exact source, tests and outstanding physical AMD checks.
+NVIDIA continues to use the separately imported `mercahash_gpu_specialized.h`,
+unchanged by the AMD work. See
 [CUDA integration and qualification](mining/CUDA-WALLET-INTEGRATION.md) for
 source checksums, the exact port adjustments, tests and hardware requirements.
 Neither production backend delegates hashing to the C++ test execution path.
 
-Each context owns sixteen state lanes and a contiguous private 128 MiB scratchpad.
+Each context owns sixteen state lanes and a contiguous private scratchpad:
+128 MiB for V1, 16 MiB for V2. The following legacy execution details describe V1.
 CUDA uses one thread per context during fill, then a full 32-thread warp per
 context for binding and mixing. Binding distributes each block's 64 lines across
 the warp and combines lane accumulators with XOR shuffles. Mixing retains the
@@ -67,7 +71,12 @@ one nonblocking stream. Cancellation is checked before queued kernels and after
 synchronized groups. Cancellation and exceptions drain outstanding work before
 host buffers expire or device buffers are reused/freed. Default CUDA cache
 behavior is preserved. AMD retains 4,096-line fill chunks and its existing
-per-launch synchronization. No MercaHash workload is shortened.
+per-launch synchronization for V1. AMD V2 retains 4,096-line fill, 64-block binding
+and 256-step mixing chunks, but uses dedicated kernels and at most four ordered
+kernel enqueues before an explicit finish. Its scalar stages use one work-item;
+binding selects a supported power-of-two workgroup from 8 to 64 with an OpenCL
+1.2 local-memory XOR reduction. No MercaHash workload is shortened. Actual AMD
+runtime parity, throughput and Stop latency remain pending physical validation.
 
 A driver call itself cannot be forcibly interrupted safely. Kernel duration,
 watchdog behavior, sustained responsiveness and driver-reset behavior require
