@@ -5,6 +5,32 @@
 #include <test/data/pq_p2p_candidate1.json.h>
 #include <univalue.h>
 #include <boost/test/unit_test.hpp>
+#include <limits>
+
+namespace pq::test {
+/** Defined only in this test translation unit; no production state setter. */
+struct PacketCipherAccess {
+    static void NearLimit(PacketCipher& cipher, uint64_t packets) {
+        BOOST_REQUIRE_EQUAL(cipher.m_packets, 0U);
+        BOOST_REQUIRE(!cipher.m_failed && !cipher.m_pending);
+        BOOST_REQUIRE(packets >= (uint64_t{1} << 32) - 1);
+        cipher.m_packets = packets;
+    }
+    static bool Failed(const PacketCipher& cipher) { return cipher.m_failed; }
+    // Destructive private probe, used ONLY after all terminal API checks. Compare
+    // with an independent control to detect FS advancement on rejected calls,
+    // without reading padding/uninitialized buffers or copying secret objects.
+    // This never resets m_failed or enables a successful PacketCipher retry.
+    static std::array<std::byte,20> Probe(PacketCipher& cipher) {
+        std::array<std::byte,3> length{};
+        std::array<std::byte,1> plain{};
+        std::array<std::byte,20> result{};
+        cipher.m_length.Crypt(length,std::span{result}.first(3));
+        cipher.m_payload.Encrypt(plain,{},std::span{result}.subspan(3));
+        return result;
+    }
+};
+}
 
 namespace {
 using namespace pq;
@@ -294,6 +320,103 @@ BOOST_AUTO_TEST_CASE(packet_call_order_errors_are_terminal)
         BOOST_CHECK(sentinel == Bytes{42}); BOOST_CHECK_EQUAL(dec.Packets(),0U);
         BOOST_CHECK(!dec.DecryptLength(std::span{wire}.first(3)));
         BOOST_CHECK(!dec.Decrypt(std::span{wire}.subspan(3),sentinel,ignored));
+    }
+}
+BOOST_AUTO_TEST_CASE(packet_limit_last_permitted_packet_and_terminal_retries)
+{
+    // Inject ONLY the outer guard counter. The underlying FS cipher state is
+    // fresh: this tests the 2^32 guard, not billions of packets/rekeys or their
+    // actual final nonce. Real 224-packet transitions have separate frozen tests.
+    using test::PacketCipherAccess;
+    constexpr uint64_t limit = uint64_t{1} << 32;
+    Pair p; auto m5 = p.At(5); Bytes out; BOOST_REQUIRE(p.r->Advance(m5,out));
+    auto keys = p.i->TakeKeys();
+    for (uint8_t role : {0,1}) for (bool discard : {false,true}) {
+        BOOST_TEST_CONTEXT("role=" << unsigned(role) << " decoy=" << discard) {
+            const auto& length = role ? keys.r_length.bytes : keys.i_length.bytes;
+            const auto& payload = role ? keys.r_payload.bytes : keys.i_payload.bytes;
+            PacketCipher enc(length,payload,keys.h5,role), dec(length,payload,keys.h5,role);
+            PacketCipherAccess::NearLimit(enc,limit - 1); PacketCipherAccess::NearLimit(dec,limit - 1);
+            const Bytes contents{18,42}; Bytes wire;
+            BOOST_REQUIRE(enc.Encrypt(contents,discard ? 128 : 0,wire));
+            BOOST_CHECK_EQUAL(enc.Packets(),limit); BOOST_CHECK_EQUAL(enc.Epoch(),limit / 224);
+            auto size = dec.DecryptLength(std::span{wire}.first(3));
+            BOOST_REQUIRE(size); BOOST_CHECK_EQUAL(*size,contents.size());
+            BOOST_CHECK_EQUAL(dec.Packets(),limit - 1);
+            Bytes plain{99}; bool decoy{!discard};
+            BOOST_REQUIRE(dec.Decrypt(std::span{wire}.subspan(3),plain,decoy));
+            BOOST_CHECK_EQUAL(decoy,discard); BOOST_CHECK(plain == (discard ? Bytes{99} : contents));
+            BOOST_CHECK_EQUAL(dec.Packets(),limit); BOOST_CHECK_EQUAL(dec.Epoch(),limit / 224);
+            for (unsigned retry = 0; retry < 3; ++retry) {
+                Bytes rejected{77};
+                BOOST_CHECK(!enc.Encrypt(contents,0,rejected)); BOOST_CHECK(rejected == Bytes{77});
+                BOOST_CHECK(!dec.DecryptLength(std::span{wire}.first(3)));
+                plain = {99}; decoy = true;
+                BOOST_CHECK(!dec.Decrypt(std::span{wire}.subspan(3),plain,decoy));
+                BOOST_CHECK(plain == Bytes{99}); BOOST_CHECK(decoy);
+                // A failed instance cannot be revived by changing call direction.
+                BOOST_CHECK(!dec.Encrypt(contents,0,rejected)); BOOST_CHECK(rejected == Bytes{77});
+                BOOST_CHECK(!enc.DecryptLength(std::span{wire}.first(3)));
+                BOOST_CHECK(!enc.Decrypt(std::span{wire}.subspan(3),plain,decoy)); BOOST_CHECK(plain == Bytes{99});
+                BOOST_CHECK(PacketCipherAccess::Failed(enc) && PacketCipherAccess::Failed(dec));
+                BOOST_CHECK_EQUAL(enc.Packets(),limit); BOOST_CHECK_EQUAL(dec.Packets(),limit);
+            }
+            PacketCipher control(length,payload,keys.h5,role); Bytes control_wire;
+            BOOST_REQUIRE(control.Encrypt(contents,discard ? 128 : 0,control_wire)); BOOST_CHECK(control_wire == wire);
+            const auto expected = PacketCipherAccess::Probe(control);
+            BOOST_CHECK(PacketCipherAccess::Probe(enc) == expected);
+            BOOST_CHECK(PacketCipherAccess::Probe(dec) == expected);
+            // Even after the test-only probe, production entry points stay dead.
+            Bytes rejected{77};
+            BOOST_CHECK(!enc.Encrypt(contents,0,rejected)); BOOST_CHECK(rejected == Bytes{77});
+            BOOST_CHECK(!dec.DecryptLength(std::span{wire}.first(3)));
+            BOOST_CHECK(PacketCipherAccess::Failed(enc) && PacketCipherAccess::Failed(dec));
+            BOOST_CHECK_EQUAL(enc.Packets(),limit); BOOST_CHECK_EQUAL(dec.Packets(),limit);
+        }
+    }
+    // Independent AKE with fresh session coins and traffic keys remains usable.
+    Pair fresh(1); m5 = fresh.At(5); BOOST_REQUIRE(fresh.r->Advance(m5,out));
+    auto new_keys = fresh.i->TakeKeys(); BOOST_CHECK(new_keys.id != keys.id);
+    for (uint8_t role : {0,1}) {
+        const auto& length = role ? new_keys.r_length.bytes : new_keys.i_length.bytes;
+        const auto& payload = role ? new_keys.r_payload.bytes : new_keys.i_payload.bytes;
+        BOOST_CHECK(!Equal(length,role ? keys.r_length.bytes : keys.i_length.bytes));
+        BOOST_CHECK(!Equal(payload,role ? keys.r_payload.bytes : keys.i_payload.bytes));
+        PacketCipher enc(length,payload,new_keys.h5,role), dec(length,payload,new_keys.h5,role);
+        Bytes wire, plain; bool decoy{true};
+        BOOST_REQUIRE(enc.Encrypt(Bytes{18,42},0,wire));
+        BOOST_REQUIRE(dec.DecryptLength(std::span{wire}.first(3)));
+        BOOST_REQUIRE(dec.Decrypt(std::span{wire}.subspan(3),plain,decoy));
+        BOOST_CHECK(plain == (Bytes{18,42})); BOOST_CHECK(!decoy);
+        BOOST_CHECK_EQUAL(enc.Packets(),1U); BOOST_CHECK_EQUAL(dec.Packets(),1U);
+    }
+}
+BOOST_AUTO_TEST_CASE(packet_limit_rejects_at_and_above_limit_without_cipher_state_change)
+{
+    using test::PacketCipherAccess;
+    constexpr uint64_t limit = uint64_t{1} << 32;
+    std::array<uint8_t,32> length{}, payload{}; payload[0] = 1; Digest h5{};
+    for (uint8_t role : {0,1}) for (uint64_t count : {limit,limit + 1,std::numeric_limits<uint64_t>::max()}) {
+        BOOST_TEST_CONTEXT("role=" << unsigned(role) << " injected_count=" << count) {
+            PacketCipher enc(length,payload,h5,role), dec(length,payload,h5,role), source(length,payload,h5,role);
+            PacketCipherAccess::NearLimit(enc,count); PacketCipherAccess::NearLimit(dec,count);
+            Bytes wire; BOOST_REQUIRE(source.Encrypt(Bytes{18,42},0,wire));
+            for (unsigned retry = 0; retry < 3; ++retry) {
+                Bytes rejected{77}, plain{99}; bool decoy{true};
+                BOOST_CHECK(!enc.Encrypt(Bytes{18,42},0,rejected)); BOOST_CHECK(rejected == Bytes{77});
+                BOOST_CHECK(!dec.DecryptLength(std::span{wire}.first(3)));
+                BOOST_CHECK(!dec.Decrypt(std::span{wire}.subspan(3),plain,decoy));
+                BOOST_CHECK(plain == Bytes{99}); BOOST_CHECK(decoy);
+                BOOST_CHECK(PacketCipherAccess::Failed(enc) && PacketCipherAccess::Failed(dec));
+                BOOST_CHECK_EQUAL(enc.Packets(),count); BOOST_CHECK_EQUAL(dec.Packets(),count);
+            }
+            PacketCipher control(length,payload,h5,role);
+            const auto expected = PacketCipherAccess::Probe(control);
+            BOOST_CHECK(PacketCipherAccess::Probe(enc) == expected);
+            BOOST_CHECK(PacketCipherAccess::Probe(dec) == expected);
+            BOOST_CHECK(PacketCipherAccess::Failed(enc) && PacketCipherAccess::Failed(dec));
+            BOOST_CHECK_EQUAL(enc.Packets(),count); BOOST_CHECK_EQUAL(dec.Packets(),count);
+        }
     }
 }
 BOOST_AUTO_TEST_SUITE_END()

@@ -14,7 +14,7 @@
 #include <vector>
 
 namespace pq {
-namespace test { struct Access; }
+namespace test { struct Access; struct PacketCipherAccess; }
 using Bytes = std::vector<uint8_t>;
 using Network = std::array<uint8_t, 85>;
 inline constexpr std::string_view PREFACE{"Mercatura/P2P/PQ"};
@@ -76,6 +76,7 @@ public:
 
 /** One directional packet state. Never reuse after any decoding error. */
 class PacketCipher {
+    friend struct test::PacketCipherAccess;
     FSChaCha20 m_length;
     FSChaCha20Poly1305 m_payload;
     const Digest m_h5;
