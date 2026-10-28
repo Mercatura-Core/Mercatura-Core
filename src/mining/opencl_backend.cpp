@@ -432,7 +432,11 @@ class OpenClBackend final : public GpuBackend
                     Check(api.clFinish(queue), "Synchronize bounded AMD V2 window");
                     pending = 0;
                 }
-                return !cancelled();
+                if (cancelled()) {
+                    Check(api.clFinish(queue), "Drain cancelled AMD V2 work");
+                    return false;
+                }
+                return true;
             };
             if (!launch(init)) return {};
             for (const auto kernel : {fill, bind, mix, final}) {

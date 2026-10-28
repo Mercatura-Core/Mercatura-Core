@@ -208,6 +208,12 @@ int main()
                 Require(failed && runtime.pending == 0, "Synchronization error escaped without draining");
                 runtime.fail_finish = 0;
                 Require(backend->Hash(std::span{input}.first(1), [] { return false; }).size() == 1, "Restart after synchronization error failed");
+                runtime.launches.clear();
+                runtime.fail_finish = runtime.finishes + 2;
+                failed = false;
+                try { backend->Hash(input, [&] { return !runtime.launches.empty(); }); } catch (const std::runtime_error&) { failed = true; }
+                Require(failed && runtime.pending == 0, "Post-enqueue cancellation suppressed a drain error");
+                runtime.fail_finish = 0;
             }
             clean();
         }
