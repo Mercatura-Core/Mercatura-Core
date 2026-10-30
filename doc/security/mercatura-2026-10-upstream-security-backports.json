@@ -1,0 +1,3055 @@
+{
+  "schema": "mercatura-2026-10-security-backports-v1",
+  "generated_utc": "2026-10-30T09:06:17.697693+00:00",
+  "overall_result": "PARTIAL",
+  "original_source_sha": "61f1f4b9e24d07ea56fcfc1952aaa73aac498394",
+  "initial_checkout_sha": "631886dd5159614b628ced3fe4fa1e289ce19451",
+  "patched_source_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+  "branch": "security/bitcoin-core-2026-10-backports",
+  "security_commits": [
+    "77a4de7a10730544f728fd809f710a9a8fec5e46",
+    "2f25a22f4fd6522b451f7cdad599b4cb2e79f9a3",
+    "0a66162c465898b132e31d7574b0b8fb89ff09cc"
+  ],
+  "issues": [
+    {
+      "tested_tree_deltas": [
+        {
+          "test": "A-select",
+          "staged_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "committed_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "delta_to_commit": ""
+        },
+        {
+          "test": "A-unit",
+          "staged_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "committed_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "delta_to_commit": ""
+        },
+        {
+          "test": "A-pq-select-functional",
+          "staged_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "committed_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "delta_to_commit": ""
+        },
+        {
+          "test": "A-classical-select-functional",
+          "staged_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "committed_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "delta_to_commit": ""
+        },
+        {
+          "test": "A-select-asan-ubsan",
+          "staged_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "committed_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "delta_to_commit": ""
+        },
+        {
+          "test": "A-pq-fuzz-smoke",
+          "staged_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "committed_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "delta_to_commit": ""
+        },
+        {
+          "test": "A-pq-protocol",
+          "staged_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "committed_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "delta_to_commit": ""
+        }
+      ],
+      "id": "A",
+      "cve": "CVE-2026-117350",
+      "title": "TCP urgent-data receive-backpressure",
+      "commit": "77a4de7a10730544f728fd809f710a9a8fec5e46",
+      "upstream_pr": "https://github.com/bitcoin/bitcoin/pull/36665",
+      "upstream_commit": "2186232955fa70f47c584fb4973e5d849dcfe0f1",
+      "official_advisory": "https://bitcoincore.org/en/2026/10/28/disclose-tcp-oom/",
+      "root_cause": "Exceptions were monitored even when receive monitoring was paused, allowing urgent data to trigger more reads.",
+      "corrected_invariant": "select exception monitoring requires a receive request; send-only/paused sockets cannot get urgent-data ERR readiness.",
+      "files": [
+        "src/test/CMakeLists.txt",
+        "src/test/sock_tests.cpp",
+        "src/test/util/sock_select.cpp",
+        "src/util/sock.cpp"
+      ],
+      "focused_tests": [
+        {
+          "name": "A-select",
+          "command": [
+            "work/build/bin/sock_select_tests",
+            "--report_level=detailed",
+            "--log_level=test_suite"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "61f1f4b9e24d07ea56fcfc1952aaa73aac498394",
+          "source_status": "M  src/test/CMakeLists.txt\nM  src/test/sock_tests.cpp\nA  src/test/util/sock_select.cpp\nM  src/util/sock.cpp\n",
+          "started_utc": "2026-10-30T04:18:44.680999+00:00",
+          "timeout_seconds": 60,
+          "source_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "environment": {
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp"
+          },
+          "returncode": 0,
+          "duration_seconds": 0.164,
+          "result": "PASS"
+        },
+        {
+          "name": "A-unit",
+          "command": [
+            "work/build/bin/test_bitcoin",
+            "--run_test=sock_tests,net_tests,netbase_tests,net_peer_connection_tests,pq_transport_tests,pq_policy_tests",
+            "--report_level=detailed",
+            "--log_level=test_suite"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "61f1f4b9e24d07ea56fcfc1952aaa73aac498394",
+          "source_status": "M  src/test/CMakeLists.txt\nM  src/test/sock_tests.cpp\nA  src/test/util/sock_select.cpp\nM  src/util/sock.cpp\n",
+          "started_utc": "2026-10-30T04:18:33.309903+00:00",
+          "timeout_seconds": 300,
+          "source_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "environment": {
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp"
+          },
+          "returncode": 0,
+          "duration_seconds": 23.095,
+          "result": "PASS"
+        },
+        {
+          "name": "A-pq-select-functional",
+          "command": [
+            "python3",
+            "work/build/test/functional/feature_pq_transport.py",
+            "--configfile=/workspace/work/security-backports/work/build/test/config.ini",
+            "--tmpdir=/workspace/work/security-backports/work/tmp/A-pq-select",
+            "--portseed=120",
+            "--timeout-factor=2"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "61f1f4b9e24d07ea56fcfc1952aaa73aac498394",
+          "source_status": "M  src/test/CMakeLists.txt\nM  src/test/sock_tests.cpp\nA  src/test/util/sock_select.cpp\nM  src/util/sock.cpp\n",
+          "started_utc": "2026-10-30T04:19:33.563813+00:00",
+          "timeout_seconds": 600,
+          "source_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "environment": {
+            "BITCOIND": "/workspace/work/security-backports/work/mercaturad-select",
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp"
+          },
+          "returncode": 0,
+          "duration_seconds": 160.87,
+          "result": "PASS"
+        },
+        {
+          "name": "A-classical-select-functional",
+          "command": [
+            "python3",
+            "work/build/test/functional/mercatura_p2p_propagation.py",
+            "--configfile=/workspace/work/security-backports/work/build/test/config.ini",
+            "--tmpdir=/workspace/work/security-backports/work/tmp/A-classical-select",
+            "--portseed=121",
+            "--timeout-factor=2"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "61f1f4b9e24d07ea56fcfc1952aaa73aac498394",
+          "source_status": "M  src/test/CMakeLists.txt\nM  src/test/sock_tests.cpp\nA  src/test/util/sock_select.cpp\nM  src/util/sock.cpp\n",
+          "started_utc": "2026-10-30T04:19:36.290636+00:00",
+          "timeout_seconds": 300,
+          "source_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "environment": {
+            "BITCOIND": "/workspace/work/security-backports/work/mercaturad-select",
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp"
+          },
+          "returncode": 0,
+          "duration_seconds": 138.806,
+          "result": "PASS"
+        },
+        {
+          "name": "A-select-asan-ubsan",
+          "command": [
+            "work/sanitized/sock_select_tests/sock_select_tests",
+            "--report_level=detailed",
+            "--log_level=test_suite"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "61f1f4b9e24d07ea56fcfc1952aaa73aac498394",
+          "source_status": "M  src/test/CMakeLists.txt\nM  src/test/sock_tests.cpp\nA  src/test/util/sock_select.cpp\nM  src/util/sock.cpp\n",
+          "started_utc": "2026-10-30T04:22:02.583843+00:00",
+          "timeout_seconds": 60,
+          "source_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "environment": {
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp",
+            "ASAN_OPTIONS": "detect_leaks=1:abort_on_error=1",
+            "UBSAN_OPTIONS": "halt_on_error=1"
+          },
+          "returncode": 0,
+          "duration_seconds": 0.229,
+          "result": "PASS",
+          "instrumentation": "ASan+UBSan on select production Sock implementation, socket tests, and test main; linked node/support libraries uninstrumented"
+        },
+        {
+          "name": "A-pq-fuzz-smoke",
+          "command": [
+            "work/build/bin/pq_fuzz_smoke"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "61f1f4b9e24d07ea56fcfc1952aaa73aac498394",
+          "source_status": "M  src/test/CMakeLists.txt\nM  src/test/sock_tests.cpp\nA  src/test/util/sock_select.cpp\nM  src/util/sock.cpp\n",
+          "started_utc": "2026-10-30T04:22:02.868704+00:00",
+          "timeout_seconds": 60,
+          "source_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "environment": {
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp"
+          },
+          "returncode": 0,
+          "duration_seconds": 2.539,
+          "result": "PASS"
+        },
+        {
+          "name": "A-pq-protocol",
+          "command": [
+            "work/build/bin/pq_stagea_tests",
+            "--report_level=detailed"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "61f1f4b9e24d07ea56fcfc1952aaa73aac498394",
+          "source_status": "M  src/test/CMakeLists.txt\nM  src/test/sock_tests.cpp\nA  src/test/util/sock_select.cpp\nM  src/util/sock.cpp\n",
+          "started_utc": "2026-10-30T04:22:22.567340+00:00",
+          "timeout_seconds": 120,
+          "source_tree": "90b3d40796a4ca8f5fa138044a6b808c765d61bb",
+          "environment": {
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp"
+          },
+          "returncode": 0,
+          "duration_seconds": 0.565,
+          "result": "PASS"
+        }
+      ],
+      "patch_result": "PASS"
+    },
+    {
+      "tested_tree_deltas": [
+        {
+          "test": "B-unit",
+          "staged_tree": "46c1edd0768a8295d10165fced75bf046f60f501",
+          "committed_tree": "d74a1b716fd579d074564aa81a0c793532f86a1e",
+          "delta_to_commit": "M\tsrc/test/net_tests.cpp"
+        },
+        {
+          "test": "B-final-pause-unit",
+          "staged_tree": "d74a1b716fd579d074564aa81a0c793532f86a1e",
+          "committed_tree": "d74a1b716fd579d074564aa81a0c793532f86a1e",
+          "delta_to_commit": ""
+        },
+        {
+          "test": "B-pause-asan-ubsan",
+          "staged_tree": "46c1edd0768a8295d10165fced75bf046f60f501",
+          "committed_tree": "d74a1b716fd579d074564aa81a0c793532f86a1e",
+          "delta_to_commit": "M\tsrc/test/net_tests.cpp"
+        },
+        {
+          "test": "B-peer-timeouts-functional",
+          "staged_tree": "cee59e475e5da78728b2a428b83a35150d00ad35",
+          "committed_tree": "d74a1b716fd579d074564aa81a0c793532f86a1e",
+          "delta_to_commit": "M\tsrc/test/net_tests.cpp"
+        },
+        {
+          "test": "B-pq-lifecycle-functional",
+          "staged_tree": "cee59e475e5da78728b2a428b83a35150d00ad35",
+          "committed_tree": "d74a1b716fd579d074564aa81a0c793532f86a1e",
+          "delta_to_commit": "M\tsrc/test/net_tests.cpp"
+        },
+        {
+          "test": "B-pq-lifecycle-unit",
+          "staged_tree": "46c1edd0768a8295d10165fced75bf046f60f501",
+          "committed_tree": "d74a1b716fd579d074564aa81a0c793532f86a1e",
+          "delta_to_commit": "M\tsrc/test/net_tests.cpp"
+        }
+      ],
+      "id": "B",
+      "cve": "CVE-2026-117349",
+      "title": "Persistently paused send buffers",
+      "commit": "2f25a22f4fd6522b451f7cdad599b4cb2e79f9a3",
+      "upstream_pr": "https://github.com/bitcoin/bitcoin/pull/36667",
+      "upstream_commit": "5da09030f7402e90a4fd73fced576c44d05cf1d3",
+      "official_advisory": "https://bitcoincore.org/en/2026/10/28/disclose-fpausesend-oom/",
+      "root_cause": "Pre-BIP31 peers could remain send-paused while additional announcements accumulated, without an independent pause deadline.",
+      "corrected_invariant": "Both pause writers record only false-to-true transitions atomically; continued pause beyond the existing twenty-minute interval triggers disconnect, independent of protocol version or transport.",
+      "files": [
+        "src/net.cpp",
+        "src/net.h",
+        "src/test/CMakeLists.txt",
+        "src/test/net_tests.cpp",
+        "src/test/util/net.h"
+      ],
+      "focused_tests": [
+        {
+          "name": "B-unit",
+          "command": [
+            "work/build/bin/net_security_tests",
+            "--report_level=detailed",
+            "--log_level=test_suite"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "77a4de7a10730544f728fd809f710a9a8fec5e46",
+          "source_status": "M  src/net.cpp\nM  src/net.h\nM  src/test/CMakeLists.txt\nM  src/test/net_tests.cpp\nM  src/test/util/net.h\n",
+          "started_utc": "2026-10-30T04:29:00.110963+00:00",
+          "timeout_seconds": 300,
+          "source_tree": "46c1edd0768a8295d10165fced75bf046f60f501",
+          "environment": {
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp"
+          },
+          "returncode": 0,
+          "duration_seconds": 24.211,
+          "result": "PASS"
+        },
+        {
+          "name": "B-final-pause-unit",
+          "command": [
+            "work/build/bin/net_security_tests",
+            "--run_test=net_tests/paused_send_timeout",
+            "--report_level=detailed"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "77a4de7a10730544f728fd809f710a9a8fec5e46",
+          "source_status": "M  src/net.cpp\nM  src/net.h\nM  src/test/CMakeLists.txt\nM  src/test/net_tests.cpp\nM  src/test/util/net.h\n",
+          "started_utc": "2026-10-30T04:31:16.861087+00:00",
+          "timeout_seconds": 60,
+          "source_tree": "d74a1b716fd579d074564aa81a0c793532f86a1e",
+          "environment": {
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp"
+          },
+          "returncode": 0,
+          "duration_seconds": 0.366,
+          "result": "PASS"
+        },
+        {
+          "name": "B-pause-asan-ubsan",
+          "command": [
+            "work/sanitized/net_security_tests/net_security_tests",
+            "--run_test=net_tests/paused_send_timeout",
+            "--report_level=detailed"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "77a4de7a10730544f728fd809f710a9a8fec5e46",
+          "source_status": "M  src/net.cpp\nM  src/net.h\nM  src/test/CMakeLists.txt\nM  src/test/net_tests.cpp\nM  src/test/util/net.h\n",
+          "started_utc": "2026-10-30T04:30:19.617540+00:00",
+          "timeout_seconds": 120,
+          "source_tree": "46c1edd0768a8295d10165fced75bf046f60f501",
+          "environment": {
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp"
+          },
+          "returncode": 0,
+          "duration_seconds": 0.417,
+          "result": "PASS",
+          "instrumentation": "ASan+UBSan on production net.cpp and network tests; other linked libraries uninstrumented"
+        },
+        {
+          "name": "B-peer-timeouts-functional",
+          "command": [
+            "python3",
+            "work/build/test/functional/p2p_timeouts.py",
+            "--configfile=/workspace/work/security-backports/work/build/test/config.ini",
+            "--tmpdir=/workspace/work/security-backports/work/tmp/B-peer-timeouts",
+            "--portseed=131",
+            "--timeout-factor=2"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "77a4de7a10730544f728fd809f710a9a8fec5e46",
+          "source_status": "M  src/net.cpp\nM  src/net.h\nM  src/test/CMakeLists.txt\nM  src/test/net_tests.cpp\nM  src/test/util/net.h\n",
+          "started_utc": "2026-10-30T04:27:43.196070+00:00",
+          "timeout_seconds": 240,
+          "source_tree": "cee59e475e5da78728b2a428b83a35150d00ad35",
+          "environment": {
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp"
+          },
+          "returncode": 0,
+          "duration_seconds": 2.209,
+          "result": "PASS"
+        },
+        {
+          "name": "B-pq-lifecycle-functional",
+          "command": [
+            "python3",
+            "work/build/test/functional/feature_pq_b1_lifecycle.py",
+            "--configfile=/workspace/work/security-backports/work/build/test/config.ini",
+            "--tmpdir=/workspace/work/security-backports/work/tmp/B-pq-lifecycle",
+            "--portseed=130",
+            "--timeout-factor=2"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "77a4de7a10730544f728fd809f710a9a8fec5e46",
+          "source_status": "M  src/net.cpp\nM  src/net.h\nM  src/test/CMakeLists.txt\nM  src/test/net_tests.cpp\nM  src/test/util/net.h\n",
+          "started_utc": "2026-10-30T04:27:30.390674+00:00",
+          "timeout_seconds": 600,
+          "source_tree": "cee59e475e5da78728b2a428b83a35150d00ad35",
+          "environment": {
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp"
+          },
+          "returncode": 0,
+          "duration_seconds": 161.661,
+          "result": "PASS"
+        },
+        {
+          "name": "B-pq-lifecycle-unit",
+          "command": [
+            "work/build/bin/pq_b1_tests",
+            "--report_level=short"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "77a4de7a10730544f728fd809f710a9a8fec5e46",
+          "source_status": "M  src/net.cpp\nM  src/net.h\nM  src/test/CMakeLists.txt\nM  src/test/net_tests.cpp\nM  src/test/util/net.h\n",
+          "started_utc": "2026-10-30T04:30:20.084435+00:00",
+          "timeout_seconds": 180,
+          "source_tree": "46c1edd0768a8295d10165fced75bf046f60f501",
+          "environment": {
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp"
+          },
+          "returncode": 0,
+          "duration_seconds": 16.958,
+          "result": "PASS"
+        }
+      ],
+      "patch_result": "PASS"
+    },
+    {
+      "tested_tree_deltas": [
+        {
+          "test": "C-storage-unit",
+          "staged_tree": "8fff0a67db2abb377d947733ce2a48d044c0c251",
+          "committed_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+          "delta_to_commit": "M\ttest/functional/feature_security_storage_compat.py"
+        },
+        {
+          "test": "C-storage-asan-ubsan",
+          "staged_tree": "8fff0a67db2abb377d947733ce2a48d044c0c251",
+          "committed_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+          "delta_to_commit": "M\ttest/functional/feature_security_storage_compat.py"
+        },
+        {
+          "test": "C-old-to-new-functional",
+          "staged_tree": "2da463f94a4d3406e4555da01338ea04aef2b2b6",
+          "committed_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+          "delta_to_commit": "M\tsrc/test/blockmanager_tests.cpp\nM\tsrc/test/blockstorage_durability_tests.cpp\nM\tsrc/test/flatfile_tests.cpp\nM\ttest/functional/feature_security_storage_compat.py"
+        }
+      ],
+      "id": "C",
+      "cve": "CVE-2026-117346",
+      "title": "Block/undo absolute file positions",
+      "commit": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "upstream_pr": "https://github.com/bitcoin/bitcoin/pull/36669",
+      "upstream_commit": "2b5b6fe231ff45a09d9e24411e4420d51ed45cab",
+      "official_advisory": "https://bitcoincore.org/en/2026/10/28/disclose-undo-overflow/",
+      "root_cause": "32-bit absolute offsets and undo accounting could wrap; Windows long-based seek/truncate operations could not represent large positions.",
+      "corrected_invariant": "Absolute positions/accounting are uint64_t; seeks, truncation and allocation use checked wide operations; existing VARINT bytes remain identical for old valid values.",
+      "files": [
+        "src/chain.h",
+        "src/flatfile.cpp",
+        "src/flatfile.h",
+        "src/kernel/chain.h",
+        "src/node/blockstorage.cpp",
+        "src/node/blockstorage.h",
+        "src/streams.cpp",
+        "src/streams.h",
+        "src/test/CMakeLists.txt",
+        "src/test/blockmanager_tests.cpp",
+        "src/test/blockstorage_durability_tests.cpp",
+        "src/test/flatfile_tests.cpp",
+        "src/test/util/sparse.h",
+        "src/util/fs_helpers.cpp",
+        "src/util/fs_helpers.h",
+        "test/functional/feature_security_storage_compat.py",
+        "test/functional/test_runner.py"
+      ],
+      "focused_tests": [
+        {
+          "name": "C-storage-unit",
+          "command": [
+            "work/build/bin/storage_security_tests",
+            "--catch_system_error=no",
+            "--report_level=detailed",
+            "--log_level=test_suite"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "2f25a22f4fd6522b451f7cdad599b4cb2e79f9a3",
+          "source_status": "M  src/chain.h\nM  src/flatfile.cpp\nM  src/flatfile.h\nM  src/kernel/chain.h\nM  src/node/blockstorage.cpp\nM  src/node/blockstorage.h\nM  src/streams.cpp\nM  src/streams.h\nM  src/test/CMakeLists.txt\nM  src/test/blockmanager_tests.cpp\nM  src/test/blockstorage_durability_tests.cpp\nM  src/test/flatfile_tests.cpp\nA  src/test/util/sparse.h\nM  src/util/fs_helpers.cpp\nM  src/util/fs_helpers.h\nA  test/functional/feature_security_storage_compat.py\nM  test/functional/test_runner.py\n",
+          "started_utc": "2026-10-30T04:54:08.486890+00:00",
+          "timeout_seconds": 900,
+          "source_tree": "8fff0a67db2abb377d947733ce2a48d044c0c251",
+          "environment": {
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp"
+          },
+          "returncode": 0,
+          "duration_seconds": 156.938,
+          "result": "PASS"
+        },
+        {
+          "name": "C-storage-asan-ubsan",
+          "command": [
+            "work/sanitized/storage_security_tests/storage_security_tests",
+            "--catch_system_error=no",
+            "--run_test=flatfile_tests,blockstorage_durability_tests",
+            "--report_level=detailed",
+            "--log_level=test_suite"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "2f25a22f4fd6522b451f7cdad599b4cb2e79f9a3",
+          "source_status": "M  src/chain.h\nM  src/flatfile.cpp\nM  src/flatfile.h\nM  src/kernel/chain.h\nM  src/node/blockstorage.cpp\nM  src/node/blockstorage.h\nM  src/streams.cpp\nM  src/streams.h\nM  src/test/CMakeLists.txt\nM  src/test/blockmanager_tests.cpp\nM  src/test/blockstorage_durability_tests.cpp\nM  src/test/flatfile_tests.cpp\nA  src/test/util/sparse.h\nM  src/util/fs_helpers.cpp\nM  src/util/fs_helpers.h\nA  test/functional/feature_security_storage_compat.py\nM  test/functional/test_runner.py\n",
+          "started_utc": "2026-10-30T04:56:04.794914+00:00",
+          "timeout_seconds": 180,
+          "source_tree": "8fff0a67db2abb377d947733ce2a48d044c0c251",
+          "environment": {
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp",
+            "ASAN_OPTIONS": "detect_leaks=1:abort_on_error=1",
+            "UBSAN_OPTIONS": "halt_on_error=1"
+          },
+          "returncode": 0,
+          "duration_seconds": 11.301,
+          "result": "PASS",
+          "instrumentation": "ASan+UBSan on flatfile.cpp, streams.cpp, fs_helpers.cpp, node/blockstorage.cpp, flatfile and durability tests; other linked libraries uninstrumented"
+        },
+        {
+          "name": "C-old-to-new-functional",
+          "command": [
+            "python3",
+            "source/test/functional/feature_security_storage_compat.py",
+            "--configfile=/workspace/work/security-backports/work/build/test/config.ini",
+            "--legacy-fixture=/workspace/work/security-backports/work/legacy/chain-fixture",
+            "--tmpdir=/workspace/work/security-backports/work/tmp/C-upgrade",
+            "--portseed=141",
+            "--timeout-factor=2"
+          ],
+          "cwd": "/workspace/work/security-backports",
+          "source_sha": "2f25a22f4fd6522b451f7cdad599b4cb2e79f9a3",
+          "source_status": "M  src/chain.h\nM  src/flatfile.cpp\nM  src/flatfile.h\nM  src/kernel/chain.h\nM  src/node/blockstorage.cpp\nM  src/node/blockstorage.h\nM  src/streams.cpp\nM  src/streams.h\nM  src/test/CMakeLists.txt\nMM src/test/blockmanager_tests.cpp\nM  src/test/blockstorage_durability_tests.cpp\nMM src/test/flatfile_tests.cpp\nA  src/test/util/sparse.h\nM  src/util/fs_helpers.cpp\nM  src/util/fs_helpers.h\nA  test/functional/feature_security_storage_compat.py\nM  test/functional/test_runner.py\n",
+          "started_utc": "2026-10-30T04:52:36.051284+00:00",
+          "timeout_seconds": 900,
+          "source_tree": "2da463f94a4d3406e4555da01338ea04aef2b2b6",
+          "environment": {
+            "QT_QPA_PLATFORM": "offscreen",
+            "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+            "TMPDIR": "/workspace/work/security-backports/work/tmp"
+          },
+          "returncode": 0,
+          "duration_seconds": 135.479,
+          "result": "PASS"
+        }
+      ],
+      "patch_result": "PASS"
+    }
+  ],
+  "source_provenance": {
+    "initial_clean_release_build": {
+      "name": "final-release-build",
+      "command": [
+        "cmake",
+        "--build",
+        "work/release",
+        "-j",
+        "3"
+      ],
+      "cwd": "/workspace/work/security-backports",
+      "source_sha": "08278d0ab193277d60189587a3b6f0b9446433d1",
+      "source_status": "",
+      "started_utc": "2026-10-30T04:58:32.709632+00:00",
+      "timeout_seconds": 2400,
+      "source_tree": "8fff0a67db2abb377d947733ce2a48d044c0c251",
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+        "TMPDIR": "/workspace/work/security-backports/work/tmp"
+      },
+      "returncode": 0,
+      "duration_seconds": 1460.764,
+      "result": "PASS"
+    },
+    "mode_only_fix": {
+      "previous_storage_commit": "08278d0ab193277d60189587a3b6f0b9446433d1",
+      "final_storage_commit": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "change": "Functional test executable mode100644 to100755 only",
+      "raw_diff": ":100644 100755 ab4be97 ab4be97 M\ttest/functional/feature_security_storage_compat.py\n",
+      "numstat": "0\t0\ttest/functional/feature_security_storage_compat.py\n",
+      "production_and_test_file_contents_identical": true,
+      "file_permission_lint": "PASS",
+      "direct_executable_help": "PASS"
+    },
+    "final_version_refresh": {
+      "name": "final-release-build",
+      "command": [
+        "cmake",
+        "--build",
+        "work/release",
+        "-j",
+        "3"
+      ],
+      "cwd": "/workspace/work/security-backports",
+      "source_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "source_status": "",
+      "started_utc": "2026-10-30T05:25:54.267576+00:00",
+      "timeout_seconds": 300,
+      "source_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+        "TMPDIR": "/workspace/work/security-backports/work/tmp"
+      },
+      "returncode": 0,
+      "duration_seconds": 7.397,
+      "result": "PASS"
+    }
+  },
+  "final_qualification": {
+    "final-release-build": {
+      "name": "final-release-build",
+      "command": [
+        "cmake",
+        "--build",
+        "work/release",
+        "-j",
+        "3"
+      ],
+      "cwd": "/workspace/work/security-backports",
+      "source_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "source_status": "",
+      "started_utc": "2026-10-30T05:25:54.267576+00:00",
+      "timeout_seconds": 300,
+      "source_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+        "TMPDIR": "/workspace/work/security-backports/work/tmp"
+      },
+      "returncode": 0,
+      "duration_seconds": 7.397,
+      "result": "PASS"
+    },
+    "final-extra-build": {
+      "name": "final-extra-build",
+      "command": [
+        "cmake",
+        "--build",
+        "work/release",
+        "-j",
+        "3",
+        "--target",
+        "pq_stagea_tests",
+        "pq_transport_runner",
+        "pq_b1_tests",
+        "pq_fuzz_smoke",
+        "sock_select_tests"
+      ],
+      "cwd": "/workspace/work/security-backports",
+      "source_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "source_status": "",
+      "started_utc": "2026-10-30T05:26:01.727810+00:00",
+      "timeout_seconds": 900,
+      "source_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+        "TMPDIR": "/workspace/work/security-backports/work/tmp"
+      },
+      "returncode": 0,
+      "duration_seconds": 105.916,
+      "result": "PASS"
+    },
+    "final-unit-qt": {
+      "name": "final-unit-qt",
+      "command": [
+        "ctest",
+        "--test-dir",
+        "work/release",
+        "-j",
+        "2",
+        "--timeout",
+        "900",
+        "--output-on-failure",
+        "--output-junit",
+        "/workspace/work/security-backports/evidence/final-unit-qt.xml"
+      ],
+      "cwd": "/workspace/work/security-backports",
+      "source_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "source_status": "",
+      "started_utc": "2026-10-30T05:29:39.041523+00:00",
+      "timeout_seconds": 3600,
+      "source_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+        "TMPDIR": "/workspace/work/security-backports/work/tmp"
+      },
+      "returncode": 0,
+      "duration_seconds": 2767.454,
+      "result": "PASS"
+    },
+    "final-native-functional": {
+      "name": "final-native-functional",
+      "command": [
+        "python3",
+        "work/release/test/functional/test_runner.py",
+        "--jobs=2",
+        "--quiet",
+        "--timeout-factor=2",
+        "--tmpdirprefix=/workspace/work/security-backports/work/tmp",
+        "--resultsfile=/workspace/work/security-backports/evidence/final-native-functional.csv"
+      ],
+      "cwd": "/workspace/work/security-backports",
+      "source_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "source_status": "",
+      "started_utc": "2026-10-30T08:36:41.374411+00:00",
+      "timeout_seconds": 5400,
+      "source_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+        "TMPDIR": "/workspace/work/security-backports/work/tmp"
+      },
+      "returncode": 0,
+      "duration_seconds": 1744.16,
+      "result": "PASS"
+    },
+    "final-upgrade": {
+      "name": "final-upgrade",
+      "command": [
+        "source/test/functional/feature_security_storage_compat.py",
+        "--configfile=/workspace/work/security-backports/work/release/test/config.ini",
+        "--legacy-fixture=/workspace/work/security-backports/work/legacy/chain-fixture",
+        "--tmpdir=/workspace/work/security-backports/work/tmp/final-upgrade",
+        "--portseed=145",
+        "--timeout-factor=2"
+      ],
+      "cwd": "/workspace/work/security-backports",
+      "source_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "source_status": "",
+      "started_utc": "2026-10-30T05:34:51.794524+00:00",
+      "timeout_seconds": 900,
+      "source_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+        "TMPDIR": "/workspace/work/security-backports/work/tmp"
+      },
+      "returncode": 0,
+      "duration_seconds": 165.722,
+      "result": "PASS"
+    },
+    "enforced-profile-build": {
+      "name": "enforced-profile-build",
+      "command": [
+        "nice",
+        "-n",
+        "10",
+        "cmake",
+        "--build",
+        "work/enforced",
+        "-j",
+        "1",
+        "--target",
+        "bitcoind",
+        "bitcoin-cli"
+      ],
+      "cwd": "/workspace/work/security-backports",
+      "source_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "source_status": "",
+      "started_utc": "2026-10-30T06:12:12.111672+00:00",
+      "timeout_seconds": 3600,
+      "source_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+        "TMPDIR": "/workspace/work/security-backports/work/tmp"
+      },
+      "returncode": 0,
+      "duration_seconds": 882.934,
+      "result": "PASS"
+    },
+    "enforced-profile-functional": {
+      "name": "enforced-profile-functional",
+      "command": [
+        "python3",
+        "source/test/functional/feature_pq_required.py",
+        "--public-testnet",
+        "--configfile=/workspace/work/security-backports/work/enforced/test/config.ini",
+        "--tmpdir=/workspace/work/security-backports/work/tmp/final-enforced",
+        "--portseed=146",
+        "--timeout-factor=2"
+      ],
+      "cwd": "/workspace/work/security-backports",
+      "source_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "source_status": "",
+      "started_utc": "2026-10-30T08:36:41.387248+00:00",
+      "timeout_seconds": 600,
+      "source_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+      "environment": {
+        "BITCOIND": "/workspace/work/security-backports/work/enforced/bin/mercaturad",
+        "QT_QPA_PLATFORM": "offscreen",
+        "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+        "TMPDIR": "/workspace/work/security-backports/work/tmp"
+      },
+      "returncode": 0,
+      "duration_seconds": 20.337,
+      "result": "PASS"
+    },
+    "final-select": {
+      "name": "final-select",
+      "command": [
+        "work/release/bin/sock_select_tests",
+        "--catch_system_error=no",
+        "--report_level=detailed"
+      ],
+      "cwd": "/workspace/work/security-backports",
+      "source_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "source_status": "",
+      "started_utc": "2026-10-30T05:29:43.311482+00:00",
+      "timeout_seconds": 60,
+      "source_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+        "TMPDIR": "/workspace/work/security-backports/work/tmp"
+      },
+      "returncode": 0,
+      "duration_seconds": 0.192,
+      "result": "PASS"
+    },
+    "final-pq-fuzz-smoke": {
+      "name": "final-pq-fuzz-smoke",
+      "command": [
+        "work/release/bin/pq_fuzz_smoke"
+      ],
+      "cwd": "/workspace/work/security-backports",
+      "source_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "source_status": "",
+      "started_utc": "2026-10-30T05:29:43.566842+00:00",
+      "timeout_seconds": 120,
+      "source_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+        "TMPDIR": "/workspace/work/security-backports/work/tmp"
+      },
+      "returncode": 0,
+      "duration_seconds": 3.444,
+      "result": "PASS"
+    },
+    "final-pq-protocol": {
+      "name": "final-pq-protocol",
+      "command": [
+        "work/release/bin/pq_stagea_tests",
+        "--catch_system_error=no",
+        "--report_level=detailed"
+      ],
+      "cwd": "/workspace/work/security-backports",
+      "source_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "source_status": "",
+      "started_utc": "2026-10-30T05:29:47.091680+00:00",
+      "timeout_seconds": 120,
+      "source_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+      "environment": {
+        "QT_QPA_PLATFORM": "offscreen",
+        "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+        "TMPDIR": "/workspace/work/security-backports/work/tmp"
+      },
+      "returncode": 0,
+      "duration_seconds": 0.816,
+      "result": "PASS"
+    },
+    "enforced-profile-runtime-evidence": {
+      "name": "enforced-profile-runtime-evidence",
+      "command": [
+        "python3",
+        "source/test/functional/feature_pq_required.py",
+        "--public-testnet",
+        "--nocleanup",
+        "--configfile=/workspace/work/security-backports/work/enforced/test/config.ini",
+        "--tmpdir=/workspace/work/security-backports/work/tmp/final-enforced-evidence",
+        "--portseed=146",
+        "--timeout-factor=2"
+      ],
+      "cwd": "/workspace/work/security-backports",
+      "source_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "source_status": "",
+      "started_utc": "2026-10-30T08:37:45.006754+00:00",
+      "timeout_seconds": 600,
+      "source_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+      "environment": {
+        "BITCOIND": "/workspace/work/security-backports/work/enforced/bin/mercaturad",
+        "QT_QPA_PLATFORM": "offscreen",
+        "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+        "TMPDIR": "/workspace/work/security-backports/work/tmp"
+      },
+      "returncode": 0,
+      "duration_seconds": 22.601,
+      "result": "PASS"
+    }
+  },
+  "enforced_pq_runtime": {
+    "chain": "testnet",
+    "events": [
+      {
+        "outbound_classical_rejected": true,
+        "tcp_attempts": 1
+      },
+      {
+        "origin": "connect",
+        "session_id": "9f30a829b81b0b0e08068fa1526be476e8c445dd019abd9657471cc3cff4a548"
+      },
+      {
+        "origin": "addnode",
+        "session_id": "d0514af90548a3061aa8b18266ef066e6ca579b5152449ad047453321d8d7a33"
+      },
+      {
+        "exact_pin_reconnect": true,
+        "alternate_destination_unverified": true,
+        "mismatch_retried_without_replacement": true
+      },
+      {
+        "default_profile_required": true,
+        "activation": "pending"
+      }
+    ],
+    "status": [
+      {
+        "chain": "test",
+        "build": "v0.1.2-p9p11-dev-0a66162c4658",
+        "testnet_enforced_build": true,
+        "testnet_activation": "pending",
+        "network_discriminator": "01d7dbeea42069ffbedcb99d0701f69ab941fdb6d22ab28472836acfd145dc899a7c70fcb30c63a75b845e4f7d01107d852e4c2485c51a50aaaa94fc61995e71bbee983a2ac3713831264adb47fb6bd1e058d5f004",
+        "required": true,
+        "transport": "pq-v1",
+        "listening": true,
+        "connected": 1,
+        "pending": 0,
+        "queued": 0,
+        "active": 0,
+        "established_total": 1,
+        "failures": {
+          "framing": 0,
+          "authentication_or_crypto": 0,
+          "pin": 0,
+          "deadline": 0,
+          "resource": 0,
+          "packet": 0
+        },
+        "known_addresses": 0,
+        "discovery": "connected"
+      },
+      {
+        "chain": "test",
+        "build": "v0.1.2-p9p11-dev-0a66162c4658",
+        "testnet_enforced_build": true,
+        "testnet_activation": "pending",
+        "network_discriminator": "01d7dbeea42069ffbedcb99d0701f69ab941fdb6d22ab28472836acfd145dc899a7c70fcb30c63a75b845e4f7d01107d852e4c2485c51a50aaaa94fc61995e71bbee983a2ac3713831264adb47fb6bd1e058d5f004",
+        "required": true,
+        "transport": "pq-v1",
+        "listening": true,
+        "connected": 0,
+        "pending": 0,
+        "queued": 0,
+        "active": 0,
+        "established_total": 0,
+        "failures": {
+          "framing": 0,
+          "authentication_or_crypto": 0,
+          "pin": 0,
+          "deadline": 0,
+          "resource": 0,
+          "packet": 0
+        },
+        "known_addresses": 0,
+        "discovery": "disabled"
+      },
+      {
+        "chain": "test",
+        "build": "v0.1.2-p9p11-dev-0a66162c4658",
+        "testnet_enforced_build": true,
+        "testnet_activation": "pending",
+        "network_discriminator": "01d7dbeea42069ffbedcb99d0701f69ab941fdb6d22ab28472836acfd145dc899a7c70fcb30c63a75b845e4f7d01107d852e4c2485c51a50aaaa94fc61995e71bbee983a2ac3713831264adb47fb6bd1e058d5f004",
+        "required": true,
+        "transport": "pq-v1",
+        "listening": true,
+        "connected": 1,
+        "pending": 0,
+        "queued": 0,
+        "active": 0,
+        "established_total": 3,
+        "failures": {
+          "framing": 0,
+          "authentication_or_crypto": 0,
+          "pin": 0,
+          "deadline": 0,
+          "resource": 0,
+          "packet": 0
+        },
+        "known_addresses": 0,
+        "discovery": "connected"
+      }
+    ],
+    "persistent_pin_tests": true,
+    "public_network_contact": false,
+    "genesis": "b3fc707c9a89dc45d1cf6a837284b22ad2b6fd41b99af601079db9dcbeff6920"
+  },
+  "final_exit_audit": {
+    "generated_utc": "2026-10-30T09:05:51.106992+00:00",
+    "head": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+    "commits": [
+      "77a4de7a10730544f728fd809f710a9a8fec5e46",
+      "2f25a22f4fd6522b451f7cdad599b4cb2e79f9a3",
+      "0a66162c465898b132e31d7574b0b8fb89ff09cc"
+    ],
+    "diff_check": "PASS",
+    "original_checkout": {
+      "head": "631886dd5159614b628ced3fe4fa1e289ce19451",
+      "branch": "work",
+      "status": "",
+      "origin_v0_1": "43382aea07be42935c0040c1b6fdf12d2648d92f"
+    },
+    "original_checkout_unchanged": true,
+    "owned_processes": [],
+    "no_ci_queries": true,
+    "no_push_merge_release_or_deployment": true
+  },
+  "full_unit_qt": {
+    "total": 194,
+    "passed": 193,
+    "failed": 0,
+    "skipped": 1,
+    "details": [
+      {
+        "name": "univalue_test",
+        "result": "passed",
+        "seconds": "0.00348479"
+      },
+      {
+        "name": "univalue_object_test",
+        "result": "passed",
+        "seconds": "0.0060967"
+      },
+      {
+        "name": "secp256k1_noverify_tests",
+        "result": "passed",
+        "seconds": "29.4097"
+      },
+      {
+        "name": "secp256k1_tests",
+        "result": "passed",
+        "seconds": "61.5996"
+      },
+      {
+        "name": "secp256k1_exhaustive_tests",
+        "result": "passed",
+        "seconds": "10.9183"
+      },
+      {
+        "name": "test_bitcoin-qt",
+        "result": "passed",
+        "seconds": "159.538"
+      },
+      {
+        "name": "test_mining-qt",
+        "result": "passed",
+        "seconds": "92.4123"
+      },
+      {
+        "name": "test_mining_app-qt-1",
+        "result": "passed",
+        "seconds": "5.74616"
+      },
+      {
+        "name": "test_mining_app-qt-2",
+        "result": "passed",
+        "seconds": "6.03759"
+      },
+      {
+        "name": "test_mining_app-qt-pq-v2",
+        "result": "passed",
+        "seconds": "24.2097"
+      },
+      {
+        "name": "test_mining_app-qt-pq-transition",
+        "result": "passed",
+        "seconds": "29.4647"
+      },
+      {
+        "name": "test_peersecurity-qt",
+        "result": "passed",
+        "seconds": "0.401134"
+      },
+      {
+        "name": "addrman_tests",
+        "result": "passed",
+        "seconds": "0.221079"
+      },
+      {
+        "name": "allocator_tests",
+        "result": "passed",
+        "seconds": "0.114569"
+      },
+      {
+        "name": "amount_tests",
+        "result": "passed",
+        "seconds": "0.11314"
+      },
+      {
+        "name": "argsman_tests",
+        "result": "passed",
+        "seconds": "35.0574"
+      },
+      {
+        "name": "arith_uint256_tests",
+        "result": "passed",
+        "seconds": "0.119733"
+      },
+      {
+        "name": "banman_tests",
+        "result": "passed",
+        "seconds": "0.116787"
+      },
+      {
+        "name": "base32_tests",
+        "result": "passed",
+        "seconds": "0.11538"
+      },
+      {
+        "name": "base58_tests",
+        "result": "passed",
+        "seconds": "0.11693"
+      },
+      {
+        "name": "base64_tests",
+        "result": "passed",
+        "seconds": "0.114904"
+      },
+      {
+        "name": "bech32_tests",
+        "result": "passed",
+        "seconds": "0.113277"
+      },
+      {
+        "name": "bip32_tests",
+        "result": "passed",
+        "seconds": "0.140191"
+      },
+      {
+        "name": "bip324_tests",
+        "result": "passed",
+        "seconds": "0.653069"
+      },
+      {
+        "name": "blockchain_tests",
+        "result": "passed",
+        "seconds": "116.734"
+      },
+      {
+        "name": "blockencodings_tests",
+        "result": "passed",
+        "seconds": "5.50826"
+      },
+      {
+        "name": "blockfilter_index_tests",
+        "result": "passed",
+        "seconds": "140.333"
+      },
+      {
+        "name": "blockfilter_tests",
+        "result": "passed",
+        "seconds": "0.13896"
+      },
+      {
+        "name": "blockmanager_tests",
+        "result": "passed",
+        "seconds": "281.386"
+      },
+      {
+        "name": "blockstorage_durability_tests",
+        "result": "passed",
+        "seconds": "22.2809"
+      },
+      {
+        "name": "bloom_tests",
+        "result": "passed",
+        "seconds": "0.171495"
+      },
+      {
+        "name": "bswap_tests",
+        "result": "passed",
+        "seconds": "0.119205"
+      },
+      {
+        "name": "caches_tests",
+        "result": "passed",
+        "seconds": "0.154477"
+      },
+      {
+        "name": "chain_tests",
+        "result": "passed",
+        "seconds": "2.79053"
+      },
+      {
+        "name": "chainstate_write_tests",
+        "result": "passed",
+        "seconds": "90.1045"
+      },
+      {
+        "name": "checkqueue_tests",
+        "result": "passed",
+        "seconds": "7.31143"
+      },
+      {
+        "name": "cluster_linearize_tests",
+        "result": "passed",
+        "seconds": "6.6946"
+      },
+      {
+        "name": "coins_tests_base",
+        "result": "passed",
+        "seconds": "2.82364"
+      },
+      {
+        "name": "coins_tests_dbbase",
+        "result": "passed",
+        "seconds": "3.16929"
+      },
+      {
+        "name": "coins_tests",
+        "result": "passed",
+        "seconds": "1.11819"
+      },
+      {
+        "name": "coinscachepair_tests",
+        "result": "passed",
+        "seconds": "0.114358"
+      },
+      {
+        "name": "coinstatsindex_tests",
+        "result": "passed",
+        "seconds": "113.104"
+      },
+      {
+        "name": "coinsviewoverlay_tests",
+        "result": "passed",
+        "seconds": "0.117752"
+      },
+      {
+        "name": "common_url_tests",
+        "result": "passed",
+        "seconds": "0.115506"
+      },
+      {
+        "name": "compress_tests",
+        "result": "passed",
+        "seconds": "0.220207"
+      },
+      {
+        "name": "crypto_tests",
+        "result": "passed",
+        "seconds": "1.77398"
+      },
+      {
+        "name": "mercahash_v2_tests",
+        "result": "passed",
+        "seconds": "2.62157"
+      },
+      {
+        "name": "mercahash_activation_tests",
+        "result": "passed",
+        "seconds": "11.4776"
+      },
+      {
+        "name": "mercahash_activation_tests_transition",
+        "result": "passed",
+        "seconds": "10.1756"
+      },
+      {
+        "name": "cpu_miner_tests",
+        "result": "passed",
+        "seconds": "3.95959"
+      },
+      {
+        "name": "worker_limits_tests",
+        "result": "passed",
+        "seconds": "0.113765"
+      },
+      {
+        "name": "witness_resource_tests",
+        "result": "passed",
+        "seconds": "0.385926"
+      },
+      {
+        "name": "witness_resource_tests_chain",
+        "result": "passed",
+        "seconds": "59.844"
+      },
+      {
+        "name": "witness_resource_tests_net",
+        "result": "passed",
+        "seconds": "0.755368"
+      },
+      {
+        "name": "mining_statistics_tests",
+        "result": "passed",
+        "seconds": "0.119553"
+      },
+      {
+        "name": "gpu_capacity_tests",
+        "result": "passed",
+        "seconds": "0.117283"
+      },
+      {
+        "name": "gpu_scheduling_tests",
+        "result": "passed",
+        "seconds": "4.00794"
+      },
+      {
+        "name": "gpu_miner_tests",
+        "result": "passed",
+        "seconds": "0.634887"
+      },
+      {
+        "name": "mercahash_gpu_tests",
+        "result": "passed",
+        "seconds": "3.0767"
+      },
+      {
+        "name": "mercahash_opencl_tests",
+        "result": "passed",
+        "seconds": "2.97556"
+      },
+      {
+        "name": "mercahash_gpu_sync_tests",
+        "result": "passed",
+        "seconds": "0.117721"
+      },
+      {
+        "name": "cuda_binding_tests",
+        "result": "passed",
+        "seconds": "1.11695"
+      },
+      {
+        "name": "cuckoocache_tests",
+        "result": "passed",
+        "seconds": "0.538412"
+      },
+      {
+        "name": "dbwrapper_tests",
+        "result": "passed",
+        "seconds": "0.153462"
+      },
+      {
+        "name": "denialofservice_tests",
+        "result": "passed",
+        "seconds": "1.59087"
+      },
+      {
+        "name": "descriptor_tests",
+        "result": "passed",
+        "seconds": "0.795873"
+      },
+      {
+        "name": "disconnected_transactions",
+        "result": "passed",
+        "seconds": "38.6427"
+      },
+      {
+        "name": "feefrac_tests",
+        "result": "passed",
+        "seconds": "0.117383"
+      },
+      {
+        "name": "fee_rounder_tests",
+        "result": "passed",
+        "seconds": "0.113484"
+      },
+      {
+        "name": "flatfile_tests",
+        "result": "passed",
+        "seconds": "0.126846"
+      },
+      {
+        "name": "fs_tests",
+        "result": "passed",
+        "seconds": "0.118987"
+      },
+      {
+        "name": "getarg_tests",
+        "result": "passed",
+        "seconds": "0.121723"
+      },
+      {
+        "name": "hash_tests",
+        "result": "passed",
+        "seconds": "0.125764"
+      },
+      {
+        "name": "headers_sync_chainwork_tests",
+        "result": "passed",
+        "seconds": "82.4455"
+      },
+      {
+        "name": "headers_replay_tests",
+        "result": "passed",
+        "seconds": "12.7876"
+      },
+      {
+        "name": "httpserver_tests",
+        "result": "passed",
+        "seconds": "0.122899"
+      },
+      {
+        "name": "i2p_tests",
+        "result": "passed",
+        "seconds": "0.126475"
+      },
+      {
+        "name": "interfaces_tests",
+        "result": "passed",
+        "seconds": "281.974"
+      },
+      {
+        "name": "key_io_tests",
+        "result": "passed",
+        "seconds": "0.129897"
+      },
+      {
+        "name": "key_tests",
+        "result": "passed",
+        "seconds": "0.245939"
+      },
+      {
+        "name": "logging_tests",
+        "result": "passed",
+        "seconds": "0.131378"
+      },
+      {
+        "name": "mempool_tests",
+        "result": "passed",
+        "seconds": "1.24327"
+      },
+      {
+        "name": "merkle_tests",
+        "result": "passed",
+        "seconds": "1.43469"
+      },
+      {
+        "name": "merkleblock_tests",
+        "result": "passed",
+        "seconds": "0.117429"
+      },
+      {
+        "name": "miner_tests",
+        "result": "passed",
+        "seconds": "62.6792"
+      },
+      {
+        "name": "miniminer_tests",
+        "result": "passed",
+        "seconds": "174.191"
+      },
+      {
+        "name": "miniscript_tests",
+        "result": "passed",
+        "seconds": "0.924732"
+      },
+      {
+        "name": "minisketch_tests",
+        "result": "passed",
+        "seconds": "0.175641"
+      },
+      {
+        "name": "multisig_tests",
+        "result": "passed",
+        "seconds": "0.12159"
+      },
+      {
+        "name": "bip328_tests",
+        "result": "passed",
+        "seconds": "0.12016"
+      },
+      {
+        "name": "net_peer_connection_tests",
+        "result": "passed",
+        "seconds": "0.34785"
+      },
+      {
+        "name": "net_peer_eviction_tests",
+        "result": "passed",
+        "seconds": "0.190567"
+      },
+      {
+        "name": "net_tests",
+        "result": "passed",
+        "seconds": "5.14044"
+      },
+      {
+        "name": "pq_p2p_tests",
+        "result": "passed",
+        "seconds": "0.208837"
+      },
+      {
+        "name": "pq_assurance_tests",
+        "result": "passed",
+        "seconds": "0.582683"
+      },
+      {
+        "name": "pq_identity_tests",
+        "result": "passed",
+        "seconds": "0.135049"
+      },
+      {
+        "name": "pq_transport_tests",
+        "result": "passed",
+        "seconds": "16.4645"
+      },
+      {
+        "name": "pq_policy_tests",
+        "result": "passed",
+        "seconds": "0.150449"
+      },
+      {
+        "name": "netbase_tests",
+        "result": "passed",
+        "seconds": "0.134618"
+      },
+      {
+        "name": "node_init_tests",
+        "result": "passed",
+        "seconds": "0.379808"
+      },
+      {
+        "name": "node_warnings_tests",
+        "result": "passed",
+        "seconds": "0.115289"
+      },
+      {
+        "name": "orphanage_tests",
+        "result": "passed",
+        "seconds": "1.84084"
+      },
+      {
+        "name": "pcp_tests",
+        "result": "passed",
+        "seconds": "0.13429"
+      },
+      {
+        "name": "peerman_tests",
+        "result": "passed",
+        "seconds": "0.931962"
+      },
+      {
+        "name": "pmt_tests",
+        "result": "passed",
+        "seconds": "0.197839"
+      },
+      {
+        "name": "policyestimator_tests",
+        "result": "passed",
+        "seconds": "1.45496"
+      },
+      {
+        "name": "pool_tests",
+        "result": "passed",
+        "seconds": "0.125345"
+      },
+      {
+        "name": "block_capacity_tests",
+        "result": "passed",
+        "seconds": "0.140027"
+      },
+      {
+        "name": "testnet_capacity_tests",
+        "result": "passed",
+        "seconds": "2.31874"
+      },
+      {
+        "name": "blockchunk_tests",
+        "result": "passed",
+        "seconds": "0.127706"
+      },
+      {
+        "name": "pow_tests",
+        "result": "passed",
+        "seconds": "5.99161"
+      },
+      {
+        "name": "prevector_tests",
+        "result": "passed",
+        "seconds": "0.573912"
+      },
+      {
+        "name": "private_broadcast_tests",
+        "result": "passed",
+        "seconds": "0.119445"
+      },
+      {
+        "name": "raii_event_tests",
+        "result": "passed",
+        "seconds": "0.120206"
+      },
+      {
+        "name": "random_tests",
+        "result": "passed",
+        "seconds": "4.39555"
+      },
+      {
+        "name": "rbf_tests",
+        "result": "passed",
+        "seconds": "195.26"
+      },
+      {
+        "name": "rest_tests",
+        "result": "passed",
+        "seconds": "0.119816"
+      },
+      {
+        "name": "result_tests",
+        "result": "passed",
+        "seconds": "0.116067"
+      },
+      {
+        "name": "reverselock_tests",
+        "result": "passed",
+        "seconds": "0.116456"
+      },
+      {
+        "name": "rpc_tests",
+        "result": "passed",
+        "seconds": "4.06646"
+      },
+      {
+        "name": "sanity_tests",
+        "result": "passed",
+        "seconds": "0.120377"
+      },
+      {
+        "name": "scheduler_tests",
+        "result": "passed",
+        "seconds": "0.131926"
+      },
+      {
+        "name": "script_assets_tests",
+        "result": "skipped",
+        "seconds": "0.11636"
+      },
+      {
+        "name": "script_p2sh_tests",
+        "result": "passed",
+        "seconds": "0.129814"
+      },
+      {
+        "name": "script_parse_tests",
+        "result": "passed",
+        "seconds": "0.117551"
+      },
+      {
+        "name": "script_segwit_tests",
+        "result": "passed",
+        "seconds": "0.133655"
+      },
+      {
+        "name": "script_standard_tests",
+        "result": "passed",
+        "seconds": "0.127917"
+      },
+      {
+        "name": "script_tests",
+        "result": "passed",
+        "seconds": "0.781385"
+      },
+      {
+        "name": "scriptnum_tests",
+        "result": "passed",
+        "seconds": "0.133661"
+      },
+      {
+        "name": "serfloat_tests",
+        "result": "passed",
+        "seconds": "0.541622"
+      },
+      {
+        "name": "serialize_tests",
+        "result": "passed",
+        "seconds": "0.184624"
+      },
+      {
+        "name": "settings_tests",
+        "result": "passed",
+        "seconds": "0.128657"
+      },
+      {
+        "name": "sighash_tests",
+        "result": "passed",
+        "seconds": "0.328721"
+      },
+      {
+        "name": "sigopcount_tests",
+        "result": "passed",
+        "seconds": "0.123437"
+      },
+      {
+        "name": "skiplist_tests",
+        "result": "passed",
+        "seconds": "0.489374"
+      },
+      {
+        "name": "sock_tests",
+        "result": "passed",
+        "seconds": "1.13618"
+      },
+      {
+        "name": "span_tests",
+        "result": "passed",
+        "seconds": "0.11769"
+      },
+      {
+        "name": "streams_tests",
+        "result": "passed",
+        "seconds": "0.157797"
+      },
+      {
+        "name": "sync_tests",
+        "result": "passed",
+        "seconds": "0.116875"
+      },
+      {
+        "name": "system_ram_tests",
+        "result": "passed",
+        "seconds": "0.116596"
+      },
+      {
+        "name": "system_tests",
+        "result": "passed",
+        "seconds": "0.685509"
+      },
+      {
+        "name": "testnet4_miner_tests",
+        "result": "passed",
+        "seconds": "0.425543"
+      },
+      {
+        "name": "threadpool_tests",
+        "result": "passed",
+        "seconds": "0.726218"
+      },
+      {
+        "name": "timeoffsets_tests",
+        "result": "passed",
+        "seconds": "0.129899"
+      },
+      {
+        "name": "torcontrol_tests",
+        "result": "passed",
+        "seconds": "0.117397"
+      },
+      {
+        "name": "transaction_tests",
+        "result": "passed",
+        "seconds": "0.20598"
+      },
+      {
+        "name": "translation_tests",
+        "result": "passed",
+        "seconds": "0.118176"
+      },
+      {
+        "name": "txdownload_tests",
+        "result": "passed",
+        "seconds": "108.591"
+      },
+      {
+        "name": "txgraph_tests",
+        "result": "passed",
+        "seconds": "0.40266"
+      },
+      {
+        "name": "txindex_tests",
+        "result": "passed",
+        "seconds": "55.4543"
+      },
+      {
+        "name": "txospenderindex_tests",
+        "result": "passed",
+        "seconds": "42.6965"
+      },
+      {
+        "name": "txpackage_tests",
+        "result": "passed",
+        "seconds": "415.296"
+      },
+      {
+        "name": "txreconciliation_tests",
+        "result": "passed",
+        "seconds": "0.123416"
+      },
+      {
+        "name": "txrequest_tests",
+        "result": "passed",
+        "seconds": "0.996346"
+      },
+      {
+        "name": "txvalidation_tests",
+        "result": "passed",
+        "seconds": "37.8583"
+      },
+      {
+        "name": "txvalidationcache_tests",
+        "result": "passed",
+        "seconds": "112.342"
+      },
+      {
+        "name": "uint256_tests",
+        "result": "passed",
+        "seconds": "0.122742"
+      },
+      {
+        "name": "util_check_tests",
+        "result": "passed",
+        "seconds": "0.116434"
+      },
+      {
+        "name": "util_expected_tests",
+        "result": "passed",
+        "seconds": "0.119214"
+      },
+      {
+        "name": "util_string_tests",
+        "result": "passed",
+        "seconds": "0.114049"
+      },
+      {
+        "name": "util_tests",
+        "result": "passed",
+        "seconds": "0.195017"
+      },
+      {
+        "name": "util_threadnames_tests",
+        "result": "passed",
+        "seconds": "0.132436"
+      },
+      {
+        "name": "util_trace_tests",
+        "result": "passed",
+        "seconds": "0.124209"
+      },
+      {
+        "name": "mercatura_controller_tests",
+        "result": "passed",
+        "seconds": "0.129506"
+      },
+      {
+        "name": "mercatura_emission_tests",
+        "result": "passed",
+        "seconds": "15.5759"
+      },
+      {
+        "name": "mercatura_fixedpoint_tests",
+        "result": "passed",
+        "seconds": "0.117649"
+      },
+      {
+        "name": "validation_block_tests",
+        "result": "passed",
+        "seconds": "549.267"
+      },
+      {
+        "name": "validation_block_tests_dgw",
+        "result": "passed",
+        "seconds": "22.4212"
+      },
+      {
+        "name": "validation_chainstate_tests",
+        "result": "passed",
+        "seconds": "95.719"
+      },
+      {
+        "name": "validation_chainstatemanager_tests",
+        "result": "passed",
+        "seconds": "523.015"
+      },
+      {
+        "name": "validation_flush_tests",
+        "result": "passed",
+        "seconds": "0.463285"
+      },
+      {
+        "name": "validation_tests",
+        "result": "passed",
+        "seconds": "0.935883"
+      },
+      {
+        "name": "validationinterface_tests",
+        "result": "passed",
+        "seconds": "0.218445"
+      },
+      {
+        "name": "versionbits_tests",
+        "result": "passed",
+        "seconds": "0.794703"
+      },
+      {
+        "name": "db_tests",
+        "result": "passed",
+        "seconds": "0.224378"
+      },
+      {
+        "name": "encryption_persistence_tests",
+        "result": "passed",
+        "seconds": "14.4544"
+      },
+      {
+        "name": "coinselector_tests",
+        "result": "passed",
+        "seconds": "13.6817"
+      },
+      {
+        "name": "coinselection_tests",
+        "result": "passed",
+        "seconds": "0.79436"
+      },
+      {
+        "name": "feebumper_tests",
+        "result": "passed",
+        "seconds": "0.335311"
+      },
+      {
+        "name": "group_outputs_tests",
+        "result": "passed",
+        "seconds": "1.15468"
+      },
+      {
+        "name": "init_tests",
+        "result": "passed",
+        "seconds": "0.12484"
+      },
+      {
+        "name": "mining_tests_wallet",
+        "result": "passed",
+        "seconds": "2.42717"
+      },
+      {
+        "name": "mining_tests_solo",
+        "result": "passed",
+        "seconds": "86.3102"
+      },
+      {
+        "name": "mining_tests_v2",
+        "result": "passed",
+        "seconds": "1.08731"
+      },
+      {
+        "name": "ismine_tests",
+        "result": "passed",
+        "seconds": "0.11868"
+      },
+      {
+        "name": "psbt_wallet_tests",
+        "result": "passed",
+        "seconds": "2.10992"
+      },
+      {
+        "name": "scriptpubkeyman_tests",
+        "result": "passed",
+        "seconds": "0.118571"
+      },
+      {
+        "name": "spend_tests",
+        "result": "passed",
+        "seconds": "74.6682"
+      },
+      {
+        "name": "wallet_crypto_tests",
+        "result": "passed",
+        "seconds": "1.39913"
+      },
+      {
+        "name": "wallet_rpc_tests",
+        "result": "passed",
+        "seconds": "0.124039"
+      },
+      {
+        "name": "wallet_tests",
+        "result": "passed",
+        "seconds": "572.784"
+      },
+      {
+        "name": "wallet_transaction_tests",
+        "result": "passed",
+        "seconds": "0.348955"
+      },
+      {
+        "name": "walletdb_tests",
+        "result": "passed",
+        "seconds": "0.12767"
+      },
+      {
+        "name": "walletload_tests",
+        "result": "passed",
+        "seconds": "0.594525"
+      }
+    ]
+  },
+  "native_functional": {
+    "total": 56,
+    "passed": 56,
+    "failed": 0,
+    "skipped": 0,
+    "details": [
+      {
+        "test": "feature_pq_activation.py",
+        "status": "Passed",
+        "duration(seconds)": "42"
+      },
+      {
+        "test": "feature_pq_b1_lifecycle.py --mercahash-v2-height=0",
+        "status": "Passed",
+        "duration(seconds)": "39"
+      },
+      {
+        "test": "feature_pq_b3_assurance.py",
+        "status": "Passed",
+        "duration(seconds)": "12"
+      },
+      {
+        "test": "feature_pq_discovery.py",
+        "status": "Passed",
+        "duration(seconds)": "43"
+      },
+      {
+        "test": "feature_pq_discovery.py --public-testnet",
+        "status": "Passed",
+        "duration(seconds)": "10"
+      },
+      {
+        "test": "feature_pq_required.py",
+        "status": "Passed",
+        "duration(seconds)": "29"
+      },
+      {
+        "test": "feature_pq_required.py --public-testnet",
+        "status": "Passed",
+        "duration(seconds)": "19"
+      },
+      {
+        "test": "feature_pq_transport.py",
+        "status": "Passed",
+        "duration(seconds)": "167"
+      },
+      {
+        "test": "feature_pq_transport.py --mercahash-v2-height=0",
+        "status": "Passed",
+        "duration(seconds)": "23"
+      },
+      {
+        "test": "feature_pq_transport.py --mercahash-v2-height=20",
+        "status": "Passed",
+        "duration(seconds)": "55"
+      },
+      {
+        "test": "feature_pq_transport_negative.py",
+        "status": "Passed",
+        "duration(seconds)": "65"
+      },
+      {
+        "test": "mercatura_block_capacity.py",
+        "status": "Passed",
+        "duration(seconds)": "185"
+      },
+      {
+        "test": "mercatura_chain_reorg.py",
+        "status": "Passed",
+        "duration(seconds)": "18"
+      },
+      {
+        "test": "mercatura_classical_ownership_shutdown.py",
+        "status": "Passed",
+        "duration(seconds)": "50"
+      },
+      {
+        "test": "mercatura_coinbase_maturity.py",
+        "status": "Passed",
+        "duration(seconds)": "54"
+      },
+      {
+        "test": "mercatura_coinbase_subsidy.py",
+        "status": "Passed",
+        "duration(seconds)": "3"
+      },
+      {
+        "test": "mercatura_coinbase_template.py",
+        "status": "Passed",
+        "duration(seconds)": "45"
+      },
+      {
+        "test": "mercatura_dgw.py",
+        "status": "Passed",
+        "duration(seconds)": "154"
+      },
+      {
+        "test": "mercatura_fee_boundary.py",
+        "status": "Passed",
+        "duration(seconds)": "38"
+      },
+      {
+        "test": "mercatura_fee_policy.py",
+        "status": "Passed",
+        "duration(seconds)": "46"
+      },
+      {
+        "test": "mercatura_headers_replay.py",
+        "status": "Passed",
+        "duration(seconds)": "6"
+      },
+      {
+        "test": "mercatura_mercahash_pow.py",
+        "status": "Passed",
+        "duration(seconds)": "2"
+      },
+      {
+        "test": "mercatura_mercahash_v2.py",
+        "status": "Passed",
+        "duration(seconds)": "55"
+      },
+      {
+        "test": "mercatura_mining.py",
+        "status": "Passed",
+        "duration(seconds)": "1"
+      },
+      {
+        "test": "mercatura_network_identity.py",
+        "status": "Passed",
+        "duration(seconds)": "4"
+      },
+      {
+        "test": "mercatura_p2p_propagation.py",
+        "status": "Passed",
+        "duration(seconds)": "89"
+      },
+      {
+        "test": "mercatura_pq_address_enforcement.py",
+        "status": "Passed",
+        "duration(seconds)": "0"
+      },
+      {
+        "test": "mercatura_pq_auth_commitments.py",
+        "status": "Passed",
+        "duration(seconds)": "42"
+      },
+      {
+        "test": "mercatura_pq_batching.py",
+        "status": "Passed",
+        "duration(seconds)": "36"
+      },
+      {
+        "test": "mercatura_pq_capacity.py",
+        "status": "Passed",
+        "duration(seconds)": "117"
+      },
+      {
+        "test": "mercatura_pq_capacity.py --pq",
+        "status": "Passed",
+        "duration(seconds)": "111"
+      },
+      {
+        "test": "mercatura_pq_invalid_auth.py",
+        "status": "Passed",
+        "duration(seconds)": "41"
+      },
+      {
+        "test": "mercatura_pq_many_input_selection.py",
+        "status": "Passed",
+        "duration(seconds)": "65"
+      },
+      {
+        "test": "mercatura_pq_mempool_persistence.py",
+        "status": "Passed",
+        "duration(seconds)": "43"
+      },
+      {
+        "test": "mercatura_pq_multi_input.py",
+        "status": "Passed",
+        "duration(seconds)": "40"
+      },
+      {
+        "test": "mercatura_pq_p2p_malformed.py",
+        "status": "Passed",
+        "duration(seconds)": "38"
+      },
+      {
+        "test": "mercatura_pq_package.py",
+        "status": "Passed",
+        "duration(seconds)": "61"
+      },
+      {
+        "test": "mercatura_pq_prevout_amount.py",
+        "status": "Passed",
+        "duration(seconds)": "58"
+      },
+      {
+        "test": "mercatura_pq_psbt.py",
+        "status": "Passed",
+        "duration(seconds)": "57"
+      },
+      {
+        "test": "mercatura_pq_rbf.py",
+        "status": "Passed",
+        "duration(seconds)": "63"
+      },
+      {
+        "test": "mercatura_pq_reorg.py",
+        "status": "Passed",
+        "duration(seconds)": "86"
+      },
+      {
+        "test": "mercatura_pq_rescan.py",
+        "status": "Passed",
+        "duration(seconds)": "324"
+      },
+      {
+        "test": "mercatura_pq_send_receive.py",
+        "status": "Passed",
+        "duration(seconds)": "56"
+      },
+      {
+        "test": "mercatura_reindex.py",
+        "status": "Passed",
+        "duration(seconds)": "80"
+      },
+      {
+        "test": "mercatura_smoke.py",
+        "status": "Passed",
+        "duration(seconds)": "0"
+      },
+      {
+        "test": "mercatura_solo_native.py",
+        "status": "Passed",
+        "duration(seconds)": "86"
+      },
+      {
+        "test": "mercatura_storage_recovery.py",
+        "status": "Passed",
+        "duration(seconds)": "253"
+      },
+      {
+        "test": "mercatura_testnet_capacity.py",
+        "status": "Passed",
+        "duration(seconds)": "2"
+      },
+      {
+        "test": "mercatura_testnet_identity.py",
+        "status": "Passed",
+        "duration(seconds)": "1"
+      },
+      {
+        "test": "mercatura_three_node_pq.py",
+        "status": "Passed",
+        "duration(seconds)": "120"
+      },
+      {
+        "test": "mercatura_wallet_backup_restore.py",
+        "status": "Passed",
+        "duration(seconds)": "36"
+      },
+      {
+        "test": "mercatura_wallet_encryption.py",
+        "status": "Passed",
+        "duration(seconds)": "61"
+      },
+      {
+        "test": "mercatura_wallet_encryption_persistence.py",
+        "status": "Passed",
+        "duration(seconds)": "77"
+      },
+      {
+        "test": "mercatura_wallet_historical_recovery.py",
+        "status": "Passed",
+        "duration(seconds)": "43"
+      },
+      {
+        "test": "mercatura_wallet_persistence.py",
+        "status": "Passed",
+        "duration(seconds)": "41"
+      },
+      {
+        "test": "mercatura_witness_resource.py",
+        "status": "Passed",
+        "duration(seconds)": "9"
+      }
+    ]
+  },
+  "platforms": [
+    {
+      "platform": "Linux x86_64",
+      "result": "PASS",
+      "coverage": "Native fresh Release daemon/CLI/Qt, registered unit/Qt suite, default native functional suite, direct select backend, controlled storage upgrade and enforced-PQ profile."
+    },
+    {
+      "platform": "Windows x64 MSVC",
+      "result": "NOT RUN",
+      "reason": "No native MSVC/Windows executor attached. Existing CI definition available; no new run triggered."
+    },
+    {
+      "platform": "macOS ARM64",
+      "result": "NOT RUN",
+      "reason": "No native macOS executor attached. Existing native CI definition only."
+    },
+    {
+      "platform": "macOS x86_64",
+      "result": "NOT RUN",
+      "reason": "No native macOS executor or usable cross SDK/toolchain available; existing cross-build workflow definition only."
+    },
+    {
+      "platform": "Linux ARM64",
+      "result": "NOT RUN",
+      "reason": "No ARM executor/toolchain attached; existing native CI definition only."
+    }
+  ],
+  "database_compatibility": {
+    "result": "PARTIAL",
+    "controlled_old_to_new": "PASS",
+    "legacy_writer_source_sha": "2f25a22f4fd6522b451f7cdad599b4cb2e79f9a3",
+    "fixture": {
+      "writer": {
+        "source_sha": "2f25a22f4fd6522b451f7cdad599b4cb2e79f9a3",
+        "binary_sha256": "e8435bcb2645907a2cd883e22f52e6e3497ad17fa01d16cfc2f08374e0109df8"
+      },
+      "snapshot": {
+        "height": 103,
+        "tip": "b032a0209cfd6d471a5d64a5f79e4cdcaf81dae1460500b989419fa4a7025a64",
+        "chainwork": "00000000000000000000000000000000000000000000000000000000000000d0",
+        "utxo_hash": "17cf5c4cfc0af3ef5aef5fa4d64e426d99fc43883fd00aeaad065298addac82f",
+        "txouts": 104,
+        "amount": "2449581.02",
+        "hashes": [
+          "8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685",
+          "92da5970d17055579da7deb9fdaefbd9d8c04d9abe0568cc72a1c8ae2afa8236",
+          "ed3449dbbd939522ea6c528fb7262887e3df1ae57f64f22668c3569d4ec7169b",
+          "cb884c6063f4553b541334e97b5911ef2ee29184a48fe33e72989e7b9b6969c6",
+          "5be5278a0f5d3268403da528dc45d4112fa661fc009488526e2657ec33532f98",
+          "ae05d18b11c9640f19d75eeca12e6e0a51d904d2de30da74f30fe64045547020",
+          "049911db59730d702be5b1aaa7984f8100ecb1a5fbf2b949308f5ebdb423164e",
+          "4f4e3f487f14573d30f044896396285e93813fdc8f19c8f92df12ebb9f6f95ad",
+          "f5e00ca0277ebb26ca695139537269b83b2ef3b5172a72fa7e4631adb399d517",
+          "38d3fdee62f091faeba45a634919a5e22545777403a10b6563f65af921b44235",
+          "fdfab9a277fdad7fe8c54f725a77d6c0b37c2f29157dfffe6afc3d510c8c3ac2",
+          "91dd558bc5a658efa8f67c6933d39b8f957d3f61f83abdf6f3ad8e64e1105b05",
+          "ed823402d70e4015bf0aeb3a6538fdadc82c3cd3f216061938fd5111cad67779",
+          "c43708faf42a076ae10ae2b86c376ab2006097b124d95a2f139fb1b918feebec",
+          "580d252a45fa43624aeea82abb1c2acaa4e4a0386dc4e3c37b6d0e1347d681e6",
+          "abd9192d30ae2c0b7d4e3fecda7fa2b52a841d62456cdf2347522087543c77f9",
+          "bf223af89ee24fcff1c58a2bec1e917f573fe3a049ecb2f036073db32b53ec18",
+          "8e9a4bd38616b2d89a2ad8f00ead59a1bb61ee5fd9c5c400646432e05df31ef7",
+          "949626fc1c66c6083193ad81a2a92799f82508c2674f1704c63c965def688108",
+          "ff0031a236d2b0379da3951105e0ffc7fa6c9071665c60d099203ea80b118d01",
+          "4d41223e842ba21d64b1db78ab0d118aecea947fa02757f8ba35903c5007b2a6",
+          "6ee2bccebb47415c4009a57cf369055aa85f377c8034ce54beb67b93ae4aa7d3",
+          "ade4a71ab7dee9fce95c49587ae537b369069fd8f498343089bdf4deafcf2998",
+          "5751937dbfeccc2ad1462b35e1d5c0cd985b16a5eca82f1eea959d3a5db3b6b7",
+          "caf1b0f910bded49d487b5ea6865eed41d8dab87cbc9a9f6c4cd1b985b61c09d",
+          "8364f3b4f3cdeaf68d69f2eced9ec275682a8b8fd7f8a57fd9549124707556e1",
+          "5bb182b86ba0a28f4f45c7b728dc5c5b6857dc277526ceb109fea7682f40ab67",
+          "22c78de412bd930dba5a9a5ea26098e2760b308b8fa6500606ec074d30e4eba5",
+          "48d8bb86df9918c01b41ca03a9b9fa7cdbaa327a870d6d4acc2d719298495428",
+          "212a2f6f27266c49333cf6179062871b8dedacb4ec0c91085e67e99d8aef2e64",
+          "8eb926d857653870478fa96c281530cb8beaf52fc1738a472a5d12ceb9abedb2",
+          "e0fcd3358a9f48f4265a0edbf00f38f8b03b68f9faf57d5a86bbd112076b3c14",
+          "b6a0a6d9d31d96d97fbb67036b610b9faf24d32ccc87e1a282639a56817a5a67",
+          "6167b0237405b73d416dd07e585a2d4cc46fd15ca4c370e871cf92f82d578d68",
+          "f0c237c1d04daac9d20c646bb15c015c138283ef2ff801d38ee6623cdeabf3ca",
+          "5da3ca95fae1019d3eb98e3f611b4f03042d9ea8c2ca5c5663748b7558c9b987",
+          "9cb851b057d8680b3396f079a6bf4a1366919a6c292a0563ee7b71a7efba17b1",
+          "d7bccbedabec30babb4ecf34750f28ae8cb3fbe5fadca0792b128d54c62114bc",
+          "8000d314fa664720ec567b59f6e1e515c02bc5e6779f3b7105152c16f3f5b558",
+          "f75c693ce57eb051f9d57ce59cd33ebbf2d7c5f217982e40ad54765cdae21b35",
+          "d9a36f2355d4dd81ea3a256aacc60e482b4524932f24e39e65017eca17b8cb3c",
+          "01c553396880df443f11c446b55962b163ab6126170076eb6c9b104b7f4434b4",
+          "346e4e2bf2f2c42175ffd2f2fd28b505baebe96001ea1dba835d2421c1e503b8",
+          "9003283d6b38efc1d1e066032ebb39976c34de4689139cabf2d15a7c9a907b96",
+          "c93aed8dbbdcafa448cd7af8b3826fc2eec0b17ecdfbce32e7fbb46bf7e2a673",
+          "67025664d2b6043c65a2fbb3d5f582a0bd0501bea4718ac707b9510152078066",
+          "8287979bd4e39ab2b4fd47b61720ef951ca392fd9de0682961ba345493609df8",
+          "4353e4a014cf1131b7638715f1cd1f3f28314e9d448aabb168c7ad85c1cdce4f",
+          "c0ac382068eed92bb20e692c63fecebde752b1aaa34a1277d4f430396a0344c0",
+          "9b4b277b82b1be8b13baa3c4f182dea9e390f38f98f6b3200055a98c4d612cc9",
+          "67f576a7fd8d18880d8e987d95ce192998f8b098bd8181128ddf291c1e25ad95",
+          "473b3950491792ee2a9bf0d076e59476cb86265df9831bdf34063c6f8dc6d813",
+          "dd7f774c7dae0e3d976f128c12c435d2bfb1231e1546c36affc7a2734e94b491",
+          "dcd7eae68ad3ccf27de7fdad7847c8a6e70451456c2d54b6cb5659db6cc667c0",
+          "e4cf7e13542c07c921129bf9224082dbfd3780fc3bc9aeefeaa93fc04c3cf658",
+          "8b71e63b84e84397fe641a294b4464a2da0a3dab87d5acc8f0fc6dfc5d2c93c4",
+          "bf865c17148a932ad68cd1a2311f3b7d90a1548cf6d9bf3f3e80e22ff30a2613",
+          "b455b64b6bb01a6079f832eadc1d42defa8ab5129c50d6cdec66d6944933cf53",
+          "c4b992cba5fe3bca1ebc6a67bd77cb3ff1c0046df7f54f110d4d926697ce467b",
+          "d97ba2e79d823740396c0b269d4e5ae5e3adc393fd7da48ab6ba85d08a1dbff8",
+          "35e951ce6aabf290dc639090b6d640db6a41be1a8832a602a11c12bfb3ea0543",
+          "3aad0eb9f0c715184455feedcb4be06f5ce5d320179c5028be154365e30bdedd",
+          "619f0a6247b8ebbd8ccf38c7a28012b1d4a11ed5d3238bb25ab79e91ff2c1fa2",
+          "88510c6c89f72975e7f6b059316980905053a34b6fd1ac5d384674ef7bc98912",
+          "c748d052895aa28c470beb8769712405de2005f4191c25f86facc80d998e4b4e",
+          "94d392746a8e94dcdf5d9b0f6544a7fe1b594741a61ef24155fd07c40fd5a423",
+          "12ad089a6a2e1639ea271d01fb3fc106693b075042793048719738cdcc2e0fe8",
+          "208204a4ce0a86c02a71f16714258aa6c4c61eb64a85d0b68ed9455389933efe",
+          "b04f70861668051cfbdb50cf7743459cef32b5aed3c73dda2c9bfd74fff69d69",
+          "d0491597ad231034dfd0f0df34a729af20d63d306a23324a88a5311ef5190a06",
+          "a8403379dad76372ca758d78b871992a39fd3bae3340d85ab1ca2a0d0c163a70",
+          "f0424f90a0bf67d19b7783abdf125f5855e7f8dcda506c94eafb0ffa25f81eb9",
+          "f3df12dbdb52dc56dd6cbba681808283b7f9962492a36394ba0b56d297a62ea6",
+          "d49d2f3ae1a30ee368d1c1f952e2444bbf83367ee2e65a33297e8866a3babe59",
+          "45c924ff1d50af3c05066e1f44f1923ff5908c85aef3b872804581f270bd9d2f",
+          "46df67c3648fd4d93197dac03122660483aa0c4c4c7a9ffbcfb306b4eaf56055",
+          "c4b44583904a7701998134d7eb3e8592849ce66d76d96a3776c89e2140829e2c",
+          "ddd4431387566fc09cd9385317c8a4e866a6cc60eadae795e5d4357c2a1c7f4f",
+          "0c4caf614be4db25b9a93fa55f7685a09b360c6ad78b8704e8fbea803bbabe0d",
+          "7ca7b479e2be89ffa7f44563d63e55d5f2cdc01c3e7bd019d4c2a6b3c4784098",
+          "75a879a913ce776dd5e92d0dcee8e56d8cf11356908300cd4d7615b6f7a46178",
+          "2feaccc978dcd5cbc3174ac6da845dd8394eda6a6a9143c4c4bcdb338c6d080a",
+          "8604dd80f14b5365e9f2986b5f3e5132518ce79d5575dccf506604b5a2720090",
+          "0129a957ea3acc0b57036cbef2c86570d21680f0f56458faecced11ae519aad9",
+          "8e857f58595350ef7719c031772b346f7304bf6fb78e464b27b282c3592284e1",
+          "90fcd365d1a70d5c421cb8213eb84099d434f0dfd248ffdf81697bca24cddc8e",
+          "28d7958922921dcf7ee87319c88819394e7873b4c7b3762cacbb5e4dfd7b8808",
+          "958f8c3a1dbf4eb8bead3eb9867b29ab2abec97e75a726ce25881b9e4730ef6f",
+          "130c83064ee269724efbeac1c8793a36a73a7347fe35db79903de3732f3cb1b6",
+          "b9ac0f8058e70ff197de237e76061da556e76564b2ab249c0d69095c5237e685",
+          "70ae310db30887a1137d061e411ef78297ed3870fcf0b5a7dd0dd78c1f029d25",
+          "fa8a02246c07cd02c570328b51effca9fb53d10327b6fb3332b1e5abe3289b8e",
+          "46612a3a5f7d9cb8d0c838faf6ffaf7270f47544f80d1eddb3b9e2f21064887c",
+          "cf603a64212aab0bcd00a5263e4c537b9eaae12327ec1a49bf3646adad5d6c99",
+          "be30ee6204360f55d42d70cd7819b97ef6097824626dfd1b7cb09a0f8ec55021",
+          "96704abf50bfdad0f1b515f9d9606030542918fb81e9e6adb692c5ae6713f5ca",
+          "9613c52d665109474fc2225d0a42ec4adf6146ca11701a815edbbdab48dd3fe3",
+          "ff88fb2f289910dce05c6f2ed5f59355457e90e93a15d405f655430329182eb7",
+          "8990e2ea2c96247c8f9d9ecdde989c7a09bec54adf18ed9d2307faae78299c03",
+          "5971b276f4517b9d117ffb72e8e0f3614feceade5a794069ada2efe1da6554a5",
+          "52fe8f84b9c20a9313c7e906554609d5ee7538542b35de8fdbcf824ac233b8f1",
+          "f0b61cd6d367780e7fe672ccaa3ea8dc1905938c1f7738eefa81f9140371fb65",
+          "3ab9686d05969820b5f0057b8fe5d3b454a349d9a348d8f17646a33536303756",
+          "b032a0209cfd6d471a5d64a5f79e4cdcaf81dae1460500b989419fa4a7025a64"
+        ]
+      },
+      "spending_block": "3ab9686d05969820b5f0057b8fe5d3b454a349d9a348d8f17646a33536303756"
+    },
+    "metadata": "256 old-width values compared byte-for-byte for FlatFilePos, CBlockFileInfo and CDiskBlockIndex; 512 total fixed-seed samples plus explicit boundary/malformed vectors.",
+    "large_undo": {
+      "logical_bytes": 4296015872,
+      "allocated_bytes": 2101248,
+      "persistent_index_restart_and_disconnect": "PASS"
+    },
+    "historical_evidence": "Assignment attests previous history/original-database qualification at base 61f1f4b9; that is prior evidence, not a new-source PASS. Repository-retained older reports are pinned to their own earlier source and are not substituted.",
+    "rollback_within_old_range": "PASS",
+    "separate_categories": [
+      {
+        "category": "Existing on-disk serialization",
+        "status": "PASS",
+        "evidence": "60 explicit byte-identical old/new comparisons across three persistent schemas, 100 field round trips, three old-width overflow rejections; prior 512 samples and golden encoding retained."
+      },
+      {
+        "category": "Old-database direct open",
+        "status": "PARTIAL",
+        "evidence": "Generated pre-storage-fix database opens without reindex on patched executable; original height-12332 public-testnet snapshot is unavailable."
+      },
+      {
+        "category": "Reindex behavior",
+        "status": "PASS",
+        "evidence": "Authenticated final-upgrade plus default reindex/storage-recovery functional tests at exact security-code SHA."
+      },
+      {
+        "category": "Chainstate recovery",
+        "status": "PASS",
+        "evidence": "Authenticated final-upgrade chainstate reindex and full native recovery tests."
+      },
+      {
+        "category": "Rollback within old range",
+        "status": "PASS",
+        "evidence": "Checksum-pinned v0.1.2-testnet release and pre-C binary directly opened new-written low-range metadata, verified all blocks, old/new undo reorg, restart; patched reopen passed."
+      },
+      {
+        "category": "Large-file behavior",
+        "status": "PASS",
+        "evidence": "Linux sparse seek/allocation/truncation and persistent undo above 4 GiB; native Windows/macOS remains pending."
+      },
+      {
+        "category": "Original historical snapshot on patched code",
+        "status": "NOT TESTED",
+        "evidence": "No authorized original height-12332 fixture present. Requires a disposable copy, matching expected hash/chainwork/UTXO, verifychain(4,0) and restart; no live explorer access."
+      }
+    ]
+  },
+  "focused_case_counts": {
+    "A-select": [
+      "Test module \"MercaturaPQStageA\" has passed with:",
+      "  8 test cases out of 8 passed",
+      "  383 assertions out of 383 passed",
+      "",
+      "  Test suite \"sock_tests\" has passed with:",
+      "    8 test cases out of 8 passed"
+    ],
+    "A-unit": [
+      "Test module \"Bitcoin Core Test Suite\" has passed with:",
+      "  66 test cases out of 1052 passed",
+      "  986 test cases out of 1052 skipped",
+      "  263798 assertions out of 263798 passed",
+      "",
+      "  Test suite \"net_peer_connection_tests\" has passed with:"
+    ],
+    "A-select-asan-ubsan": [
+      "Test module \"MercaturaPQStageA\" has passed with:",
+      "  8 test cases out of 8 passed",
+      "  383 assertions out of 383 passed",
+      "",
+      "  Test suite \"sock_tests\" has passed with:",
+      "    8 test cases out of 8 passed"
+    ],
+    "B-unit": [
+      "Test module \"MercaturaPQStageA\" has passed with:",
+      "  66 test cases out of 67 passed",
+      "  1 test case out of 67 skipped",
+      "  258928 assertions out of 258928 passed",
+      "",
+      "  Test suite \"net_tests\" has passed with:"
+    ],
+    "B-final-pause-unit": [
+      "Test module \"MercaturaPQStageA\" has passed with:",
+      "  1 test case out of 67 passed",
+      "  66 test cases out of 67 skipped",
+      "  1158 assertions out of 1158 passed",
+      "",
+      "  Test suite \"net_tests\" has passed with:"
+    ],
+    "B-pause-asan-ubsan": [
+      "Test module \"MercaturaPQStageA\" has passed with:",
+      "  1 test case out of 67 passed",
+      "  66 test cases out of 67 skipped",
+      "  1158 assertions out of 1158 passed",
+      "",
+      "  Test suite \"net_tests\" has passed with:"
+    ],
+    "B-pq-lifecycle-unit": [
+      "Test module \"MercaturaPQStageA\" has passed with:",
+      "  64 test cases out of 67 passed",
+      "  3 test cases out of 67 skipped",
+      "  190328 assertions out of 190328 passed",
+      ""
+    ],
+    "C-storage-unit": [
+      "Test module \"MercaturaPQStageA\" has passed with:",
+      "  59 test cases out of 59 passed",
+      "  224273 assertions out of 224273 passed",
+      "",
+      "  Test suite \"flatfile_tests\" has passed with:",
+      "    6 test cases out of 6 passed"
+    ],
+    "C-storage-asan-ubsan": [
+      "Test module \"MercaturaPQStageA\" has passed with:",
+      "  15 test cases out of 59 passed",
+      "  44 test cases out of 59 skipped",
+      "  3627 assertions out of 3627 passed",
+      "",
+      "  Test suite \"flatfile_tests\" has passed with:"
+    ]
+  },
+  "bounded_adversarial": {
+    "socket_event_masks": 128,
+    "send_pause_random_timing_samples": 256,
+    "storage_metadata_samples": 512,
+    "pq_smoke_targets": 7,
+    "pq_smoke_inputs_per_target": 1000,
+    "whole_program_sanitizers": false,
+    "coverage_guided_fuzzing_run": false
+  },
+  "ci": {
+    "status": "NOT TRIGGERED",
+    "runs": [],
+    "dispatch": "NOT REQUESTED",
+    "job_coverage": "NOT OBSERVED"
+  },
+  "flags": {
+    "production_code_changed": true,
+    "consensus_changed": false,
+    "network_identity_changed": false,
+    "mercahash_v2_activation_height_changed": false,
+    "pq_crypto_changed": false,
+    "new_production_dependencies": false,
+    "live_infrastructure_modified": false,
+    "v0_1_modified": false,
+    "pushed": false,
+    "all_owned_processes_exited": true
+  },
+  "remaining_security_concerns": [
+    "Native Windows/macOS and ARM qualification on this exact source remains open; Linux select execution does not establish native platform success.",
+    "CI was not triggered or polled under the assignment.",
+    "Sanitizers instrumented the selected real production/test translation units; other linked libraries were uninstrumented. Whole-program sanitizer and coverage-guided libFuzzer qualification were not run.",
+    "Filesystems must support the required large files. FAT32 file-size limits and unsupported narrow off_t platforms are not expanded by this patch. Unrepresentable operations fail closed.",
+    "Existing four-byte record-length headers remain unchanged; unrepresentable record sizes fail closed before narrowing/writing. This work expands absolute positions and accounting, not the record-header format.",
+    "Controlled old-to-new database and metadata compatibility passed. Real historical public-testnet replay/original-database qualification on the patched source was not repeated; no legitimate real historical snapshot was present."
+  ],
+  "reports": {
+    "markdown": "/workspace/work/security-backports/source/doc/security/MERCATURA-2026-10-UPSTREAM-SECURITY-BACKPORTS.md",
+    "json": "/workspace/work/security-backports/source/doc/security/mercatura-2026-10-upstream-security-backports.json",
+    "evidence_directory": "/workspace/work/security-backports/evidence",
+    "text_only_review_bundle": "/workspace/work/security-backports/mercatura-security-review.tar.gz",
+    "final_handoff": "/workspace/work/security-backports/source/doc/security/MERCATURA-2026-10-SECURITY-BACKPORT-FINAL-QUALIFICATION.md",
+    "new_qualification_evidence_directory": "/workspace/work/security-final/evidence"
+  },
+  "ready_for_founder_review": true,
+  "ready_for_release": false,
+  "final_git_status": "Reports committed in documentation-only commits; final clean status and exact branch SHA are captured in the post-commit publication receipt.",
+  "initial_local_qualification_ci": {
+    "status": "NOT TRIGGERED",
+    "polled": false
+  },
+  "initial_local_qualification_git_status": "?? doc/security/MERCATURA-2026-10-UPSTREAM-SECURITY-BACKPORTS.md\n?? doc/security/mercatura-2026-10-upstream-security-backports.json",
+  "initial_local_qualification_flags": {
+    "production_code_changed": true,
+    "consensus_changed": false,
+    "network_identity_changed": false,
+    "mercahash_v2_activation_height_changed": false,
+    "pq_crypto_changed": false,
+    "new_production_dependencies": false,
+    "live_infrastructure_modified": false,
+    "v0_1_modified": false,
+    "pushed": false,
+    "all_owned_processes_exited": true
+  },
+  "final_qualification_handoff": {
+    "recorded_utc": "2026-10-30T10:27:22.581835+00:00",
+    "overall_result": "PARTIAL",
+    "base_candidate_sha": "61f1f4b9e24d07ea56fcfc1952aaa73aac498394",
+    "security_code_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+    "documentation_commit_sha": null,
+    "published_branch_sha_at_ci_request": null,
+    "final_branch_head_resolution": "The containing documentation commit; its literal SHA and remote verification are recorded after commit in /workspace/work/security-final/evidence/final-publication.json and the final founder response. A file cannot embed its own containing commit SHA.",
+    "official_v0_1_sha": "631886dd5159614b628ced3fe4fa1e289ce19451",
+    "security_branch_url": "https://github.com/Mercatura-Core/Mercatura-Core/tree/security/bitcoin-core-2026-10-backports",
+    "prior_evidence_verification": {
+      "previous_manifest": "PASS",
+      "existing_reports": {
+        "MERCATURA-2026-10-UPSTREAM-SECURITY-BACKPORTS.md": "0d2d825e7c592b46b33e3685a74b6b314d81adea139abeded54323111b7d8099",
+        "mercatura-2026-10-upstream-security-backports.json": "a102226f16717c8d64a3a45c401e6ec9a4ae3a5423a7909bd4a2dc5302c14d41"
+      },
+      "code_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "unit": {
+        "total": 194,
+        "passed": 193,
+        "failed": 0,
+        "skipped": 1
+      },
+      "functional": {
+        "total": 56,
+        "passed": 56,
+        "failed": 0,
+        "skipped": 0
+      },
+      "prior_evidence_source_authentication": "PASS; source SHA/tree plus preserved SHA256 manifest, not a cryptographic third-party attestation",
+      "prior_result_retained": "PARTIAL"
+    },
+    "code_review": {
+      "base": "61f1f4b9e24d07ea56fcfc1952aaa73aac498394",
+      "code": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+      "commits": [
+        "77a4de7a10730544f728fd809f710a9a8fec5e46",
+        "2f25a22f4fd6522b451f7cdad599b4cb2e79f9a3",
+        "0a66162c465898b132e31d7574b0b8fb89ff09cc"
+      ],
+      "production_files": [
+        "src/chain.h",
+        "src/flatfile.cpp",
+        "src/flatfile.h",
+        "src/kernel/chain.h",
+        "src/net.cpp",
+        "src/net.h",
+        "src/node/blockstorage.cpp",
+        "src/node/blockstorage.h",
+        "src/streams.cpp",
+        "src/streams.h",
+        "src/util/fs_helpers.cpp",
+        "src/util/fs_helpers.h",
+        "src/util/sock.cpp"
+      ],
+      "test_files": [
+        "src/test/CMakeLists.txt",
+        "src/test/blockmanager_tests.cpp",
+        "src/test/blockstorage_durability_tests.cpp",
+        "src/test/flatfile_tests.cpp",
+        "src/test/net_tests.cpp",
+        "src/test/sock_tests.cpp",
+        "src/test/util/net.h",
+        "src/test/util/sock_select.cpp",
+        "src/test/util/sparse.h",
+        "test/functional/feature_security_storage_compat.py",
+        "test/functional/test_runner.py"
+      ],
+      "removed_or_replaced_conditionals": [
+        {
+          "file": "src/flatfile.cpp",
+          "old_line": "    if (pos.IsNull()) {"
+        },
+        {
+          "file": "src/flatfile.cpp",
+          "old_line": "    if (pos.nPos && fseek(file, pos.nPos, SEEK_SET)) {"
+        },
+        {
+          "file": "src/net.cpp",
+          "old_line": "        if (pnode->m_send_memusage + pnode->m_transport->GetSendMemoryUsage() > nSendBufferMaxSize) pnode->fPauseSend = true;"
+        },
+        {
+          "file": "src/node/blockstorage.cpp",
+          "old_line": "    if (nCurrentUsage + nBuffer >= target) {"
+        },
+        {
+          "file": "src/node/blockstorage.cpp",
+          "old_line": "            if (nCurrentUsage + nBuffer < target) { // are we below our target?"
+        },
+        {
+          "file": "src/node/blockstorage.cpp",
+          "old_line": "    while (uint64_t{m_blockfile_info[nFile].nSize} +"
+        },
+        {
+          "file": "src/node/blockstorage.cpp",
+          "old_line": "        if (!FindUndoPos(state, block.nFile, pos, blockundo_size + UNDO_DATA_DISK_OVERHEAD)) {"
+        },
+        {
+          "file": "src/streams.cpp",
+          "old_line": "    if (std::fseek(m_file, offset, origin) != 0) {"
+        },
+        {
+          "file": "src/util/fs_helpers.cpp",
+          "old_line": "    if (0 == posix_fallocate(fileno(file), 0, nEndPos)) return;"
+        },
+        {
+          "file": "src/util/fs_helpers.cpp",
+          "old_line": "    if (fseek(file, offset, SEEK_SET)) {"
+        },
+        {
+          "file": "src/util/sock.cpp",
+          "old_line": "        FD_SET(s, &err);"
+        }
+      ],
+      "protected_paths_changed": [],
+      "production_dependencies_added": false,
+      "unrelated_changes": [],
+      "verified_defects_found": [],
+      "verdict": "PASS"
+    },
+    "additional_storage_qualification": {
+      "rollback": {
+        "scope": "generated regtest history only, positions below UINT32_MAX",
+        "code_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+        "public_network_contact": false,
+        "real_historical_fixture_used": false,
+        "old_release": "v0.1.2-testnet",
+        "release_archive_sha256": "858f087d41defba5d2db718fc2c1bc78e5d865ac98df41ba59408f87b2f118f0",
+        "binary_sha256": {
+          "patched": "b668194057043857aa761a75f5dc7d9a613b48186816f29428c0dac16d58d9c3",
+          "published_old_release": "885d6f8ad367db266431c7d93a1b53455d97c5b2bcf14afb478e5549d80c502f",
+          "pre_storage_fix": "e8435bcb2645907a2cd883e22f52e6e3497ad17fa01d16cfc2f08374e0109df8"
+        },
+        "patched_direct_open_and_restart": "PASS",
+        "new_writer_snapshot": {
+          "height": 104,
+          "tip": "3e7aa800d9942b588a612c20ae567b20a3ae507921e63ce71e715f090402bd4a",
+          "chainwork": "00000000000000000000000000000000000000000000000000000000000000d2",
+          "utxo_hash": "17cf5c4cfc0af3ef5aef5fa4d64e426d99fc43883fd00aeaad065298addac82f",
+          "txouts": 104,
+          "amount": "2449581.02",
+          "hashes": [
+            "8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685",
+            "92da5970d17055579da7deb9fdaefbd9d8c04d9abe0568cc72a1c8ae2afa8236",
+            "ed3449dbbd939522ea6c528fb7262887e3df1ae57f64f22668c3569d4ec7169b",
+            "cb884c6063f4553b541334e97b5911ef2ee29184a48fe33e72989e7b9b6969c6",
+            "5be5278a0f5d3268403da528dc45d4112fa661fc009488526e2657ec33532f98",
+            "ae05d18b11c9640f19d75eeca12e6e0a51d904d2de30da74f30fe64045547020",
+            "049911db59730d702be5b1aaa7984f8100ecb1a5fbf2b949308f5ebdb423164e",
+            "4f4e3f487f14573d30f044896396285e93813fdc8f19c8f92df12ebb9f6f95ad",
+            "f5e00ca0277ebb26ca695139537269b83b2ef3b5172a72fa7e4631adb399d517",
+            "38d3fdee62f091faeba45a634919a5e22545777403a10b6563f65af921b44235",
+            "fdfab9a277fdad7fe8c54f725a77d6c0b37c2f29157dfffe6afc3d510c8c3ac2",
+            "91dd558bc5a658efa8f67c6933d39b8f957d3f61f83abdf6f3ad8e64e1105b05",
+            "ed823402d70e4015bf0aeb3a6538fdadc82c3cd3f216061938fd5111cad67779",
+            "c43708faf42a076ae10ae2b86c376ab2006097b124d95a2f139fb1b918feebec",
+            "580d252a45fa43624aeea82abb1c2acaa4e4a0386dc4e3c37b6d0e1347d681e6",
+            "abd9192d30ae2c0b7d4e3fecda7fa2b52a841d62456cdf2347522087543c77f9",
+            "bf223af89ee24fcff1c58a2bec1e917f573fe3a049ecb2f036073db32b53ec18",
+            "8e9a4bd38616b2d89a2ad8f00ead59a1bb61ee5fd9c5c400646432e05df31ef7",
+            "949626fc1c66c6083193ad81a2a92799f82508c2674f1704c63c965def688108",
+            "ff0031a236d2b0379da3951105e0ffc7fa6c9071665c60d099203ea80b118d01",
+            "4d41223e842ba21d64b1db78ab0d118aecea947fa02757f8ba35903c5007b2a6",
+            "6ee2bccebb47415c4009a57cf369055aa85f377c8034ce54beb67b93ae4aa7d3",
+            "ade4a71ab7dee9fce95c49587ae537b369069fd8f498343089bdf4deafcf2998",
+            "5751937dbfeccc2ad1462b35e1d5c0cd985b16a5eca82f1eea959d3a5db3b6b7",
+            "caf1b0f910bded49d487b5ea6865eed41d8dab87cbc9a9f6c4cd1b985b61c09d",
+            "8364f3b4f3cdeaf68d69f2eced9ec275682a8b8fd7f8a57fd9549124707556e1",
+            "5bb182b86ba0a28f4f45c7b728dc5c5b6857dc277526ceb109fea7682f40ab67",
+            "22c78de412bd930dba5a9a5ea26098e2760b308b8fa6500606ec074d30e4eba5",
+            "48d8bb86df9918c01b41ca03a9b9fa7cdbaa327a870d6d4acc2d719298495428",
+            "212a2f6f27266c49333cf6179062871b8dedacb4ec0c91085e67e99d8aef2e64",
+            "8eb926d857653870478fa96c281530cb8beaf52fc1738a472a5d12ceb9abedb2",
+            "e0fcd3358a9f48f4265a0edbf00f38f8b03b68f9faf57d5a86bbd112076b3c14",
+            "b6a0a6d9d31d96d97fbb67036b610b9faf24d32ccc87e1a282639a56817a5a67",
+            "6167b0237405b73d416dd07e585a2d4cc46fd15ca4c370e871cf92f82d578d68",
+            "f0c237c1d04daac9d20c646bb15c015c138283ef2ff801d38ee6623cdeabf3ca",
+            "5da3ca95fae1019d3eb98e3f611b4f03042d9ea8c2ca5c5663748b7558c9b987",
+            "9cb851b057d8680b3396f079a6bf4a1366919a6c292a0563ee7b71a7efba17b1",
+            "d7bccbedabec30babb4ecf34750f28ae8cb3fbe5fadca0792b128d54c62114bc",
+            "8000d314fa664720ec567b59f6e1e515c02bc5e6779f3b7105152c16f3f5b558",
+            "f75c693ce57eb051f9d57ce59cd33ebbf2d7c5f217982e40ad54765cdae21b35",
+            "d9a36f2355d4dd81ea3a256aacc60e482b4524932f24e39e65017eca17b8cb3c",
+            "01c553396880df443f11c446b55962b163ab6126170076eb6c9b104b7f4434b4",
+            "346e4e2bf2f2c42175ffd2f2fd28b505baebe96001ea1dba835d2421c1e503b8",
+            "9003283d6b38efc1d1e066032ebb39976c34de4689139cabf2d15a7c9a907b96",
+            "c93aed8dbbdcafa448cd7af8b3826fc2eec0b17ecdfbce32e7fbb46bf7e2a673",
+            "67025664d2b6043c65a2fbb3d5f582a0bd0501bea4718ac707b9510152078066",
+            "8287979bd4e39ab2b4fd47b61720ef951ca392fd9de0682961ba345493609df8",
+            "4353e4a014cf1131b7638715f1cd1f3f28314e9d448aabb168c7ad85c1cdce4f",
+            "c0ac382068eed92bb20e692c63fecebde752b1aaa34a1277d4f430396a0344c0",
+            "9b4b277b82b1be8b13baa3c4f182dea9e390f38f98f6b3200055a98c4d612cc9",
+            "67f576a7fd8d18880d8e987d95ce192998f8b098bd8181128ddf291c1e25ad95",
+            "473b3950491792ee2a9bf0d076e59476cb86265df9831bdf34063c6f8dc6d813",
+            "dd7f774c7dae0e3d976f128c12c435d2bfb1231e1546c36affc7a2734e94b491",
+            "dcd7eae68ad3ccf27de7fdad7847c8a6e70451456c2d54b6cb5659db6cc667c0",
+            "e4cf7e13542c07c921129bf9224082dbfd3780fc3bc9aeefeaa93fc04c3cf658",
+            "8b71e63b84e84397fe641a294b4464a2da0a3dab87d5acc8f0fc6dfc5d2c93c4",
+            "bf865c17148a932ad68cd1a2311f3b7d90a1548cf6d9bf3f3e80e22ff30a2613",
+            "b455b64b6bb01a6079f832eadc1d42defa8ab5129c50d6cdec66d6944933cf53",
+            "c4b992cba5fe3bca1ebc6a67bd77cb3ff1c0046df7f54f110d4d926697ce467b",
+            "d97ba2e79d823740396c0b269d4e5ae5e3adc393fd7da48ab6ba85d08a1dbff8",
+            "35e951ce6aabf290dc639090b6d640db6a41be1a8832a602a11c12bfb3ea0543",
+            "3aad0eb9f0c715184455feedcb4be06f5ce5d320179c5028be154365e30bdedd",
+            "619f0a6247b8ebbd8ccf38c7a28012b1d4a11ed5d3238bb25ab79e91ff2c1fa2",
+            "88510c6c89f72975e7f6b059316980905053a34b6fd1ac5d384674ef7bc98912",
+            "c748d052895aa28c470beb8769712405de2005f4191c25f86facc80d998e4b4e",
+            "94d392746a8e94dcdf5d9b0f6544a7fe1b594741a61ef24155fd07c40fd5a423",
+            "12ad089a6a2e1639ea271d01fb3fc106693b075042793048719738cdcc2e0fe8",
+            "208204a4ce0a86c02a71f16714258aa6c4c61eb64a85d0b68ed9455389933efe",
+            "b04f70861668051cfbdb50cf7743459cef32b5aed3c73dda2c9bfd74fff69d69",
+            "d0491597ad231034dfd0f0df34a729af20d63d306a23324a88a5311ef5190a06",
+            "a8403379dad76372ca758d78b871992a39fd3bae3340d85ab1ca2a0d0c163a70",
+            "f0424f90a0bf67d19b7783abdf125f5855e7f8dcda506c94eafb0ffa25f81eb9",
+            "f3df12dbdb52dc56dd6cbba681808283b7f9962492a36394ba0b56d297a62ea6",
+            "d49d2f3ae1a30ee368d1c1f952e2444bbf83367ee2e65a33297e8866a3babe59",
+            "45c924ff1d50af3c05066e1f44f1923ff5908c85aef3b872804581f270bd9d2f",
+            "46df67c3648fd4d93197dac03122660483aa0c4c4c7a9ffbcfb306b4eaf56055",
+            "c4b44583904a7701998134d7eb3e8592849ce66d76d96a3776c89e2140829e2c",
+            "ddd4431387566fc09cd9385317c8a4e866a6cc60eadae795e5d4357c2a1c7f4f",
+            "0c4caf614be4db25b9a93fa55f7685a09b360c6ad78b8704e8fbea803bbabe0d",
+            "7ca7b479e2be89ffa7f44563d63e55d5f2cdc01c3e7bd019d4c2a6b3c4784098",
+            "75a879a913ce776dd5e92d0dcee8e56d8cf11356908300cd4d7615b6f7a46178",
+            "2feaccc978dcd5cbc3174ac6da845dd8394eda6a6a9143c4c4bcdb338c6d080a",
+            "8604dd80f14b5365e9f2986b5f3e5132518ce79d5575dccf506604b5a2720090",
+            "0129a957ea3acc0b57036cbef2c86570d21680f0f56458faecced11ae519aad9",
+            "8e857f58595350ef7719c031772b346f7304bf6fb78e464b27b282c3592284e1",
+            "90fcd365d1a70d5c421cb8213eb84099d434f0dfd248ffdf81697bca24cddc8e",
+            "28d7958922921dcf7ee87319c88819394e7873b4c7b3762cacbb5e4dfd7b8808",
+            "958f8c3a1dbf4eb8bead3eb9867b29ab2abec97e75a726ce25881b9e4730ef6f",
+            "130c83064ee269724efbeac1c8793a36a73a7347fe35db79903de3732f3cb1b6",
+            "b9ac0f8058e70ff197de237e76061da556e76564b2ab249c0d69095c5237e685",
+            "70ae310db30887a1137d061e411ef78297ed3870fcf0b5a7dd0dd78c1f029d25",
+            "fa8a02246c07cd02c570328b51effca9fb53d10327b6fb3332b1e5abe3289b8e",
+            "46612a3a5f7d9cb8d0c838faf6ffaf7270f47544f80d1eddb3b9e2f21064887c",
+            "cf603a64212aab0bcd00a5263e4c537b9eaae12327ec1a49bf3646adad5d6c99",
+            "be30ee6204360f55d42d70cd7819b97ef6097824626dfd1b7cb09a0f8ec55021",
+            "96704abf50bfdad0f1b515f9d9606030542918fb81e9e6adb692c5ae6713f5ca",
+            "9613c52d665109474fc2225d0a42ec4adf6146ca11701a815edbbdab48dd3fe3",
+            "ff88fb2f289910dce05c6f2ed5f59355457e90e93a15d405f655430329182eb7",
+            "8990e2ea2c96247c8f9d9ecdde989c7a09bec54adf18ed9d2307faae78299c03",
+            "5971b276f4517b9d117ffb72e8e0f3614feceade5a794069ada2efe1da6554a5",
+            "52fe8f84b9c20a9313c7e906554609d5ee7538542b35de8fdbcf824ac233b8f1",
+            "f0b61cd6d367780e7fe672ccaa3ea8dc1905938c1f7738eefa81f9140371fb65",
+            "3ab9686d05969820b5f0057b8fe5d3b454a349d9a348d8f17646a33536303756",
+            "b032a0209cfd6d471a5d64a5f79e4cdcaf81dae1460500b989419fa4a7025a64",
+            "3e7aa800d9942b588a612c20ae567b20a3ae507921e63ce71e715f090402bd4a"
+          ]
+        },
+        "published_old_release": {
+          "direct_open": "PASS",
+          "verifychain_level_4_all_blocks": "PASS",
+          "new_and_old_undo_reorg": "PASS",
+          "restart": "PASS",
+          "version": "Mercatura Core daemon version v0.1.2 mercaturad"
+        },
+        "pre_storage_fix": {
+          "direct_open": "PASS",
+          "verifychain_level_4_all_blocks": "PASS",
+          "new_and_old_undo_reorg": "PASS",
+          "restart": "PASS",
+          "version": "Mercatura Core daemon version v0.1.2-p9p11-dev-2f25a22f4fd6 mercaturad"
+        },
+        "original_fixture_unchanged": true,
+        "patched_reopen_after_rollback": "PASS",
+        "all_children_exited": true,
+        "no_reindex_requested": true,
+        "result": "PASS"
+      },
+      "explicit_serialization": {
+        "name": "final-serialization-explicit-old-boundaries",
+        "command": [
+          "python3",
+          "work/build-serialization-probe.py"
+        ],
+        "cwd": "/workspace/work/security-final",
+        "source_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+        "source_status": "?? doc/security/\n",
+        "started_utc": "2026-10-30T10:23:20.697871+00:00",
+        "timeout_seconds": 180,
+        "source_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+        "environment": {
+          "QT_QPA_PLATFORM": "offscreen",
+          "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+          "TMPDIR": "/workspace/work/security-backports/work/tmp"
+        },
+        "returncode": 0,
+        "duration_seconds": 2.524,
+        "result": "PASS"
+      },
+      "flatfile_boundaries": {
+        "name": "final-storage-serialization-boundaries",
+        "command": [
+          "/workspace/work/security-backports/work/release/bin/test_bitcoin",
+          "--run_test=flatfile_tests",
+          "--catch_system_error=no",
+          "--report_level=detailed",
+          "--log_level=message"
+        ],
+        "cwd": "/workspace/work/security-final",
+        "source_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+        "source_status": "?? doc/security/\n",
+        "started_utc": "2026-10-30T10:20:21.442613+00:00",
+        "timeout_seconds": 180,
+        "source_tree": "fa6a225739db35aff8fdb41938614cb98a73637a",
+        "environment": {
+          "QT_QPA_PLATFORM": "offscreen",
+          "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+          "TMPDIR": "/workspace/work/security-backports/work/tmp"
+        },
+        "returncode": 0,
+        "duration_seconds": 0.165,
+        "result": "PASS"
+      }
+    },
+    "database_compatibility_categories": [
+      {
+        "category": "Existing on-disk serialization",
+        "status": "PASS",
+        "evidence": "60 explicit byte-identical old/new comparisons across three persistent schemas, 100 field round trips, three old-width overflow rejections; prior 512 samples and golden encoding retained."
+      },
+      {
+        "category": "Old-database direct open",
+        "status": "PARTIAL",
+        "evidence": "Generated pre-storage-fix database opens without reindex on patched executable; original height-12332 public-testnet snapshot is unavailable."
+      },
+      {
+        "category": "Reindex behavior",
+        "status": "PASS",
+        "evidence": "Authenticated final-upgrade plus default reindex/storage-recovery functional tests at exact security-code SHA."
+      },
+      {
+        "category": "Chainstate recovery",
+        "status": "PASS",
+        "evidence": "Authenticated final-upgrade chainstate reindex and full native recovery tests."
+      },
+      {
+        "category": "Rollback within old range",
+        "status": "PASS",
+        "evidence": "Checksum-pinned v0.1.2-testnet release and pre-C binary directly opened new-written low-range metadata, verified all blocks, old/new undo reorg, restart; patched reopen passed."
+      },
+      {
+        "category": "Large-file behavior",
+        "status": "PASS",
+        "evidence": "Linux sparse seek/allocation/truncation and persistent undo above 4 GiB; native Windows/macOS remains pending."
+      },
+      {
+        "category": "Original historical snapshot on patched code",
+        "status": "NOT TESTED",
+        "evidence": "No authorized original height-12332 fixture present. Requires a disposable copy, matching expected hash/chainwork/UTXO, verifychain(4,0) and restart; no live explorer access."
+      }
+    ],
+    "gates": [
+      {
+        "id": "A",
+        "gate": "Security patches",
+        "status": "PASS"
+      },
+      {
+        "id": "B",
+        "gate": "Local regression",
+        "status": "PASS"
+      },
+      {
+        "id": "C",
+        "gate": "Storage compatibility",
+        "status": "PARTIAL"
+      },
+      {
+        "id": "D",
+        "gate": "Native Windows",
+        "status": "NOT TESTED"
+      },
+      {
+        "id": "E",
+        "gate": "Native macOS",
+        "status": "NOT TESTED"
+      },
+      {
+        "id": "F",
+        "gate": "PQ enforcing profile",
+        "status": "PASS"
+      },
+      {
+        "id": "G",
+        "gate": "Git provenance",
+        "status": "PENDING"
+      },
+      {
+        "id": "H",
+        "gate": "CI",
+        "status": "NOT TESTED"
+      },
+      {
+        "id": "I",
+        "gate": "Founder approval",
+        "status": "PENDING"
+      }
+    ],
+    "ci": {
+      "status": "NOT TRIGGERED",
+      "runs": [],
+      "dispatch": "NOT REQUESTED",
+      "job_coverage": "NOT OBSERVED"
+    },
+    "production_changes_this_assignment": false,
+    "long_local_suites_repeated": false,
+    "founder_fast_forward_ready": false,
+    "packaging_ready": false,
+    "original_historical_fixture_present": false,
+    "live_testnet_contact": false,
+    "v2_height_selected": false,
+    "all_owned_test_processes_exited": true,
+    "evidence_directory": "/workspace/work/security-final/evidence"
+  }
+}
