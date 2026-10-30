@@ -233,21 +233,43 @@ BOOST_AUTO_TEST_CASE(wait_connection_error)
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    Sock unused{CreateSocket()};
-    BOOST_REQUIRE_EQUAL(unused.Bind(reinterpret_cast<sockaddr*>(&addr), sizeof(addr)), 0);
-    socklen_t addr_len{sizeof(addr)};
-    BOOST_REQUIRE_EQUAL(unused.GetSockName(reinterpret_cast<sockaddr*>(&addr), &addr_len), 0);
-    // Keep the port reserved but unlistened throughout the connection attempt.
     Sock client{CreateSocket()};
+    {
+        Sock unused{CreateSocket()};
+        BOOST_REQUIRE_EQUAL(unused.Bind(reinterpret_cast<sockaddr*>(&addr), sizeof(addr)), 0);
+        socklen_t addr_len{sizeof(addr)};
+        BOOST_REQUIRE_EQUAL(unused.GetSockName(reinterpret_cast<sockaddr*>(&addr), &addr_len), 0);
+        // Bind the client while the destination is reserved, preventing an
+        // ephemeral source port from becoming a loopback self-connection.
+        sockaddr_in source{addr};
+        source.sin_port = 0;
+        BOOST_REQUIRE_EQUAL(client.Bind(reinterpret_cast<sockaddr*>(&source), sizeof(source)), 0);
+    }
+    // A bound but unlistened socket need not reject a SYN promptly on every
+    // platform. Close it before connecting so the destination is a closed port.
     BOOST_REQUIRE(client.SetNonBlocking());
-    BOOST_CHECK_EQUAL(client.Connect(reinterpret_cast<sockaddr*>(&addr), sizeof(addr)), SOCKET_ERROR);
-    Sock::Event occurred{};
-    BOOST_REQUIRE(client.Wait(1s, Sock::RECV | Sock::SEND, &occurred));
-    BOOST_CHECK(occurred & (Sock::RECV | Sock::SEND | Sock::ERR));
-    int error{};
-    socklen_t len{sizeof(error)};
-    BOOST_REQUIRE_EQUAL(client.GetSockOpt(SOL_SOCKET, SO_ERROR, &error, &len), 0);
-    BOOST_CHECK_NE(error, 0);
+    const int result{client.Connect(reinterpret_cast<sockaddr*>(&addr), sizeof(addr))};
+    const int connect_error{WSAGetLastError()}; // errno on POSIX; capture before any test/logging calls.
+#ifdef WIN32
+    constexpr int refused{WSAECONNREFUSED};
+#else
+    constexpr int refused{ECONNREFUSED};
+#endif
+    BOOST_TEST_CONTEXT("connect result=" << result << ", native error=" << connect_error) {
+        BOOST_REQUIRE_EQUAL(result, SOCKET_ERROR);
+        if (connect_error != WSAEINPROGRESS && connect_error != WSAEWOULDBLOCK && connect_error != WSAEINVAL) {
+            // An immediate refusal is conclusive; SO_ERROR need not retain it.
+            BOOST_CHECK_EQUAL(connect_error, refused);
+            return;
+        }
+        Sock::Event occurred{};
+        BOOST_REQUIRE(client.Wait(5s, Sock::RECV | Sock::SEND, &occurred));
+        BOOST_REQUIRE(occurred & (Sock::RECV | Sock::SEND | Sock::ERR));
+        int error{};
+        socklen_t len{sizeof(error)};
+        BOOST_REQUIRE_EQUAL(client.GetSockOpt(SOL_SOCKET, SO_ERROR, &error, &len), 0);
+        BOOST_CHECK_EQUAL(error, refused);
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

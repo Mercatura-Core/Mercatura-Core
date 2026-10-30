@@ -309,9 +309,16 @@ endif()
 add_executable(sock_select_tests EXCLUDE_FROM_ALL
   ../../contrib/devtools/pq-stagea-test-main.cpp
   sock_tests.cpp
-  util/sock_select.cpp
+  ../util/sock.cpp
 )
 target_compile_definitions(sock_select_tests PRIVATE MERCATURA_TEST_SELECT_BACKEND)
+# Preinclude the backend override before compat.h can choose poll(). Compile
+# the production source directly instead of including a .cpp in another .cpp.
+if(MSVC)
+  target_compile_options(sock_select_tests PRIVATE "/FI${CMAKE_CURRENT_SOURCE_DIR}/util/sock_select.h")
+else()
+  target_compile_options(sock_select_tests PRIVATE -include "${CMAKE_CURRENT_SOURCE_DIR}/util/sock_select.h")
+endif()
 target_link_libraries(sock_select_tests PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
 
 add_executable(net_security_tests EXCLUDE_FROM_ALL
