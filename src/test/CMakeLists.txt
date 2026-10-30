@@ -304,6 +304,16 @@ if(BUILD_FUZZ_BINARY AND SANITIZERS MATCHES "(^|,)fuzzer(,|$)")
   target_link_libraries(pq_fuzz PRIVATE core_interface bitcoin_crypto fuzzer_interface)
 endif()
 
+# Compile the production select backend even on Linux. Keep this separate from
+# test_bitcoin, which exercises the platform's normal socket backend.
+add_executable(sock_select_tests EXCLUDE_FROM_ALL
+  ../../contrib/devtools/pq-stagea-test-main.cpp
+  sock_tests.cpp
+  util/sock_select.cpp
+)
+target_compile_definitions(sock_select_tests PRIVATE MERCATURA_TEST_SELECT_BACKEND)
+target_link_libraries(sock_select_tests PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
+
 target_link_libraries(test_bitcoin
   core_interface
   test_util

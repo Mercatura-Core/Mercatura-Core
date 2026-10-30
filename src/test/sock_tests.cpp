@@ -172,4 +172,82 @@ BOOST_AUTO_TEST_CASE(recv_until_terminator_limit)
 
 #endif /* WIN32 */
 
+// Real TCP sockets are required for urgent data; socketpair() is insufficient
+// on several platforms. All traffic is bounded and stays on loopback.
+static std::pair<std::unique_ptr<Sock>, std::unique_ptr<Sock>> CreateTCPPair()
+{
+    Sock listener{CreateSocket()};
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    BOOST_REQUIRE_EQUAL(listener.Bind(reinterpret_cast<sockaddr*>(&addr), sizeof(addr)), 0);
+    BOOST_REQUIRE_EQUAL(listener.Listen(1), 0);
+    socklen_t addr_len{sizeof(addr)};
+    BOOST_REQUIRE_EQUAL(listener.GetSockName(reinterpret_cast<sockaddr*>(&addr), &addr_len), 0);
+    auto client{std::make_unique<Sock>(CreateSocket())};
+    BOOST_REQUIRE_EQUAL(client->Connect(reinterpret_cast<sockaddr*>(&addr), addr_len), 0);
+    auto server{listener.Accept(nullptr, nullptr)};
+    BOOST_REQUIRE(server);
+    BOOST_REQUIRE(client->SetNonBlocking());
+    BOOST_REQUIRE(server->SetNonBlocking());
+    return {std::move(client), std::move(server)};
+}
+
+BOOST_AUTO_TEST_CASE(wait_backpressure_urgent_data)
+{
+    auto [sender, receiver]{CreateTCPPair()};
+    BOOST_REQUIRE_EQUAL(sender->Send("!", 1, MSG_OOB), 1);
+
+    Sock::Event occurred{};
+    BOOST_REQUIRE(receiver->Wait(1s, Sock::RECV, &occurred));
+#if !defined(USE_POLL) || defined(MERCATURA_TEST_SELECT_BACKEND)
+    // select must retain exception monitoring when receiving is enabled.
+    BOOST_CHECK(occurred & Sock::ERR);
+#endif
+    // Pending urgent data must never enable reads when receive is paused.
+    // Repeated masks model bounded adversarial readiness/backpressure changes.
+    const std::shared_ptr<const Sock> receiver_ref{std::shared_ptr<const Sock>{}, receiver.get()};
+    const std::shared_ptr<const Sock> sender_ref{std::shared_ptr<const Sock>{}, sender.get()};
+    for (unsigned i{0}; i < 128; ++i) {
+        const Sock::Event requested{static_cast<Sock::Event>((i & 1) ? Sock::SEND : 0)};
+        // Windows select requires at least one socket in a nonempty set.
+        Sock::EventsPerSock events{{receiver_ref, Sock::Events{requested}}, {sender_ref, Sock::Events{Sock::SEND}}};
+        BOOST_REQUIRE(receiver->WaitMany(0ms, events));
+        occurred = events.at(receiver_ref).occurred;
+        BOOST_CHECK_EQUAL(occurred & (Sock::RECV | Sock::ERR), 0);
+        if (requested & Sock::SEND) BOOST_CHECK(occurred & Sock::SEND);
+    }
+    char urgent{};
+    BOOST_REQUIRE_EQUAL(receiver->Recv(&urgent, 1, MSG_OOB), 1);
+    BOOST_CHECK_EQUAL(urgent, '!');
+    BOOST_REQUIRE_EQUAL(sender->Send("a", 1, 0), 1);
+    BOOST_REQUIRE(receiver->Wait(1s, Sock::RECV, &occurred));
+    BOOST_CHECK(occurred & Sock::RECV);
+    char byte{};
+    BOOST_REQUIRE_EQUAL(receiver->Recv(&byte, 1, 0), 1);
+    BOOST_CHECK_EQUAL(byte, 'a');
+}
+
+BOOST_AUTO_TEST_CASE(wait_connection_error)
+{
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    Sock unused{CreateSocket()};
+    BOOST_REQUIRE_EQUAL(unused.Bind(reinterpret_cast<sockaddr*>(&addr), sizeof(addr)), 0);
+    socklen_t addr_len{sizeof(addr)};
+    BOOST_REQUIRE_EQUAL(unused.GetSockName(reinterpret_cast<sockaddr*>(&addr), &addr_len), 0);
+    // Keep the port reserved but unlistened throughout the connection attempt.
+    Sock client{CreateSocket()};
+    BOOST_REQUIRE(client.SetNonBlocking());
+    BOOST_CHECK_EQUAL(client.Connect(reinterpret_cast<sockaddr*>(&addr), sizeof(addr)), SOCKET_ERROR);
+    Sock::Event occurred{};
+    BOOST_REQUIRE(client.Wait(1s, Sock::RECV | Sock::SEND, &occurred));
+    BOOST_CHECK(occurred & (Sock::RECV | Sock::SEND | Sock::ERR));
+    int error{};
+    socklen_t len{sizeof(error)};
+    BOOST_REQUIRE_EQUAL(client.GetSockOpt(SOL_SOCKET, SO_ERROR, &error, &len), 0);
+    BOOST_CHECK_NE(error, 0);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
