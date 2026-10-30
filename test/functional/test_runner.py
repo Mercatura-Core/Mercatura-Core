@@ -147,6 +147,7 @@ MERCATURA_SCRIPTS = [
 ]
 
 EXTENDED_SCRIPTS = [
+    'feature_security_storage_compat.py',
     # These tests are not run by default.
     # Longest test should go first, to favor running tests in parallel
     'feature_pruning.py',

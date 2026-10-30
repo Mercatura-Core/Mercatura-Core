@@ -12,6 +12,7 @@
 #include <pow.h>
 #include <script/script.h>
 #include <test/util/setup_common.h>
+#include <test/util/sparse.h>
 #include <txdb.h>
 #include <undo.h>
 #include <util/fs_helpers.h>
@@ -24,10 +25,15 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
+
+#ifndef WIN32
+#include <sys/stat.h>
+#endif
 
 namespace {
 struct CommitControl {
@@ -209,6 +215,95 @@ BOOST_AUTO_TEST_CASE(normal_persistence_and_restart)
     Sync();
     Mine();
     Sync();
+}
+
+BOOST_AUTO_TEST_CASE(large_undo_position_persistence_and_disconnect)
+{
+    Mine();
+    Sync();
+    auto& blockman{m_node.chainman->m_blockman};
+    {
+        // Mark the existing disposable rev file sparse before extending it.
+        FILE* raw{fsbridge::fopen(m_args.GetBlocksDirPath() / "rev00000.dat", "rb+")};
+        AutoFile file{raw};
+        BOOST_REQUIRE(!file.IsNull());
+        BOOST_REQUIRE(MakeTestFileSparse(raw));
+    }
+    constexpr uint64_t boundary{uint64_t{1} << 32};
+    {
+        LOCK(cs_main);
+        blockman.GetBlockFileInfo(0)->nUndoSize = boundary - 4;
+    }
+    const auto block{Mine()};
+    const auto hash{block.GetHash()};
+    {
+        LOCK(cs_main);
+        const auto* index{m_node.chainman->ActiveTip()};
+        BOOST_REQUIRE_GT(index->nUndoPos, boundary);
+        BOOST_CHECK_GT(blockman.GetBlockFileInfo(0)->nUndoSize, boundary);
+        CBlockUndo undo;
+        BOOST_REQUIRE(blockman.ReadBlockUndo(undo, *index));
+        BOOST_CHECK(undo.vtxundo.empty());
+    }
+    Sync();
+    m_node.validation_signals->SyncWithValidationInterfaceQueue();
+    m_node.chainman.reset();
+    m_make_chainman();
+    LoadVerifyActivateChainstate();
+    CBlockIndex* index{WITH_LOCK(cs_main, return m_node.chainman->ActiveTip())};
+    {
+        LOCK(cs_main);
+        BOOST_CHECK(index->GetBlockHash() == hash);
+        BOOST_REQUIRE_GT(index->nUndoPos, boundary);
+        CBlockUndo undo;
+        BOOST_REQUIRE(m_node.chainman->m_blockman.ReadBlockUndo(undo, *index));
+    }
+    BlockValidationState state;
+    BOOST_REQUIRE(m_node.chainman->ActiveChainstate().InvalidateBlock(state, index));
+    BOOST_CHECK_EQUAL(WITH_LOCK(cs_main, return m_node.chainman->ActiveHeight()), 1);
+    {
+        LOCK(cs_main);
+        m_node.chainman->ActiveChainstate().ResetBlockFailureFlags(index);
+        m_node.chainman->RecalculateBestHeader();
+    }
+    BlockValidationState recovery;
+    BOOST_REQUIRE(m_node.chainman->ActiveChainstate().ActivateBestChain(recovery));
+    BOOST_CHECK(WITH_LOCK(cs_main, return m_node.chainman->ActiveTip()->GetBlockHash()) == hash);
+    Sync();
+#ifndef WIN32
+    struct stat physical{};
+    BOOST_REQUIRE_EQUAL(stat((m_args.GetBlocksDirPath() / "rev00000.dat").c_str(), &physical), 0);
+    BOOST_CHECK_LT(static_cast<uint64_t>(physical.st_blocks) * 512, uint64_t{4} << 20);
+    BOOST_TEST_MESSAGE("Large undo logical bytes: " << physical.st_size << "; allocated bytes: " << physical.st_blocks * 512);
+#endif
+}
+
+BOOST_AUTO_TEST_CASE(undo_position_overflow_rejected_before_accounting)
+{
+    Mine();
+    Sync();
+    const auto block{NextBlock()};
+    const auto hash{block.GetHash()};
+    auto& blockman{m_node.chainman->m_blockman};
+    LOCK(cs_main);
+    CBlockIndex index{block};
+    index.phashBlock = &hash;
+    index.pprev = m_node.chainman->ActiveTip();
+    index.nHeight = 2;
+    index.nFile = 0;
+    auto* info{blockman.GetBlockFileInfo(0)};
+    const auto previous{info->nUndoSize};
+    info->nUndoSize = std::numeric_limits<uint64_t>::max() - 1;
+    BlockValidationState state;
+    BOOST_CHECK(!blockman.WriteBlockUndo(CBlockUndo{}, state, index));
+    BOOST_CHECK(state.IsError());
+    BOOST_CHECK(!state.IsInvalid());
+    BOOST_CHECK_EQUAL(info->nUndoSize, std::numeric_limits<uint64_t>::max() - 1);
+    BOOST_CHECK(!(index.nStatus & BLOCK_HAVE_UNDO));
+    info->nUndoSize = previous;
+    BlockValidationState retry;
+    BOOST_CHECK(!blockman.WriteBlockUndo(CBlockUndo{}, retry, index));
+    BOOST_CHECK(retry.IsError());
 }
 
 BOOST_AUTO_TEST_CASE(rollover_sync_failure)

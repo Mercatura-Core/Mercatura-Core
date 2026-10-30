@@ -141,12 +141,20 @@ void DirectoryCommit(const fs::path& dirname)
 #endif
 }
 
-bool TruncateFile(FILE* file, unsigned int length)
+bool TruncateFile(FILE* file, uint64_t length)
 {
+    if (!std::in_range<int64_t>(length)) {
+        errno = EOVERFLOW;
+        return false;
+    }
 #if defined(WIN32)
-    return _chsize(_fileno(file), length) == 0;
+    return _chsize_s(_fileno(file), static_cast<int64_t>(length)) == 0;
 #else
-    return ftruncate(fileno(file), length) == 0;
+    if (!std::in_range<off_t>(length)) {
+        errno = EOVERFLOW;
+        return false;
+    }
+    return ftruncate(fileno(file), static_cast<off_t>(length)) == 0;
 #endif
 }
 
@@ -178,17 +186,20 @@ int RaiseFileDescriptorLimit(int nMinFD)
  * this function tries to make a particular range of a file allocated (corresponding to disk space)
  * it is advisory, and the range specified in the arguments will never contain live data
  */
-void AllocateFileRange(FILE* file, unsigned int offset, unsigned int length)
+void AllocateFileRange(FILE* file, uint64_t offset, uint64_t length)
 {
+    constexpr uint64_t max_position{std::numeric_limits<int64_t>::max()};
+    if (length == 0 || offset > max_position || length > max_position - offset) return;
+    const uint64_t end{offset + length};
+#ifndef WIN32
+    if (!std::in_range<off_t>(end)) return;
+#endif
 #if defined(WIN32)
     // Windows-specific version
     HANDLE hFile = (HANDLE)_get_osfhandle(_fileno(file));
     LARGE_INTEGER nFileSize;
-    int64_t nEndPos = (int64_t)offset + length;
-    nFileSize.u.LowPart = nEndPos & 0xFFFFFFFF;
-    nFileSize.u.HighPart = nEndPos >> 32;
-    SetFilePointerEx(hFile, nFileSize, 0, FILE_BEGIN);
-    SetEndOfFile(hFile);
+    nFileSize.QuadPart = static_cast<int64_t>(end);
+    if (SetFilePointerEx(hFile, nFileSize, 0, FILE_BEGIN)) SetEndOfFile(hFile);
 #elif defined(__APPLE__)
     // OSX specific version
     // NOTE: Contrary to other OS versions, the OSX version assumes that
@@ -197,23 +208,25 @@ void AllocateFileRange(FILE* file, unsigned int offset, unsigned int length)
     fst.fst_flags = F_ALLOCATECONTIG;
     fst.fst_posmode = F_PEOFPOSMODE;
     fst.fst_offset = 0;
-    fst.fst_length = length; // mac os fst_length takes the # of free bytes to allocate, not desired file size
+    fst.fst_length = static_cast<off_t>(length); // free bytes to allocate, not desired file size
     fst.fst_bytesalloc = 0;
     if (fcntl(fileno(file), F_PREALLOCATE, &fst) == -1) {
         fst.fst_flags = F_ALLOCATEALL;
         fcntl(fileno(file), F_PREALLOCATE, &fst);
     }
-    ftruncate(fileno(file), static_cast<off_t>(offset) + length);
+    ftruncate(fileno(file), static_cast<off_t>(end));
 #else
 #if defined(HAVE_POSIX_FALLOCATE)
     // Version using posix_fallocate
-    off_t nEndPos = (off_t)offset + length;
-    if (0 == posix_fallocate(fileno(file), 0, nEndPos)) return;
+    // Reserve only the requested range, including when offset follows a sparse
+    // hole. Reserving the entire prefix would turn a small extension into an
+    // allocation proportional to the absolute position.
+    if (0 == posix_fallocate(fileno(file), static_cast<off_t>(offset), static_cast<off_t>(length))) return;
 #endif
     // Fallback version
     // TODO: just write one byte per block
     static const char buf[65536] = {};
-    if (fseek(file, offset, SEEK_SET)) {
+    if (FileSeek64(file, static_cast<int64_t>(offset), SEEK_SET)) {
         return;
     }
     while (length > 0) {

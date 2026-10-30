@@ -8,11 +8,17 @@
 
 #include <util/fs.h>
 
+#include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <iosfwd>
 #include <limits>
 #include <optional>
+#include <utility>
+
+#ifndef WIN32
+#include <sys/types.h>
+#endif
 
 #ifdef __APPLE__
 enum class FSType {
@@ -43,9 +49,34 @@ bool FileCommit(FILE* file);
  */
 void DirectoryCommit(const fs::path& dirname);
 
-bool TruncateFile(FILE* file, unsigned int length);
+bool TruncateFile(FILE* file, uint64_t length);
+
+/** File positioning without Windows LLP64 long truncation. On POSIX, reject
+ * offsets the platform's off_t cannot represent instead of narrowing them. */
+inline int FileSeek64(FILE* file, int64_t offset, int origin)
+{
+#ifdef WIN32
+    return _fseeki64(file, offset, origin);
+#else
+    if (!std::in_range<off_t>(offset)) {
+        errno = EOVERFLOW;
+        return -1;
+    }
+    return ::fseeko(file, static_cast<off_t>(offset), origin);
+#endif
+}
+
+inline int64_t FileTell64(FILE* file)
+{
+#ifdef WIN32
+    return _ftelli64(file);
+#else
+    return ::ftello(file);
+#endif
+}
+
 int RaiseFileDescriptorLimit(int nMinFD);
-void AllocateFileRange(FILE* file, unsigned int offset, unsigned int length);
+void AllocateFileRange(FILE* file, uint64_t offset, uint64_t length);
 
 /**
  * Rename src to dest.

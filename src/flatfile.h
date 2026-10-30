@@ -16,13 +16,13 @@
 struct FlatFilePos
 {
     int32_t nFile{-1};
-    uint32_t nPos{0};
+    uint64_t nPos{0};
 
     SERIALIZE_METHODS(FlatFilePos, obj) { READWRITE(VARINT_MODE(obj.nFile, VarIntMode::NONNEGATIVE_SIGNED), VARINT(obj.nPos)); }
 
     FlatFilePos() = default;
 
-    FlatFilePos(int32_t nFileIn, uint32_t nPosIn)
+    FlatFilePos(int32_t nFileIn, uint64_t nPosIn)
         : nFile{nFileIn},
           nPos{nPosIn}
     {}
@@ -72,10 +72,10 @@ public:
      *
      * @param[in] pos The starting position that bytes will be allocated after.
      * @param[in] add_size The minimum number of bytes to be allocated.
-     * @param[out] out_of_space Whether the allocation failed due to insufficient disk space.
+     * @param[out] out_of_space Whether the range is unrepresentable or disk space is insufficient.
      * @return The number of bytes successfully allocated.
      */
-    size_t Allocate(const FlatFilePos& pos, size_t add_size, bool& out_of_space) const;
+    size_t Allocate(const FlatFilePos& pos, uint64_t add_size, bool& out_of_space) const;
 
     /**
      * Commit a file to disk, and optionally truncate off extra pre-allocated bytes if final.

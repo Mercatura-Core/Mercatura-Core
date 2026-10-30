@@ -9,6 +9,7 @@
 #include <consensus/amount.h>
 #include <attributes.h>
 
+#include <cstdint>
 #include <iostream>
 
 class CBlock;
@@ -33,7 +34,7 @@ struct BlockInfo {
     std::optional<CAmount> subsidy{};
 
     int file_number = -1;
-    unsigned data_pos = 0;
+    uint64_t data_pos = 0;
     const CBlock* data = nullptr;
     const CBlockUndo* undo_data = nullptr;
     // The maximum time in the chain up to and including this block.

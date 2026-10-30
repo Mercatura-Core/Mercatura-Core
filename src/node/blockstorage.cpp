@@ -48,6 +48,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <exception>
+#include <limits>
 #include <map>
 #include <optional>
 #include <ostream>
@@ -55,6 +56,7 @@
 #include <stdexcept>
 #include <system_error>
 #include <unordered_map>
+#include <utility>
 
 namespace kernel {
 static constexpr uint8_t DB_BLOCK_FILES{'f'};
@@ -367,7 +369,7 @@ void BlockManager::FindFilesToPrune(
     uint64_t nBytesToPrune;
     int count = 0;
 
-    if (nCurrentUsage + nBuffer >= target) {
+    if (SaturatingAdd(nCurrentUsage, nBuffer) >= target) {
         // On a prune event, the chainstate DB is flushed.
         // To avoid excessive prune events negating the benefit of high dbcache
         // values, we should not prune too rapidly.
@@ -382,13 +384,13 @@ void BlockManager::FindFilesToPrune(
 
         for (int fileNumber = 0; fileNumber < this->MaxBlockfileNum(); fileNumber++) {
             const auto& fileinfo = m_blockfile_info[fileNumber];
-            nBytesToPrune = fileinfo.nSize + fileinfo.nUndoSize;
+            nBytesToPrune = SaturatingAdd(fileinfo.nSize, fileinfo.nUndoSize);
 
             if (fileinfo.nSize == 0) {
                 continue;
             }
 
-            if (nCurrentUsage + nBuffer < target) { // are we below our target?
+            if (SaturatingAdd(nCurrentUsage, nBuffer) < target) { // are we below our target?
                 break;
             }
 
@@ -401,14 +403,15 @@ void BlockManager::FindFilesToPrune(
             PruneOneBlockFile(fileNumber);
             // Queue up the files for removal
             setFilesToPrune.insert(fileNumber);
-            nCurrentUsage -= nBytesToPrune;
+            nCurrentUsage = nCurrentUsage == std::numeric_limits<uint64_t>::max()
+                ? CalculateCurrentUsage() : nCurrentUsage - nBytesToPrune;
             count++;
         }
     }
 
     LogDebug(BCLog::PRUNE, "[%s] target=%dMiB actual=%dMiB diff=%dMiB min_height=%d max_prune_height=%d removed %d blk/rev pairs\n",
              chain.GetRole(), target / 1024 / 1024, nCurrentUsage / 1024 / 1024,
-             (int64_t(target) - int64_t(nCurrentUsage)) / 1024 / 1024,
+             int64_t(target / 1024 / 1024) - int64_t(nCurrentUsage / 1024 / 1024),
              min_block_to_prune, last_block_can_prune, count);
 }
 
@@ -867,7 +870,7 @@ uint64_t BlockManager::CalculateCurrentUsage()
 
     uint64_t retval = 0;
     for (const CBlockFileInfo& file : m_blockfile_info) {
-        retval += file.nSize + file.nUndoSize;
+        retval = SaturatingAdd(retval, SaturatingAdd(file.nSize, file.nUndoSize));
     }
     return retval;
 }
@@ -934,9 +937,7 @@ FlatFilePos BlockManager::FindNextBlockPos(unsigned int nAddSize, unsigned int n
 
     assert(uint64_t{nAddSize} < max_blockfile_size);
 
-    while (uint64_t{m_blockfile_info[nFile].nSize} +
-               uint64_t{nAddSize} >=
-           max_blockfile_size) {
+    while (m_blockfile_info[nFile].nSize >= max_blockfile_size - nAddSize) {
         // when the undo file is keeping up with the block file, we want to flush it explicitly
         // when it is lagging behind (more blocks arrive than are being connected), we let the
         // undo block write case handle it
@@ -1000,7 +1001,13 @@ void BlockManager::UpdateBlockInfo(const CBlock& block, unsigned int nHeight, co
     }
 
     // Update the file information with the current block.
-    const unsigned int added_size = ::GetSerializeSize(TX_WITH_WITNESS(block));
+    const uint64_t added_size{::GetSerializeSize(TX_WITH_WITNESS(block))};
+    constexpr uint64_t max_position{std::numeric_limits<int64_t>::max()};
+    if (pos.nPos > max_position || added_size > max_position - pos.nPos) {
+        m_blockfile_flush_failed = true;
+        m_opts.notifications.fatalError(_("Block file position overflow."));
+        return;
+    }
     const int nFile = pos.nFile;
     if (static_cast<int>(m_blockfile_info.size()) <= nFile) {
         m_blockfile_info.resize(nFile + 1);
@@ -1010,13 +1017,18 @@ void BlockManager::UpdateBlockInfo(const CBlock& block, unsigned int nHeight, co
     m_dirty_fileinfo.insert(nFile);
 }
 
-bool BlockManager::FindUndoPos(BlockValidationState& state, int nFile, FlatFilePos& pos, unsigned int nAddSize)
+bool BlockManager::FindUndoPos(BlockValidationState& state, int nFile, FlatFilePos& pos, uint64_t nAddSize)
 {
     pos.nFile = nFile;
 
     LOCK(cs_LastBlockFile);
 
     pos.nPos = m_blockfile_info[nFile].nUndoSize;
+    constexpr uint64_t max_position{std::numeric_limits<int64_t>::max()};
+    if (pos.nPos > max_position || nAddSize > max_position - pos.nPos) {
+        m_blockfile_flush_failed = true;
+        return FatalError(m_opts.notifications, state, _("Undo file position overflow."));
+    }
     m_blockfile_info[nFile].nUndoSize += nAddSize;
     m_dirty_fileinfo.insert(nFile);
 
@@ -1045,8 +1057,16 @@ bool BlockManager::WriteBlockUndo(const CBlockUndo& blockundo, BlockValidationSt
     // Write undo information to disk
     if (block.GetUndoPos().IsNull()) {
         FlatFilePos pos;
-        const auto blockundo_size{static_cast<uint32_t>(GetSerializeSize(blockundo))};
-        if (!FindUndoPos(state, block.nFile, pos, blockundo_size + UNDO_DATA_DISK_OVERHEAD)) {
+        const uint64_t serialized_size{GetSerializeSize(blockundo)};
+        // Keep the existing four-byte record length; only absolute positions
+        // and accounting are widened. Reject an unrepresentable record before
+        // any narrowing conversion or file modification.
+        if (!std::in_range<uint32_t>(serialized_size)) {
+            m_blockfile_flush_failed = true;
+            return FatalError(m_opts.notifications, state, _("Undo record size overflow."));
+        }
+        const auto blockundo_size{static_cast<uint32_t>(serialized_size)};
+        if (!FindUndoPos(state, block.nFile, pos, serialized_size + UNDO_DATA_DISK_OVERHEAD)) {
             LogError("FindUndoPos failed for %s while writing block undo", pos.ToString());
             return false;
         }
@@ -1328,7 +1348,14 @@ BlockManager::ReadRawBlockResult BlockManager::ReadRawBlock(const FlatFilePos& p
 
 FlatFilePos BlockManager::WriteBlock(const CBlock& block, int nHeight)
 {
-    const unsigned int block_size{static_cast<unsigned int>(GetSerializeSize(TX_WITH_WITNESS(block)))};
+    const uint64_t serialized_size{GetSerializeSize(TX_WITH_WITNESS(block))};
+    if (serialized_size > std::numeric_limits<uint32_t>::max() - STORAGE_HEADER_BYTES) {
+        LOCK(cs_LastBlockFile);
+        m_blockfile_flush_failed = true;
+        m_opts.notifications.fatalError(_("Block record size overflow."));
+        return {};
+    }
+    const auto block_size{static_cast<uint32_t>(serialized_size)};
     FlatFilePos pos{FindNextBlockPos(block_size + STORAGE_HEADER_BYTES, nHeight, block.GetBlockTime())};
     if (pos.IsNull()) {
         LogError("FindNextBlockPos failed for %s while writing block", pos.ToString());

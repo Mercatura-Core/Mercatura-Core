@@ -50,7 +50,7 @@ BOOST_AUTO_TEST_CASE(blockmanager_large_block_storage_limits)
         uint64_t{MAX_BLOCKFILE_SIZE} + 2);
 
     // The largest scheduled Mercatura block plus its blk*.dat storage header
-    // fits safely in the existing uint32_t block-file position representation.
+    // fits safely in the preserved uint32_t per-record length representation.
     constexpr uint64_t max_stored_block_entry{
         MERCATURA_MAX_BLOCK_CAPACITY_BYTES + STORAGE_HEADER_BYTES
     };
@@ -372,6 +372,22 @@ BOOST_AUTO_TEST_CASE(blockmanager_flush_block_file)
     // Block 2 was not overwritten:
     BOOST_CHECK(!blockman.ReadBlock(read_block, pos2, {}, /*height=*/2));
     BOOST_CHECK_EQUAL(read_block.nVersion, 2);
+}
+
+BOOST_FIXTURE_TEST_CASE(blockmanager_64bit_usage_accounting, TestingSetup)
+{
+    LOCK(cs_main);
+    auto& blockman{m_node.chainman->m_blockman};
+    auto* info{blockman.GetBlockFileInfo(0)};
+    BOOST_REQUIRE(info != nullptr);
+    const auto previous{*info};
+    info->nSize = (uint64_t{1} << 32) - 1;
+    info->nUndoSize = (uint64_t{1} << 32) + 1;
+    BOOST_CHECK_EQUAL(blockman.CalculateCurrentUsage(), uint64_t{1} << 33);
+    info->nSize = std::numeric_limits<uint64_t>::max();
+    info->nUndoSize = 1;
+    BOOST_CHECK_EQUAL(blockman.CalculateCurrentUsage(), std::numeric_limits<uint64_t>::max());
+    *info = previous;
 }
 
 BOOST_AUTO_TEST_SUITE_END()
