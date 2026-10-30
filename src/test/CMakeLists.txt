@@ -314,6 +314,17 @@ add_executable(sock_select_tests EXCLUDE_FROM_ALL
 target_compile_definitions(sock_select_tests PRIVATE MERCATURA_TEST_SELECT_BACKEND)
 target_link_libraries(sock_select_tests PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
 
+add_executable(net_security_tests EXCLUDE_FROM_ALL
+  ../../contrib/devtools/pq-stagea-test-main.cpp
+  net_tests.cpp
+  net_peer_connection_tests.cpp
+  netbase_tests.cpp
+  pq_transport_tests.cpp
+  pq_policy_tests.cpp
+  sock_tests.cpp
+)
+target_link_libraries(net_security_tests PRIVATE core_interface test_util bitcoin_cli bitcoin_node bitcoin_consensus minisketch secp256k1 Boost::headers libevent::extra)
+
 target_link_libraries(test_bitcoin
   core_interface
   test_util

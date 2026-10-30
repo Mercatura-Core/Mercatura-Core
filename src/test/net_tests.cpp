@@ -9,6 +9,7 @@
 #include <compat/compat.h>
 #include <net.h>
 #include <net_processing.h>
+#include <net_pq.h>
 #include <netaddress.h>
 #include <netbase.h>
 #include <netmessagemaker.h>
@@ -32,7 +33,9 @@
 #include <ios>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
+#include <thread>
 
 using namespace std::literals;
 using namespace util::hex_literals;
@@ -1588,6 +1591,172 @@ BOOST_AUTO_TEST_CASE(private_broadcast_version_does_not_update_addrman_services)
 
     BOOST_CHECK_EQUAL(m_node.addrman->Select().first.nServices, NODE_NONE);
     m_node.peerman->FinalizeNode(node);
+}
+
+namespace {
+class PausedSendSock : public ZeroSock
+{
+public:
+    mutable size_t budget{0};
+    ssize_t Send(const void*, size_t size, int) const override
+    {
+        if (budget == 0) {
+#ifdef WIN32
+            WSASetLastError(WSAEWOULDBLOCK);
+#else
+            errno = EWOULDBLOCK;
+#endif
+            return SOCKET_ERROR;
+        }
+        const size_t sent{std::min(size, budget)};
+        budget -= sent;
+        return sent;
+    }
+
+private:
+    PausedSendSock& operator=(Sock&&) override { throw std::logic_error("PausedSendSock is not movable"); }
+};
+
+void EstablishPausedSendPQ(pq::PQTransport& local, pq::PQTransport& remote)
+{
+    const auto deadline{std::chrono::steady_clock::now() + 5s};
+    auto transfer = [](Transport& from, Transport& to) {
+        auto wire{std::get<0>(from.GetBytesToSend(false))};
+        const auto size{wire.size()};
+        if (size == 0) return;
+        BOOST_REQUIRE(to.ReceivedBytes(wire));
+        BOOST_REQUIRE(wire.empty());
+        from.MarkBytesSent(size);
+    };
+    while (!local.GetInfo().pq_authenticated || !remote.GetInfo().pq_authenticated) {
+        BOOST_REQUIRE(std::chrono::steady_clock::now() < deadline);
+        BOOST_REQUIRE(local.Poll());
+        BOOST_REQUIRE(remote.Poll());
+        transfer(local, remote);
+        transfer(remote, local);
+        std::this_thread::sleep_for(1ms);
+    }
+}
+} // namespace
+
+BOOST_AUTO_TEST_CASE(paused_send_timeout)
+{
+    auto& connman{static_cast<ConnmanTestMsg&>(*m_node.connman)};
+    connman.SetSendBufferMaxSize(1024);
+    connman.SetPeerConnectTimeout(1s);
+
+    // Exercise the same queue/timeout paths for classical and authenticated PQ
+    // transports, including peers without nonce-based ping/pong support.
+    for (const bool use_pq : {false, true}) {
+        for (const int version : {BIP0031_VERSION, PROTOCOL_VERSION}) {
+            constexpr auto start{1700000000s};
+            SetMockTime(start - 60s);
+            auto socket{std::make_shared<PausedSendSock>()};
+            auto context{use_pq ? std::make_shared<pq::Context>(pq::SelectedNetwork()) : nullptr};
+            CNode node{0, socket, CAddress{LookupNumeric("127.0.0.1", 18444), NODE_NETWORK},
+                       0, 0, CService{}, "", ConnectionType::OUTBOUND_FULL_RELAY, false, 0,
+                       CNodeOptions{.pq_context = context}};
+            std::unique_ptr<pq::PQTransport> remote;
+            if (use_pq) {
+                remote = std::make_unique<pq::PQTransport>(context, false, std::nullopt, "paused-send-remote");
+                EstablishPausedSendPQ(static_cast<pq::PQTransport&>(*node.m_transport), *remote);
+                BOOST_REQUIRE(node.m_transport->GetInfo().pq_encrypted);
+            }
+            node.nVersion = version;
+            node.SetCommonVersion(version);
+            node.fSuccessfullyConnected = true;
+            SetMockTime(start);
+            node.m_last_send = start;
+            node.m_last_recv = start;
+            BOOST_CHECK(!node.fPauseSend);
+            BOOST_CHECK(node.m_pause_send_since.load() == 0s);
+
+            auto push = [&](size_t size) {
+                CSerializedNetMsg msg;
+                msg.m_type = NetMsgType::INV;
+                msg.data.resize(size, 42);
+                connman.PushMessage(&node, std::move(msg));
+            };
+            auto check = [&](std::chrono::microseconds now) {
+                // Keep ordinary inactivity fresh to isolate the pause timer.
+                node.m_last_send = std::chrono::duration_cast<std::chrono::seconds>(now);
+                node.m_last_recv = node.m_last_send.load();
+                return connman.InactivityCheckPublic(node, now);
+            };
+
+            socket->budget = 65536;
+            push(8);
+            BOOST_CHECK(!node.fPauseSend);
+            BOOST_CHECK(!check(start));
+            socket->budget = 0;
+            push(4096);
+            BOOST_REQUIRE(node.fPauseSend);
+            BOOST_CHECK(node.m_pause_send_since.load() == start);
+            SetMockTime(start + 100s);
+            push(4096);
+            socket->budget = 1; // Even slight send progress must not renew the timer.
+            connman.SocketSendDataPublic(node);
+            BOOST_CHECK(node.m_pause_send_since.load() == start);
+            BOOST_CHECK(!check(start + TIMEOUT_INTERVAL - 1us));
+            BOOST_CHECK(!check(start + TIMEOUT_INTERVAL));
+            BOOST_CHECK(check(start + TIMEOUT_INTERVAL + 1us));
+
+            socket->budget = 65536;
+            connman.SocketSendDataPublic(node);
+            BOOST_REQUIRE(!node.fPauseSend);
+            BOOST_CHECK(!check(start + 2 * TIMEOUT_INTERVAL));
+
+            // Cover the first transition in SocketSendData as well as PushMessage.
+            auto since{start + 3 * TIMEOUT_INTERVAL};
+            SetMockTime(since);
+            {
+                LOCK(node.cs_vSend);
+                CSerializedNetMsg msg;
+                msg.m_type = NetMsgType::INV;
+                msg.data.resize(4096, 42);
+                node.m_send_memusage += msg.GetMemoryUsage();
+                node.vSendMsg.push_back(std::move(msg));
+            }
+            socket->budget = 0;
+            connman.SocketSendDataPublic(node);
+            BOOST_REQUIRE(node.fPauseSend);
+            BOOST_CHECK(node.m_pause_send_since.load() == since);
+
+            // Fixed-seed bounded adversarial timing, recovery and reentry.
+            FastRandomContext random{true};
+            for (unsigned i{0}; i < 64; ++i) {
+                const auto elapsed{std::chrono::microseconds{random.randrange(2400000001ULL)}};
+                BOOST_CHECK_EQUAL(check(since + elapsed), elapsed > TIMEOUT_INTERVAL);
+                socket->budget = 65536;
+                connman.SocketSendDataPublic(node);
+                BOOST_REQUIRE(!node.fPauseSend);
+                since += 2401s;
+                SetMockTime(since);
+                socket->budget = 0;
+                push(4096);
+                BOOST_REQUIRE(node.fPauseSend);
+                BOOST_CHECK(node.m_pause_send_since.load() == since);
+            }
+            BOOST_CHECK(check(since + TIMEOUT_INTERVAL + 1us));
+            const auto retained_wire{std::get<0>(node.m_transport->GetBytesToSend(false))};
+            const std::vector<uint8_t> retained_copy{retained_wire.begin(), retained_wire.end()};
+            std::weak_ptr<Sock> released{socket};
+            socket.reset();
+            node.CloseSocketDisconnect();
+            BOOST_CHECK(node.fDisconnect);
+            BOOST_CHECK(released.expired());
+            if (use_pq) {
+                BOOST_CHECK(!node.m_transport->GetInfo().pq_encrypted);
+                BOOST_CHECK(std::get<0>(node.m_transport->GetBytesToSend(false)).empty());
+                // PQ intentionally keeps outstanding send spans stable until
+                // CNode destruction. Closing must revoke keys, not invalidate
+                // a socket thread's borrowed buffer.
+                BOOST_CHECK(std::equal(retained_wire.begin(), retained_wire.end(), retained_copy.begin(), retained_copy.end()));
+                remote->Disconnect();
+                BOOST_CHECK_EQUAL(context->Pending(), 0U);
+            }
+        }
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
