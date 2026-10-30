@@ -8,9 +8,9 @@ Dedicated branch: `security/bitcoin-core-2026-10-backports`. [GitHub branch](htt
 
 Official `v0.1`: `631886dd5159614b628ced3fe4fa1e289ce19451` (read-only observation; no modification).
 
-Evidence documentation commit: recorded after this initial evidence snapshot is committed.
+Evidence documentation commit: `5e298a49be457c31258703c34402db05e03ba8c7`.
 
-Publication and CI have not yet occurred at this documentation snapshot.
+Published branch SHA at CI request: `5e298a49be457c31258703c34402db05e03ba8c7`.
 
 The final receipt is a documentation-only successor when publication details are added. Its literal SHA is recorded in the external publication receipt and final response; it cannot be embedded in its own content. Production and test blobs must remain identical to the reviewed code SHA.
 
@@ -42,8 +42,17 @@ The rollback probe uses generated regtest history with a native PQ spend, not a 
 
 ## Native CI and exact source
 
-CI state: **NOT TRIGGERED**. Dispatch: **NOT REQUESTED**. Initial job coverage: NOT OBSERVED.
+CI state: **PENDING**. Dispatch: **BLOCKED before dispatch: one gh workflow run request failed with Forbidden resolving workflow at api.github.com; no successful PQ run**. Initial job coverage: Observed Windows native MSVC, macOS native ARM64, four Linux/cross-build matrix jobs, lint and meta: eight jobs total. Native jobs were configuring, not passed. SKIP_BRANCH_PUSH did not suppress these scheduled jobs. GUI/PQ integration matrix was not dispatched..
 
+- [CI run 41041130424](https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424), SHA `5e298a49be457c31258703c34402db05e03ba8c7`, in_progress, conclusion `None`.
+- [Windows native x86_64 MSVC](https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013925104): in_progress, conclusion `None`.
+- [[meta] determine runners](https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013925513): completed, conclusion `success`.
+- [macOS native ARM64](https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013925538): in_progress, conclusion `None`.
+- [lint](https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013984629): in_progress, conclusion `None`.
+- [macOS Intel x86_64 cross-compile](https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013984706): in_progress, conclusion `None`.
+- [Windows x86_64 UCRT cross-compile](https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013984716): in_progress, conclusion `None`.
+- [Linux native x86_64, headless](https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013984730): in_progress, conclusion `None`.
+- [macOS ARM64 cross-compile](https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013984812): in_progress, conclusion `None`.
 
 The standard `ci.yml` push workflow has Linux/cross-build, native macOS ARM64 and Windows MSVC full-unit/functional jobs plus lint. Branch-push jobs depend on `vars.SKIP_BRANCH_PUSH != true`; actual initial scheduling must be checked, not inferred. These native jobs are headless. The GUI-capable `pq-integration.yml` matrix covers Linux x86_64/ARM64, macOS ARM64 and Windows MSVC, Qt/PQ policy/transport/identity, controlled networking, enforced profile and local package smoke. Its filtered CTest command excludes the new net/flatfile suites, so it complements the standard full-unit workflow rather than substituting for it. Neither workflow publishes releases.
 
@@ -53,11 +62,11 @@ A final documentation-only receipt must not cause duplicate lengthy CI: its comm
 
 | Platform | Compile | Unit/security | Functional | Qt | Enforcing profile | Package smoke |
 |---|---|---|---|---|---|---|
-| Linux x86_64 local | PASS (prior exact code) | PASS (prior exact code) | PASS (prior exact code) | PASS (prior exact code) | PASS (prior exact code) | NOT TESTED locally |
-| Windows x64 MSVC CI | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED |
-| macOS ARM64 CI | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED |
-| macOS x86_64 cross CI | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED |
-| Linux ARM64 CI | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED | PENDING / NOT TESTED |
+| Linux x86_64 local | PASS | PASS | PASS | PASS | PASS | NOT TESTED locally |
+| Windows x64 MSVC CI | PENDING (scheduled) | PENDING (scheduled) | PENDING (scheduled) | NOT TESTED (GUI dispatch blocked) | NOT TESTED | NOT TESTED |
+| macOS ARM64 CI | PENDING (scheduled) | PENDING (scheduled) | PENDING (scheduled) | NOT TESTED (GUI dispatch blocked) | NOT TESTED | NOT TESTED |
+| macOS x86_64 cross CI | PENDING (scheduled) | NOT TESTED natively | NOT TESTED natively | NOT TESTED | NOT TESTED | NOT TESTED |
+| Linux ARM64 CI | NOT TESTED (dispatch blocked) | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED | NOT TESTED |
 
 Linux direct select execution establishes that the affected backend actually ran; it does not establish native Windows/macOS success. Cross-build coverage is compilation only unless runtime tests explicitly execute. Read exact scheduled job and step coverage from the initial snapshot; queued/running jobs are not passes.
 
@@ -68,18 +77,18 @@ Linux direct select execution establishes that the affected backend actually ran
 | A — Security patches | PASS |
 | B — Local regression | PASS |
 | C — Storage compatibility | PARTIAL |
-| D — Native Windows | NOT TESTED |
-| E — Native macOS | NOT TESTED |
+| D — Native Windows | PENDING |
+| E — Native macOS | PENDING |
 | F — PQ enforcing profile | PASS |
-| G — Git provenance | PENDING |
-| H — CI | NOT TESTED |
+| G — Git provenance | PASS |
+| H — CI | PENDING |
 | I — Founder approval | PENDING |
 
 ## Founder prerequisites and safety
 
 Before any fast-forward, obtain completed native Windows/macOS and applicable ARM results for the reviewed production/test blobs, full security regression coverage (including the standard unit workflow), and the enforcing profile. Resolve the original-database gap with a disposable authorized snapshot if original-history qualification is required. Recheck that official v0.1 is unchanged and an ancestor; a divergent remote branch requires stopping. Founder approval is a separate manual decision and is not presumed. Packaging is not authorized by this incomplete technical evidence. No merge commands are enabled while these gates remain open; see the separate founder handoff file.
 
-Production consensus, genesis/network identity, DGW/emission, hashing, MercaHash V1/V2, PQ handshake/derivation/authentication, native mining rewards and capacity heights are unchanged. No live endpoint, operator datadir, release, tag or deployment was accessed/modified. All local test processes exited.
+Production consensus, genesis/network identity, DGW/emission, hashing, MercaHash V1/V2, PQ handshake/derivation/authentication, native mining rewards and capacity heights are unchanged. No live-testnet endpoint or operator datadir was accessed. No release, tag, deployment or live infrastructure was created/modified; an existing checksum-pinned release was downloaded only for the isolated rollback probe. All local test processes exited.
 
 ## Read-only next-decision appendix
 

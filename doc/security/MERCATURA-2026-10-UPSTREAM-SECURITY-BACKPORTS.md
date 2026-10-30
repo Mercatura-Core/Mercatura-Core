@@ -101,7 +101,7 @@ ASan/UBSan actually passed 8 socket cases, 1 paused-send case (1,158 assertions)
 
 **CI and publication**
 
-Publication is authorized and pending the documentation commit. No merge, tag, release, deployment or live-testnet access is authorized. CI results remain untested until an actual run is identified.
+The dedicated branch publication checkpoint at CI request was `5e298a49be457c31258703c34402db05e03ba8c7`; a documentation-only receipt follows, and the official v0.1 remains unchanged. CI initial observations and run URLs appear in the final-qualification report. No CI polling, merge, tag, release, deployment or live-testnet access occurred.
 
 **Final audit and remaining concerns**
 

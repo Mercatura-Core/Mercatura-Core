@@ -4,7 +4,7 @@
 
 Official last observed v0.1: `631886dd5159614b628ced3fe4fa1e289ce19451`.
 Security code: `0a66162c465898b132e31d7574b0b8fb89ff09cc`.
-Evidence documentation commit: `None`.
+Evidence documentation commit: `5e298a49be457c31258703c34402db05e03ba8c7`.
 Branch: `security/bitcoin-core-2026-10-backports` on authorized `project` remote (`https://github.com/Mercatura-Core/Mercatura-Core.git`).
 Final literal branch HEAD and initial CI run URLs are in the post-commit publication receipt `/workspace/work/security-final/evidence/final-publication.json` and final founder response.
 

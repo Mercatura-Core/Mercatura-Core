@@ -2584,10 +2584,568 @@
     "coverage_guided_fuzzing_run": false
   },
   "ci": {
-    "status": "NOT TRIGGERED",
-    "runs": [],
-    "dispatch": "NOT REQUESTED",
-    "job_coverage": "NOT OBSERVED"
+    "status": "PENDING",
+    "observed_once": true,
+    "polled": false,
+    "run_collection_queries": 1,
+    "job_collection_queries": 1,
+    "runs": [
+      {
+        "id": 41041130424,
+        "name": "CI",
+        "head_sha": "5e298a49be457c31258703c34402db05e03ba8c7",
+        "status": "in_progress",
+        "conclusion": null,
+        "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424",
+        "event": "push"
+      }
+    ],
+    "jobs": [
+      {
+        "id": 124013925104,
+        "name": "Windows native x86_64 MSVC",
+        "status": "in_progress",
+        "conclusion": null,
+        "run_id": 41041130424,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Annotate with pull request number",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Configure",
+            "status": "in_progress",
+            "conclusion": null,
+            "number": 4
+          },
+          {
+            "name": "Build",
+            "status": "pending",
+            "conclusion": null,
+            "number": 5
+          },
+          {
+            "name": "Repeat six-worker version turnover regression",
+            "status": "pending",
+            "conclusion": null,
+            "number": 6
+          },
+          {
+            "name": "Unit tests",
+            "status": "pending",
+            "conclusion": null,
+            "number": 7
+          },
+          {
+            "name": "Mercatura functional tests",
+            "status": "pending",
+            "conclusion": null,
+            "number": 8
+          },
+          {
+            "name": "Post Checkout",
+            "status": "pending",
+            "conclusion": null,
+            "number": 16
+          }
+        ],
+        "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013925104"
+      },
+      {
+        "id": 124013925513,
+        "name": "[meta] determine runners",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 41041130424,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Annotate with pull request number",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Run if [[ \"${REPO_USE_WARP_RUNNERS}\" == \"Mercatura-Core/Mercatura-Core\" ]]; then",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          }
+        ],
+        "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013925513"
+      },
+      {
+        "id": 124013925538,
+        "name": "macOS native ARM64",
+        "status": "in_progress",
+        "conclusion": null,
+        "run_id": 41041130424,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Annotate with pull request number",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Install dependencies",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Configure",
+            "status": "in_progress",
+            "conclusion": null,
+            "number": 5
+          },
+          {
+            "name": "Build",
+            "status": "pending",
+            "conclusion": null,
+            "number": 6
+          },
+          {
+            "name": "Unit tests",
+            "status": "pending",
+            "conclusion": null,
+            "number": 7
+          },
+          {
+            "name": "Mercatura functional tests",
+            "status": "pending",
+            "conclusion": null,
+            "number": 8
+          },
+          {
+            "name": "Post Checkout",
+            "status": "pending",
+            "conclusion": null,
+            "number": 16
+          }
+        ],
+        "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013925538"
+      },
+      {
+        "id": 124013984629,
+        "name": "lint",
+        "status": "in_progress",
+        "conclusion": null,
+        "run_id": 41041130424,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Annotate with pull request number",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Configure Docker",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "CI script",
+            "status": "in_progress",
+            "conclusion": null,
+            "number": 5
+          },
+          {
+            "name": "Post Configure Docker",
+            "status": "pending",
+            "conclusion": null,
+            "number": 9
+          },
+          {
+            "name": "Post Checkout",
+            "status": "pending",
+            "conclusion": null,
+            "number": 10
+          }
+        ],
+        "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013984629"
+      },
+      {
+        "id": 124013984706,
+        "name": "macOS Intel x86_64 cross-compile",
+        "status": "in_progress",
+        "conclusion": null,
+        "run_id": 41041130424,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Annotate with pull request number",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Configure environment",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Restore caches",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5
+          },
+          {
+            "name": "Configure Docker",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6
+          },
+          {
+            "name": "Clear unnecessary files",
+            "status": "in_progress",
+            "conclusion": null,
+            "number": 7
+          },
+          {
+            "name": "CI script",
+            "status": "pending",
+            "conclusion": null,
+            "number": 8
+          },
+          {
+            "name": "Save caches",
+            "status": "pending",
+            "conclusion": null,
+            "number": 9
+          },
+          {
+            "name": "Post Configure Docker",
+            "status": "pending",
+            "conclusion": null,
+            "number": 16
+          },
+          {
+            "name": "Post Restore caches",
+            "status": "pending",
+            "conclusion": null,
+            "number": 17
+          },
+          {
+            "name": "Post Checkout",
+            "status": "pending",
+            "conclusion": null,
+            "number": 18
+          }
+        ],
+        "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013984706"
+      },
+      {
+        "id": 124013984716,
+        "name": "Windows x86_64 UCRT cross-compile",
+        "status": "in_progress",
+        "conclusion": null,
+        "run_id": 41041130424,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Annotate with pull request number",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Configure environment",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Restore caches",
+            "status": "in_progress",
+            "conclusion": null,
+            "number": 5
+          },
+          {
+            "name": "Configure Docker",
+            "status": "pending",
+            "conclusion": null,
+            "number": 6
+          },
+          {
+            "name": "Clear unnecessary files",
+            "status": "pending",
+            "conclusion": null,
+            "number": 7
+          },
+          {
+            "name": "CI script",
+            "status": "pending",
+            "conclusion": null,
+            "number": 8
+          },
+          {
+            "name": "Save caches",
+            "status": "pending",
+            "conclusion": null,
+            "number": 9
+          },
+          {
+            "name": "Post Restore caches",
+            "status": "pending",
+            "conclusion": null,
+            "number": 17
+          },
+          {
+            "name": "Post Checkout",
+            "status": "pending",
+            "conclusion": null,
+            "number": 18
+          }
+        ],
+        "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013984716"
+      },
+      {
+        "id": 124013984730,
+        "name": "Linux native x86_64, headless",
+        "status": "in_progress",
+        "conclusion": null,
+        "run_id": 41041130424,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Annotate with pull request number",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Configure environment",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Restore caches",
+            "status": "in_progress",
+            "conclusion": null,
+            "number": 5
+          },
+          {
+            "name": "Configure Docker",
+            "status": "pending",
+            "conclusion": null,
+            "number": 6
+          },
+          {
+            "name": "Clear unnecessary files",
+            "status": "pending",
+            "conclusion": null,
+            "number": 7
+          },
+          {
+            "name": "CI script",
+            "status": "pending",
+            "conclusion": null,
+            "number": 8
+          },
+          {
+            "name": "Save caches",
+            "status": "pending",
+            "conclusion": null,
+            "number": 9
+          },
+          {
+            "name": "Post Restore caches",
+            "status": "pending",
+            "conclusion": null,
+            "number": 17
+          },
+          {
+            "name": "Post Checkout",
+            "status": "pending",
+            "conclusion": null,
+            "number": 18
+          }
+        ],
+        "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013984730"
+      },
+      {
+        "id": 124013984812,
+        "name": "macOS ARM64 cross-compile",
+        "status": "in_progress",
+        "conclusion": null,
+        "run_id": 41041130424,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Annotate with pull request number",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Checkout",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Configure environment",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Restore caches",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5
+          },
+          {
+            "name": "Configure Docker",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6
+          },
+          {
+            "name": "Clear unnecessary files",
+            "status": "in_progress",
+            "conclusion": null,
+            "number": 7
+          },
+          {
+            "name": "CI script",
+            "status": "pending",
+            "conclusion": null,
+            "number": 8
+          },
+          {
+            "name": "Save caches",
+            "status": "pending",
+            "conclusion": null,
+            "number": 9
+          },
+          {
+            "name": "Post Configure Docker",
+            "status": "pending",
+            "conclusion": null,
+            "number": 16
+          },
+          {
+            "name": "Post Restore caches",
+            "status": "pending",
+            "conclusion": null,
+            "number": 17
+          },
+          {
+            "name": "Post Checkout",
+            "status": "pending",
+            "conclusion": null,
+            "number": 18
+          }
+        ],
+        "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013984812"
+      }
+    ],
+    "dispatch": "BLOCKED before dispatch: one gh workflow run request failed with Forbidden resolving workflow at api.github.com; no successful PQ run",
+    "dispatch_attempts": 1,
+    "job_coverage": "Observed Windows native MSVC, macOS native ARM64, four Linux/cross-build matrix jobs, lint and meta: eight jobs total. Native jobs were configuring, not passed. SKIP_BRANCH_PUSH did not suppress these scheduled jobs. GUI/PQ integration matrix was not dispatched.",
+    "gui_pq_workflow_dispatched": false,
+    "gui_pq_run_id": null,
+    "standard_run_source_sha": "5e298a49be457c31258703c34402db05e03ba8c7"
   },
   "flags": {
     "production_code_changed": true,
@@ -2598,7 +3156,7 @@
     "new_production_dependencies": false,
     "live_infrastructure_modified": false,
     "v0_1_modified": false,
-    "pushed": false,
+    "pushed": true,
     "all_owned_processes_exited": true
   },
   "remaining_security_concerns": [
@@ -2638,12 +3196,12 @@
     "all_owned_processes_exited": true
   },
   "final_qualification_handoff": {
-    "recorded_utc": "2026-10-30T10:27:22.581835+00:00",
+    "recorded_utc": "2026-10-30T10:32:15.363673+00:00",
     "overall_result": "PARTIAL",
     "base_candidate_sha": "61f1f4b9e24d07ea56fcfc1952aaa73aac498394",
     "security_code_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
-    "documentation_commit_sha": null,
-    "published_branch_sha_at_ci_request": null,
+    "documentation_commit_sha": "5e298a49be457c31258703c34402db05e03ba8c7",
+    "published_branch_sha_at_ci_request": "5e298a49be457c31258703c34402db05e03ba8c7",
     "final_branch_head_resolution": "The containing documentation commit; its literal SHA and remote verification are recorded after commit in /workspace/work/security-final/evidence/final-publication.json and the final founder response. A file cannot embed its own containing commit SHA.",
     "official_v0_1_sha": "631886dd5159614b628ced3fe4fa1e289ce19451",
     "security_branch_url": "https://github.com/Mercatura-Core/Mercatura-Core/tree/security/bitcoin-core-2026-10-backports",
@@ -3008,12 +3566,12 @@
       {
         "id": "D",
         "gate": "Native Windows",
-        "status": "NOT TESTED"
+        "status": "PENDING"
       },
       {
         "id": "E",
         "gate": "Native macOS",
-        "status": "NOT TESTED"
+        "status": "PENDING"
       },
       {
         "id": "F",
@@ -3023,12 +3581,12 @@
       {
         "id": "G",
         "gate": "Git provenance",
-        "status": "PENDING"
+        "status": "PASS"
       },
       {
         "id": "H",
         "gate": "CI",
-        "status": "NOT TESTED"
+        "status": "PENDING"
       },
       {
         "id": "I",
@@ -3037,10 +3595,568 @@
       }
     ],
     "ci": {
-      "status": "NOT TRIGGERED",
-      "runs": [],
-      "dispatch": "NOT REQUESTED",
-      "job_coverage": "NOT OBSERVED"
+      "status": "PENDING",
+      "observed_once": true,
+      "polled": false,
+      "run_collection_queries": 1,
+      "job_collection_queries": 1,
+      "runs": [
+        {
+          "id": 41041130424,
+          "name": "CI",
+          "head_sha": "5e298a49be457c31258703c34402db05e03ba8c7",
+          "status": "in_progress",
+          "conclusion": null,
+          "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424",
+          "event": "push"
+        }
+      ],
+      "jobs": [
+        {
+          "id": 124013925104,
+          "name": "Windows native x86_64 MSVC",
+          "status": "in_progress",
+          "conclusion": null,
+          "run_id": 41041130424,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Annotate with pull request number",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Checkout",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Configure",
+              "status": "in_progress",
+              "conclusion": null,
+              "number": 4
+            },
+            {
+              "name": "Build",
+              "status": "pending",
+              "conclusion": null,
+              "number": 5
+            },
+            {
+              "name": "Repeat six-worker version turnover regression",
+              "status": "pending",
+              "conclusion": null,
+              "number": 6
+            },
+            {
+              "name": "Unit tests",
+              "status": "pending",
+              "conclusion": null,
+              "number": 7
+            },
+            {
+              "name": "Mercatura functional tests",
+              "status": "pending",
+              "conclusion": null,
+              "number": 8
+            },
+            {
+              "name": "Post Checkout",
+              "status": "pending",
+              "conclusion": null,
+              "number": 16
+            }
+          ],
+          "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013925104"
+        },
+        {
+          "id": 124013925513,
+          "name": "[meta] determine runners",
+          "status": "completed",
+          "conclusion": "success",
+          "run_id": 41041130424,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Annotate with pull request number",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Run if [[ \"${REPO_USE_WARP_RUNNERS}\" == \"Mercatura-Core/Mercatura-Core\" ]]; then",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4
+            }
+          ],
+          "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013925513"
+        },
+        {
+          "id": 124013925538,
+          "name": "macOS native ARM64",
+          "status": "in_progress",
+          "conclusion": null,
+          "run_id": 41041130424,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Annotate with pull request number",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Checkout",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Install dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4
+            },
+            {
+              "name": "Configure",
+              "status": "in_progress",
+              "conclusion": null,
+              "number": 5
+            },
+            {
+              "name": "Build",
+              "status": "pending",
+              "conclusion": null,
+              "number": 6
+            },
+            {
+              "name": "Unit tests",
+              "status": "pending",
+              "conclusion": null,
+              "number": 7
+            },
+            {
+              "name": "Mercatura functional tests",
+              "status": "pending",
+              "conclusion": null,
+              "number": 8
+            },
+            {
+              "name": "Post Checkout",
+              "status": "pending",
+              "conclusion": null,
+              "number": 16
+            }
+          ],
+          "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013925538"
+        },
+        {
+          "id": 124013984629,
+          "name": "lint",
+          "status": "in_progress",
+          "conclusion": null,
+          "run_id": 41041130424,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Annotate with pull request number",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Checkout",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Configure Docker",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4
+            },
+            {
+              "name": "CI script",
+              "status": "in_progress",
+              "conclusion": null,
+              "number": 5
+            },
+            {
+              "name": "Post Configure Docker",
+              "status": "pending",
+              "conclusion": null,
+              "number": 9
+            },
+            {
+              "name": "Post Checkout",
+              "status": "pending",
+              "conclusion": null,
+              "number": 10
+            }
+          ],
+          "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013984629"
+        },
+        {
+          "id": 124013984706,
+          "name": "macOS Intel x86_64 cross-compile",
+          "status": "in_progress",
+          "conclusion": null,
+          "run_id": 41041130424,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Annotate with pull request number",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Checkout",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Configure environment",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4
+            },
+            {
+              "name": "Restore caches",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5
+            },
+            {
+              "name": "Configure Docker",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6
+            },
+            {
+              "name": "Clear unnecessary files",
+              "status": "in_progress",
+              "conclusion": null,
+              "number": 7
+            },
+            {
+              "name": "CI script",
+              "status": "pending",
+              "conclusion": null,
+              "number": 8
+            },
+            {
+              "name": "Save caches",
+              "status": "pending",
+              "conclusion": null,
+              "number": 9
+            },
+            {
+              "name": "Post Configure Docker",
+              "status": "pending",
+              "conclusion": null,
+              "number": 16
+            },
+            {
+              "name": "Post Restore caches",
+              "status": "pending",
+              "conclusion": null,
+              "number": 17
+            },
+            {
+              "name": "Post Checkout",
+              "status": "pending",
+              "conclusion": null,
+              "number": 18
+            }
+          ],
+          "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013984706"
+        },
+        {
+          "id": 124013984716,
+          "name": "Windows x86_64 UCRT cross-compile",
+          "status": "in_progress",
+          "conclusion": null,
+          "run_id": 41041130424,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Annotate with pull request number",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Checkout",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Configure environment",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4
+            },
+            {
+              "name": "Restore caches",
+              "status": "in_progress",
+              "conclusion": null,
+              "number": 5
+            },
+            {
+              "name": "Configure Docker",
+              "status": "pending",
+              "conclusion": null,
+              "number": 6
+            },
+            {
+              "name": "Clear unnecessary files",
+              "status": "pending",
+              "conclusion": null,
+              "number": 7
+            },
+            {
+              "name": "CI script",
+              "status": "pending",
+              "conclusion": null,
+              "number": 8
+            },
+            {
+              "name": "Save caches",
+              "status": "pending",
+              "conclusion": null,
+              "number": 9
+            },
+            {
+              "name": "Post Restore caches",
+              "status": "pending",
+              "conclusion": null,
+              "number": 17
+            },
+            {
+              "name": "Post Checkout",
+              "status": "pending",
+              "conclusion": null,
+              "number": 18
+            }
+          ],
+          "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013984716"
+        },
+        {
+          "id": 124013984730,
+          "name": "Linux native x86_64, headless",
+          "status": "in_progress",
+          "conclusion": null,
+          "run_id": 41041130424,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Annotate with pull request number",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Checkout",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Configure environment",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4
+            },
+            {
+              "name": "Restore caches",
+              "status": "in_progress",
+              "conclusion": null,
+              "number": 5
+            },
+            {
+              "name": "Configure Docker",
+              "status": "pending",
+              "conclusion": null,
+              "number": 6
+            },
+            {
+              "name": "Clear unnecessary files",
+              "status": "pending",
+              "conclusion": null,
+              "number": 7
+            },
+            {
+              "name": "CI script",
+              "status": "pending",
+              "conclusion": null,
+              "number": 8
+            },
+            {
+              "name": "Save caches",
+              "status": "pending",
+              "conclusion": null,
+              "number": 9
+            },
+            {
+              "name": "Post Restore caches",
+              "status": "pending",
+              "conclusion": null,
+              "number": 17
+            },
+            {
+              "name": "Post Checkout",
+              "status": "pending",
+              "conclusion": null,
+              "number": 18
+            }
+          ],
+          "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013984730"
+        },
+        {
+          "id": 124013984812,
+          "name": "macOS ARM64 cross-compile",
+          "status": "in_progress",
+          "conclusion": null,
+          "run_id": 41041130424,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Annotate with pull request number",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Checkout",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Configure environment",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4
+            },
+            {
+              "name": "Restore caches",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5
+            },
+            {
+              "name": "Configure Docker",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6
+            },
+            {
+              "name": "Clear unnecessary files",
+              "status": "in_progress",
+              "conclusion": null,
+              "number": 7
+            },
+            {
+              "name": "CI script",
+              "status": "pending",
+              "conclusion": null,
+              "number": 8
+            },
+            {
+              "name": "Save caches",
+              "status": "pending",
+              "conclusion": null,
+              "number": 9
+            },
+            {
+              "name": "Post Configure Docker",
+              "status": "pending",
+              "conclusion": null,
+              "number": 16
+            },
+            {
+              "name": "Post Restore caches",
+              "status": "pending",
+              "conclusion": null,
+              "number": 17
+            },
+            {
+              "name": "Post Checkout",
+              "status": "pending",
+              "conclusion": null,
+              "number": 18
+            }
+          ],
+          "html_url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424/job/124013984812"
+        }
+      ],
+      "dispatch": "BLOCKED before dispatch: one gh workflow run request failed with Forbidden resolving workflow at api.github.com; no successful PQ run",
+      "dispatch_attempts": 1,
+      "job_coverage": "Observed Windows native MSVC, macOS native ARM64, four Linux/cross-build matrix jobs, lint and meta: eight jobs total. Native jobs were configuring, not passed. SKIP_BRANCH_PUSH did not suppress these scheduled jobs. GUI/PQ integration matrix was not dispatched.",
+      "gui_pq_workflow_dispatched": false,
+      "gui_pq_run_id": null,
+      "standard_run_source_sha": "5e298a49be457c31258703c34402db05e03ba8c7"
     },
     "production_changes_this_assignment": false,
     "long_local_suites_repeated": false,
