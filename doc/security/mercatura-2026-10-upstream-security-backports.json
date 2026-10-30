@@ -3145,7 +3145,8 @@
     "job_coverage": "Observed Windows native MSVC, macOS native ARM64, four Linux/cross-build matrix jobs, lint and meta: eight jobs total. Native jobs were configuring, not passed. SKIP_BRANCH_PUSH did not suppress these scheduled jobs. GUI/PQ integration matrix was not dispatched.",
     "gui_pq_workflow_dispatched": false,
     "gui_pq_run_id": null,
-    "standard_run_source_sha": "5e298a49be457c31258703c34402db05e03ba8c7"
+    "standard_run_source_sha": "5e298a49be457c31258703c34402db05e03ba8c7",
+    "snapshot_scope": "Historical initial observation before CI repair; superseded by ci_current and ci_repair"
   },
   "flags": {
     "production_code_changed": true,
@@ -4167,5 +4168,266 @@
     "v2_height_selected": false,
     "all_owned_test_processes_exited": true,
     "evidence_directory": "/workspace/work/security-final/evidence"
+  },
+  "ci_current": {
+    "status": "PENDING AUTOMATIC PUSH RUN",
+    "previous_run": "FAIL (41041130424 at 5e298a49be457c31258703c34402db05e03ba8c7)",
+    "run_url_receipt": "/workspace/work/security-ci-repair/evidence/new-ci-initial-snapshot.json",
+    "polled": false
+  },
+  "ci_repair": {
+    "original_branch_head": "e363780eea9adf1c47184d3bef14f0fbd9097e8e",
+    "production_security_sha": "0a66162c465898b132e31d7574b0b8fb89ff09cc",
+    "socket_fix_commit": "4f2fbdeef8c284976070f975f13558f0b5504329",
+    "locale_fix_commit_resolution": "The commit containing this locale-test correction and report update; exact SHA is captured after commit in /workspace/work/security-ci-repair/evidence/publication.json.",
+    "previous_ci": {
+      "run_id": 41041130424,
+      "url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41041130424",
+      "source_sha": "5e298a49be457c31258703c34402db05e03ba8c7",
+      "status": "FAIL",
+      "windows_job": 124013925104,
+      "macos_job": 124013925538,
+      "lint_job": 124013984629,
+      "native_results": {
+        "build": "PASS",
+        "ctest_total": 187,
+        "passed": 185,
+        "failed": 1,
+        "skipped": 1,
+        "failed_test": "sock_tests/wait_connection_error",
+        "assertions": [
+          246,
+          250
+        ]
+      },
+      "lint_failures": [
+        "lint-locale-dependence.py: std::to_string(value) in src/test/flatfile_tests.cpp",
+        "lint-includes.py: textual inclusion of util/sock.cpp by the forced-select test wrapper"
+      ]
+    },
+    "root_causes": {
+      "socket": "Nonportable test fixture: a bound/unlistened destination was assumed to refuse within one second and every refusal was assumed asynchronous. Old native logs show no readiness and SO_ERROR=0, but did not capture the initial native connect error; the old immediate-vs-still-pending path cannot be reconstructed conclusively.",
+      "locale": "The regression called std::to_string, prohibited by the repository locale-dependence lint.",
+      "include": "The opt-in forced-select test textually included a .cpp, prohibited by the repository include lint."
+    },
+    "changes": {
+      "socket": "Use a closed loopback destination, prebind the client while the destination is reserved to avoid self-connect, capture connect result/native error immediately, and require actual ECONNREFUSED/WSAECONNREFUSED either immediately or via readiness plus SO_ERROR. The asynchronous wait is bounded at five seconds.",
+      "forced_select": "Compile src/util/sock.cpp directly in the opt-in test target, preincluding a guarded test header with -include or MSVC /FI to select the backend. No .cpp include or lint exemption remains. nm confirms the Linux test object imports select, not poll.",
+      "locale": "Use util::ToString from util/string.h, which explicitly imbues the classic locale; retain the full large-position formatting assertion and serialization vectors."
+    },
+    "local_results": {
+      "ci-repair-socket-build": {
+        "name": "ci-repair-socket-build",
+        "command": [
+          "cmake",
+          "--build",
+          "/workspace/work/security-backports/work/release",
+          "-j2",
+          "--target",
+          "test_bitcoin",
+          "sock_select_tests",
+          "pq_stagea_tests"
+        ],
+        "cwd": "/workspace/work/security-backports/source",
+        "source_sha": "e363780eea9adf1c47184d3bef14f0fbd9097e8e",
+        "source_status": " M src/test/CMakeLists.txt\n M src/test/sock_tests.cpp\n D src/test/util/sock_select.cpp\n?? src/test/util/sock_select.h\n",
+        "started_utc": "2026-10-30T11:46:05.367227+00:00",
+        "timeout_seconds": 600,
+        "source_tree": "86ef341a86bc41a235ae767c047d0a6611c2fc17",
+        "environment": {
+          "QT_QPA_PLATFORM": "offscreen",
+          "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+          "TMPDIR": "/workspace/work/security-backports/work/tmp"
+        },
+        "returncode": 0,
+        "duration_seconds": 26.626,
+        "result": "PASS"
+      },
+      "ci-repair-socket-adjacent": {
+        "name": "ci-repair-socket-adjacent",
+        "command": [
+          "/workspace/work/security-backports/work/release/bin/test_bitcoin",
+          "--run_test=sock_tests,netbase_tests,net_peer_connection_tests,pq_transport_tests,pq_policy_tests",
+          "--catch_system_error=no",
+          "--report_level=detailed",
+          "--log_level=message"
+        ],
+        "cwd": "/workspace/work/security-backports/source",
+        "source_sha": "e363780eea9adf1c47184d3bef14f0fbd9097e8e",
+        "source_status": "M  src/test/CMakeLists.txt\nM  src/test/sock_tests.cpp\nD  src/test/util/sock_select.cpp\nA  src/test/util/sock_select.h\n",
+        "started_utc": "2026-10-30T11:47:57.480064+00:00",
+        "timeout_seconds": 180,
+        "source_tree": "1a246a5128169af48e1a91f206cc35f3b2ea821f",
+        "environment": {
+          "QT_QPA_PLATFORM": "offscreen",
+          "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+          "TMPDIR": "/workspace/work/security-backports/work/tmp"
+        },
+        "returncode": 0,
+        "duration_seconds": 17.759,
+        "result": "PASS"
+      },
+      "ci-repair-forced-select": {
+        "name": "ci-repair-forced-select",
+        "command": [
+          "/workspace/work/security-backports/work/release/bin/sock_select_tests",
+          "--report_level=detailed",
+          "--log_level=message"
+        ],
+        "cwd": "/workspace/work/security-backports/source",
+        "source_sha": "e363780eea9adf1c47184d3bef14f0fbd9097e8e",
+        "source_status": "M  src/test/CMakeLists.txt\nM  src/test/sock_tests.cpp\nD  src/test/util/sock_select.cpp\nA  src/test/util/sock_select.h\n",
+        "started_utc": "2026-10-30T11:47:56.370346+00:00",
+        "timeout_seconds": 60,
+        "source_tree": "1a246a5128169af48e1a91f206cc35f3b2ea821f",
+        "environment": {
+          "QT_QPA_PLATFORM": "offscreen",
+          "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+          "TMPDIR": "/workspace/work/security-backports/work/tmp"
+        },
+        "returncode": 0,
+        "duration_seconds": 0.164,
+        "result": "PASS"
+      },
+      "ci-repair-flatfile-build": {
+        "name": "ci-repair-flatfile-build",
+        "command": [
+          "cmake",
+          "--build",
+          "/workspace/work/security-backports/work/release",
+          "-j2",
+          "--target",
+          "test_bitcoin"
+        ],
+        "cwd": "/workspace/work/security-backports/source",
+        "source_sha": "4f2fbdeef8c284976070f975f13558f0b5504329",
+        "source_status": "M  src/test/flatfile_tests.cpp\n",
+        "started_utc": "2026-10-30T11:50:25.861231+00:00",
+        "timeout_seconds": 300,
+        "source_tree": "658735bbc6997c759f5adad81ed150f913254b50",
+        "environment": {
+          "QT_QPA_PLATFORM": "offscreen",
+          "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+          "TMPDIR": "/workspace/work/security-backports/work/tmp"
+        },
+        "returncode": 0,
+        "duration_seconds": 5.885,
+        "result": "PASS"
+      },
+      "ci-repair-flatfile": {
+        "name": "ci-repair-flatfile",
+        "command": [
+          "/workspace/work/security-backports/work/release/bin/test_bitcoin",
+          "--run_test=flatfile_tests",
+          "--catch_system_error=no",
+          "--report_level=detailed",
+          "--log_level=message"
+        ],
+        "cwd": "/workspace/work/security-backports/source",
+        "source_sha": "4f2fbdeef8c284976070f975f13558f0b5504329",
+        "source_status": "M  src/test/flatfile_tests.cpp\n",
+        "started_utc": "2026-10-30T11:50:31.817800+00:00",
+        "timeout_seconds": 180,
+        "source_tree": "658735bbc6997c759f5adad81ed150f913254b50",
+        "environment": {
+          "QT_QPA_PLATFORM": "offscreen",
+          "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+          "TMPDIR": "/workspace/work/security-backports/work/tmp"
+        },
+        "returncode": 0,
+        "duration_seconds": 0.165,
+        "result": "PASS"
+      },
+      "ci-repair-locale-lint": {
+        "name": "ci-repair-locale-lint",
+        "command": [
+          "python3",
+          "test/lint/lint-locale-dependence.py"
+        ],
+        "cwd": "/workspace/work/security-backports/source",
+        "source_sha": "4f2fbdeef8c284976070f975f13558f0b5504329",
+        "source_status": "M  src/test/flatfile_tests.cpp\n",
+        "started_utc": "2026-10-30T11:50:10.226103+00:00",
+        "timeout_seconds": 90,
+        "source_tree": "cd7990054f16e833539a7eebfc0dee55e90d8aa3",
+        "environment": {
+          "QT_QPA_PLATFORM": "offscreen",
+          "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+          "TMPDIR": "/workspace/work/security-backports/work/tmp"
+        },
+        "returncode": 0,
+        "duration_seconds": 0.381,
+        "result": "PASS"
+      },
+      "ci-repair-include-lint": {
+        "name": "ci-repair-include-lint",
+        "command": [
+          "python3",
+          "test/lint/lint-includes.py"
+        ],
+        "cwd": "/workspace/work/security-backports/source",
+        "source_sha": "4f2fbdeef8c284976070f975f13558f0b5504329",
+        "source_status": "M  src/test/flatfile_tests.cpp\n",
+        "started_utc": "2026-10-30T11:50:10.657992+00:00",
+        "timeout_seconds": 90,
+        "source_tree": "cd7990054f16e833539a7eebfc0dee55e90d8aa3",
+        "environment": {
+          "QT_QPA_PLATFORM": "offscreen",
+          "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+          "TMPDIR": "/workspace/work/security-backports/work/tmp"
+        },
+        "returncode": 0,
+        "duration_seconds": 0.415,
+        "result": "PASS"
+      },
+      "ci-repair-guard-lint": {
+        "name": "ci-repair-guard-lint",
+        "command": [
+          "python3",
+          "test/lint/lint-include-guards.py"
+        ],
+        "cwd": "/workspace/work/security-backports/source",
+        "source_sha": "4f2fbdeef8c284976070f975f13558f0b5504329",
+        "source_status": "M  src/test/flatfile_tests.cpp\n",
+        "started_utc": "2026-10-30T11:50:32.030909+00:00",
+        "timeout_seconds": 90,
+        "source_tree": "658735bbc6997c759f5adad81ed150f913254b50",
+        "environment": {
+          "QT_QPA_PLATFORM": "offscreen",
+          "LD_LIBRARY_PATH": "/workspace/work/security-backports/work/deps/usr/lib/x86_64-linux-gnu",
+          "TMPDIR": "/workspace/work/security-backports/work/tmp"
+        },
+        "returncode": 0,
+        "duration_seconds": 0.114,
+        "result": "PASS"
+      }
+    },
+    "local_counts": {
+      "socket_network_pq_cases": 49,
+      "socket_network_pq_assertions": 123017,
+      "forced_select_cases": 8,
+      "forced_select_assertions": 384,
+      "flatfile_cases": 6,
+      "flatfile_assertions": 3394
+    },
+    "source_provenance": "Precommit runners retain preceding HEAD and staged tree; socket-source-before-tests.json and reviewed diffs identify code blobs. Final focused runs and binary metadata refresh will be pinned to the committed repair HEAD in separate evidence before publication.",
+    "production_behavior_changed": false,
+    "production_sources_changed": false,
+    "security_invariant_unchanged": true,
+    "urgent_data_regression_unchanged": true,
+    "tests_disabled": false,
+    "native_closure": "PENDING: the fixture repair passes locally; native Windows/macOS success must come from the new exact-source CI run.",
+    "new_ci": {
+      "status": "PENDING AUTOMATIC PUSH RUN",
+      "run_url": null,
+      "receipt": "/workspace/work/security-ci-repair/evidence/new-ci-initial-snapshot.json",
+      "no_polling": true,
+      "manual_reruns_requested": 0
+    },
+    "remaining_prior_limits": [
+      "Original public-testnet database fixture is unavailable.",
+      "GUI-capable PQ workflow from the prior assignment was not dispatched successfully; that limitation is not closed by these test repairs."
+    ],
+    "ready_for_founder_merge_review": false
   }
 }

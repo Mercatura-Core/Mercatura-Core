@@ -14,6 +14,7 @@
 #include <test/util/sparse.h>
 #include <util/fs_helpers.h>
 #include <util/strencodings.h>
+#include <util/string.h>
 
 #include <limits>
 
@@ -230,7 +231,7 @@ BOOST_AUTO_TEST_CASE(position_serialization_64bit)
         FlatFilePos decoded;
         stream >> decoded;
         BOOST_CHECK(pos == decoded);
-        BOOST_CHECK(pos.ToString().find(std::to_string(value)) != std::string::npos);
+        BOOST_CHECK(pos.ToString().find(util::ToString(value)) != std::string::npos);
     }
     DataStream malformed{std::vector<uint8_t>(20, 0xff)};
     FlatFilePos invalid;
