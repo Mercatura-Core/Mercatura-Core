@@ -78,7 +78,7 @@ before 17,000. A successful build does not establish public connectivity or roll
 
 ## Qualification limitations
 
-Use the [exact-source qualification report](../validation/MERCATURA-TESTNET-17000-PQ-REQUIRED-PRE-RELEASE.md)
+Use the [exact-source qualification report](validation/MERCATURA-TESTNET-17000-PQ-REQUIRED-PRE-RELEASE.md)
 for actual unit/functional/Qt results, native CI status, historical-database scope,
 reported chain tip and missing physical GPU evidence. Pending CI is not a pass;
 compilation and mocked host tests do not establish native device performance.
