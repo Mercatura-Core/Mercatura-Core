@@ -68,7 +68,7 @@ BOOST_AUTO_TEST_CASE(boundary_wrong_versions_forks_and_cache)
     for (const int h : {1, 2}) BOOST_CHECK(GetPoWVersion(params, h) == mercahash::Version::V1);
     for (const int h : {3, 4, 103}) BOOST_CHECK(GetPoWVersion(params, h) == mercahash::Version::V2);
     ArgsManager public_args;
-    for (const auto type : {ChainType::MAIN, ChainType::TESTNET, ChainType::TESTNET4, ChainType::SIGNET}) {
+    for (const auto type : {ChainType::MAIN, ChainType::TESTNET4, ChainType::SIGNET}) {
         BOOST_CHECK(!CreateChainParams(public_args, type)->GetConsensus().nMercaHashV2Height);
     }
     const auto first{Header(Params().GenesisBlock(), 1, 1)};
@@ -180,7 +180,7 @@ BOOST_AUTO_TEST_CASE(network_defaults_and_v2_genesis_are_explicit)
 {
     ArgsManager args;
     PoWHashContext context;
-    for (const auto chain : {ChainType::MAIN, ChainType::TESTNET, ChainType::TESTNET4, ChainType::SIGNET}) {
+    for (const auto chain : {ChainType::MAIN, ChainType::TESTNET4, ChainType::SIGNET}) {
         const auto network{CreateChainParams(args, chain)};
         BOOST_CHECK(!network->GetConsensus().nMercaHashV2Height);
         for (const int64_t height : {0, 1, 100, std::numeric_limits<int>::max()})

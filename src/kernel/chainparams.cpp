@@ -199,6 +199,7 @@ public:
     CTestNetParams() {
         m_chain_type = ChainType::TESTNET;
         consensus.nBlockCapacity4MiBHeight = 8'000;
+        consensus.nMercaHashV2Height = 17'000;
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
         // Mercatura has no inherited Bitcoin historical script exceptions.

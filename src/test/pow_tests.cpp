@@ -15,12 +15,53 @@
 #include <util/strencodings.h>
 
 #include <array>
+#include <limits>
 #include <span>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
 
 BOOST_FIXTURE_TEST_SUITE(pow_tests, BasicTestingSetup)
+
+BOOST_AUTO_TEST_CASE(public_testnet_mercahash_v2_17000)
+{
+    const auto testnet{CreateChainParams(*m_node.args, ChainType::TESTNET)};
+    const auto& consensus{testnet->GetConsensus()};
+    BOOST_REQUIRE(consensus.nMercaHashV2Height.has_value());
+    BOOST_CHECK_EQUAL(*consensus.nMercaHashV2Height, 17'000);
+    BOOST_CHECK_EQUAL(testnet->GenesisBlock().GetHash().GetHex(),
+                      "b3fc707c9a89dc45d1cf6a837284b22ad2b6fd41b99af601079db9dcbeff6920");
+    BOOST_REQUIRE(consensus.nBlockCapacity4MiBHeight.has_value());
+    BOOST_CHECK_EQUAL(*consensus.nBlockCapacity4MiBHeight, 8'000);
+    BOOST_CHECK_EQUAL(consensus.nPowTargetSpacing, 150);
+    for (const int64_t height : {0, 16'998, 16'999}) {
+        BOOST_CHECK(GetPoWVersion(consensus, height) == mercahash::Version::V1);
+    }
+    for (const int64_t height : {17'000, 17'001, 1'000'000, std::numeric_limits<int>::max()}) {
+        BOOST_CHECK(GetPoWVersion(consensus, height) == mercahash::Version::V2);
+    }
+    // Activation changes the hash dispatcher, never the difficulty calculation.
+    auto v1_params{consensus};
+    v1_params.nMercaHashV2Height.reset();
+    for (const int candidate_height : {16'999, 17'000, 17'001}) {
+        std::array<CBlockIndex, 25> history;
+        for (size_t i = 0; i < history.size(); ++i) {
+            history[i].nHeight = candidate_height - history.size() + i;
+            history[i].nBits = 0x1c0ffff0;
+            history[i].nTime = 1'700'000'000 + i * consensus.nPowTargetSpacing;
+            history[i].pprev = i ? &history[i - 1] : nullptr;
+        }
+        CBlockHeader next;
+        next.nTime = history.back().nTime + consensus.nPowTargetSpacing;
+        BOOST_CHECK_EQUAL(GetNextWorkRequired(&history.back(), &next, consensus), 0x1c0ffff0U);
+        BOOST_CHECK_EQUAL(GetNextWorkRequired(&history.back(), &next, consensus),
+                          GetNextWorkRequired(&history.back(), &next, v1_params));
+    }
+    for (const auto chain : {ChainType::MAIN, ChainType::SIGNET, ChainType::TESTNET4, ChainType::REGTEST}) {
+        const auto other{CreateChainParams(*m_node.args, chain)};
+        BOOST_CHECK(!other->GetConsensus().nMercaHashV2Height.has_value());
+    }
+}
 
 static std::vector<CBlockIndex> BuildDGWChain(
     int count,
@@ -1078,7 +1119,8 @@ BOOST_AUTO_TEST_CASE(mercahash_development_genesis_miner)
             while (!CheckProofOfWork(
                 genesis,
                 dev_consensus,
-                pow_context)) {
+                pow_context,
+                /*candidate_height=*/0)) {
                 ++genesis.nNonce;
             }
 
@@ -1303,7 +1345,8 @@ BOOST_AUTO_TEST_CASE(mercahash_genesis_vectors)
                 CheckProofOfWork(
                     genesis,
                     params->GetConsensus(),
-                    pow_context));
+                    pow_context,
+                    /*candidate_height=*/0));
 
             BOOST_REQUIRE_EQUAL(genesis.vtx.size(), 1U);
 
