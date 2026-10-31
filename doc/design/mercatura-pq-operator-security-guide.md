@@ -1,12 +1,41 @@
 # PQ operator security guide
 
-This is development documentation. Public-testnet PQ activation mechanism,
-height/window and official release are pending founder approval. Default builds
-retain pending testnet policy. Enforcing qualification builds use
-`MERCATURA_REQUIRE_PQ_TESTNET=ON` and reject runtime off. An explicit isolated
-`-pqp2p=required` connection is never allowed to fall back to V1 or BIP324.
-Mainnet required-from-first-connection architecture is implemented; launch is
-outside this assignment.
+## Current founder-approved policy
+
+- **MercaHash V2 public-testnet activation: block 17,000 — FOUNDER APPROVED.**
+  Height 16,999 is the last V1 block; height 17,000 and later require V2.
+- **Public-testnet PQ transport: COMPULSORY FROM NODE STARTUP — FOUNDER APPROVED.**
+  **PQ transport has no block-height activation.** Genesis sync, reindex, reorg,
+  offline recovery and network activity toggles do not weaken that policy.
+- Mainnet V2-from-genesis implementation is **DEFERRED** until the founder has
+  observed real public-testnet V2 operation for several days after activation.
+  Mainnet genesis, PoW settings and required-PQ policy are unchanged here.
+- Release publication and live deployment are **NOT YET AUTHORIZED**. No official
+  version/tag is assigned. Founder review and integration, exact-source release
+  qualification, packages and operator coordination remain separate steps.
+
+Ordinary binaries require public-testnet PQ even when the deprecated compatibility
+CMake option MERCATURA_REQUIRE_PQ_TESTNET is OFF. Omitting -pqp2p or specifying
+-pqp2p=required works; -pqp2p=off is rejected. No V1/BIP324 fallback follows failed
+authentication. The five-message handshake and existing identity/pin safeguards
+are unchanged. Mainnet remains compulsory, regtest opt-in, signet/testnet4 unchanged.
+
+getnetworkinfo.pqp2p.required reports actual local enforcement. The legacy
+testnet_enforced_build field is retained as an always-true compatibility alias for
+this binary's public-testnet policy. testnet_activation is required-from-startup,
+describing approved software policy, not completed live-network deployment.
+Authentication and expected-identity verification remain distinct peer properties.
+
+The independent AKE-review waiver remains an accepted experimental-testnet risk;
+it is not completed independent certification. Formal two-independent-operator
+bootstrap qualification remains deferred. At least one publicly reachable PQ
+bootstrap and a fresh-node connection/synchronization check are still required
+before cutover. The existing offline inventory renderer's 2–16-operator schema
+is unchanged and does not prove public reachability or operator independence.
+
+See the current [pre-release qualification](../validation/MERCATURA-TESTNET-17000-PQ-REQUIRED-PRE-RELEASE.md)
+for exact commits, measured results and limitations. The three upstream security
+fixes and subsequent portability repairs remain in the branch history.
 
 ## Read assurance accurately
 

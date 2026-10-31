@@ -1,10 +1,55 @@
 # Public-testnet PQ activation options — founder decision pending
 
+## Current founder-approved policy
+
+- **MercaHash V2 public-testnet activation: block 17,000 — FOUNDER APPROVED.**
+  Height 16,999 is the last V1 block; height 17,000 and later require V2.
+- **Public-testnet PQ transport: COMPULSORY FROM NODE STARTUP — FOUNDER APPROVED.**
+  **PQ transport has no block-height activation.** Genesis sync, reindex, reorg,
+  offline recovery and network activity toggles do not weaken that policy.
+- Mainnet V2-from-genesis implementation is **DEFERRED** until the founder has
+  observed real public-testnet V2 operation for several days after activation.
+  Mainnet genesis, PoW settings and required-PQ policy are unchanged here.
+- Release publication and live deployment are **NOT YET AUTHORIZED**. No official
+  version/tag is assigned. Founder review and integration, exact-source release
+  qualification, packages and operator coordination remain separate steps.
+
+Ordinary binaries require public-testnet PQ even when the deprecated compatibility
+CMake option MERCATURA_REQUIRE_PQ_TESTNET is OFF. Omitting -pqp2p or specifying
+-pqp2p=required works; -pqp2p=off is rejected. No V1/BIP324 fallback follows failed
+authentication. The five-message handshake and existing identity/pin safeguards
+are unchanged. Mainnet remains compulsory, regtest opt-in, signet/testnet4 unchanged.
+
+getnetworkinfo.pqp2p.required reports actual local enforcement. The legacy
+testnet_enforced_build field is retained as an always-true compatibility alias for
+this binary's public-testnet policy. testnet_activation is required-from-startup,
+describing approved software policy, not completed live-network deployment.
+Authentication and expected-identity verification remain distinct peer properties.
+
+The independent AKE-review waiver remains an accepted experimental-testnet risk;
+it is not completed independent certification. Formal two-independent-operator
+bootstrap qualification remains deferred. At least one publicly reachable PQ
+bootstrap and a fresh-node connection/synchronization check are still required
+before cutover. The existing offline inventory renderer's 2–16-operator schema
+is unchanged and does not prove public reachability or operator independence.
+
+See the current [pre-release qualification](../validation/MERCATURA-TESTNET-17000-PQ-REQUIRED-PRE-RELEASE.md)
+for exact commits, measured results and limitations. The three upstream security
+fixes and subsequent portability repairs remain in the branch history.
+
+## Historical engineering study — before the final approvals
+
+All remaining material in this appendix is the earlier source-scoped decision
+study and evidence. Its pending decisions, optional profiles, version suggestions
+and uncompleted history gates describe that checkpoint; they do not override the
+approved policy above. Test results and their original source references are
+preserved rather than represented as fresh validation of the activation branch.
+
 This study responds to the revised P9–P11 handoff. It is a recommendation and
 test plan, not an approved activation mechanism, height, date, release or rollout.
 No live service, DNS record or public participant has been changed.
 
-## Separate decisions
+### Separate decisions
 
 Public-testnet capacity is already fixed: 1 MiB through 7,999, 4 MiB at 8,000,
 then the existing absolute doubling schedule. This remains unchanged.
@@ -14,7 +59,7 @@ future consensus/release decision, outside this networking change.
 PQ enforcement must not be implicitly tied to either capacity or PoW activation.
 No actual current public-testnet height has been obtained in this assignment.
 
-## Options
+### Options
 
 | Mechanism | Fresh/lagging node behavior | Existing sockets and reorgs | Coordination/rollback |
 |---|---|---|---|
@@ -23,7 +68,7 @@ No actual current public-testnet height has been obtained in this assignment.
 | Date/time gate | New clients need correct clocks and a durable epoch rule; wrong-clock/offline nodes may disagree | Wall-clock skew creates split behavior; established sockets need bounded close/reconnect | Easier to announce but requires clock, grace-period and rollback rules; not implemented or recommended as an automatic trigger here |
 | Hybrid coordination milestone | H or a date can be an announcement/planning milestone, while the approved enforcing release itself remains tip-independent | Avoids policy oscillation on chain reorg/reindex | Keeps a practical coordination reference without converting local chain height into a downgrade condition |
 
-## Recommendation — not a finalized mechanism
+### Recommendation — not a finalized mechanism
 
 Prefer a founder-approved coordinated required release, optionally announced
 against a separately approved planning milestone. Enforcement in that candidate
@@ -41,7 +86,7 @@ qualification capability, not authorization to deploy or an approved trigger.
 Do not publish an enforcing build as an official release before the founder acts.
 Mainnet's architectural rule remains required from its first connection.
 
-## Height-based designs: unresolved bootstrap problem
+### Height-based designs: unresolved bootstrap problem
 
 With local policies `P(tip<H)=classical` and `P(tip>=H)=PQ-only`, a synchronized
 peer and a genesis/lagging peer have incompatible expectations. Neither application
@@ -58,7 +103,7 @@ persisted across restart/reindex. That adds design/state/recovery questions and 
 not justified merely by choosing an integer H. No such production trigger is
 implemented in this assignment.
 
-## Required scenarios and evidence boundaries
+### Required scenarios and evidence boundaries
 
 | Scenario | Tip-independent required-policy expectation | Executed qualification |
 |---|---|---|
@@ -79,7 +124,7 @@ required connection checks. A synthetic boundary in a model/regtest is never a p
 public activation height. Genesis-only public tests do not establish historical
 replay, independently operated public bootstrap, Tor/NAT behavior or deployment.
 
-## If the founder chooses a height-based coordination milestone
+### If the founder chooses a height-based coordination milestone
 
 Obtain actual height/hash/chainwork with timestamps from authenticated, authorized
 operator observations, preferably multiple independent nodes. Record the source;
