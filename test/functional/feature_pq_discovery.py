@@ -89,8 +89,8 @@ class PQDiscoveryTest(BitcoinTestFramework):
                 latency=(0.01, 0.02), bytes_per_second=2 * 1024 * 1024) as proxy:
             common = ['-dns=0', '-dnsseed=0', '-fixedseeds=0', '-discover=0', '-natpmp=0', '-maxconnections=16',
                       f'-proxy={proxy.address}', '-proxyrandomize=0', '-onlynet=' + ('ipv6' if ipv6 else 'ipv4')]
-            common += ['-pqp2p=required']
             if not self.options.public_testnet:
+                common += ['-pqp2p=required']
                 common += ['-mercahashv2height=0']
             for n in range(4):
                 bind = f'[{loopback}]:{p2p_port(n)}' if ipv6 else f'{loopback}:{p2p_port(n)}'

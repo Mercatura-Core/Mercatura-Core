@@ -31,7 +31,7 @@ BOOST_FIXTURE_TEST_SUITE(pq_policy_tests, Fixture)
 BOOST_AUTO_TEST_CASE(compulsory_policy_has_no_weakening_override)
 {
     for (const bool enforced : {false, true}) for (const auto chain : CHAINS) {
-        const bool compulsory = chain == ChainType::MAIN || (chain == ChainType::TESTNET && enforced);
+        const bool compulsory = chain == ChainType::MAIN || chain == ChainType::TESTNET;
         BOOST_CHECK_EQUAL(RequiredMode(chain, {}, enforced), compulsory);
         for (const auto bad : {"", "on", "optional", "prefer", "Required", "required,off"}) {
             BOOST_CHECK_THROW(RequiredMode(chain, bad, enforced), std::runtime_error);
@@ -41,10 +41,13 @@ BOOST_AUTO_TEST_CASE(compulsory_policy_has_no_weakening_override)
             BOOST_CHECK_THROW(RequiredMode(chain, "off", enforced), std::runtime_error);
         } else {
             BOOST_CHECK(!RequiredMode(chain, "off", enforced));
-            if (chain == ChainType::REGTEST || chain == ChainType::TESTNET) BOOST_CHECK(RequiredMode(chain, "required", enforced));
+            if (chain == ChainType::REGTEST) BOOST_CHECK(RequiredMode(chain, "required", enforced));
             else BOOST_CHECK_THROW(RequiredMode(chain, "required", enforced), std::runtime_error);
         }
     }
+    // The deprecated diagnostic describes effective source policy, never the
+    // requested legacy CMake flag (including a build explicitly configured OFF).
+    BOOST_CHECK(TestnetEnforcedBuild());
     BOOST_CHECK_THROW(RequiredMode(static_cast<ChainType>(255)), std::runtime_error);
 }
 

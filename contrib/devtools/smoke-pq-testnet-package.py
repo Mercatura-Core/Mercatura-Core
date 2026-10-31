@@ -66,7 +66,7 @@ def main():
                         time.sleep(0.1)
                 assert info['pqp2p']['required'] and info['pqp2p']['chain'] == 'test'
                 assert info['pqp2p']['testnet_enforced_build']
-                assert info['pqp2p']['testnet_activation'] == 'pending'
+                assert info['pqp2p']['testnet_activation'] == 'required-from-startup'
                 assert not info['networkactive'] and not info['pqp2p']['listening']
                 assert info['connections'] == info['pqp2p']['connected'] == 0
                 genesis = rpc('getblockhash', [0])

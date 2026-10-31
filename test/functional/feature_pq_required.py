@@ -79,7 +79,8 @@ class PQRequiredTest(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.chain = 'testnet' if self.options.public_testnet else 'regtest'
         self.common = ['-dnsseed=0', '-fixedseeds=0', '-discover=0', '-natpmp=0', '-maxconnections=16']
-        self.common += ['-pqp2p=required']
+        if not self.options.public_testnet:
+            self.common += ['-pqp2p=required']
         self.extra_args = [self.common + ['-connect=0']] * self.num_nodes
 
     def setup_network(self):
@@ -218,19 +219,17 @@ class PQRequiredTest(BitcoinTestFramework):
             self.nodes[1].assert_start_raises_init_error(extra_args=args, expected_msg='Error: ' + error)
         if self.options.public_testnet:
             default_args = [a for a in self.extra_args[1] if not a.startswith('-pqp2p=')]
-            enforced = self.status(0)['testnet_enforced_build']
+            assert self.status(0)['testnet_enforced_build']
             self.start_node(1, default_args)
-            assert_equal(self.status()['required'], enforced)
-            assert_equal(self.status()['testnet_activation'], 'pending')
+            assert self.status()['required']
+            assert_equal(self.status()['testnet_activation'], 'required-from-startup')
             self.stop_node(1)
-            if enforced:
-                self.nodes[1].assert_start_raises_init_error(extra_args=default_args + ['-pqp2p=off'],
-                    expected_msg='Error: This qualification build requires public-testnet PQ; -pqp2p=off is forbidden. Public activation remains pending.')
-            else:
-                self.start_node(1, default_args + ['-pqp2p=off'])
-                assert not self.status()['required']
-                self.stop_node(1)
-            events.append({'default_profile_required': enforced, 'activation': 'pending'})
+            self.start_node(1, default_args + ['-pqp2p=required'])
+            assert self.status()['required']
+            self.stop_node(1)
+            self.nodes[1].assert_start_raises_init_error(extra_args=default_args + ['-pqp2p=off'],
+                expected_msg='Error: PQ P2P is compulsory on Mercatura public testnet; -pqp2p=off is forbidden.')
+            events.append({'default_profile_required': True, 'activation': 'required-from-startup'})
         self.start_node(1, self.extra_args[1])
         assert_equal(self.nodes[0].getblockcount(), 0)
         (Path(self.options.tmpdir) / 'pq-required-evidence.json').write_text(json.dumps({

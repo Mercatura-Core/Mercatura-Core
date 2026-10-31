@@ -107,12 +107,13 @@ public:
     ResourceStats Resources();
 };
 
-/** Immutable build profile, not an approved public-testnet activation decision. */
+/** Deprecated compatibility diagnostic: this binary always enforces testnet PQ.
+ * This describes source policy, not completion of the live network cutover. */
 bool TestnetEnforcedBuild();
-/** Mainnet required; testnet pending unless explicitly built for enforcement.
- * Pending testnet/regtest allow isolated opt-in. Enforcing profiles reject off.
- * The explicit profile parameter lets unit tests cover both build profiles. */
-bool RequiredMode(ChainType chain, std::optional<std::string_view> option = {}, bool testnet_enforced = TestnetEnforcedBuild());
+/** Mainnet and public testnet require PQ from startup, independently of height.
+ * Regtest retains opt-in. The legacy profile parameter is ignored; neither
+ * its value nor the legacy CMake option can weaken public-testnet policy. */
+bool RequiredMode(ChainType chain, std::optional<std::string_view> option = {}, bool legacy_testnet_enforced = TestnetEnforcedBuild());
 Network NetworkForChain(const CChainParams& params);
 Network SelectedNetwork();
 std::shared_ptr<const Identity> LoadIdentity(const std::string& path, bool create, const Network& network);

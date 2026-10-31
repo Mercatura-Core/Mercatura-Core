@@ -3,7 +3,7 @@
 #ifndef MERCATURA_PQ_CONFIG_H
 #define MERCATURA_PQ_CONFIG_H
 
-// Qualification capability only. No production activation height or date.
+// Legacy requested profile value only; this cannot disable compulsory testnet PQ.
 #cmakedefine01 MERCATURA_REQUIRE_PQ_TESTNET
 
 #endif // MERCATURA_PQ_CONFIG_H

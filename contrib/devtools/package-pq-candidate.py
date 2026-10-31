@@ -68,8 +68,8 @@ def main():
     manifest = {'channel': 'p9p11-dev', 'official_release': False, 'source_commit': source, 'source_tree': tree,
                 'binary_version': version, 'platform': platform.platform(), 'configuration': cache, 'compilers': compilers,
                 'suite': 1, 'protocol_version': 1, 'main_policy': 'required from first connection; no classical fallback',
-                'testnet_profile': 'enforced-qualification' if cache.get('MERCATURA_REQUIRE_PQ_TESTNET') == 'ON' else 'activation-pending',
-                'testnet_activation': 'pending founder approval',
+                'testnet_profile': 'compulsory-from-startup; legacy enforcement option ignored',
+                'testnet_activation': 'required-from-startup; live cutover not established by packaging',
                 'testnet_genesis': 'b3fc707c9a89dc45d1cf6a837284b22ad2b6fd41b99af601079db9dcbeff6920',
                 'dependency_scope': 'Native build bundle; clean-machine dependency and installer qualification is separate',
                 'files': {}}

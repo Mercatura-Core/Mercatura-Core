@@ -38,12 +38,8 @@ set(MERCATURA_VERSION_BUILD 2)
 # Development channel only; no next release version or official tag is assigned.
 set(MERCATURA_VERSION_STRING "0.1.2-p9p11-dev")
 option(MERCATURA_PUBLIC_TESTNET_RELEASE "Build the GUI as a public-testnet-only wallet package" OFF)
-option(MERCATURA_REQUIRE_PQ_TESTNET "Enforce testnet PQ from first connection in an isolated qualification build; activation/release approval remains pending" OFF)
-if(MERCATURA_REQUIRE_PQ_TESTNET)
-  set(MERCATURA_PQ_TESTNET_PROFILE "enforced qualification; activation pending founder approval")
-else()
-  set(MERCATURA_PQ_TESTNET_PROFILE "activation pending; explicit isolated qualification only")
-endif()
+option(MERCATURA_REQUIRE_PQ_TESTNET "Deprecated compatibility option, ignored: public-testnet PQ is compulsory even when OFF" OFF)
+set(MERCATURA_PQ_TESTNET_PROFILE "compulsory from startup; no height activation; legacy enforcement option ignored")
 set(COPYRIGHT_YEAR "2026")
 
 # During the enabling of the CXX and CXXOBJ languages, we modify
