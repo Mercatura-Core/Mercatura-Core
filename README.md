@@ -307,6 +307,9 @@ Public testnet resources:
 
 - Website: https://mercaturacore.com
 - Explorer: https://explorer.mercaturacore.com/?network=testnet
+- Discord: https://discord.gg/aYvFQ6yZAM
+- Reddit: https://www.reddit.com/r/Mercatura/
+- X: https://x.com/MercaturaCore
 - Mercatura Core v0.1.3-testnet downloads: https://github.com/Mercatura-Core/Mercatura-Core/releases/tag/v0.1.3-testnet
 - Release checksums: https://github.com/Mercatura-Core/Mercatura-Core/releases/download/v0.1.3-testnet/SHA256SUMS
 
