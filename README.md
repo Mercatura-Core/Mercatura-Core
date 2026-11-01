@@ -1,10 +1,22 @@
 # Mercatura Core (MCA)
 
-Mercatura is a Bitcoin-family, pure proof-of-work cryptocurrency focused on a simple miner-driven consensus model, CPU-oriented proof of work, native post-quantum transaction ownership, and conservative full-node operation.
+Mercatura is a Bitcoin-family, pure proof-of-work cryptocurrency focused on a miner-driven consensus model, memory-hard proof of work, native post-quantum transaction ownership, authenticated post-quantum peer connections, and conservative full-node operation.
 
 Mercatura Core is derived from the modern Bitcoin Core codebase and is being adapted into an independent network with its own consensus rules, monetary policy, network identity, wallet behavior, mining algorithm, and test infrastructure.
 
-> **Project status:** Mercatura public testnet is live. Mainnet has not launched. The v0.1 software and protocol remain under active public-testnet validation, and mainnet launch-sensitive values may still change before release.
+> **Project status:** Mercatura public testnet is live. **[Mercatura Core v0.1.3-testnet](https://github.com/Mercatura-Core/Mercatura-Core/releases/tag/v0.1.3-testnet)** is the current public-testnet release. Mainnet has not launched; development parameters remain subject to validation.
+
+## Public Testnet v0.1.3 — Upgrade Required
+
+**[Download Mercatura Core v0.1.3-testnet](https://github.com/Mercatura-Core/Mercatura-Core/releases/tag/v0.1.3-testnet)** — Linux x86-64, Windows x64 (installer or portable ZIP), and macOS ARM64. Download `SHA256SUMS` from the same release and verify each package before use.
+
+- **Mandatory post-quantum networking:** All upgraded public-testnet nodes use authenticated, encrypted **PQ-v1** P2P transport (ML-KEM-768 key establishment and ML-DSA-65 peer authentication). Classical and BIP324 fallback are not accepted. Older nodes cannot connect until upgraded.
+- **Live interoperability:** v0.1.3 Windows Qt and Linux testnet nodes have established authenticated encrypted PQ-v1 sessions. This is a limited public-testnet observation, not a claim of a comprehensive independent security audit.
+- **MercaHash V2 activation:** **Public-testnet block height 17,000** is the first V2 block; height 16,999 is the final V1 block. Upgrade before the transition. The historic chain is unchanged.
+- **Current testnet capacity:** 4 MiB effective block cap since height 8,000. The separate 1 MiB-to-1024 MiB scheduled capacity policy below describes the planned initial mainnet baseline.
+- **Built-in mining:** Mercatura Core Qt includes optional native CPU solo mining, with experimental GPU support on compatible builds and devices. The Mining tab uses the existing wallet/full node, pays rewards to a wallet-owned post-quantum address, and has no mining software or developer fee. Physical GPU qualification is still limited.
+
+Public-testnet software is experimental. Testnet MCA has **no monetary value**. Back up your wallet before upgrading.
 
 ## Protocol Overview
 
@@ -13,7 +25,7 @@ Mercatura Core is derived from the modern Bitcoin Core codebase and is being ada
 | Project | Mercatura |
 | Ticker | `MCA` |
 | Consensus | Pure Proof of Work |
-| Proof of Work | MercaHash V1 |
+| Proof of Work | MercaHash V1 through testnet height 16,999; MercaHash V2 from height 17,000 |
 | Target block time | 150 seconds |
 | Difficulty adjustment | DGWv3 |
 | DGW lookback | 24 blocks |
@@ -28,7 +40,8 @@ Mercatura Core is derived from the modern Bitcoin Core codebase and is being ada
 | Base unit | 1 MCA = 100 base units |
 | Minimum fee policy | 0.01 MCA per started 1,000 bytes |
 | Recommended dust threshold | 0.02 MCA |
-| Initial effective block cap | 1 MiB |
+| Initial planned mainnet effective block cap | 1 MiB |
+| Public-testnet effective block cap | 4 MiB from block 8,000 |
 | Scheduled block-cap growth | Doubles approximately every 5 years |
 | Maximum scheduled block cap | 1024 MiB |
 | Witness discount | None |
@@ -54,7 +67,7 @@ The project aims to preserve mature Bitcoin Core networking, mempool, pruning, w
 
 Major Mercatura-specific components include:
 
-- **MercaHash V1**, a memory-intensive CPU-oriented proof-of-work algorithm
+- **MercaHash V1**, with an approved public-testnet transition to V2 at height 17,000
 - **DGWv3 difficulty adjustment**
 - **native ML-DSA-65 post-quantum authorization**
 - **two-decimal monetary accounting**
@@ -64,11 +77,11 @@ Major Mercatura-specific components include:
 - **Mercatura-specific genesis blocks**
 - **no SegWit witness discount for block-cap accounting**
 
-## MercaHash V1
+## MercaHash Proof of Work
 
-MercaHash V1 is Mercatura's native proof-of-work function.
+Mercatura's existing public-testnet history uses MercaHash V1 up to and including block 16,999. **MercaHash V2 activates from block 17,000**, with no genesis reset or difficulty reset. The updated node verifies historical blocks under their respective algorithms.
 
-Current consensus parameters include:
+MercaHash V1 consensus parameters include:
 
 - 128 MiB private mutable scratchpad per worker
 - 64-byte scratchpad lines
@@ -83,13 +96,9 @@ Current consensus parameters include:
 - 256 final scratchpad reads
 - SHA3-256 finalization
 
+MercaHash V2 uses a **16 MiB private scratchpad per worker** and version-aware native CPU/CUDA/OpenCL mining paths. The exact consensus implementation and permanent vectors are authoritative; do not substitute approximate independent implementations. See [MercaHash V2 testnet activation](doc/mining/MERCAHASH-V2-TESTNET-17000.md) and [native mining guidance](doc/native-cpu-mining.md) for details.
+
 MercaHash is consensus-critical. Independent implementations must reproduce Mercatura Core behavior exactly.
-
-The standalone Mercatura CPU miner is maintained separately as:
-
-**MercaMiner**
-
-https://github.com/Mercatura-Core/MercaMiner
 
 ## Difficulty Adjustment
 
@@ -191,7 +200,7 @@ Mercatura retains Bitcoin Core's block-weight framework where practical but remo
 
 Witness and non-witness bytes therefore count equally for Mercatura block-cap accounting.
 
-The current scheduled consensus ceiling is:
+The planned **initial mainnet** capacity schedule is:
 
 - **1 MiB at launch**
 - doubles every **1,051,200 blocks**
@@ -200,7 +209,9 @@ The current scheduled consensus ceiling is:
 
 The growth schedule is intended to follow long-term improvements in ordinary node bandwidth, storage, propagation capacity, and home-node viability.
 
-This is a consensus ceiling, not a requirement that miners fill blocks to the maximum size.
+**Current public testnet:** The effective block cap increased to **4 MiB at block 8,000**. The planned initial mainnet schedule above should not be mistaken for the current testnet ceiling.
+
+A consensus ceiling is not a requirement that miners fill blocks to the maximum size.
 
 ## Fees and Monetary Units
 
@@ -273,7 +284,7 @@ Mercatura also uses its own data directory and network-specific subdirectories.
 
 ## Public Testnet Connectivity
 
-Mercatura's public testnet is live.
+Mercatura's public testnet is live. **v0.1.3+ PQ-v1 transport is required from startup.** Older pre-upgrade peers cannot connect; no classical/BIP324 fallback is available. The peer software versions and PQ status can be inspected using `getpeerinfo`.
 
 Current bootstrap peer:
 
@@ -296,14 +307,14 @@ Public testnet resources:
 
 - Website: https://mercaturacore.com
 - Explorer: https://explorer.mercaturacore.com/?network=testnet
-- Mercatura Core release: https://github.com/Mercatura-Core/Mercatura-Core/releases
-- MercaMiner release: https://github.com/Mercatura-Core/MercaMiner/releases/tag/v0.1.0-testnet2
+- Mercatura Core v0.1.3-testnet downloads: https://github.com/Mercatura-Core/Mercatura-Core/releases/tag/v0.1.3-testnet
+- Release checksums: https://github.com/Mercatura-Core/Mercatura-Core/releases/download/v0.1.3-testnet/SHA256SUMS
 
 **Testnet MCA is for testing only and has no monetary value.**
 
 ## Software Components
 
-The Mercatura ecosystem currently consists of several related components.
+The Mercatura ecosystem includes the Core node and wallet plus its public Explorer.
 
 ### Mercatura Core
 
@@ -317,32 +328,7 @@ Mercatura Core provides:
 - command-line tools
 - mining RPC support
 - Qt wallet functionality
-
-### MercaMiner
-
-MercaMiner is the standalone Mercatura CPU miner.
-
-It communicates with Mercatura Core using:
-
-- `getblocktemplate`
-- `submitblock`
-
-MercaMiner includes:
-
-- MercaHash V1
-- multithreaded mining
-- network selection
-- RPC cookie authentication
-- configuration-file support
-- automatic RPC discovery
-- payout-address configuration
-- periodic hashrate reporting
-- accepted/stale/rejected block reporting
-- benchmark functionality
-
-Repository:
-
-https://github.com/Mercatura-Core/MercaMiner
+- built-in wallet-owned CPU solo mining and optional experimental GPU mining
 
 ### Mercatura Qt
 
@@ -362,8 +348,11 @@ The wallet supports Mercatura-specific behavior including:
 - wallet backup
 - address-book functionality
 - PSBT workflows
+- optional native solo mining within a dedicated Mining tab, with CPU worker controls and live statistics
+- automatic selection of a native PQ mining reward address owned by the wallet
+- experimental NVIDIA CUDA / AMD OpenCL mining where supported by the build and hardware
 
-Linux, Windows, and macOS are treated as supported Mercatura Core GUI targets.
+Release downloads are provided for **Windows x64, Linux x86-64, and macOS ARM64**. macOS CPU mining is supported; the macOS application is not currently Apple-notarized. GPU modes have not been fully qualified on physical hardware.
 
 ### Block Explorer
 
@@ -383,7 +372,7 @@ Mainnet and testnet explorer data are kept separate.
 
 Mercatura is in its **v0.1 pre-mainnet development cycle**, with the **public testnet now live**.
 
-Core consensus, MercaHash V1, DGWv3, adaptive emission, native ML-DSA-65 transaction authorization, PQ wallet functionality, Mercatura Qt branding, standalone CPU mining, and public Explorer infrastructure have reached the public-testnet stage.
+Core consensus, MercaHash V1 and scheduled testnet V2, DGWv3, adaptive emission, native ML-DSA-65 transaction authorization, mandatory PQ-v1 P2P networking, integrated Qt mining, and public Explorer infrastructure have reached the public-testnet stage.
 
 Current work focuses on:
 
@@ -464,6 +453,8 @@ build/bin/mercatura-cli stop
 
 ## Running Testnet
 
+**Use v0.1.3 or later for PQ-v1 network compatibility**, and back up wallet data before upgrading. Public-testnet Qt release binaries are locked to testnet; mainnet has not launched.
+
 Start a public-testnet node with the current bootstrap peer:
 
 ```bash
@@ -489,35 +480,25 @@ The public-testnet P2P port is `27778`.
 
 RPC should normally remain bound to localhost unless the operator has a specific secured deployment requirement.
 
-## Mining
+## Mining With Mercatura Core Qt
 
-The M5 development branch adds optional NVIDIA CUDA and AMD OpenCL backends to
-native Qt Solo Mining, including mixed CPU/GPU and multiple devices. See
-[native GPU mining](doc/native-gpu-mining.md) for build options, compatibility,
-validation limits and hardware qualification requirements. GPU options default
-to OFF; this development work is not a qualified GPU mining release.
+**Native solo mining is integrated directly into the Mercatura Core Qt wallet.** There is no separate miner to install and no need to run a second blockchain node.
 
-Mercatura Core exposes the mining RPC interfaces required by external miners.
+1. Install the latest [Mercatura Core public-testnet release](https://github.com/Mercatura-Core/Mercatura-Core/releases/tag/v0.1.3-testnet) and back up your wallet.
+2. Launch Mercatura Core Qt on public testnet; allow the blockchain to synchronize.
+3. Create or open your own native post-quantum wallet.
+4. Open the **Mining** tab and choose **CPU** (recommended for initial testing), set an appropriate worker count, and select **Start Mining**.
+5. Monitor the session's hashrate, worker activity, and accepted block statistics. Use **Stop Mining** to end the session cleanly.
 
-For normal CPU mining, use MercaMiner:
+Mining rewards are directed to a wallet-owned native PQ address that the Mining tab creates or reuses. There are **no software mining fees, developer fees, or automatic donation deductions**. Normal network transaction fees remain separate.
 
-https://github.com/Mercatura-Core/MercaMiner
+**CPU and memory:** MercaHash V1 uses a private **128 MiB** scratchpad per worker; MercaHash V2 uses **16 MiB** per worker. The active proof-of-work version changes automatically at public-testnet height **17,000**, and resource limits vary by version. Increasing CPU worker count does not necessarily increase performance proportionally.
 
-MercaMiner obtains candidate blocks through:
+**GPU (experimental):** Supported Windows/Linux builds may offer NVIDIA CUDA and AMD OpenCL options, including combined CPU + GPU mining and device selection. Availability depends on the build and compatible hardware. Physical GPU performance and compatibility have not been comprehensively qualified. macOS ARM64 is a CPU-mining release.
 
-```text
-getblocktemplate
-```
+Nodes and miners should upgrade to v0.1.3 **before block 17,000**; clients using older consensus rules cannot mine or validate the V2 chain after activation. The node must also use mandatory PQ-v1 P2P on public testnet.
 
-and submits solved blocks through:
-
-```text
-submitblock
-```
-
-MercaHash V1 requires approximately **128 MiB of private scratchpad memory per mining worker**.
-
-As a result, practical miner configuration depends on both CPU characteristics and available memory bandwidth.
+For advanced integrations, Mercatura Core retains `getblocktemplate` and `submitblock` RPC interfaces for compatible mining software.
 
 ## Wallet
 
@@ -621,7 +602,7 @@ Before mainnet launch, the project will perform a final launch-parameter pass co
 - final genesis block hash
 - final genesis MercaHash
 - dependent test vectors
-- MercaMiner mainnet network identity
+- mainnet native mining and wallet network-identity verification
 - seed infrastructure
 - public explorer configuration
 - release binaries
@@ -657,7 +638,7 @@ Mercatura-specific work includes its:
 - PQ wallet architecture
 - block-cap policy
 - fee and monetary model
-- mining software
+- native Qt mining integration
 - test infrastructure
 
 The project acknowledges and retains appropriate attribution for upstream open-source work.
