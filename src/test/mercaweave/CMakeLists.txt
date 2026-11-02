@@ -5,6 +5,8 @@ project(mercaweave_research LANGUAGES C CXX)
 # Standalone configure only; never included by production CMakeLists.txt.
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Match Mercatura's requirement that verification is built with assertions.
+add_compile_options(-UNDEBUG)
 option(MERCAWEAVE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
 get_filename_component(MCA_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 if(MERCAWEAVE_SANITIZERS)
@@ -42,3 +44,26 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 add_test(NAME locked_python_vectors COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/reference.py)
 add_test(NAME mercaweave_tests COMMAND mercaweave_tests)
 add_test(NAME cross_language_vectors COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/crosscheck.py $<TARGET_FILE:mercaweave_tests>)
+
+# Test-only link to unmodified production verification. Vendored secp256k1 is
+# needed by interpreter/pubkey objects even though Mercatura forbids classical
+# signature ownership in Script. No new third-party dependency is downloaded.
+set(SECP256K1_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(SECP256K1_BUILD_BENCHMARK OFF CACHE BOOL "" FORCE)
+set(SECP256K1_BUILD_EXHAUSTIVE_TESTS OFF CACHE BOOL "" FORCE)
+set(SECP256K1_BUILD_CTIME_TESTS OFF CACHE BOOL "" FORCE)
+set(SECP256K1_ENABLE_MODULE_RECOVERY ON CACHE BOOL "" FORCE)
+set(SECP256K1_INSTALL OFF CACHE BOOL "" FORCE)
+add_subdirectory(${MCA_SRC}/secp256k1 ${CMAKE_CURRENT_BINARY_DIR}/secp256k1 EXCLUDE_FROM_ALL)
+add_library(mercaweave_native STATIC
+  native_v2.cpp
+  ${MCA_SRC}/script/interpreter.cpp
+  ${MCA_SRC}/pubkey.cpp
+  ${MCA_SRC}/hash.cpp
+  ${MCA_SRC}/crypto/sha1.cpp
+  ${MCA_SRC}/crypto/sha512.cpp
+  ${MCA_SRC}/crypto/hmac_sha512.cpp)
+target_link_libraries(mercaweave_native PUBLIC mercaweave PRIVATE secp256k1)
+add_executable(mercaweave_native_tests native_tests.cpp fixtures.cpp)
+target_link_libraries(mercaweave_native_tests PRIVATE mercaweave_native)
+add_test(NAME native_v2_interoperability COMMAND mercaweave_native_tests)
