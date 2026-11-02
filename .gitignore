@@ -4,6 +4,7 @@
 # https://docs.github.com/en/get-started/git-basics/ignoring-files#configuring-ignored-files-for-all-repositories-on-your-computer
 
 # Build subdirectories.
+/work/
 /*build*
 !/build-aux
 !/build_msvc

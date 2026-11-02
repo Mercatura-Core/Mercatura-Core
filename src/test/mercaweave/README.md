@@ -1,0 +1,102 @@
+# Standalone MercaWeave v0.1 research
+
+This directory is its own CMake project. Production CMake never includes it.
+It reuses Mercatura's actual `CMutableTransaction`, `CTransaction`, `CScript`,
+outpoint/output serializers, hash primitives, HKDF and pinned pure ML-DSA-65
+wrapper. No nodes, RPC, wallets, network activation or datadirs are involved.
+
+## Build and test
+
+From the research worktree root, with CMake >=3.22, a C++20 compiler and Python 3:
+
+```bash
+cmake -S src/test/mercaweave -B work/build-release -DCMAKE_BUILD_TYPE=Release
+cmake --build work/build-release -j4
+ctest --test-dir work/build-release --output-on-failure
+work/build-release/mercaweave_tests
+python3 src/test/mercaweave/reference.py
+python3 src/test/mercaweave/crosscheck.py work/build-release/mercaweave_tests
+```
+
+The session initially lacked CMake. It was installed only under ignored
+`work/tools`, using `python3 -m pip install --target work/tools cmake==4.4.4`.
+That installation's executables are `work/tools/cmake/data/bin/{cmake,ctest}`.
+No system installation or unrelated dependency is required.
+
+```bash
+cmake -S src/test/mercaweave -B work/build-sanitize \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo -DMERCAWEAVE_SANITIZERS=ON
+cmake --build work/build-sanitize -j4
+ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1 \
+  ctest --test-dir work/build-sanitize --output-on-failure
+work/build-release/mercaweave_bench > work/benchmarks.csv
+```
+
+LeakSanitizer could not run in the session's ptrace-based sandbox. The exact
+fatal error and successful ASan/UBSan commands are recorded in the validation
+report. Run leak detection separately on a host that supports it.
+
+## API contract
+
+`Sign` and `Verify` require spent `CTxOut` records authenticated by the caller
+and supplied in vin order. They enforce basic format/value/duplicate-outpoint
+checks, existing per-stack/per-item witness bounds, locked group limits,
+canonical reconstruction, per-input ownership and transaction-wide signatures.
+They do not establish chain membership, maturity, finality, remaining block
+budget, or mempool standardness. Passing invented spent outputs is not proof
+that those outputs exist in a blockchain.
+
+The in-memory harness limits serialized buffers/transactions to 32 MiB to
+bound these experiments. This is a harness limitation, not a new consensus
+limit; larger mixed-input workloads need separately bounded harness support.
+
+Every non-v3 input requires an independently correct `NonV3Verifier`; the
+default fails closed. `fixtures.cpp::VerifyV2` is a research adapter reproducing
+the audited v2 digest, ownership and signature rules. It is not the production
+script interpreter. Production v2 semantics and code are unchanged.
+
+Successful validation returns an immutable record bound to the exact full
+transaction bytes, spent context and genesis. `Matches` detects a changed
+context; it does not establish chain validity. `Verify` accepts no cached result
+and always rechecks ownership. Production flags, reorgs, caches, mempool and
+parallel script integration remain separate future work.
+
+`DecodeWitness` is a bounded decoder of the locked anchor/follower grammar;
+it checks canonical CompactSize counts and exact item lengths before allocation.
+Transaction serialization and complete valid transaction round trips use the
+inherited serializers. There is no new arbitrary-transaction network parser.
+
+`Sign` requires an explicit randomness source and fails atomically when it is
+missing or fails. Only the named test helper supplies zero randomness. Real
+applications must supply fresh cryptographically secure bytes for every group.
+Secret keys, temporary signing randomness and the HKDF state are cleansed.
+
+## Fixtures and measurements
+
+`reference.py` contains the locked Section 12 expected values and independently
+reproduces all ten values and the three required lengths. `crosscheck.py` parses
+actual C++ transaction bytes independently and checks four real-key cases:
+two-input/one-key, repeated nonce, noncontiguous multi-group and mixed v2/v3.
+It also checks HKDF derivation for all three purposes and compares the complete
+deterministic C++ output to permanent `vectors.json`.
+
+All fixture seeds are public, deterministic TEST DATA. The fixture signatures
+use test-only zero randomness and are verified through the actual pinned
+ML-DSA wrapper. No expanded private key is stored. The synthetic patterned
+public key is used only for structural hashing.
+
+`benchmarks.csv` and `benchmark-environment.json` record this session's final
+run. Workloads use one warm-up plus five measured repetitions; medians include
+complete signing/verification pipelines. Each group uses one real signature;
+every member's ownership is checked. Invalid nonce rejection occurs before
+ML-DSA. Peak RSS and CPU are cumulative process observations, not isolated
+per-transaction memory or CPU percentage. No cold-cache measurement is claimed.
+
+V2 comparison transactions have real signatures verified through the research
+adapter, not production consensus validation. Weight-only labels do not certify
+relay standardness. Independent-key cases at 500/1000 inputs are skipped because
+they exceed 256 groups. A 1000-input one-group transaction is tested.
+
+The 4096-input, 256-group and 1024-member maximum tests are explicitly structural
+fixtures without valid ML-DSA signatures. Above-limit cases reject before crypto.
+They do not claim production mempool acceptance.
