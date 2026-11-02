@@ -65,9 +65,14 @@ void Writer::write(std::span<const std::byte> src)
 }
 void Reader::read(std::span<std::byte> dst)
 {
-    Require(dst.size() <= remaining(), Error::Encoding);
-    if (!dst.empty()) std::memcpy(dst.data(), bytes.data() + pos, dst.size());
-    pos += dst.size();
+    const auto pos = m_pos;
+    skip(dst.size());
+    if (!dst.empty()) std::memcpy(dst.data(), m_bytes.data() + pos, dst.size());
+}
+void Reader::skip(size_t n)
+{
+    Require(n <= remaining(), Error::Encoding);
+    m_pos += n;
 }
 Bytes Wire(const CMutableTransaction& tx, bool witness)
 {
@@ -90,6 +95,58 @@ CScriptWitness DecodeWitness(std::span<const unsigned char> bytes)
         }
         Require(r.remaining() == 0, Error::Encoding);
         return w;
+    } catch (const std::ios_base::failure&) { throw Failure(Error::Encoding); }
+}
+CMutableTransaction DecodeTransaction(std::span<const unsigned char> bytes)
+{
+    // This remains the existing 32 MiB in-memory research-harness budget.
+    // Never feed attacker counts directly to a vector-allocating decoder.
+    Require(bytes.size() <= MAX_SIZE, Error::Encoding);
+    try {
+        Reader r{bytes};
+        r.skip(4);
+        auto inputs = ReadCompactSize(r);
+        bool witness{false};
+        if (inputs == 0) {
+            uint8_t flags;
+            r >> flags;
+            Require(flags == 1, Error::Encoding);
+            witness = true;
+            inputs = ReadCompactSize(r);
+        }
+        Require(inputs > 0 && inputs <= r.remaining() / 41, Error::Encoding);
+        for (uint64_t i = 0; i < inputs; ++i) {
+            r.skip(36);
+            r.skip(ReadCompactSize(r));
+            r.skip(4);
+        }
+        const auto outputs = ReadCompactSize(r);
+        Require(outputs <= r.remaining() / 9, Error::Encoding);
+        for (uint64_t i = 0; i < outputs; ++i) {
+            r.skip(8);
+            r.skip(ReadCompactSize(r));
+        }
+        if (witness) {
+            bool any{false};
+            for (uint64_t i = 0; i < inputs; ++i) {
+                const auto count = ReadCompactSize(r);
+                Require(count <= Consensus::MAX_WITNESS_STACK_ITEMS && count <= r.remaining(), Error::Encoding);
+                any |= count != 0;
+                for (uint64_t item = 0; item < count; ++item) {
+                    const auto size = ReadCompactSize(r);
+                    Require(size <= Consensus::MAX_WITNESS_ITEM_BYTES, Error::Encoding);
+                    r.skip(size);
+                }
+            }
+            Require(any, Error::Encoding);
+        }
+        r.skip(4);
+        Require(r.remaining() == 0, Error::Encoding);
+        Reader decode{bytes};
+        CMutableTransaction tx;
+        decode >> TX_WITH_WITNESS(tx);
+        Require(decode.remaining() == 0, Error::Encoding);
+        return tx;
     } catch (const std::ios_base::failure&) { throw Failure(Error::Encoding); }
 }
 B32 Commitment(const B32& genesis, std::span<const unsigned char> pk, const B32& nonce)

@@ -36,18 +36,23 @@ struct Writer {
     void write(std::span<const std::byte> src);
     template<class T> Writer& operator<<(const T& t) { ::Serialize(*this, t); return *this; }
 };
-struct Reader {
-    std::span<const unsigned char> bytes;
-    size_t pos{0};
-    explicit Reader(std::span<const unsigned char> b) : bytes(b) {}
+class Reader {
+    const std::span<const unsigned char> m_bytes;
+    size_t m_pos{0};
+public:
+    explicit Reader(std::span<const unsigned char> b) : m_bytes(b) {}
     void read(std::span<std::byte> dst);
+    void skip(size_t n);
     template<class T> Reader& operator>>(T&& t) { ::Unserialize(*this, t); return *this; }
-    size_t remaining() const { return bytes.size() - pos; }
+    size_t remaining() const { return m_bytes.size() - m_pos; }
 };
 template<class T> Bytes SerializeBytes(const T& t) { Writer w; w << t; return std::move(w.bytes); }
 Bytes Wire(const CMutableTransaction& tx, bool witness = true);
 // Decode only the small research witness grammar: bounds precede allocations.
 CScriptWitness DecodeWitness(std::span<const unsigned char> bytes);
+// Preflight canonical byte counts and resource bounds before invoking the
+// inherited transaction decoder. A decoded transaction is not authorization.
+CMutableTransaction DecodeTransaction(std::span<const unsigned char> bytes);
 
 struct Member { uint32_t index; B32 nonce; };
 struct Group { uint32_t anchor; PublicKey pk; std::vector<Member> members; };
