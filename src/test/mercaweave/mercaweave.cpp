@@ -261,8 +261,7 @@ Bytes Manifest(const Mapping& map)
     Require(members.size() == map.inputs, Error::Context);
     return std::move(w.bytes);
 }
-Hashes TransactionHashes(const CMutableTransaction& tx, const std::vector<CTxOut>& spent,
-                         const B32& genesis, const Mapping& map)
+Hashes BodyHashes(const CMutableTransaction& tx, const std::vector<CTxOut>& spent, const B32& genesis)
 {
     Require(spent.size() == tx.vin.size(), Error::Context);
     MercaturaPQHashWriter prev{"Mercatura/PQGroupAuth/v1/Prevouts"};
@@ -282,6 +281,12 @@ Hashes TransactionHashes(const CMutableTransaction& tx, const std::vector<CTxOut
     body << tx.version << tx.nLockTime << uint64_t(tx.vin.size()) << uint64_t(tx.vout.size())
          << genesis << h.prev << h.amount << h.script << h.sequence << h.output;
     h.tx = body.GetHash();
+    return h;
+}
+Hashes TransactionHashes(const CMutableTransaction& tx, const std::vector<CTxOut>& spent,
+                         const B32& genesis, const Mapping& map)
+{
+    auto h = BodyHashes(tx, spent, genesis);
     h.manifest = PQH384("Mercatura/PQGroupAuth/v1/Manifest", Manifest(map));
     return h;
 }

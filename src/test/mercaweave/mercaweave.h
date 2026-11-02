@@ -79,6 +79,9 @@ CScript Output(const B32& genesis, std::span<const unsigned char> pk, const B32&
 Mapping Reconstruct(const CMutableTransaction& tx, const std::vector<CTxOut>& spent);
 void CheckOwnership(const Mapping& map, const std::vector<CTxOut>& spent, const B32& genesis, Statistics& stats);
 Bytes Manifest(const Mapping& map);
+// Five components and transaction body only; useful for stage qualification.
+// No manifest or ownership decision is implied by this low-level hash helper.
+Hashes BodyHashes(const CMutableTransaction& tx, const std::vector<CTxOut>& spent, const B32& genesis);
 Hashes TransactionHashes(const CMutableTransaction& tx, const std::vector<CTxOut>& spent,
                          const B32& genesis, const Mapping& map);
 H48 Digest(const B32& genesis, const Hashes& hashes, const Group& group);
