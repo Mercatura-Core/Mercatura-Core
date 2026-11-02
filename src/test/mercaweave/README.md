@@ -100,3 +100,49 @@ they exceed 256 groups. A 1000-input one-group transaction is tested.
 The 4096-input, 256-group and 1024-member maximum tests are explicitly structural
 fixtures without valid ML-DSA signatures. Above-limit cases reject before crypto.
 They do not claim production mempool acceptance.
+
+## Work Order 02 qualification
+
+The original benchmark sections above describe Work Order 01 artifacts.
+The expanded research project now also builds `mercaweave_native_tests`,
+`mercaweave_parser_tests`, `mercaweave_attack_tests` and
+`mercaweave_qualification_bench`. CTest runs seven focused targets.
+
+`native_v2.cpp` links unmodified production transaction precomputation,
+`ComputeMercaturaPQAuthDigestV1`, the genuine PQ signature checker and
+`VerifyScript`. It snapshots transaction/spent/genesis/flags and precomputes
+once per session. Native Script verification alone must not authorize v3:
+the existing interpreter still has unknown-witness semantics. `VerifyMixed`
+always sends actual v3 outputs through the standalone group verifier.
+`pq_checker_calls` counts native checker entries; only valid complete contexts
+reach actual ML-DSA verification. Production files and normal builds are unchanged.
+
+Research builds now preserve assertions with `-UNDEBUG`, as required by
+Mercatura's production policy headers. No assertions were disabled to link them.
+The dependency is the already-vendored secp256k1 source, not a new download.
+
+`DecodeTransaction` checks canonical counts, lengths, flags and remaining bytes
+before invoking inherited allocating deserialization. It is a bounded research
+byte decoder, not a network entrypoint or authorization decision. Persistent
+mutation seeds are in `mutation_seeds.h`. No coverage-guided fuzzer is installed;
+bounded mutation suites are exercised under ASan/UBSan.
+
+```bash
+work/build-release/mercaweave_native_tests
+work/build-release/mercaweave_parser_tests
+work/build-release/mercaweave_attack_tests
+python3 src/test/mercaweave/resource_qualification.py \
+  work/build-release/mercaweave_qualification_bench work/security-benchmarks.csv
+```
+
+Committed WO02 measurements are `security-benchmarks.csv` and
+`security-benchmarks.json`; checkpoint reproduction uses
+`work-order-02-baseline.csv`. The new resource runner uses fresh child processes,
+three warm-ups and eleven measured repetitions per stage. Whole-process RSS may
+include the Python launcher's pre-exec high-water floor; C++ allocation counters
+exclude C malloc/realloc and aligned allocations. The separate byte-hashing
+diagnostic shows why `4G+N` must not be treated as a complete CPU budget.
+
+See `doc/design/mercaweave-v0.1-security-qualification.md` for the eight-part
+threat model, named executable tests, supported Script malleability examples,
+limits of the accounting evidence and remaining integration gates.

@@ -31,7 +31,7 @@ def run(executable, output):
         assert float(row['worst_verify_ms']) >= float(row['median_verify_ms'])
         rows.append(row)
     with output.open('w', newline='') as stream:
-        writer = csv.DictWriter(stream, fieldnames=rows[0].keys())
+        writer = csv.DictWriter(stream, fieldnames=rows[0].keys(), lineterminator='\n')
         writer.writeheader()
         writer.writerows(rows)
     metadata = {

@@ -192,3 +192,11 @@ transaction-scoped immutable authorization, every script-check entrypoint,
 cache binding, block resource context and mixed authorization. Production
 consensus/wallet/PSBT/Qt changes and all activation work remain deferred and
 require a separate work order. No activation schedule or height is proposed.
+
+## Work Order 02 follow-up (2026-11-02)
+
+The original Work Order 01 evidence above is preserved. Current hardening,
+native production-v2 interoperability, malleability, staged resource measurements
+and 7/7 release/sanitizer CTest qualification are documented in
+`mercaweave-v0.1-security-qualification.md`. New artifacts use separate names;
+the original vectors and benchmark CSV remain byte-for-byte unchanged.
