@@ -1,0 +1,42 @@
+{
+  "recorded_at": "2026-11-02T06:16:08.809794-08:00",
+  "source_base": "4b88b619fb1b08c7f30112a38eb471880b2a6af4",
+  "research_engine_commit": "84e766a0f9932bdf03c7c380e8c819083b3efbe1",
+  "branch": "research/mercaweave-v0.1",
+  "os": "Debian GNU/Linux 13.6 (trixie)",
+  "kernel": "6.18.57",
+  "architecture": "x86_64",
+  "cpu": "AMD EPYC 9V74 80-Core Processor; 3 CPUs visible to VM",
+  "observed_memory_total_gib": 9.7,
+  "observed_memory_available_gib_before_build": 9.2,
+  "observed_disk_available_gib_before_build": 7.5,
+  "swap": "none",
+  "compiler": "GCC/G++ 14.2.0",
+  "cmake": "4.4.4 (local work/tools installation)",
+  "release_flags": "-O3 -DNDEBUG; C++20; portable SHA256 and pinned portable ML-DSA-65",
+  "sanitizer_flags": "-O2 -g -DNDEBUG -fsanitize=address,undefined -fno-omit-frame-pointer",
+  "warmup_runs_per_workload": 1,
+  "measured_runs_per_workload": 5,
+  "timing": "median complete pipeline, repeated in-process; no signature cache; no cold-cache claim",
+  "entropy": "test-only all-zero 32-byte randomness; deterministic public fixture seeds",
+  "v2_comparison": "actual serialized transactions and real signatures verified through research v2 adapter; production interpreter not linked",
+  "rss_semantics": "Linux ru_maxrss KiB; cumulative high-water mark of benchmark process",
+  "cpu_semantics": "cumulative user+system CPU milliseconds for benchmark process; not percentage",
+  "skipped_workloads": [
+    {
+      "inputs": 500,
+      "groups": 500,
+      "reason": "exceeds locked maximum of 256 groups"
+    },
+    {
+      "inputs": 1000,
+      "groups": 1000,
+      "reason": "exceeds locked maximum of 256 groups"
+    }
+  ],
+  "leak_sanitizer": "unavailable: fatal ptrace incompatibility; ASan/UBSan passed with detect_leaks=0",
+  "artifact_sha256": {
+    "vectors.json": "ea4978206307ac21d4f544b05e6da3543e094c9a1c4bd97c44f90fad4420c49c",
+    "benchmarks.csv": "0896a259684d85b4df92299d535c7f292ab237fefbb0a3114c4c8cd7fe83ac28"
+  }
+}
