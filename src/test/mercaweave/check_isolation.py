@@ -36,7 +36,7 @@ def main():
         "mercaweave_isolated_control", "mercaweave_coin_validation", "mercaweave_coin_probe",
         "mercaweave_integration", "mercaweave_integration_tests", "mercaweave_integration_bench",
         "mercaweave_wallet_primitives", "mercaweave_wallet_primitive_probe", "mercaweave_wallet",
-        "mercaweave_wallet_tests", "mercaweave_wallet_bench", "mercaweave_psbt_tests",
+        "mercaweave_wallet_tests", "mercaweave_wallet_bench", "mercaweave_psbt_tests", "mercaweave_reward_planner", "mercaweave_reward_tests", "mercaweave_qt_bridge", "mercaweave_qt_integration_tests",
     }
     flags, ordinary, interpreters = 0, 0, []
     for entry in commands:
