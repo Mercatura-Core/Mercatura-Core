@@ -34,7 +34,9 @@ CScript NativeOutput(const PublicKey& pk)
 }
 std::filesystem::path SafePath(const std::filesystem::path& path)
 {
-    auto root=std::filesystem::weakly_canonical(Wallet::StorageRoot());
+    auto configured=std::filesystem::absolute(Wallet::StorageRoot()).lexically_normal();
+    auto root=std::filesystem::weakly_canonical(configured);
+    Require(root==configured,Code::Metadata,"research-storage-root-symlink");
     auto p=std::filesystem::weakly_canonical(path);
     auto rel=p.lexically_relative(root);
     Require(!rel.empty()&&!rel.is_absolute()&&*rel.begin()!="..",Code::Metadata,"research-storage-path-only");
@@ -204,8 +206,9 @@ std::unique_ptr<Wallet> Wallet::Restore(std::span<const unsigned char> bytes,B32
 std::filesystem::path Wallet::StorageRoot(){return MERCAWEAVE_RESEARCH_STORAGE_ROOT;}
 void Wallet::Save(const std::filesystem::path& path)const
 {
+    auto p=SafePath(path);
     std::filesystem::create_directories(StorageRoot());std::filesystem::permissions(StorageRoot(),std::filesystem::perms::owner_all);
-    auto p=SafePath(path);auto temp=p;temp+=".tmp";Require(!std::filesystem::is_symlink(temp),Code::Metadata,"snapshot-symlink");
+    auto temp=p;temp+=".tmp";Require(!std::filesystem::is_symlink(temp),Code::Metadata,"snapshot-symlink");
     auto bytes=Backup();{std::ofstream stream(temp,std::ios::binary|std::ios::trunc);Require(bool(stream),Code::Metadata,"snapshot-open");stream.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());Require(bool(stream),Code::Metadata,"snapshot-write");}
     std::filesystem::permissions(temp,std::filesystem::perms::owner_read|std::filesystem::perms::owner_write);std::filesystem::rename(temp,p);
 }
