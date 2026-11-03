@@ -44,9 +44,12 @@ void Keys()
     auto tampered=backup;tampered.back()^=1;auto bad_mac=Wallet::Restore(tampered,genesis);
     Check(!bad_mac->Unlock(pass)&&bad_mac->IsLocked(),"metadata authentication fails closed");
     bool truncated=false;try{Wallet::Restore(std::span(backup).first(30),genesis);}catch(const std::exception&){truncated=true;}Check(truncated,"truncated encrypted snapshot");
+    auto envelope=[&](const Bytes& data,const std::function<void(Bytes&)>& edit){Reader r(data);Bytes magic;wallet::CMasterKey mk;wallet::MercaturaPQCryptedSeed es;Bytes metadata;H48 mac;r>>magic>>mk>>es>>metadata>>mac;edit(metadata);Writer out;out<<magic<<mk<<es<<metadata<<mac;return out.bytes;};
+    auto wrong_version=envelope(backup,[](Bytes& metadata){metadata[4]^=3;});Reject([&]{Wallet::Restore(wrong_version,genesis);},Code::Version);
+    auto missing_ranges=envelope(backup,[](Bytes& metadata){const auto cursors=metadata[45];metadata.erase(metadata.begin()+46,metadata.begin()+46+cursors*14);metadata[45]=0;});Reject([&]{Wallet::Restore(missing_ranges,genesis);},Code::Metadata);
     auto watch=Wallet::Watch(genesis,records);Check(watch->IsWatchOnly()&&watch->IsLocked()&&!watch->Unlock(pass),"watch wallet has no seed/unlock");
     Reject([&]{watch->Issue();},Code::WatchOnly);Reject([&]{watch->Key(first);},Code::WatchOnly);
-    auto watch_copy=Wallet::Restore(watch->Backup(),genesis);Check(watch_copy->Records()==records,"explicit public range watch restore");
+    auto damaged_watch=watch->Backup();damaged_watch.back()^=1;Reject([&]{Wallet::Restore(damaged_watch,genesis);},Code::Metadata);auto watch_copy=Wallet::Restore(watch->Backup(),genesis);Check(watch_copy->Records()==records,"explicit public range watch restore");
     auto recovered=Wallet::Create(seed,genesis,pass);Check(recovered->Unlock(pass),"seed-only recovery unlock");recovered->RecoverIssued(w->Records());
     Check(recovered->Issue()==w->Issue(),"explicit issued ranges reconstruct high-water indexes");
     wallet::CKeyingMaterial wrong_seed(32,0x43);auto wrong=Wallet::Create(wrong_seed,genesis,pass);Check(wrong->Unlock(pass),"wrong-seed fixture unlock");
