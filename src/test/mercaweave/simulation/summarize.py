@@ -65,7 +65,7 @@ def main():
     write_json(out/'failed-attempts.json',failed);write_json(out/'native-campaigns.json',stages);write_json(out/'research-campaigns.json',research)
     write_json(out/'preserved-evidence.json',prior)
     with (out/'native-summary.csv').open('w') as f:
-        writer=csv.DictWriter(f,fieldnames=['campaign','stage','actual_transactions','confirmed','witness_signatures','serialized_bytes','weight','fees_units','peak_node_rss_kib','observed_process_cpu_seconds','peak_logical_disk_bytes','duration_seconds']);writer.writeheader()
+        writer=csv.DictWriter(f,lineterminator='\n',fieldnames=['campaign','stage','actual_transactions','confirmed','witness_signatures','serialized_bytes','weight','fees_units','peak_node_rss_kib','observed_process_cpu_seconds','peak_logical_disk_bytes','duration_seconds']);writer.writeheader()
         for item in stages:writer.writerow({k:item[k]for k in writer.fieldnames})
     print(json.dumps(dict(real_native_transactions=sum(r['actual_transactions']for r in stages),completed_stages=len(stages),preserved_files=len(prior),research_shapes=33)))
 
