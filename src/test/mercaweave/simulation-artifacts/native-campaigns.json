@@ -1,0 +1,2026 @@
+[
+  {
+    "stage": "100-7",
+    "manifest": {
+      "seed": 7,
+      "transactions": 100,
+      "nodes": 3,
+      "epoch_size": 1000,
+      "batch_size": 20,
+      "custody": "independent",
+      "mining_interval": 0,
+      "soak_seconds": 0,
+      "max_soak_cycles": 10,
+      "disruptions": true,
+      "extended": false
+    },
+    "actual_transactions": 105,
+    "confirmed": 105,
+    "witness_signatures": 130,
+    "serialized_bytes": 706738,
+    "weight": 771802,
+    "fees_units": 1409,
+    "phases": {
+      "funding": {
+        "transactions": 1,
+        "bytes": 9664,
+        "fees": 15,
+        "inputs": 1,
+        "outputs": 101
+      },
+      "hot_wallet_funding": {
+        "transactions": 1,
+        "bytes": 5407,
+        "fees": 11,
+        "inputs": 1,
+        "outputs": 2
+      },
+      "deposit": {
+        "transactions": 100,
+        "bytes": 540700,
+        "fees": 1100,
+        "inputs": 100,
+        "outputs": 200
+      },
+      "withdrawal": {
+        "transactions": 3,
+        "bytes": 150967,
+        "fees": 283,
+        "inputs": 28,
+        "outputs": 53
+      }
+    },
+    "input_distribution": {
+      "1": 102,
+      "11": 2,
+      "6": 1
+    },
+    "output_distribution": {
+      "101": 1,
+      "2": 101,
+      "21": 2,
+      "11": 1
+    },
+    "timings_ms": {
+      "construction_ms": {
+        "median": 0.011347000054229284,
+        "minimum": 0.008772999990469543,
+        "maximum": 0.05995999981678324
+      },
+      "signing_ms": {
+        "median": 1.13884499978667,
+        "minimum": 0.7915520000096876,
+        "maximum": 10.653905999788549
+      },
+      "admission_ms": {
+        "median": 7.031128999642533,
+        "minimum": 5.525542000214045,
+        "maximum": 18.174646999796096
+      },
+      "propagation_ms": {
+        "median": 7990.471635999711,
+        "minimum": 6986.355438999908,
+        "maximum": 17462.89334999983
+      },
+      "confirmation_ms": {
+        "median": 18699.82864399981,
+        "minimum": 1921.7750530001467,
+        "maximum": 19382.860169000196
+      }
+    },
+    "blocks": [
+      {
+        "kind": "block",
+        "elapsed_s": 201.73377389400002,
+        "height": 102,
+        "bytes": 9925,
+        "weight": 23782,
+        "transactions": 1,
+        "fees": 15,
+        "generate_validate_propagate_ms": 1919.7174680002718
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 203.6673640050003,
+        "height": 103,
+        "bytes": 5668,
+        "weight": 6754,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 1913.419960000283
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 223.06635070100037,
+        "height": 104,
+        "bytes": 540961,
+        "weight": 582736,
+        "transactions": 100,
+        "fees": 1100,
+        "generate_validate_propagate_ms": 1907.0252850001452
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 237.15564131300016,
+        "height": 105,
+        "bytes": 151228,
+        "weight": 162274,
+        "transactions": 3,
+        "fees": 283,
+        "generate_validate_propagate_ms": 2462.8910490000635
+      }
+    ],
+    "observed_block_capacity_bytes": 4194304,
+    "peak_node_rss_kib": 319584,
+    "observed_process_cpu_seconds": 124.29,
+    "peak_logical_disk_bytes": 60462006,
+    "sampled_disk_growth": 3880653,
+    "events": [
+      {
+        "kind": "isolation",
+        "elapsed_s": 0.13559835600017323,
+        "chain": "regtest",
+        "nodes": 3,
+        "transport": "loopback-native-v2",
+        "standard_policy": true,
+        "synchronous_sqlite": true
+      },
+      {
+        "kind": "accounting",
+        "elapsed_s": 237.1680433380002,
+        "credited_units": 20000,
+        "withdrawn_units": 5000,
+        "offchain_liabilities": 15000,
+        "offchain_transfers": 0
+      },
+      {
+        "kind": "partition",
+        "elapsed_s": 237.2267901340001,
+        "edge": [
+          0,
+          1
+        ]
+      },
+      {
+        "kind": "reconnect",
+        "elapsed_s": 239.9452859830003,
+        "catchup_ms": 2125.308711999878
+      },
+      {
+        "kind": "restart",
+        "elapsed_s": 241.46955478600012,
+        "tip": "966a489f9ff18d8f26f6b899d93a6b828111af32d3a37dcb5b0479e2fae81379"
+      },
+      {
+        "kind": "soak",
+        "elapsed_s": 241.4815323730004,
+        "requested_seconds": 0,
+        "actual_seconds": 2.5439999262744095e-06,
+        "cycles": 0
+      }
+    ],
+    "source_hashes": null,
+    "transaction_table_sha256": "97c617326cc79a8f89faca2374cfa25736f9872c6f323ae00a7221637fba78c9",
+    "campaign": "native-independent",
+    "duration_seconds": 242.64202600599992
+  },
+  {
+    "stage": "500-7",
+    "manifest": {
+      "seed": 7,
+      "transactions": 500,
+      "nodes": 3,
+      "epoch_size": 1000,
+      "batch_size": 20,
+      "custody": "independent",
+      "mining_interval": 0,
+      "soak_seconds": 0,
+      "max_soak_cycles": 10,
+      "disruptions": true,
+      "extended": false
+    },
+    "actual_transactions": 515,
+    "confirmed": 515,
+    "witness_signatures": 640,
+    "serialized_bytes": 3479880,
+    "weight": 3801870,
+    "fees_units": 6936,
+    "phases": {
+      "funding": {
+        "transactions": 1,
+        "bytes": 26866,
+        "fees": 32,
+        "inputs": 1,
+        "outputs": 501
+      },
+      "hot_wallet_funding": {
+        "transactions": 1,
+        "bytes": 5407,
+        "fees": 11,
+        "inputs": 1,
+        "outputs": 2
+      },
+      "deposit": {
+        "transactions": 500,
+        "bytes": 2703500,
+        "fees": 5500,
+        "inputs": 500,
+        "outputs": 1000
+      },
+      "withdrawal": {
+        "transactions": 13,
+        "bytes": 744107,
+        "fees": 1393,
+        "inputs": 138,
+        "outputs": 263
+      }
+    },
+    "input_distribution": {
+      "1": 502,
+      "11": 12,
+      "6": 1
+    },
+    "output_distribution": {
+      "501": 1,
+      "2": 501,
+      "21": 12,
+      "11": 1
+    },
+    "timings_ms": {
+      "construction_ms": {
+        "median": 0.014341999758471502,
+        "minimum": 0.009253999905922683,
+        "maximum": 1.9257280000601895
+      },
+      "signing_ms": {
+        "median": 1.2766019999617129,
+        "minimum": 0.8504410002387885,
+        "maximum": 11.969485000008717
+      },
+      "admission_ms": {
+        "median": 8.996701000342,
+        "minimum": 5.369301999962772,
+        "maximum": 36.5729420000207
+      },
+      "propagation_ms": {
+        "median": 26499.28845400018,
+        "minimum": 2850.899632999699,
+        "maximum": 42566.440261000025
+      },
+      "confirmation_ms": {
+        "median": 40754.52388799976,
+        "minimum": 1821.6783040002156,
+        "maximum": 45008.32301200034
+      }
+    },
+    "blocks": [
+      {
+        "kind": "block",
+        "elapsed_s": 205.70313506899993,
+        "height": 102,
+        "bytes": 27127,
+        "weight": 92590,
+        "transactions": 1,
+        "fees": 32,
+        "generate_validate_propagate_ms": 1810.0252220001494
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 208.11583907299973,
+        "height": 103,
+        "bytes": 5668,
+        "weight": 6754,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 2392.3955709997244
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 253.13821957399978,
+        "height": 104,
+        "bytes": 2703763,
+        "weight": 2909944,
+        "transactions": 500,
+        "fees": 5500,
+        "generate_validate_propagate_ms": 2176.4931950001483
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 283.86921063499994,
+        "height": 105,
+        "bytes": 744368,
+        "weight": 796334,
+        "transactions": 13,
+        "fees": 1393,
+        "generate_validate_propagate_ms": 1808.8923459999933
+      }
+    ],
+    "observed_block_capacity_bytes": 4194304,
+    "peak_node_rss_kib": 402432,
+    "observed_process_cpu_seconds": 133.26,
+    "peak_logical_disk_bytes": 72133356,
+    "sampled_disk_growth": 15473811,
+    "events": [
+      {
+        "kind": "isolation",
+        "elapsed_s": 0.11043084999982966,
+        "chain": "regtest",
+        "nodes": 3,
+        "transport": "loopback-native-v2",
+        "standard_policy": true,
+        "synchronous_sqlite": true
+      },
+      {
+        "kind": "accounting",
+        "elapsed_s": 283.89358084199966,
+        "credited_units": 100000,
+        "withdrawn_units": 25000,
+        "offchain_liabilities": 75000,
+        "offchain_transfers": 0
+      },
+      {
+        "kind": "partition",
+        "elapsed_s": 283.9608113759996,
+        "edge": [
+          0,
+          1
+        ]
+      },
+      {
+        "kind": "reconnect",
+        "elapsed_s": 287.4193324979997,
+        "catchup_ms": 2221.473779000007
+      },
+      {
+        "kind": "restart",
+        "elapsed_s": 288.892351943,
+        "tip": "cafe22ad911344c2709a4eb13c301b242432a141454ef3d45bac095398ceed49"
+      },
+      {
+        "kind": "soak",
+        "elapsed_s": 288.91566717199976,
+        "requested_seconds": 0,
+        "actual_seconds": 1.3519997992261779e-06,
+        "cycles": 0
+      }
+    ],
+    "source_hashes": {
+      "native.py": "09b314b66d4b497b87eb1b56edd80a86ffed42f3eb641b7076dc01de1bff9b9b",
+      "core.py": "6f1052a4ba1a048ff76ba4db74cc06464020687a59b21840ddad612f0bfbfeb1",
+      "test_core.py": "3c318f22f107926ee6fef4c2594b30fe4f3b293665b072c3e74de763e4109d3a",
+      "__init__.py": "e3193188f24be2cee29ab008e26c5e985bcd40e6bbf9331ae722bff7da0315e0",
+      "run.py": "c608ae631c44678e8acf68f38ee2fb5d283516e6ebda682fd6e1ae999ea712af"
+    },
+    "transaction_table_sha256": "06e1b20fa01c9442a1be10c44c59824e22b63a23c76fea301a184c08c8582a74",
+    "campaign": "native-independent",
+    "duration_seconds": 290.25541612899997
+  },
+  {
+    "stage": "1000-7",
+    "manifest": {
+      "seed": 7,
+      "transactions": 1000,
+      "nodes": 3,
+      "epoch_size": 1000,
+      "batch_size": 20,
+      "custody": "independent",
+      "mining_interval": 0,
+      "soak_seconds": 0,
+      "max_soak_cycles": 10,
+      "disruptions": true,
+      "extended": false,
+      "lifecycle": false
+    },
+    "actual_transactions": 1027,
+    "confirmed": 1027,
+    "witness_signatures": 1277,
+    "serialized_bytes": 6943623,
+    "weight": 7586622,
+    "fees_units": 13839,
+    "phases": {
+      "funding": {
+        "transactions": 1,
+        "bytes": 48366,
+        "fees": 53,
+        "inputs": 1,
+        "outputs": 1001
+      },
+      "hot_wallet_funding": {
+        "transactions": 1,
+        "bytes": 5407,
+        "fees": 11,
+        "inputs": 1,
+        "outputs": 2
+      },
+      "deposit": {
+        "transactions": 1000,
+        "bytes": 5407000,
+        "fees": 11000,
+        "inputs": 1000,
+        "outputs": 2000
+      },
+      "withdrawal": {
+        "transactions": 25,
+        "bytes": 1482850,
+        "fees": 2775,
+        "inputs": 275,
+        "outputs": 525
+      }
+    },
+    "input_distribution": {
+      "1": 1002,
+      "11": 25
+    },
+    "output_distribution": {
+      "1001": 1,
+      "2": 1001,
+      "21": 25
+    },
+    "timings_ms": {
+      "construction_ms": {
+        "median": 0.012047999916831031,
+        "minimum": 0.00797199982116581,
+        "maximum": 0.315234000026976
+      },
+      "signing_ms": {
+        "median": 1.229079000040656,
+        "minimum": 0.747766000131378,
+        "maximum": 19.87826499998846
+      },
+      "admission_ms": {
+        "median": 8.227742000144644,
+        "minimum": 5.011551999814401,
+        "maximum": 292.2549589998198
+      },
+      "propagation_ms": {
+        "median": 40545.06995400015,
+        "minimum": 3360.947383000166,
+        "maximum": 99084.02189800018
+      },
+      "confirmation_ms": {
+        "median": 97983.66000499982,
+        "minimum": 1880.2728659998138,
+        "maximum": 106724.31870699984
+      }
+    },
+    "blocks": [
+      {
+        "kind": "block",
+        "elapsed_s": 206.04855961700014,
+        "height": 102,
+        "bytes": 48627,
+        "weight": 178590,
+        "transactions": 1,
+        "fees": 53,
+        "generate_validate_propagate_ms": 1864.6211549998952
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 208.48280476499986,
+        "height": 103,
+        "bytes": 5668,
+        "weight": 6754,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 2414.787213999716
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 313.12680648900005,
+        "height": 104,
+        "bytes": 4190688,
+        "weight": 4509894,
+        "transactions": 775,
+        "fees": 8525,
+        "generate_validate_propagate_ms": 4845.51441900021
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 315.268744683,
+        "height": 105,
+        "bytes": 1216836,
+        "weight": 1309986,
+        "transactions": 225,
+        "fees": 2475,
+        "generate_validate_propagate_ms": 2137.418950999745
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 334.5059046229999,
+        "height": 106,
+        "bytes": 1483111,
+        "weight": 1586086,
+        "transactions": 25,
+        "fees": 2775,
+        "generate_validate_propagate_ms": 1821.2205810000341
+      }
+    ],
+    "observed_block_capacity_bytes": 4194304,
+    "peak_node_rss_kib": 410596,
+    "observed_process_cpu_seconds": 146.87,
+    "peak_logical_disk_bytes": 86602422,
+    "sampled_disk_growth": 29847698,
+    "events": [
+      {
+        "kind": "isolation",
+        "elapsed_s": 0.1128424260000429,
+        "chain": "regtest",
+        "nodes": 3,
+        "transport": "loopback-native-v2",
+        "standard_policy": true,
+        "synchronous_sqlite": true
+      },
+      {
+        "kind": "accounting",
+        "elapsed_s": 334.5459813309999,
+        "credited_units": 200000,
+        "withdrawn_units": 50000,
+        "offchain_liabilities": 150000,
+        "offchain_transfers": 0
+      },
+      {
+        "kind": "partition",
+        "elapsed_s": 334.62157977900006,
+        "edge": [
+          0,
+          1
+        ]
+      },
+      {
+        "kind": "reconnect",
+        "elapsed_s": 336.51147175899996,
+        "catchup_ms": 1092.6764249998087
+      },
+      {
+        "kind": "restart",
+        "elapsed_s": 338.04088813499993,
+        "tip": "f834224bcdd68fc0424ad3e76507d1167cefe5032cd7f42e0bd7293bb955f10e"
+      },
+      {
+        "kind": "soak",
+        "elapsed_s": 338.07874147500024,
+        "requested_seconds": 0,
+        "actual_seconds": 2.623999989737058e-06,
+        "cycles": 0
+      }
+    ],
+    "source_hashes": {
+      "native.py": "cf93219135ea46a5bb4cdca4d129eab8e31361f0b6c290d3bb7c7acef7ba265d",
+      "core.py": "ab830693adfcf6d553184b104c9240f1206db5aa094ec18896393261a8d8e751",
+      "lifecycle.py": "25e960f3a2de8f12d8bf9e55423aae28d0c8ec0b8722bc73241a76adc2417356",
+      "test_core.py": "3c318f22f107926ee6fef4c2594b30fe4f3b293665b072c3e74de763e4109d3a",
+      "__init__.py": "e3193188f24be2cee29ab008e26c5e985bcd40e6bbf9331ae722bff7da0315e0",
+      "run.py": "1a446a3ed884cf97a49f980891967f1150bf4e7ea14180080d68e444349a6589"
+    },
+    "transaction_table_sha256": "33506e65ce95b1f4a49e3b1e8e84fb1048f12bf97f717eca31ff04882cb61b82",
+    "campaign": "native-independent",
+    "duration_seconds": 339.2969437659999
+  },
+  {
+    "stage": "3000-7",
+    "manifest": {
+      "seed": 7,
+      "transactions": 3000,
+      "nodes": 2,
+      "epoch_size": 1500,
+      "batch_size": 20,
+      "custody": "reused",
+      "mining_interval": 0,
+      "soak_seconds": 0,
+      "max_soak_cycles": 10,
+      "disruptions": true,
+      "extended": false,
+      "lifecycle": false,
+      "capacity_steps": true,
+      "bootstrap_blocks": 101
+    },
+    "actual_transactions": 3080,
+    "confirmed": 3080,
+    "witness_signatures": 3830,
+    "serialized_bytes": 20825460,
+    "weight": 22754040,
+    "fees_units": 41508,
+    "phases": {
+      "funding": {
+        "transactions": 2,
+        "bytes": 139732,
+        "fees": 150,
+        "inputs": 2,
+        "outputs": 3002
+      },
+      "hot_wallet_funding": {
+        "transactions": 2,
+        "bytes": 10814,
+        "fees": 22,
+        "inputs": 2,
+        "outputs": 4
+      },
+      "deposit": {
+        "transactions": 3000,
+        "bytes": 16221000,
+        "fees": 33000,
+        "inputs": 3000,
+        "outputs": 6000
+      },
+      "withdrawal": {
+        "transactions": 76,
+        "bytes": 4453914,
+        "fees": 8336,
+        "inputs": 826,
+        "outputs": 1576
+      }
+    },
+    "input_distribution": {
+      "1": 3004,
+      "11": 74,
+      "6": 2
+    },
+    "output_distribution": {
+      "1501": 2,
+      "2": 3002,
+      "21": 74,
+      "11": 2
+    },
+    "timings_ms": {
+      "construction_ms": {
+        "median": 0.017506500171293737,
+        "minimum": 0.007722000191279221,
+        "maximum": 4.870135000146547
+      },
+      "signing_ms": {
+        "median": 1.7761230001269723,
+        "minimum": 0.8234499996433442,
+        "maximum": 61.60403600006248
+      },
+      "admission_ms": {
+        "median": 12.316684499865005,
+        "minimum": 4.4974220008953125,
+        "maximum": 1348.0666460000066
+      },
+      "propagation_ms": {
+        "median": 17579.232220499987,
+        "minimum": 590.1238399997055,
+        "maximum": 63110.390981999444
+      },
+      "confirmation_ms": {
+        "median": 36698.1290745,
+        "minimum": 2084.4164489999457,
+        "maximum": 67822.37814099972
+      }
+    },
+    "blocks": [
+      {
+        "kind": "block",
+        "elapsed_s": 193.24371831000008,
+        "height": 102,
+        "bytes": 70127,
+        "weight": 264590,
+        "transactions": 1,
+        "fees": 75,
+        "generate_validate_propagate_ms": 2521.4568569999756
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 195.6199740930001,
+        "height": 103,
+        "bytes": 5668,
+        "weight": 6754,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 2295.035843000278
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 210.33406683500016,
+        "height": 104,
+        "bytes": 1027591,
+        "weight": 1106356,
+        "transactions": 190,
+        "fees": 2090,
+        "generate_validate_propagate_ms": 2809.931846999916
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 243.286641444,
+        "height": 105,
+        "bytes": 2081958,
+        "weight": 2240874,
+        "transactions": 385,
+        "fees": 4235,
+        "generate_validate_propagate_ms": 3318.9635140001883
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 288.08438759399996,
+        "height": 106,
+        "bytes": 3136323,
+        "weight": 3375384,
+        "transactions": 580,
+        "fees": 6380,
+        "generate_validate_propagate_ms": 4750.053798999943
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 320.39408078199995,
+        "height": 107,
+        "bytes": 1865678,
+        "weight": 2008154,
+        "transactions": 345,
+        "fees": 3795,
+        "generate_validate_propagate_ms": 3524.1843869998775
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 336.59648989900006,
+        "height": 108,
+        "bytes": 2227218,
+        "weight": 2381484,
+        "transactions": 38,
+        "fees": 4168,
+        "generate_validate_propagate_ms": 2027.4259200000415
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 339.1700241829999,
+        "height": 109,
+        "bytes": 70127,
+        "weight": 264590,
+        "transactions": 1,
+        "fees": 75,
+        "generate_validate_propagate_ms": 2061.6926789998615
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 341.5008075810001,
+        "height": 110,
+        "bytes": 5668,
+        "weight": 6754,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 2072.68160600006
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 387.1047903949998,
+        "height": 111,
+        "bytes": 3785163,
+        "weight": 4073544,
+        "transactions": 700,
+        "fees": 7700,
+        "generate_validate_propagate_ms": 2892.4898060004125
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 455.0332698160005,
+        "height": 112,
+        "bytes": 4190688,
+        "weight": 4509894,
+        "transactions": 775,
+        "fees": 8525,
+        "generate_validate_propagate_ms": 3548.725181000009
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 474.24926567600005,
+        "height": 113,
+        "bytes": 135436,
+        "weight": 146386,
+        "transactions": 25,
+        "fees": 275,
+        "generate_validate_propagate_ms": 2187.7333370002816
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 488.975342534,
+        "height": 114,
+        "bytes": 2227218,
+        "weight": 2381484,
+        "transactions": 38,
+        "fees": 4168,
+        "generate_validate_propagate_ms": 2041.1301980002463
+      }
+    ],
+    "observed_block_capacity_bytes": 4194304,
+    "peak_node_rss_kib": 503940,
+    "observed_process_cpu_seconds": 145.85,
+    "peak_logical_disk_bytes": 143997046,
+    "sampled_disk_growth": 109979229,
+    "events": [
+      {
+        "kind": "isolation",
+        "elapsed_s": 0.14000980800028628,
+        "chain": "regtest",
+        "nodes": 2,
+        "transport": "loopback-native-v2",
+        "standard_policy": true,
+        "synchronous_sqlite": true
+      },
+      {
+        "kind": "accounting",
+        "elapsed_s": 336.8015573470002,
+        "credited_units": 300000,
+        "withdrawn_units": 75000,
+        "offchain_liabilities": 225000,
+        "offchain_transfers": 0
+      },
+      {
+        "kind": "accounting",
+        "elapsed_s": 489.07566993699993,
+        "credited_units": 600000,
+        "withdrawn_units": 150000,
+        "offchain_liabilities": 450000,
+        "offchain_transfers": 0
+      },
+      {
+        "kind": "partition",
+        "elapsed_s": 489.18337914799986,
+        "edge": [
+          0,
+          1
+        ]
+      },
+      {
+        "kind": "reconnect",
+        "elapsed_s": 490.99286251500007,
+        "catchup_ms": 1112.6378139997541
+      },
+      {
+        "kind": "restart",
+        "elapsed_s": 492.73949383599984,
+        "tip": "6b3f3af5fabaaa9acc360fc3d453e602f5bf8ca88942e0d08cce0734b63daf1b"
+      },
+      {
+        "kind": "soak",
+        "elapsed_s": 492.8989630030005,
+        "requested_seconds": 0,
+        "actual_seconds": 7.91999809734989e-07,
+        "cycles": 0,
+        "cycle_bound": false
+      }
+    ],
+    "source_hashes": {
+      "native.py": "0208b1bbacd1bade2e4cc5a00584a9b793e35662788d390e4f72af7a9a2b0400",
+      "core.py": "db62bd7cd2f5401e3c5e59f79c722f70739ab1b816b1df97e18f7b4af4dd8839",
+      "lifecycle.py": "575f5500b70191909f5e74983bef6e175e12aebd3ebdea965c2c1c2cbbbbc438",
+      "test_core.py": "3c318f22f107926ee6fef4c2594b30fe4f3b293665b072c3e74de763e4109d3a",
+      "__init__.py": "e3193188f24be2cee29ab008e26c5e985bcd40e6bbf9331ae722bff7da0315e0",
+      "run.py": "322afb13737099e715a513f7c6a375b30116b2f5876b7844890e3708b03fbad4"
+    },
+    "transaction_table_sha256": "dd6dc139b4cff50e40340b10c97da5774a0acd6d38692f98b1f72baf53a79693",
+    "campaign": "native-capacity",
+    "duration_seconds": 494.1396802430004
+  },
+  {
+    "stage": "100-7",
+    "manifest": {
+      "seed": 7,
+      "transactions": 100,
+      "nodes": 2,
+      "epoch_size": 1000,
+      "batch_size": 1,
+      "custody": "reused",
+      "mining_interval": 0,
+      "soak_seconds": 30,
+      "max_soak_cycles": 2,
+      "disruptions": true,
+      "extended": false,
+      "lifecycle": true,
+      "capacity_steps": false,
+      "bootstrap_blocks": 101
+    },
+    "actual_transactions": 188,
+    "confirmed": 188,
+    "witness_signatures": 189,
+    "serialized_bytes": 1026856,
+    "weight": 1119340,
+    "fees_units": 2082,
+    "phases": {
+      "funding": {
+        "transactions": 3,
+        "bytes": 21252,
+        "fees": 37,
+        "inputs": 3,
+        "outputs": 123
+      },
+      "hot_wallet_funding": {
+        "transactions": 3,
+        "bytes": 16221,
+        "fees": 33,
+        "inputs": 3,
+        "outputs": 6
+      },
+      "deposit": {
+        "transactions": 121,
+        "bytes": 654247,
+        "fees": 1331,
+        "inputs": 121,
+        "outputs": 242
+      },
+      "withdrawal": {
+        "transactions": 60,
+        "bytes": 324420,
+        "fees": 660,
+        "inputs": 60,
+        "outputs": 120
+      },
+      "multisigner_psbt": {
+        "transactions": 1,
+        "bytes": 10716,
+        "fees": 21,
+        "inputs": 2,
+        "outputs": 2
+      }
+    },
+    "input_distribution": {
+      "1": 187,
+      "2": 1
+    },
+    "output_distribution": {
+      "101": 1,
+      "2": 185,
+      "11": 2
+    },
+    "timings_ms": {
+      "construction_ms": {
+        "median": 0.011817499853350455,
+        "minimum": 0,
+        "maximum": 0.07819799975550268
+      },
+      "signing_ms": {
+        "median": 1.3917189999119728,
+        "minimum": 0,
+        "maximum": 8.480190000227594
+      },
+      "admission_ms": {
+        "median": 7.203044499874522,
+        "minimum": 5.31442400006199,
+        "maximum": 21.40353699996922
+      },
+      "propagation_ms": {
+        "median": 2790.259107499878,
+        "minimum": 1578.6163129996567,
+        "maximum": 18836.050783000246
+      },
+      "confirmation_ms": {
+        "median": 11358.110088000558,
+        "minimum": 1460.277713999858,
+        "maximum": 20739.08169400056
+      }
+    },
+    "blocks": [
+      {
+        "kind": "block",
+        "elapsed_s": 229.87453971200011,
+        "height": 102,
+        "bytes": 9925,
+        "weight": 23782,
+        "transactions": 1,
+        "fees": 15,
+        "generate_validate_propagate_ms": 1678.2415300003777
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 231.81937108300008,
+        "height": 103,
+        "bytes": 5668,
+        "weight": 6754,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 1924.6203109996713
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 243.68436073799967,
+        "height": 104,
+        "bytes": 540961,
+        "weight": 582736,
+        "transactions": 100,
+        "fees": 1100,
+        "generate_validate_propagate_ms": 1839.1387330002544
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 264.4440925179997,
+        "height": 105,
+        "bytes": 270611,
+        "weight": 291836,
+        "transactions": 50,
+        "fees": 550,
+        "generate_validate_propagate_ms": 1902.5524609996864
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 269.503189647,
+        "height": 108,
+        "bytes": 6055,
+        "weight": 8302,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 1445.51349700032
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 271.75208319300054,
+        "height": 109,
+        "bytes": 5668,
+        "weight": 6754,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 2221.145577000243
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 275.98210955300056,
+        "height": 110,
+        "bytes": 54331,
+        "weight": 59116,
+        "transactions": 10,
+        "fees": 110,
+        "generate_validate_propagate_ms": 1703.2251609998639
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 282.85968558700006,
+        "height": 111,
+        "bytes": 27296,
+        "weight": 30026,
+        "transactions": 5,
+        "fees": 55,
+        "generate_validate_propagate_ms": 2024.5914639999683
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 288.33048700200015,
+        "height": 114,
+        "bytes": 6055,
+        "weight": 8302,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 1794.5247150000796
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 290.1513619770003,
+        "height": 115,
+        "bytes": 5668,
+        "weight": 6754,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 1790.8454309999797
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 294.86795308,
+        "height": 116,
+        "bytes": 54331,
+        "weight": 59116,
+        "transactions": 10,
+        "fees": 110,
+        "generate_validate_propagate_ms": 1872.476872000334
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 299.89186741200047,
+        "height": 117,
+        "bytes": 27296,
+        "weight": 30026,
+        "transactions": 5,
+        "fees": 55,
+        "generate_validate_propagate_ms": 1614.9017490006372
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 309.65868652100016,
+        "height": 120,
+        "bytes": 10977,
+        "weight": 12186,
+        "transactions": 1,
+        "fees": 21,
+        "generate_validate_propagate_ms": 1338.7096599999495
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 314.96965554100007,
+        "height": 121,
+        "bytes": 5668,
+        "weight": 6754,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 1744.018385000345
+      }
+    ],
+    "observed_block_capacity_bytes": 4194304,
+    "peak_node_rss_kib": 333152,
+    "observed_process_cpu_seconds": 117.48,
+    "peak_logical_disk_bytes": 43210035,
+    "sampled_disk_growth": 9188367,
+    "events": [
+      {
+        "kind": "isolation",
+        "elapsed_s": 0.1396117280000908,
+        "chain": "regtest",
+        "nodes": 2,
+        "transport": "loopback-native-v2",
+        "standard_policy": true,
+        "synchronous_sqlite": true
+      },
+      {
+        "kind": "accounting",
+        "elapsed_s": 264.45577505500023,
+        "credited_units": 20000,
+        "withdrawn_units": 5000,
+        "offchain_liabilities": 15000,
+        "offchain_transfers": 0
+      },
+      {
+        "kind": "partition",
+        "elapsed_s": 264.5152976999998,
+        "edge": [
+          0,
+          1
+        ]
+      },
+      {
+        "kind": "reconnect",
+        "elapsed_s": 266.3308140449999,
+        "catchup_ms": 1114.8908490004033
+      },
+      {
+        "kind": "restart",
+        "elapsed_s": 268.0245952380001,
+        "tip": "95e999dc316973e5938b9490b8377dd74659a7ffbcd79c3e3a78dbb72a8d4265"
+      },
+      {
+        "kind": "accounting",
+        "elapsed_s": 282.87669852700037,
+        "credited_units": 22000,
+        "withdrawn_units": 5500,
+        "offchain_liabilities": 16500,
+        "offchain_transfers": 0
+      },
+      {
+        "kind": "partition",
+        "elapsed_s": 282.93018417300027,
+        "edge": [
+          0,
+          1
+        ]
+      },
+      {
+        "kind": "reconnect",
+        "elapsed_s": 284.82723474999966,
+        "catchup_ms": 1119.9978680006097
+      },
+      {
+        "kind": "restart",
+        "elapsed_s": 286.50937696300025,
+        "tip": "b38d910b13afd7d05e9a95f3ffc11df0001fc693c0c91aadaa88ae2ee0bf305a"
+      },
+      {
+        "kind": "accounting",
+        "elapsed_s": 299.9088269240001,
+        "credited_units": 24000,
+        "withdrawn_units": 6000,
+        "offchain_liabilities": 18000,
+        "offchain_transfers": 0
+      },
+      {
+        "kind": "partition",
+        "elapsed_s": 299.96213039899976,
+        "edge": [
+          0,
+          1
+        ]
+      },
+      {
+        "kind": "reconnect",
+        "elapsed_s": 302.09143821700036,
+        "catchup_ms": 1113.5951090000162
+      },
+      {
+        "kind": "restart",
+        "elapsed_s": 303.6165297759999,
+        "tip": "b84e92d1a6b86095baf13172882e72f31f6938d5e18386e5d96b5c1f058d6b6f"
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 303.6410791389999,
+        "mutation": "signature",
+        "reason": "mempool-script-verify-flag-failed (Invalid Mercatura PQ signature)",
+        "nodes": 2,
+        "validation_ms": 3.286366999418533
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 303.6455426580005,
+        "mutation": "public_key",
+        "reason": "mempool-script-verify-flag-failed (Mercatura PQ public key commitment mismatch)",
+        "nodes": 2,
+        "validation_ms": 4.430339999998978
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 303.6497857049999,
+        "mutation": "output_value",
+        "reason": "mempool-script-verify-flag-failed (Invalid Mercatura PQ signature)",
+        "nodes": 2,
+        "validation_ms": 4.211378000036348
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 303.6578915959999,
+        "mutation": "sequence",
+        "reason": "mempool-script-verify-flag-failed (Invalid Mercatura PQ signature)",
+        "nodes": 2,
+        "validation_ms": 8.074254000348446
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 303.66124039700026,
+        "mutation": "oversized_signature",
+        "reason": "bad-witness-nonstandard",
+        "nodes": 2,
+        "validation_ms": 3.308409999590367
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 303.6701332929997,
+        "mutation": "duplicate_input",
+        "reason": "bad-txns-inputs-duplicate",
+        "nodes": 2,
+        "validation_ms": 8.716840000488446
+      },
+      {
+        "kind": "native_multisigner_psbt",
+        "elapsed_s": 309.673403967,
+        "complete": true,
+        "inputs": 2,
+        "independent_wallets": 2
+      },
+      {
+        "kind": "credited_deposit_reorg",
+        "elapsed_s": 317.6611812020001,
+        "depth": 2,
+        "credit_removed_and_restored": true,
+        "utxo_hash_restored": true,
+        "tip": "5c076512c8650fb6011d79197ba65b8aebdd1c7c37cda3b1dabeadd7da6e3fa6"
+      },
+      {
+        "kind": "reward_consolidation",
+        "elapsed_s": 317.6615564270005,
+        "executed": false,
+        "mature": 18,
+        "reason": "fewer than 50 mature coinbases in this manifest"
+      },
+      {
+        "kind": "encrypted_backup_restore",
+        "elapsed_s": 318.3355009500001,
+        "locked_rejection": -13,
+        "balance_units": 21330,
+        "plaintext_private_material_exported": false
+      },
+      {
+        "kind": "soak",
+        "elapsed_s": 318.3355144899997,
+        "requested_seconds": 30,
+        "actual_seconds": 35.59130286300024,
+        "cycles": 2,
+        "cycle_bound": true
+      }
+    ],
+    "source_hashes": {
+      "summarize.py": "39c0a94bbfb50c94d67103291d6841a1ab609828d36eb07934368e3ef476cf04",
+      "native.py": "0208b1bbacd1bade2e4cc5a00584a9b793e35662788d390e4f72af7a9a2b0400",
+      "core.py": "db62bd7cd2f5401e3c5e59f79c722f70739ab1b816b1df97e18f7b4af4dd8839",
+      "lifecycle.py": "cb47875ee3173bddd604a9663fccd9945d367b1bb9e451c51dfa36fdf7c1d6a4",
+      "test_core.py": "3c318f22f107926ee6fef4c2594b30fe4f3b293665b072c3e74de763e4109d3a",
+      "__init__.py": "e3193188f24be2cee29ab008e26c5e985bcd40e6bbf9331ae722bff7da0315e0",
+      "run.py": "322afb13737099e715a513f7c6a375b30116b2f5876b7844890e3708b03fbad4"
+    },
+    "transaction_table_sha256": "6a5a43b7fdd23fe2961d321a89f69b876ac0d72f595a849fca21e2781df2374b",
+    "campaign": "native-lifecycle-fixed",
+    "duration_seconds": 319.84034064299976
+  },
+  {
+    "stage": "20-11-attempt-1",
+    "manifest": {
+      "seed": 11,
+      "transactions": 20,
+      "nodes": 2,
+      "epoch_size": 1000,
+      "batch_size": 10,
+      "custody": "centralized",
+      "mining_interval": 0,
+      "soak_seconds": 0,
+      "max_soak_cycles": 10,
+      "disruptions": true,
+      "extended": false,
+      "lifecycle": true,
+      "capacity_steps": false,
+      "bootstrap_blocks": 160
+    },
+    "actual_transactions": 27,
+    "confirmed": 27,
+    "witness_signatures": 97,
+    "serialized_bytes": 518737,
+    "weight": 541798,
+    "fees_units": 997,
+    "phases": {
+      "funding": {
+        "transactions": 1,
+        "bytes": 6224,
+        "fees": 11,
+        "inputs": 1,
+        "outputs": 21
+      },
+      "hot_wallet_funding": {
+        "transactions": 1,
+        "bytes": 5407,
+        "fees": 11,
+        "inputs": 1,
+        "outputs": 2
+      },
+      "deposit": {
+        "transactions": 21,
+        "bytes": 113547,
+        "fees": 231,
+        "inputs": 21,
+        "outputs": 42
+      },
+      "custody_sweep": {
+        "transactions": 1,
+        "bytes": 106235,
+        "fees": 201,
+        "inputs": 20,
+        "outputs": 1
+      },
+      "withdrawal": {
+        "transactions": 1,
+        "bytes": 11103,
+        "fees": 21,
+        "inputs": 2,
+        "outputs": 11
+      },
+      "multisigner_psbt": {
+        "transactions": 1,
+        "bytes": 10716,
+        "fees": 21,
+        "inputs": 2,
+        "outputs": 2
+      },
+      "native_reward_consolidation": {
+        "transactions": 1,
+        "bytes": 265505,
+        "fees": 501,
+        "inputs": 50,
+        "outputs": 1
+      }
+    },
+    "input_distribution": {
+      "1": 23,
+      "20": 1,
+      "2": 2,
+      "50": 1
+    },
+    "output_distribution": {
+      "21": 1,
+      "2": 23,
+      "1": 2,
+      "11": 1
+    },
+    "timings_ms": {
+      "construction_ms": {
+        "median": 0.015292999705707189,
+        "minimum": 0,
+        "maximum": 0.12329499986662995
+      },
+      "signing_ms": {
+        "median": 1.3010380007472122,
+        "minimum": 0,
+        "maximum": 40.28367699993396
+      },
+      "admission_ms": {
+        "median": 10.234143999696244,
+        "minimum": 6.447976000345079,
+        "maximum": 40.84820200023387
+      },
+      "propagation_ms": {
+        "median": 3593.0432529994505,
+        "minimum": 2994.40979999963,
+        "maximum": 12118.23225399985
+      },
+      "confirmation_ms": {
+        "median": 5388.197557999774,
+        "minimum": 1988.183081999523,
+        "maximum": 13922.761944999365
+      }
+    },
+    "blocks": [
+      {
+        "kind": "block",
+        "elapsed_s": 300.1128707049993,
+        "mining_local_validation_ms": 612.5029810000342,
+        "block_convergence_ms": 1331.446632000734,
+        "height": 161,
+        "bytes": 6486,
+        "weight": 10026,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 1946.2648090002403
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 302.77044952399956,
+        "mining_local_validation_ms": 1340.1428600000145,
+        "block_convergence_ms": 1292.9624359994705,
+        "height": 162,
+        "bytes": 5669,
+        "weight": 6758,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 2635.6137920001856
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 308.3444595759993,
+        "mining_local_validation_ms": 409.01755899994896,
+        "block_convergence_ms": 1379.1147729998556,
+        "height": 163,
+        "bytes": 108402,
+        "weight": 117300,
+        "transactions": 20,
+        "fees": 220,
+        "generate_validate_propagate_ms": 1794.6512570006234
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 316.43967019699994,
+        "mining_local_validation_ms": 367.62432800060196,
+        "block_convergence_ms": 1331.2426079992292,
+        "height": 164,
+        "bytes": 106497,
+        "weight": 109794,
+        "transactions": 1,
+        "fees": 201,
+        "generate_validate_propagate_ms": 1704.4720640005835
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 330.4666487029999,
+        "mining_local_validation_ms": 418.0183050002597,
+        "block_convergence_ms": 1382.9524779994244,
+        "height": 165,
+        "bytes": 11365,
+        "weight": 13738,
+        "transactions": 1,
+        "fees": 21,
+        "generate_validate_propagate_ms": 1803.8449900004707
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 341.7008767569996,
+        "mining_local_validation_ms": 558.1074770007035,
+        "block_convergence_ms": 1005.994823999572,
+        "height": 168,
+        "bytes": 10978,
+        "weight": 12190,
+        "transactions": 1,
+        "fees": 21,
+        "generate_validate_propagate_ms": 1567.413020999993
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 347.1874984699998,
+        "mining_local_validation_ms": 590.2921850001803,
+        "block_convergence_ms": 1296.0195020004903,
+        "height": 169,
+        "bytes": 5669,
+        "weight": 6758,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 1890.3829160008172
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 354.4863478999996,
+        "mining_local_validation_ms": 442.8501509992202,
+        "block_convergence_ms": 1278.147932000138,
+        "height": 171,
+        "bytes": 265767,
+        "weight": 272754,
+        "transactions": 1,
+        "fees": 501,
+        "generate_validate_propagate_ms": 1731.6250309995667
+      }
+    ],
+    "observed_block_capacity_bytes": 4194304,
+    "peak_node_rss_kib": 327168,
+    "observed_process_cpu_seconds": 157.17000000000002,
+    "peak_logical_disk_bytes": 41675646,
+    "sampled_disk_growth": 7648259,
+    "events": [
+      {
+        "kind": "isolation",
+        "elapsed_s": 0.10783717399954185,
+        "chain": "regtest",
+        "nodes": 2,
+        "transport": "loopback-native-v2",
+        "standard_policy": true,
+        "synchronous_sqlite": true
+      },
+      {
+        "kind": "active_rules",
+        "elapsed_s": 298.11979663500006,
+        "height": 161,
+        "capacity_bytes": 4194304,
+        "compatibility_weightlimit": 16777216,
+        "sigoplimit": 80000
+      },
+      {
+        "kind": "accounting",
+        "elapsed_s": 330.48062415299955,
+        "credited_units": 4000,
+        "withdrawn_units": 1000,
+        "offchain_liabilities": 3000,
+        "offchain_transfers": 0
+      },
+      {
+        "kind": "partition",
+        "elapsed_s": 330.5400343379997,
+        "edge": [
+          0,
+          1
+        ]
+      },
+      {
+        "kind": "reconnect",
+        "elapsed_s": 332.5713953079994,
+        "catchup_ms": 1115.0814149996222
+      },
+      {
+        "kind": "restart",
+        "elapsed_s": 333.9954594619994,
+        "tip": "5f5cc230494248f5b2b46333d8a26dff8caac1a0f813a86e90bfaa093e001f04"
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 334.02473989899954,
+        "mutation": "signature",
+        "reason": "mempool-script-verify-flag-failed (Invalid Mercatura PQ signature)",
+        "nodes": 2,
+        "validation_ms": 4.246092999892426
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 334.0272356159994,
+        "mutation": "public_key",
+        "reason": "mempool-script-verify-flag-failed (Mercatura PQ public key commitment mismatch)",
+        "nodes": 2,
+        "validation_ms": 2.460493999933533
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 334.03116270699957,
+        "mutation": "output_value",
+        "reason": "mempool-script-verify-flag-failed (Invalid Mercatura PQ signature)",
+        "nodes": 2,
+        "validation_ms": 3.734261999852606
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 334.03427393199945,
+        "mutation": "sequence",
+        "reason": "mempool-script-verify-flag-failed (Invalid Mercatura PQ signature)",
+        "nodes": 2,
+        "validation_ms": 3.0823299994153786
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 334.03723550999985,
+        "mutation": "oversized_signature",
+        "reason": "bad-witness-nonstandard",
+        "nodes": 2,
+        "validation_ms": 2.9339170005187043
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 334.04068779799945,
+        "mutation": "duplicate_input",
+        "reason": "bad-txns-inputs-duplicate",
+        "nodes": 2,
+        "validation_ms": 3.2869280003069434
+      },
+      {
+        "kind": "native_multisigner_psbt",
+        "elapsed_s": 341.7149669199998,
+        "complete": true,
+        "inputs": 2,
+        "independent_wallets": 2
+      },
+      {
+        "kind": "credited_deposit_reorg",
+        "elapsed_s": 349.69786453399956,
+        "depth": 2,
+        "credit_removed_and_restored": true,
+        "utxo_hash_restored": true,
+        "tip": "be47f18e22688d6532df68b3950c755a5c3caac96dbd9e26742708c62e37095b"
+      },
+      {
+        "kind": "reward_consolidation",
+        "elapsed_s": 354.5001356919993,
+        "executed": true,
+        "mature_inputs": 50,
+        "witness_signatures": 50,
+        "automatic": false
+      },
+      {
+        "kind": "encrypted_backup_restore",
+        "elapsed_s": 356.7879543809995,
+        "locked_rejection": -13,
+        "wallet_node_restart": true,
+        "balance_units": 3768,
+        "plaintext_private_material_exported": false
+      },
+      {
+        "kind": "soak",
+        "elapsed_s": 356.78797161700004,
+        "requested_seconds": 0,
+        "actual_seconds": 5.199999577598646e-07,
+        "cycles": 0,
+        "cycle_bound": false
+      }
+    ],
+    "source_hashes": {
+      "summarize.py": "737914f821064683699ebaec80b252d66bdf821fda31ec73d945661f4a4d29c8",
+      "native.py": "e36d08b23606f9e45797887e935a879ada8fa937c4dfb03280d04cb45aacc772",
+      "core.py": "db62bd7cd2f5401e3c5e59f79c722f70739ab1b816b1df97e18f7b4af4dd8839",
+      "lifecycle.py": "72f2460c48e26ee22b5e67486a5ec10c11524c0180cd4aaf4fd5de9e7477d3d1",
+      "test_core.py": "3c318f22f107926ee6fef4c2594b30fe4f3b293665b072c3e74de763e4109d3a",
+      "__init__.py": "e3193188f24be2cee29ab008e26c5e985bcd40e6bbf9331ae722bff7da0315e0",
+      "run.py": "d51cc2750298825476951a15b30b349b5267f5edab4a051713bda8fa69b3f6f4"
+    },
+    "transaction_table_sha256": "ed516446e8429823533594fdacb4a1f9d904db8b5a4173f2c358a81851b20c97",
+    "campaign": "native-final-lifecycle",
+    "duration_seconds": 357.87934576300086
+  },
+  {
+    "stage": "500-7-attempt-2",
+    "manifest": {
+      "seed": 7,
+      "transactions": 500,
+      "nodes": 4,
+      "epoch_size": 1000,
+      "batch_size": 20,
+      "custody": "centralized",
+      "mining_interval": 0,
+      "soak_seconds": 0,
+      "max_soak_cycles": 2,
+      "disruptions": true,
+      "extended": false,
+      "lifecycle": true,
+      "capacity_steps": false,
+      "bootstrap_blocks": 101
+    },
+    "actual_transactions": 525,
+    "confirmed": 525,
+    "witness_signatures": 1018,
+    "serialized_bytes": 5487318,
+    "weight": 5857650,
+    "fees_units": 10726,
+    "phases": {
+      "funding": {
+        "transactions": 1,
+        "bytes": 26866,
+        "fees": 32,
+        "inputs": 1,
+        "outputs": 501
+      },
+      "hot_wallet_funding": {
+        "transactions": 1,
+        "bytes": 5407,
+        "fees": 11,
+        "inputs": 1,
+        "outputs": 2
+      },
+      "deposit": {
+        "transactions": 501,
+        "bytes": 2708907,
+        "fees": 5511,
+        "inputs": 501,
+        "outputs": 1002
+      },
+      "custody_sweep": {
+        "transactions": 8,
+        "bytes": 2654940,
+        "fees": 5008,
+        "inputs": 500,
+        "outputs": 8
+      },
+      "withdrawal": {
+        "transactions": 13,
+        "bytes": 80482,
+        "fees": 143,
+        "inputs": 13,
+        "outputs": 263
+      },
+      "multisigner_psbt": {
+        "transactions": 1,
+        "bytes": 10716,
+        "fees": 21,
+        "inputs": 2,
+        "outputs": 2
+      }
+    },
+    "input_distribution": {
+      "1": 516,
+      "64": 7,
+      "52": 1,
+      "2": 1
+    },
+    "output_distribution": {
+      "501": 1,
+      "2": 503,
+      "1": 8,
+      "21": 12,
+      "11": 1
+    },
+    "timings_ms": {
+      "construction_ms": {
+        "median": 0.014831999578746036,
+        "minimum": 0,
+        "maximum": 0.3545729996403679
+      },
+      "signing_ms": {
+        "median": 1.2767299995175563,
+        "minimum": 0,
+        "maximum": 63.68135100001382
+      },
+      "admission_ms": {
+        "median": 8.111398000437475,
+        "minimum": 4.9436409999543685,
+        "maximum": 44.839690000117116
+      },
+      "propagation_ms": {
+        "median": 25175.11248899973,
+        "minimum": 3073.8121029999093,
+        "maximum": 60729.680140999335
+      },
+      "confirmation_ms": {
+        "median": 60470.60629399948,
+        "minimum": 2050.1355269998385,
+        "maximum": 64558.874031000414
+      }
+    },
+    "blocks": [
+      {
+        "kind": "block",
+        "elapsed_s": 233.26463867999973,
+        "mining_local_validation_ms": 554.9440049999248,
+        "block_convergence_ms": 1475.865917000192,
+        "height": 102,
+        "bytes": 27127,
+        "weight": 92590,
+        "transactions": 1,
+        "fees": 32,
+        "generate_validate_propagate_ms": 2039.7899320005308
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 235.38789762499982,
+        "mining_local_validation_ms": 598.8067279995448,
+        "block_convergence_ms": 1501.512919000561,
+        "height": 103,
+        "bytes": 5668,
+        "weight": 6754,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 2103.0504169993947
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 299.9651595109999,
+        "mining_local_validation_ms": 747.7260480000041,
+        "block_convergence_ms": 2094.3642380007077,
+        "height": 104,
+        "bytes": 2703763,
+        "weight": 2909944,
+        "transactions": 500,
+        "fees": 5500,
+        "generate_validate_propagate_ms": 2979.6158940007444
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 306.9185004809997,
+        "mining_local_validation_ms": 853.4937739996167,
+        "block_convergence_ms": 1821.1324249996323,
+        "height": 105,
+        "bytes": 2655201,
+        "weight": 2718648,
+        "transactions": 8,
+        "fees": 5008,
+        "generate_validate_propagate_ms": 2794.5133869998244
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 327.71890912599974,
+        "mining_local_validation_ms": 713.030697999784,
+        "block_convergence_ms": 1870.9523750003427,
+        "height": 106,
+        "bytes": 56277,
+        "weight": 82710,
+        "transactions": 9,
+        "fees": 99,
+        "generate_validate_propagate_ms": 2591.2603549995765
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 345.8320361599999,
+        "mining_local_validation_ms": 1180.529920000481,
+        "block_convergence_ms": 1818.1391609996354,
+        "height": 107,
+        "bytes": 24727,
+        "weight": 35560,
+        "transactions": 4,
+        "fees": 44,
+        "generate_validate_propagate_ms": 3003.288001999863
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 377.17561692399977,
+        "mining_local_validation_ms": 358.445455999572,
+        "block_convergence_ms": 1620.6487090003066,
+        "height": 110,
+        "bytes": 10977,
+        "weight": 12186,
+        "transactions": 1,
+        "fees": 21,
+        "generate_validate_propagate_ms": 1982.393456999489
+      },
+      {
+        "kind": "block",
+        "elapsed_s": 389.674829476,
+        "mining_local_validation_ms": 361.30996700012474,
+        "block_convergence_ms": 1481.1275310003111,
+        "height": 111,
+        "bytes": 5668,
+        "weight": 6754,
+        "transactions": 1,
+        "fees": 11,
+        "generate_validate_propagate_ms": 1845.4938779996155
+      }
+    ],
+    "observed_block_capacity_bytes": 4194304,
+    "peak_node_rss_kib": 399180,
+    "observed_process_cpu_seconds": 187.71,
+    "peak_logical_disk_bytes": 101326786,
+    "sampled_disk_growth": 33513772,
+    "events": [
+      {
+        "kind": "isolation",
+        "elapsed_s": 0.12901743099973828,
+        "chain": "regtest",
+        "nodes": 4,
+        "transport": "loopback-native-v2",
+        "standard_policy": true,
+        "synchronous_sqlite": true
+      },
+      {
+        "kind": "active_rules",
+        "elapsed_s": 231.201772935,
+        "height": 102,
+        "capacity_bytes": 4194304,
+        "compatibility_weightlimit": 16777216,
+        "sigoplimit": 80000
+      },
+      {
+        "kind": "withdrawal_inventory_epoch",
+        "elapsed_s": 327.74611690299935,
+        "reason": "confirm change before reuse"
+      },
+      {
+        "kind": "accounting",
+        "elapsed_s": 345.8538449509997,
+        "credited_units": 100000,
+        "withdrawn_units": 25000,
+        "offchain_liabilities": 75000,
+        "offchain_transfers": 0
+      },
+      {
+        "kind": "partition",
+        "elapsed_s": 345.92095026100014,
+        "edge": [
+          0,
+          1
+        ]
+      },
+      {
+        "kind": "reconnect",
+        "elapsed_s": 349.16061401800016,
+        "catchup_ms": 2488.7190010003906
+      },
+      {
+        "kind": "restart",
+        "elapsed_s": 350.6994926059997,
+        "tip": "8e02eaf02012da960dede8d1c6b7e1c4760b13208c6747a392a010c41bf6d4c6"
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 350.744770712,
+        "mutation": "signature",
+        "reason": "mempool-script-verify-flag-failed (Invalid Mercatura PQ signature)",
+        "nodes": 4,
+        "validation_ms": 9.665854999184376
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 350.7508926350001,
+        "mutation": "public_key",
+        "reason": "mempool-script-verify-flag-failed (Mercatura PQ public key commitment mismatch)",
+        "nodes": 4,
+        "validation_ms": 6.080190000830044
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 350.75777999899947,
+        "mutation": "output_value",
+        "reason": "mempool-script-verify-flag-failed (Invalid Mercatura PQ signature)",
+        "nodes": 4,
+        "validation_ms": 6.852872000308707
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 350.76584044299943,
+        "mutation": "sequence",
+        "reason": "mempool-script-verify-flag-failed (Invalid Mercatura PQ signature)",
+        "nodes": 4,
+        "validation_ms": 8.02785500036407
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 350.77132061999964,
+        "mutation": "oversized_signature",
+        "reason": "bad-witness-nonstandard",
+        "nodes": 4,
+        "validation_ms": 5.44762899971829
+      },
+      {
+        "kind": "native_rejection",
+        "elapsed_s": 350.7789714390001,
+        "mutation": "duplicate_input",
+        "reason": "bad-txns-inputs-duplicate",
+        "nodes": 4,
+        "validation_ms": 7.530717000008735
+      },
+      {
+        "kind": "native_multisigner_psbt",
+        "elapsed_s": 377.1997470369997,
+        "complete": true,
+        "inputs": 2,
+        "independent_wallets": 2
+      },
+      {
+        "kind": "credited_deposit_reorg",
+        "elapsed_s": 392.86210386899984,
+        "depth": 2,
+        "credit_removed_and_restored": true,
+        "utxo_hash_restored": true,
+        "tip": "753ccb23e70d41af57a5b59cb45e1fd9eb4be6797cfae0f492e8802d5a5d2f94"
+      },
+      {
+        "kind": "reward_consolidation",
+        "elapsed_s": 392.8630264779995,
+        "executed": false,
+        "mature": 10,
+        "reason": "fewer than 50 mature coinbases in this manifest"
+      },
+      {
+        "kind": "encrypted_backup_restore",
+        "elapsed_s": 395.16064691799966,
+        "locked_rejection": -13,
+        "wallet_node_restart": true,
+        "balance_units": 80439,
+        "plaintext_private_material_exported": false
+      },
+      {
+        "kind": "soak",
+        "elapsed_s": 395.1606672879998,
+        "requested_seconds": 0,
+        "actual_seconds": 7.010003173490986e-07,
+        "cycles": 0,
+        "cycle_bound": false
+      }
+    ],
+    "source_hashes": {
+      "summarize.py": "737914f821064683699ebaec80b252d66bdf821fda31ec73d945661f4a4d29c8",
+      "native.py": "e36d08b23606f9e45797887e935a879ada8fa937c4dfb03280d04cb45aacc772",
+      "core.py": "db62bd7cd2f5401e3c5e59f79c722f70739ab1b816b1df97e18f7b4af4dd8839",
+      "lifecycle.py": "72f2460c48e26ee22b5e67486a5ec10c11524c0180cd4aaf4fd5de9e7477d3d1",
+      "test_core.py": "af5c7204cf8c2926ebd661665a6d4d4b8523dd0262f5bcedb8e5f9bf19c1fe2b",
+      "__init__.py": "e3193188f24be2cee29ab008e26c5e985bcd40e6bbf9331ae722bff7da0315e0",
+      "run.py": "d51cc2750298825476951a15b30b349b5267f5edab4a051713bda8fa69b3f6f4"
+    },
+    "transaction_table_sha256": "a4985b7ce51ed850ffc33fe096525ab563bce69cbaa97ab780a107194fd4f02d",
+    "campaign": "native-centralized",
+    "duration_seconds": 396.85569253799986
+  }
+]

@@ -1,0 +1,77 @@
+{
+  "release": {
+    "ctest_passed": 34,
+    "failed": 0,
+    "skipped": 0,
+    "unchanged_wallet_workloads": 24,
+    "duration_seconds": 35.67
+  },
+  "debug": {
+    "ctest_passed": 34,
+    "failed": 0,
+    "skipped": 0,
+    "unchanged_wallet_workloads": 24,
+    "duration_seconds": 194.97
+  },
+  "sanitize": {
+    "ctest_passed": 34,
+    "failed": 0,
+    "skipped": 0,
+    "unchanged_wallet_workloads": 24,
+    "duration_seconds": 178.77
+  },
+  "research_replay": {
+    "seed7_exact_repeat": true,
+    "seed11_distinct_wires": true,
+    "shapes": 11
+  },
+  "host": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "compiler": "g++ (Debian 14.2.0-19) 14.2.0",
+    "cpus": 3,
+    "quota_cpus": 3,
+    "memory_kib": {
+      "MemTotal": 10207480,
+      "MemAvailable": 8318376
+    },
+    "one_mib_write_fsync_ms": [
+      3.696043000672944,
+      1.1889390007127076,
+      1.258715000403754
+    ],
+    "write_fsync_median_ms": 1.258715000403754,
+    "note": "application-level overlay write+fsync latency, not a physical disk bandwidth claim"
+  },
+  "native_functional": [
+    {
+      "test": "mercatura_block_capacity.py",
+      "status": "Passed",
+      "duration(seconds)": "173"
+    },
+    {
+      "test": "mercatura_pq_psbt.py",
+      "status": "Passed",
+      "duration(seconds)": "69"
+    },
+    {
+      "test": "mercatura_pq_rbf.py",
+      "status": "Passed",
+      "duration(seconds)": "62"
+    },
+    {
+      "test": "ALL",
+      "status": "Passed",
+      "duration(seconds)": "235"
+    }
+  ],
+  "retained_log_sha256": {
+    "work/wo07b/baseline-release.log": "7802fdbfd7763c01b7980d5144edf00c686776e19c02257ce312f34f70d0e0a6",
+    "work/wo07b/baseline-debug.log": "993de3fc2ce33b8471a60f86dcfb6320cf78c29a8531ce771a42f2a475cca6e5",
+    "work/wo07b/baseline-sanitize.log": "5720cda68118d122ed57f07f9c7b5a29db072728d27cc694bd51cac1ca960b48",
+    "work/wo07b/regression-release.log": "6e7c5f9c66ff40ac206f36d9e39f3d9c1b825468b171d3173f5e9c4ac3f192df",
+    "work/wo07b/regression-debug.log": "916d3b7dc4c4dd311a0da46417d396e7d4a618fade00af94857b125fbca077a6",
+    "work/wo07b/regression-sanitize.log": "fe8e74b3b1675efa69252837c47aec87f2884fff0c790bbb5c562f4756f03d08",
+    "work/wo07b/native-regressions.log": "b15a3888fb93a33d8c85d8536516957fcb33a201044df46cf52bb45a930591b7",
+    "work/wo07b/native-regressions.csv": "706461eeeb6692cdee781adf905cfe437d188b50d86be2ef63eb92cdbcd2df2b"
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "starting_research_head": "e014a10efa17fa0a8ac053650cbede9960da055f",
+  "research_fixture_source_commit": "cf3063c",
+  "final_native_framework_commit": "0e43b0f",
+  "native_build": "work/wo07-native-release (unchanged ordinary Release binaries reused from WO07)",
+  "native_source_changes_during_wo07b": false,
+  "builds": {
+    "native": {
+      "cache": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "/usr/bin/c++",
+        "CMAKE_CXX_FLAGS": "",
+        "CMAKE_CXX_FLAGS_DEBUG": "-O0 -ftrapv -g3",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g"
+      },
+      "binary_sha256": "200840882c2bd84478613a0cab4013c09b99e691510f1afe61a2c1d63c4e10b2"
+    },
+    "release": {
+      "cache": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_COMPILER": "/usr/bin/c++",
+        "CMAKE_CXX_FLAGS": "",
+        "CMAKE_CXX_FLAGS_DEBUG": "-g",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g -DNDEBUG",
+        "MERCAWEAVE_FULL_INTEGRATION": "ON",
+        "MERCAWEAVE_QT_TESTS": "ON",
+        "MERCAWEAVE_SANITIZERS": "OFF"
+      },
+      "binary_sha256": "5dc8c5b219617953003ab9a466827b66b10f71c9d978255d3af10c839d1eec86",
+      "target_flags": {
+        "CXX_DEFINES": "-DMERCATURA_MERCAWEAVE_RESEARCH_TEST_ONLY=1",
+        "CXX_FLAGS": "-O3 -DNDEBUG -std=gnu++20 -UNDEBUG"
+      }
+    },
+    "debug": {
+      "cache": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_COMPILER": "/usr/bin/c++",
+        "CMAKE_CXX_FLAGS": "",
+        "CMAKE_CXX_FLAGS_DEBUG": "-g",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g -DNDEBUG",
+        "MERCAWEAVE_FULL_INTEGRATION": "ON",
+        "MERCAWEAVE_QT_TESTS": "ON",
+        "MERCAWEAVE_SANITIZERS": "OFF"
+      },
+      "binary_sha256": "c4edcfdc2cd736897b4a6e72e2b97c94fb00f5f86b79520d5794ee9e11e27a19",
+      "target_flags": {
+        "CXX_DEFINES": "-DMERCATURA_MERCAWEAVE_RESEARCH_TEST_ONLY=1 -D_GLIBCXX_ASSERTIONS=1",
+        "CXX_FLAGS": "-g -std=gnu++20 -UNDEBUG"
+      }
+    },
+    "sanitize": {
+      "cache": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_COMPILER": "/usr/bin/c++",
+        "CMAKE_CXX_FLAGS": "",
+        "CMAKE_CXX_FLAGS_DEBUG": "-g",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g -DNDEBUG",
+        "MERCAWEAVE_FULL_INTEGRATION": "ON",
+        "MERCAWEAVE_QT_TESTS": "ON",
+        "MERCAWEAVE_SANITIZERS": "ON"
+      },
+      "binary_sha256": "8b1232708fd40f3f1dbc8dcba7fe0abdaa8f46d3fa213130b69d79370b6b71cb",
+      "target_flags": {
+        "CXX_DEFINES": "-DMERCATURA_MERCAWEAVE_RESEARCH_TEST_ONLY=1",
+        "CXX_FLAGS": "-O2 -g -DNDEBUG -std=gnu++20 -UNDEBUG -fsanitize=address,undefined -fno-omit-frame-pointer"
+      }
+    }
+  }
+}

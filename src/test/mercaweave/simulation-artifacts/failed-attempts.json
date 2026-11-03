@@ -1,0 +1,92 @@
+[
+  {
+    "campaign": "native-final-lifecycle",
+    "stage": "20-11",
+    "transactions": 20,
+    "seed": 11,
+    "returncode": 1,
+    "duration_seconds": 386.18579832700016,
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/simulation/native.py",
+      "--configfile=/workspace/Mercatura-MercaWeave-v0.1/work/wo07-native-release/test/config.ini",
+      "--manifest=/workspace/Mercatura-MercaWeave-v0.1/work/wo07b/native-final-lifecycle/20-11/manifest.json",
+      "--output=/workspace/Mercatura-MercaWeave-v0.1/work/wo07b/native-final-lifecycle/20-11",
+      "--tmpdir=/workspace/Mercatura-MercaWeave-v0.1/work/wo07b/native-final-lifecycle/20-11/nodes",
+      "--randomseed=11"
+    ],
+    "failure_excerpt": [
+      "    assert try_rpc(code, message, fun, *args, **kwds), \"No exception raised\"",
+      "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+      "AssertionError: No exception raised"
+    ],
+    "run_log_sha256": "337785d4d29234a0b8e1df24a79df3d5e2d69586681dc2556ab5f0568ffaeaa7"
+  },
+  {
+    "campaign": "native-centralized",
+    "transactions": 500,
+    "seed": 7,
+    "returncode": 1,
+    "duration_seconds": 482.41759147500034,
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/simulation/native.py",
+      "--configfile=/workspace/Mercatura-MercaWeave-v0.1/work/wo07-native-release/test/config.ini",
+      "--manifest=/workspace/Mercatura-MercaWeave-v0.1/work/wo07b/native-centralized/500-7/manifest.json",
+      "--output=/workspace/Mercatura-MercaWeave-v0.1/work/wo07b/native-centralized/500-7",
+      "--tmpdir=/workspace/Mercatura-MercaWeave-v0.1/work/wo07b/native-centralized/500-7/nodes",
+      "--randomseed=7"
+    ],
+    "failure_excerpt": [
+      "    if change<0:raise ValueError('insufficient independently confirmed funds')",
+      "                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+      "ValueError: insufficient independently confirmed funds"
+    ],
+    "run_log_sha256": "7b286cb5e7d206798dbff08fc9b406edcfa284bf118e9bd77df74d541ae7db52"
+  },
+  {
+    "campaign": "native-centralized",
+    "stage": "500-7-attempt-1",
+    "transactions": 500,
+    "seed": 7,
+    "returncode": 1,
+    "duration_seconds": 597.2945278949992,
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/simulation/native.py",
+      "--configfile=/workspace/Mercatura-MercaWeave-v0.1/work/wo07-native-release/test/config.ini",
+      "--manifest=/workspace/Mercatura-MercaWeave-v0.1/work/wo07b/native-centralized/500-7-attempt-1/manifest.json",
+      "--output=/workspace/Mercatura-MercaWeave-v0.1/work/wo07b/native-centralized/500-7-attempt-1",
+      "--tmpdir=/workspace/Mercatura-MercaWeave-v0.1/work/wo07b/native-centralized/500-7-attempt-1/nodes",
+      "--randomseed=7"
+    ],
+    "failure_excerpt": [
+      "    assert try_rpc(code, message, fun, *args, **kwds), \"No exception raised\"",
+      "           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^",
+      "AssertionError: No exception raised"
+    ],
+    "run_log_sha256": "9ef13c05adc4c0b9bf9db2c0d59b7380422e7fe3f9027b93a6231ecbc57d284f"
+  },
+  {
+    "campaign": "native-reused",
+    "transactions": 1000,
+    "seed": 7,
+    "returncode": 1,
+    "duration_seconds": 356.64097124900036,
+    "command": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/simulation/native.py",
+      "--configfile=/workspace/Mercatura-MercaWeave-v0.1/work/wo07-native-release/test/config.ini",
+      "--manifest=/workspace/Mercatura-MercaWeave-v0.1/work/wo07b/native-reused/1000-7/manifest.json",
+      "--output=/workspace/Mercatura-MercaWeave-v0.1/work/wo07b/native-reused/1000-7",
+      "--tmpdir=/workspace/Mercatura-MercaWeave-v0.1/work/wo07b/native-reused/1000-7/nodes",
+      "--randomseed=7"
+    ],
+    "failure_excerpt": [
+      "  File \"/workspace/Mercatura-MercaWeave-v0.1/test/functional/test_framework/authproxy.py\", line 152, in __call__",
+      "    raise JSONRPCException(response['error'], status)",
+      "test_framework.authproxy.JSONRPCException: {'code': -25, 'message': 'Inputs missing or spent'} [http_status=200]"
+    ],
+    "run_log_sha256": "4525b1c8ea71cd21f8176abd80cc3e9c76402be583ab3c7458de75190132997c"
+  }
+]

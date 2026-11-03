@@ -1,0 +1,18 @@
+{
+  "completed_resume_skipped": true,
+  "changed_resume_manifest_rejected": true,
+  "previous_records_sha256_unchanged": "967a27cfc64902de180b15d65f95d58a906e91f331c05f6f7a3d7b3c55471740",
+  "controlled_interruption": {
+    "signal": "SIGTERM to runner, forwarded SIGINT to owned process group",
+    "returncode": 124,
+    "observed_daemon_count": 2,
+    "owned_observed_daemons_stopped": true,
+    "elapsed_seconds": 0.8204455310005869,
+    "interrupted_stage_preserved": true
+  },
+  "initial_observation_probe": {
+    "result": "monitor failed to identify renamed daemon comm; interrupted via finally and retained returncode 124",
+    "stage_record_sha256": "1d56e6df3784d861a623ad594486a4d1ee0a8e11af6cd63f51624f0f34101dfc"
+  },
+  "note": "Controlled interruptions are infrastructure probes; no interrupted transactions count toward completed workloads."
+}
