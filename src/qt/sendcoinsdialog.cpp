@@ -5,6 +5,7 @@
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
 #include <qt/sendcoinsdialog.h>
+#include <qt/mercaweavepanel.h>
 #include <qt/forms/ui_sendcoinsdialog.h>
 
 #include <qt/addresstablemodel.h>
@@ -67,6 +68,7 @@ SendCoinsDialog::SendCoinsDialog(const PlatformStyle *_platformStyle, QWidget *p
     platformStyle(_platformStyle)
 {
     ui->setupUi(this);
+    ui->verticalLayout->addWidget(new MercaWeaveQt::Panel(MercaWeaveQt::Panel::View::Send,this));
 
     if (!_platformStyle->getImagesOnButtons()) {
         ui->addButton->setIcon(QIcon());
@@ -146,6 +148,7 @@ void SendCoinsDialog::setClientModel(ClientModel *_clientModel)
 void SendCoinsDialog::setModel(WalletModel *_model)
 {
     this->model = _model;
+    findChild<MercaWeaveQt::Panel*>()->setModel(_model?_model->getMercaWeaveModel():nullptr);
 
     if(_model && _model->getOptionsModel())
     {

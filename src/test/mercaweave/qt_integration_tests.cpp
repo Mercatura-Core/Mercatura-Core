@@ -1,0 +1,49 @@
+// Copyright (c) 2026 The Mercatura Core developers
+// Distributed under the MIT software license, see the accompanying file COPYING.
+#include "qt_wallet_bridge.h"
+#include "wallet_fixtures.h"
+#include <QApplication>
+#include <QCheckBox>
+#include <QClipboard>
+#include <QComboBox>
+#include <QLabel>
+#include <QPushButton>
+#include <QSpinBox>
+#include <QTest>
+#include <QTimer>
+#include <qt/mercaweavepanel.h>
+#include <iostream>
+#include <util/translation.h>
+const TranslateFn G_TRANSLATION_FUN{nullptr};
+using namespace mercaweave;using namespace mercaweave::wallet_research;using namespace MercaWeaveQt;
+namespace wt=mercaweave::wallet_research::test;
+namespace {
+size_t checks=0;void Check(bool b,const char* m){++checks;if(!b)throw std::runtime_error(m);}
+void Wait(Model& model){for(int i=0;i<2000&&model.busy();++i)QTest::qWait(2);Check(!model.busy(),"backend request completed off Qt");}
+void RequestOp(Model& model,Action action){Request request;request.action=action;Check(model.request(request),"isolated action dispatched");Wait(model);}
+reward_research::Policy Policy(){reward_research::Policy p;p.isolated=p.network=p.synchronized=p.signer=true;return p;}
+void Run()
+{
+    auto wallet=std::shared_ptr<Wallet>(wt::Owner().release());auto view=integration::View::Create(wt::Genesis());auto receive=wallet->Issue(),mining=wallet->Issue(0,2),native=wallet->Issue(0,0,2),change=wallet->Issue(0,1,2);
+    std::vector<FundingCoin> rewards;for(uint32_t i=0;i<50;++i){auto point=wt::Point(2000+i);view->Insert(point,Coin{CTxOut{10000,mining.script},1,true});rewards.push_back({point});}
+    auto bridge=std::make_shared<mercaweave::qt_research::Bridge>(wallet,view,rewards,Policy());Model model;model.attachIsolated(bridge,bridge->PublicSnapshot());Panel receive_panel(Panel::View::Receive);receive_panel.setModel(&model);receive_panel.setChecked(true);receive_panel.show();
+    Check(!receive_panel.findChild<QPushButton*>("issueGroupedAddress")->isEnabled(),"explicit opt-in required even in test mode");model.setOptIn(true);auto prior=wallet->Records().size();RequestOp(model,Action::IssueReceive);Check(wallet->Records().size()==prior+1&&model.state().syntheticAddress.startsWith("SYNTHETIC"),"real WO05 issuance only exposes synthetic UI text");Check(!model.state().syntheticAddress.contains("tmca1"),"no spendable-looking grouped demonstration address");
+    wallet->Lock();prior=wallet->Records().size();RequestOp(model,Action::IssueReceive);Check(model.state().reason==Reason::Locked&&wallet->Records().size()==prior,"backend rechecks lock after stale UI capability");Check(wallet->Unlock(SecureString{"public research fixture"}),"explicit test unlock");model.attachIsolated(bridge,bridge->PublicSnapshot());model.setOptIn(true);
+    auto reserved=wallet->Issue();auto inventory=std::make_shared<mercaweave::qt_research::Bridge>(wallet,view,rewards,Policy(),std::vector<Address>{reserved});wallet->Lock();Model locked;locked.attachIsolated(inventory,inventory->PublicSnapshot());locked.setOptIn(true);prior=wallet->Records().size();RequestOp(locked,Action::IssueReceive);Check(wallet->Records().size()==prior&&locked.state().inventory==0&&locked.state().capability.locked,"locked pre-generated public reservation derives no secrets");Request again;again.action=Action::IssueReceive;Check(!locked.request(again),"exhausted locked inventory stays blocked");Check(wallet->Unlock(SecureString{"public research fixture"}),"unlock inventory owner");
+    auto watch_unique=Wallet::Watch(wt::Genesis(),wallet->Records());auto watch=std::shared_ptr<Wallet>(watch_unique.release());auto watch_backend=std::make_shared<mercaweave::qt_research::Bridge>(watch,view,rewards,Policy(),std::vector<Address>{reserved});Model watch_model;watch_model.attachIsolated(watch_backend,watch_backend->PublicSnapshot());watch_model.setOptIn(true);RequestOp(watch_model,Action::IssueReceive);Request planning;planning.action=Action::Plan;planning.sweepEnabled=true;Check(!watch_model.request(planning)&&watch_model.state().reason==Reason::WatchOnly,"watch inventory cannot become a signer");
+    while(wallet->Records().back().location.witness==3&&wallet->Records().back().location.group==0&&wallet->Records().back().location.address<63)wallet->Issue();
+    // Use actual public issued ranges, not a fabricated GUI counter.
+    for(size_t i=0;i<64;++i){auto records=wallet->Records();size_t receive_count=0;for(const auto& a:records)receive_count+=a.location.witness==3&&a.location.account==0&&a.location.purpose==0&&a.location.group==0;if(receive_count>=64)break;wallet->Issue();}
+    model.attachIsolated(bridge,bridge->PublicSnapshot());model.setOptIn(true);Check(receive_panel.findChild<QComboBox*>("groupSelection")->itemText(0).contains("64/64"),"real 64-address rotation status");RequestOp(model,Action::IssueReceive);Check(model.state().syntheticAddress.contains("group 1"),"rotation boundary goes through WO05");
+    Panel mining_panel(Panel::View::Mining);mining_panel.setModel(&model);mining_panel.setChecked(true);mining_panel.show();Check(!mining_panel.findChild<QCheckBox*>("rewardSweepEnabled")->isChecked(),"future automatic sweeping default off");Check(model.state().mature==50&&model.state().immature==0,"mature reward view uses actual synthetic coins");
+    int heartbeats=0;QTimer heartbeat;heartbeat.setInterval(1);QObject::connect(&heartbeat,&QTimer::timeout,[&]{++heartbeats;});heartbeat.start();planning.sweepEnabled=true;Check(model.request(planning),"explicit planning request");Wait(model);heartbeat.stop();Check(heartbeats>0,"wallet planning does not block Qt event loop");Check(model.state().reason==Reason::None&&model.state().preview.groups==1&&model.state().preview.inputs==50&&!model.state().preview.complete,"actual unsigned reward plan is one group and incomplete");auto proposal=model.state().proposal;Check(model.request(planning),"scheduler tick");Wait(model);Check(model.state().proposal==proposal,"repeated GUI planning does not duplicate proposal");
+    RequestOp(model,Action::Cancel);Check(model.state().proposal.isEmpty()&&model.state().reason==Reason::Cancelled,"user cancellation releases proposal");
+    auto funding_candidates=rewards;auto native_point=wt::Point(9999);view->Insert(native_point,Coin{CTxOut{1000000,native.script},1,false});funding_candidates.push_back({native_point});auto send_backend=std::make_shared<mercaweave::qt_research::Bridge>(wallet,view,funding_candidates,Policy());send_backend->SetFunding(std::vector<CTxOut>{CTxOut{900000,native.script}},change);Model send;send.attachIsolated(send_backend,send_backend->PublicSnapshot());send.setOptIn(true);Request preview;preview.action=Action::Preview;preview.mode=1;Check(send.request(preview),"strict native funding preview");Wait(send);Check(send.state().preview.nativeInputs==1&&send.state().preview.groups==0&&send.state().preview.changeType.contains("v2"),"WO05 native funding and change identity");
+    CMutableTransaction tx;std::vector<CTxOut> spent;std::vector<Address> owners;wt::Add(tx,spent,owners,view,receive,12000);wt::Add(tx,spent,owners,view,mining,12001);wt::Add(tx,spent,owners,view,mining,12002);wt::Add(tx,spent,owners,view,native,12003);tx.vout.emplace_back(39983,change.script);auto mixed=GroupPSBT::Create(tx,spent,owners);send_backend->SetPreview(mixed);auto partial_backend=std::make_shared<mercaweave::qt_research::Bridge>(wallet,view,rewards,Policy());partial_backend->SetPreview(mixed);Model partial;partial.attachIsolated(partial_backend,partial_backend->PublicSnapshot());partial.setOptIn(true);RequestOp(partial,Action::Preview);Check(partial.state().preview.groups==2&&partial.state().preview.nativeInputs==1&&partial.state().preview.followers==1&&partial.state().reason==Reason::Partial,"actual mixed PSBT renders independent groups and partial state");auto fee=partial.state().preview.fee;RequestOp(partial,Action::Preview);Check(partial.state().preview.fee==fee&&fee==17,"repeated preview never accumulates fees");
+    auto group_sig=GroupPSBT::Sign(mixed,*wallet,view,wt::ZeroFixture());Check(group_sig.complete&&group_sig.group_signatures==2&&group_sig.native_signatures==1,"real mixed authorization remains per exact key");partial_backend->SetPreview(mixed);partial.attachIsolated(partial_backend,partial_backend->PublicSnapshot());partial.setOptIn(true);RequestOp(partial,Action::Preview);Check(partial.state().preview.complete,"only verified complete signatures mark authorization complete");
+    auto underfee=mixed;underfee.tx->vout[0].nValue=39999;for(auto& in:underfee.inputs){in.m_proprietary.erase(Field(4,{}));auto native_sig=MakeMercaturaPQPSBTProprietary(PSBT_MERCATURA_PQ_SIGNATURE,{});in.m_proprietary.erase(native_sig);in.final_script_witness.SetNull();}partial_backend->SetPreview(underfee);partial.attachIsolated(partial_backend,partial_backend->PublicSnapshot());partial.setOptIn(true);RequestOp(partial,Action::Preview);Check(partial.state().reason==Reason::Fee,"external PSBT cannot bypass full-byte fee checks");
+    auto native_text=Wallet::EncodeResearchAddress(native,"tmca");QApplication::clipboard()->setText(QString::fromStdString(native_text));Check(QApplication::clipboard()->text()==QString::fromStdString(native_text),"native v2 text retains Qt clipboard roundtrip");
+    model.setOptIn(false);Check(model.state().proposal.isEmpty()&&!model.state().preview.available,"opt-out discards stale public proposal");
+}
+}
+int main(int argc,char** argv){qputenv("QT_QPA_PLATFORM","offscreen");QApplication app(argc,argv);try{Run();std::cout<<"{\"qt_wallet_checks\":"<<checks<<",\"passed\":true}\n";}catch(const std::exception& e){std::cerr<<"FAIL Qt wallet bridge: "<<e.what()<<'\n';return 1;}}

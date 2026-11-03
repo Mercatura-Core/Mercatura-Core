@@ -19,6 +19,7 @@
 
 enum class OutputType;
 
+namespace MercaWeaveQt { class Model; }
 class AddressTableModel;
 class ClientModel;
 class OptionsModel;
@@ -72,6 +73,7 @@ public:
         Unlocked      // wallet->HasEncryptionKeys() && !wallet->IsLocked()
     };
 
+    MercaWeaveQt::Model* getMercaWeaveModel();
     OptionsModel* getOptionsModel() const;
     AddressTableModel* getAddressTableModel() const;
     TransactionTableModel* getTransactionTableModel() const;

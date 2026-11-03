@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <qt/walletmodel.h>
+#include <qt/mercaweavemodel.h>
 
 #include <qt/addresstablemodel.h>
 #include <qt/clientmodel.h>
@@ -16,12 +17,14 @@
 #include <qt/transactiontablemodel.h>
 
 #include <common/args.h>
+#include <consensus/validation.h>
 #include <interfaces/handler.h>
 #include <interfaces/node.h>
 #include <key_io.h>
 #include <node/interface_ui.h>
 #include <node/types.h>
 #include <psbt.h>
+#include <policy/feerate.h>
 #include <util/translation.h>
 #include <wallet/coincontrol.h>
 #include <wallet/types.h>
@@ -152,6 +155,7 @@ bool WalletModel::validateAddress(const QString& address) const
 
 WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransaction &transaction, const CCoinControl& coinControl)
 {
+    getMercaWeaveModel()->invalidate(MercaWeaveQt::Reason::Stale);
     transaction.getWtx() = nullptr; // reset tx output
 
     CAmount total = 0;
@@ -225,6 +229,28 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
         if (nFeeRequired > m_wallet->getDefaultMaxTxFee()) {
             return AbsurdFee;
         }
+        if (newTx) {
+          try {
+            MercaWeaveQt::Preview preview;
+            preview.inputs=static_cast<int>(newTx->vin.size());preview.outputs=static_cast<int>(newTx->vout.size());
+            preview.bytes=GetTransactionFeeSize(*newTx);preview.weight=GetTransactionWeight(*newTx);preview.fee=nFeeRequired;preview.perK=preview.bytes?CFeeRate{nFeeRequired,static_cast<int32_t>(preview.bytes)}.GetFeePerK():0;
+            preview.complete=!wallet().privateKeysDisabled()&&newTx->HasWitness();
+            std::vector<COutPoint> points;for (const auto& in:newTx->vin)points.push_back(in.prevout);
+            const auto coins=wallet().getCoins(points);bool known=coins.size()==points.size();
+            for (const auto& coin:coins) {int version;std::vector<unsigned char> program;
+                if (coin.txout.scriptPubKey.IsWitnessProgram(version,program)&&version==2&&program.size()==32)++preview.nativeInputs;else known=false;}
+            preview.available=known;preview.signatures=preview.nativeInputs;
+            preview.changeType=tr("No change");
+            if (res->change_pos&&*res->change_pos<newTx->vout.size()) {
+                int version;std::vector<unsigned char> program;
+                preview.changeType=newTx->vout[*res->change_pos].scriptPubKey.IsWitnessProgram(version,program)&&version==2&&program.size()==32?tr("Independent-key witness-v2 PQ"):tr("Unavailable");
+            }
+            getMercaWeaveModel()->nativePreview(std::move(preview));
+          } catch (const std::exception&) {
+            // An optional presentation failure must not change native sending.
+            getMercaWeaveModel()->nativePreview({});
+          }
+        }
     } catch (const std::runtime_error& err) {
         // Something unexpected happened, instruct user to report this bug.
         Q_EMIT message(tr("Send Coins"), QString::fromStdString(err.what()),
@@ -281,6 +307,18 @@ void WalletModel::sendCoins(WalletModelTransaction& transaction)
     }
 
     checkBalanceChanged(m_wallet->getBalances()); // update balance immediately, otherwise there could be a short noticeable delay until pollBalanceChanged hits
+}
+
+MercaWeaveQt::Model* WalletModel::getMercaWeaveModel()
+{
+    auto* model=findChild<MercaWeaveQt::Model*>(QStringLiteral("mercaWeaveModel"),Qt::FindDirectChildrenOnly);
+    if (!model) {
+        model=new MercaWeaveQt::Model(this);
+        const auto update=[this,model] {model->observeNativeWallet(wallet().isLocked(),wallet().privateKeysDisabled());};
+        connect(this,&WalletModel::encryptionStatusChanged,model,update);
+        update();
+    }
+    return model;
 }
 
 OptionsModel* WalletModel::getOptionsModel() const

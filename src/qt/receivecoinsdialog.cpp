@@ -5,6 +5,7 @@
 #include <wallet/wallet.h>
 
 #include <qt/receivecoinsdialog.h>
+#include <qt/mercaweavepanel.h>
 #include <qt/forms/ui_receivecoinsdialog.h>
 
 #include <qt/addresstablemodel.h>
@@ -28,6 +29,7 @@ ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, QWid
     platformStyle(_platformStyle)
 {
     ui->setupUi(this);
+    ui->verticalLayout->addWidget(new MercaWeaveQt::Panel(MercaWeaveQt::Panel::View::Receive,this));
 
     if (!_platformStyle->getImagesOnButtons()) {
         ui->clearButton->setIcon(QIcon());
@@ -71,6 +73,7 @@ ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, QWid
 void ReceiveCoinsDialog::setModel(WalletModel *_model)
 {
     this->model = _model;
+    findChild<MercaWeaveQt::Panel*>()->setModel(_model?_model->getMercaWeaveModel():nullptr);
 
     if(_model && _model->getOptionsModel())
     {

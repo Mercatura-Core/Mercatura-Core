@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying file COPYING.
 
 #include <qt/miningpage.h>
+#include <qt/mercaweavepanel.h>
 #include <qt/notificationtiming.h>
 
 #include <chainparams.h>
@@ -157,6 +158,9 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     m_status->setWordWrap(true);
     form->addRow(tr("Status"), m_status);
     layout->addWidget(group);
+    auto* grouped=new MercaWeaveQt::Panel(MercaWeaveQt::Panel::View::Mining,this);
+    grouped->setModel(wallet?wallet->getMercaWeaveModel():nullptr);
+    layout->addWidget(grouped);
     for (auto* label : content->findChildren<QLabel*>()) {
         label->setWordWrap(true);
     }
