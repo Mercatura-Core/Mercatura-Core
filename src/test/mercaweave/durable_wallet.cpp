@@ -121,7 +121,7 @@ Entry Store::Reserve(const reward_research::Proposal& proposal)
 }
 void Store::Mark(uint64_t id,Status status)
 {
-    std::lock_guard lock{m_mutex};Require(m_authenticated,Code::Metadata,"journal not authenticated");Require(status!=Status::Reserved,Code::Metadata,"cannot resurrect reservation");
+    std::lock_guard lock{m_mutex};Require(m_authenticated,Code::Metadata,"journal not authenticated");Require(status==Status::SimulatedAccepted||status==Status::Cancelled||status==Status::Conflicted,Code::Metadata,"unknown journal transition");
     auto entries=m_entries;auto entry=std::find_if(entries.begin(),entries.end(),[&](const Entry& e){return e.id==id;});Require(entry!=entries.end()&&Active(*entry),Code::Conflict,"missing or terminal journal entry");entry->status=status;
     auto bytes=Encode(*m_wallet,entries,m_next);Commit(bytes);m_entries=std::move(entries);m_sealed=std::move(bytes);
 }

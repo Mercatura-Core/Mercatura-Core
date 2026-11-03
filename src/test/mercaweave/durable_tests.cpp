@@ -31,6 +31,8 @@ void Run(const char* binary)
     reward_research::Planner planner;reward_research::Policy policy;policy.enabled=policy.opted_in=policy.isolated=policy.network=policy.loaded=policy.synchronized=policy.signer=true;policy.destination=destination.script;
     auto decision=planner.Evaluate(store->Owner(),view,coins,policy);Check(decision.proposal.has_value(),"50 mature rewards form actual funded proposal");
     auto reserved=store->Reserve(*decision.proposal);Check(reserved.id==1&&reserved.inputs.size()==50,"reservation durable before caller receives it");
+    const auto prior_journal=store->Entries();Reject([&]{store->Mark(1,static_cast<Status>(255));},Code::Metadata);
+    Check(store->Entries()==prior_journal,"unknown status cannot replace a restorable durable checkpoint");
     std::vector<std::future<uint64_t>> tasks;for(int i=0;i<8;++i)tasks.push_back(std::async(std::launch::async,[&]{return store->Reserve(*decision.proposal).id;}));for(auto& task:tasks)Check(task.get()==1,"concurrent timer ticks idempotent in durable journal");
     auto conflicting=*decision.proposal;conflicting.transactions[0].psbt.tx->vout[0].nValue--;
     Reject([&]{store->Reserve(conflicting);},Code::Conflict);
