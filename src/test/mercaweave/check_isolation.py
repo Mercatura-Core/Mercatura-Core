@@ -49,7 +49,10 @@ def main():
         if pathlib.Path(entry["file"]).resolve() == ROOT / "src/script/interpreter.cpp":
             interpreters.append(enabled)
     require(sorted(interpreters) == [False, True], "need separate ordinary and isolated interpreter objects")
-    for target in ["mercaweave_isolated_control", "mercaweave_coin_probe", "mercaweave_integration_tests"]:
+    targets = ["mercaweave_isolated_control", "mercaweave_coin_probe", "mercaweave_integration_tests"]
+    if (build / "mercaweave_integration_bench").exists():
+        targets.append("mercaweave_integration_bench")
+    for target in targets:
         link = (build / f"CMakeFiles/{target}.dir/link.txt").read_text()
         require("libmercaweave_native_isolated.a" in link and "libmercaweave_native.a" not in link,
                 "checker ABI mixing: " + target)

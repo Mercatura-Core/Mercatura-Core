@@ -166,3 +166,6 @@ target_link_libraries(mercaweave_integration_tests PRIVATE mercaweave_integratio
 add_test(NAME isolated_validation_integration COMMAND mercaweave_integration_tests)
 add_test(NAME research_compile_and_cache_isolation
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/check_isolation.py ${CMAKE_CURRENT_BINARY_DIR})
+add_executable(mercaweave_integration_bench integration_bench.cpp allocation_probe.cpp fixtures.cpp)
+target_link_libraries(mercaweave_integration_bench PRIVATE mercaweave_integration)
+add_test(NAME integrated_resource_measurement_smoke COMMAND mercaweave_integration_bench small --smoke)
