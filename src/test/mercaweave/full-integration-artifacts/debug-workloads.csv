@@ -1,0 +1,15 @@
+case,inputs,outputs,groups,signatures,bytes,weight,accepted,median_ms,worst_ms,user_ms,system_ms,maxrss_kib,path
+A-one-v2,1,1,0,1,5364,5646,1,1.756,2.110,1.839,0.000,13656,actual-script-components
+B-ten-v2,10,1,0,10,53145,54534,1,16.573,16.999,16.597,0.000,13656,actual-script-components
+C-one-v3,1,1,1,1,5397,5679,1,1.322,1.338,1.312,0.000,13656,actual-script-components
+D-53-one-group,53,1,1,1,9557,16235,1,6.638,7.090,6.559,0.000,13656,actual-script-components
+E-100-one-group,100,1,1,1,13317,25776,1,10.595,11.013,10.695,0.000,13656,actual-script-components
+F-100-ten-groups,100,1,10,10,60675,73134,1,20.907,20.988,20.761,0.000,13656,actual-script-components
+G-100-independent,100,1,100,100,534255,546714,1,116.202,118.139,113.874,2.704,13656,actual-script-components
+H-mixed,55,1,1,3,20175,27099,1,11.058,11.705,11.041,0.012,13656,actual-script-components
+I-100-outputs,1,100,1,1,9654,22707,1,3.175,3.470,3.263,0.003,13656,actual-script-components
+J-near-standard-weight,1900,1,2,2,162581,396446,1,181.119,188.285,182.027,0.000,13656,actual-script-components
+K-near-4MiB-block,777,777,777,777,4193615,4413167,1,1181.158,1181.158,1172.801,6.034,17700,WO04-candidate-components
+L-late-invalid,100,1,100,100,534255,546714,0,84.780,90.340,85.916,0.000,17700,actual-script-components
+M-reorg-warm-cache,100,1,1,1,13317,25776,1,10.756,10.800,10.741,0.000,17700,actual-script-components
+N-100-native-comparator,100,1,0,100,530955,543414,1,158.972,159.485,156.253,0.000,17700,actual-script-components

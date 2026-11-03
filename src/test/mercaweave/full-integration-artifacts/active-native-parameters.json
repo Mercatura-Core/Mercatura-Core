@@ -1,0 +1,272 @@
+[
+  {
+    "network": "main",
+    "height": 0,
+    "genesis": "cd797c78731d68a82b664b3e359a2e69508ea873fe5747b686488589cc7d6f15",
+    "capacity_bytes": 4194304,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "main",
+    "height": 200,
+    "genesis": "cd797c78731d68a82b664b3e359a2e69508ea873fe5747b686488589cc7d6f15",
+    "capacity_bytes": 4194304,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "main",
+    "height": 7999,
+    "genesis": "cd797c78731d68a82b664b3e359a2e69508ea873fe5747b686488589cc7d6f15",
+    "capacity_bytes": 4194304,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "main",
+    "height": 8000,
+    "genesis": "cd797c78731d68a82b664b3e359a2e69508ea873fe5747b686488589cc7d6f15",
+    "capacity_bytes": 4194304,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "main",
+    "height": 1051200,
+    "genesis": "cd797c78731d68a82b664b3e359a2e69508ea873fe5747b686488589cc7d6f15",
+    "capacity_bytes": 8388608,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "main",
+    "height": 8409600,
+    "genesis": "cd797c78731d68a82b664b3e359a2e69508ea873fe5747b686488589cc7d6f15",
+    "capacity_bytes": 1073741824,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "test",
+    "height": 0,
+    "genesis": "b3fc707c9a89dc45d1cf6a837284b22ad2b6fd41b99af601079db9dcbeff6920",
+    "capacity_bytes": 1048576,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "test",
+    "height": 200,
+    "genesis": "b3fc707c9a89dc45d1cf6a837284b22ad2b6fd41b99af601079db9dcbeff6920",
+    "capacity_bytes": 1048576,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "test",
+    "height": 7999,
+    "genesis": "b3fc707c9a89dc45d1cf6a837284b22ad2b6fd41b99af601079db9dcbeff6920",
+    "capacity_bytes": 1048576,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "test",
+    "height": 8000,
+    "genesis": "b3fc707c9a89dc45d1cf6a837284b22ad2b6fd41b99af601079db9dcbeff6920",
+    "capacity_bytes": 4194304,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "test",
+    "height": 1051200,
+    "genesis": "b3fc707c9a89dc45d1cf6a837284b22ad2b6fd41b99af601079db9dcbeff6920",
+    "capacity_bytes": 8388608,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "test",
+    "height": 8409600,
+    "genesis": "b3fc707c9a89dc45d1cf6a837284b22ad2b6fd41b99af601079db9dcbeff6920",
+    "capacity_bytes": 1073741824,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "testnet4",
+    "height": 0,
+    "genesis": "e7a0a75ae8ed70b08b209b3ef37a33c5075a70483833eb092de535f5a7022651",
+    "capacity_bytes": 1048576,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "testnet4",
+    "height": 200,
+    "genesis": "e7a0a75ae8ed70b08b209b3ef37a33c5075a70483833eb092de535f5a7022651",
+    "capacity_bytes": 1048576,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "testnet4",
+    "height": 7999,
+    "genesis": "e7a0a75ae8ed70b08b209b3ef37a33c5075a70483833eb092de535f5a7022651",
+    "capacity_bytes": 1048576,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "testnet4",
+    "height": 8000,
+    "genesis": "e7a0a75ae8ed70b08b209b3ef37a33c5075a70483833eb092de535f5a7022651",
+    "capacity_bytes": 1048576,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "testnet4",
+    "height": 1051200,
+    "genesis": "e7a0a75ae8ed70b08b209b3ef37a33c5075a70483833eb092de535f5a7022651",
+    "capacity_bytes": 2097152,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "testnet4",
+    "height": 8409600,
+    "genesis": "e7a0a75ae8ed70b08b209b3ef37a33c5075a70483833eb092de535f5a7022651",
+    "capacity_bytes": 268435456,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "signet",
+    "height": 0,
+    "genesis": "eebe2b23469b0d91056cc9240387ba7ee601ce138160da3c508142e039e1f36b",
+    "capacity_bytes": 1048576,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "signet",
+    "height": 200,
+    "genesis": "eebe2b23469b0d91056cc9240387ba7ee601ce138160da3c508142e039e1f36b",
+    "capacity_bytes": 1048576,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "signet",
+    "height": 7999,
+    "genesis": "eebe2b23469b0d91056cc9240387ba7ee601ce138160da3c508142e039e1f36b",
+    "capacity_bytes": 1048576,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "signet",
+    "height": 8000,
+    "genesis": "eebe2b23469b0d91056cc9240387ba7ee601ce138160da3c508142e039e1f36b",
+    "capacity_bytes": 1048576,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "signet",
+    "height": 1051200,
+    "genesis": "eebe2b23469b0d91056cc9240387ba7ee601ce138160da3c508142e039e1f36b",
+    "capacity_bytes": 2097152,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "signet",
+    "height": 8409600,
+    "genesis": "eebe2b23469b0d91056cc9240387ba7ee601ce138160da3c508142e039e1f36b",
+    "capacity_bytes": 268435456,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "regtest",
+    "height": 0,
+    "genesis": "8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685",
+    "capacity_bytes": 4194304,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "regtest",
+    "height": 200,
+    "genesis": "8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685",
+    "capacity_bytes": 4194304,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "regtest",
+    "height": 7999,
+    "genesis": "8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685",
+    "capacity_bytes": 4194304,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "regtest",
+    "height": 8000,
+    "genesis": "8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685",
+    "capacity_bytes": 4194304,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "regtest",
+    "height": 1051200,
+    "genesis": "8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685",
+    "capacity_bytes": 8388608,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  },
+  {
+    "network": "regtest",
+    "height": 8409600,
+    "genesis": "8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685",
+    "capacity_bytes": 1073741824,
+    "standard_weight": 400000,
+    "sigops_limit": 80000,
+    "coinbase_maturity": 100
+  }
+]

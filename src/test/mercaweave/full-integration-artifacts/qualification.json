@@ -1,0 +1,499 @@
+{
+  "starting_head": "6cc3925bd7431bd03a07d9b0b04de07550d95022",
+  "full_ctest_source_head": "8d56b7285974921d1e37d975def3c5421c528baf",
+  "source_head": "d45cb5f7f01ad911e37949c52d9aa3318c8c3e81",
+  "branch": "research/mercaweave-v0.1",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "compiler": "g++ (Debian 14.2.0-19) 14.2.0",
+  "builds": {
+    "release": {
+      "ctest": {
+        "passed": 32,
+        "failed": 0,
+        "skipped": 0
+      },
+      "persistence_status_bound_followup": {
+        "passed": true,
+        "assertions": 53,
+        "native_sqlite": true,
+        "abrupt_process_crash": true,
+        "full_cwallet_v3": false,
+        "automatic_sign_or_broadcast": false
+      },
+      "unit_summaries": [
+        {
+          "wallet_checks": 248,
+          "rejections": 27,
+          "passed": true
+        },
+        {
+          "psbt_checks": 67,
+          "rejections": 41,
+          "mutations": 1000,
+          "mutation_rejections": 1000,
+          "passed": true
+        },
+        {
+          "qt_checks": 24,
+          "passed": true
+        },
+        {
+          "qt_checks": 39,
+          "passed": true
+        },
+        {
+          "reward_checks": 55,
+          "passed": true
+        },
+        {
+          "qt_wallet_checks": 57,
+          "passed": true
+        },
+        {
+          "native_qr_checks": 5,
+          "passed": true
+        },
+        {
+          "passed": true,
+          "assertions": 2192,
+          "cache_corpus": 1000,
+          "rejected": 900,
+          "actual_checkinput_and_cscriptcheck": true,
+          "actual_undo_components": true,
+          "full_chainstate_v3": false
+        },
+        {
+          "passed": true,
+          "assertions": 51,
+          "native_sqlite": true,
+          "abrupt_process_crash": true,
+          "full_cwallet_v3": false,
+          "automatic_sign_or_broadcast": false
+        }
+      ],
+      "locked_vector_stdout_sha256": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7",
+      "unchanged_wo05_workloads": 24,
+      "glibcxx_assertions": false,
+      "asan_ubsan": false,
+      "leak_detection": null
+    },
+    "debug": {
+      "ctest": {
+        "passed": 32,
+        "failed": 0,
+        "skipped": 0
+      },
+      "persistence_status_bound_followup": {
+        "passed": true,
+        "assertions": 53,
+        "native_sqlite": true,
+        "abrupt_process_crash": true,
+        "full_cwallet_v3": false,
+        "automatic_sign_or_broadcast": false
+      },
+      "unit_summaries": [
+        {
+          "wallet_checks": 248,
+          "rejections": 27,
+          "passed": true
+        },
+        {
+          "psbt_checks": 67,
+          "rejections": 41,
+          "mutations": 1000,
+          "mutation_rejections": 1000,
+          "passed": true
+        },
+        {
+          "qt_checks": 24,
+          "passed": true
+        },
+        {
+          "qt_checks": 39,
+          "passed": true
+        },
+        {
+          "reward_checks": 55,
+          "passed": true
+        },
+        {
+          "qt_wallet_checks": 57,
+          "passed": true
+        },
+        {
+          "native_qr_checks": 5,
+          "passed": true
+        },
+        {
+          "passed": true,
+          "assertions": 2192,
+          "cache_corpus": 1000,
+          "rejected": 900,
+          "actual_checkinput_and_cscriptcheck": true,
+          "actual_undo_components": true,
+          "full_chainstate_v3": false
+        },
+        {
+          "passed": true,
+          "assertions": 51,
+          "native_sqlite": true,
+          "abrupt_process_crash": true,
+          "full_cwallet_v3": false,
+          "automatic_sign_or_broadcast": false
+        }
+      ],
+      "locked_vector_stdout_sha256": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7",
+      "unchanged_wo05_workloads": 24,
+      "glibcxx_assertions": true,
+      "asan_ubsan": false,
+      "leak_detection": null
+    },
+    "sanitize": {
+      "ctest": {
+        "passed": 32,
+        "failed": 0,
+        "skipped": 0
+      },
+      "persistence_status_bound_followup": {
+        "passed": true,
+        "assertions": 53,
+        "native_sqlite": true,
+        "abrupt_process_crash": true,
+        "full_cwallet_v3": false,
+        "automatic_sign_or_broadcast": false
+      },
+      "unit_summaries": [
+        {
+          "wallet_checks": 248,
+          "rejections": 27,
+          "passed": true
+        },
+        {
+          "psbt_checks": 67,
+          "rejections": 41,
+          "mutations": 1000,
+          "mutation_rejections": 1000,
+          "passed": true
+        },
+        {
+          "qt_checks": 24,
+          "passed": true
+        },
+        {
+          "qt_checks": 39,
+          "passed": true
+        },
+        {
+          "reward_checks": 55,
+          "passed": true
+        },
+        {
+          "qt_wallet_checks": 57,
+          "passed": true
+        },
+        {
+          "native_qr_checks": 5,
+          "passed": true
+        },
+        {
+          "passed": true,
+          "assertions": 2192,
+          "cache_corpus": 1000,
+          "rejected": 900,
+          "actual_checkinput_and_cscriptcheck": true,
+          "actual_undo_components": true,
+          "full_chainstate_v3": false
+        },
+        {
+          "passed": true,
+          "assertions": 51,
+          "native_sqlite": true,
+          "abrupt_process_crash": true,
+          "full_cwallet_v3": false,
+          "automatic_sign_or_broadcast": false
+        }
+      ],
+      "locked_vector_stdout_sha256": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7",
+      "unchanged_wo05_workloads": 24,
+      "glibcxx_assertions": false,
+      "asan_ubsan": true,
+      "leak_detection": false
+    }
+  },
+  "native_release": {
+    "normal_compile_flag_files": 50,
+    "binaries": {
+      "mercaturad": {
+        "sha256": "200840882c2bd84478613a0cab4013c09b99e691510f1afe61a2c1d63c4e10b2",
+        "research_symbols_absent": true
+      },
+      "mercatura-cli": {
+        "sha256": "f60ddf9c6fbfcb7ce8a08e3ff7301f61f07544fafe66261c900dc03c4945cc68",
+        "research_symbols_absent": true
+      },
+      "test_mining-qt": {
+        "sha256": "86f1948a8e7067ac3e3f5cf971fa3cae255d82370e2ae96aaa06919916f4f779",
+        "research_symbols_absent": true
+      }
+    },
+    "functional": [
+      {
+        "test": "mercatura_block_capacity.py",
+        "status": "Passed",
+        "duration(seconds)": "344"
+      },
+      {
+        "test": "mercatura_fee_policy.py",
+        "status": "Passed",
+        "duration(seconds)": "76"
+      },
+      {
+        "test": "mercatura_pq_mempool_persistence.py",
+        "status": "Passed",
+        "duration(seconds)": "137"
+      },
+      {
+        "test": "mercatura_pq_package.py",
+        "status": "Passed",
+        "duration(seconds)": "82"
+      },
+      {
+        "test": "mercatura_pq_rbf.py",
+        "status": "Passed",
+        "duration(seconds)": "122"
+      },
+      {
+        "test": "mercatura_pq_reorg.py",
+        "status": "Passed",
+        "duration(seconds)": "205"
+      },
+      {
+        "test": "mercatura_wallet_encryption_persistence.py",
+        "status": "Passed",
+        "duration(seconds)": "92"
+      },
+      {
+        "test": "ALL",
+        "status": "Passed",
+        "duration(seconds)": "1060"
+      }
+    ],
+    "additional_native_reconsideration_lifecycle": {
+      "passed": true,
+      "normal_v2_only": true,
+      "synchronous_sqlite": true,
+      "exact_utxo_hash_restored": true
+    },
+    "qt": [
+      {
+        "file": "native-contention.txt",
+        "passed": 7,
+        "failed": 0,
+        "skipped": 0,
+        "duration_ms": 14266,
+        "cases": [
+          "initTestCase()",
+          "walletNotificationContention()",
+          "transactionStatusChainContention()",
+          "sharedDeviceDiscoveryRefresh()",
+          "actualGpuContextsAfterFallback()",
+          "maximumAutomaticAndReducedManualGpuContexts()",
+          "cleanupTestCase()"
+        ]
+      },
+      {
+        "file": "native-lifecycle.txt",
+        "passed": 12,
+        "failed": 0,
+        "skipped": 0,
+        "duration_ms": 37384,
+        "cases": [
+          "initTestCase()",
+          "missingWalletUnlockCancellationAndNodeShutdown()",
+          "soloWalletAndPageLifecycle()",
+          "controllerDefersWalletDestruction()",
+          "encryptedAddressCreation()",
+          "pageLifecycle()",
+          "unrestrictedV2CapacityControls()",
+          "hardwareAwareManualWorkerSelection()",
+          "combinedWorkerSelectionReservesHostVerifiers()",
+          "manualWorkersPersistAndRuntimeFormatting()",
+          "pickaxeFollowsPaletteAtHighDpi()",
+          "cleanupTestCase()"
+        ]
+      },
+      {
+        "file": "native-responsive.txt",
+        "passed": 4,
+        "failed": 0,
+        "skipped": 0,
+        "duration_ms": 17085,
+        "cases": [
+          "initTestCase()",
+          "liveSoloResponsiveness(height--1-workers-1)",
+          "liveSoloResponsiveness(height-0-workers-1)",
+          "cleanupTestCase()"
+        ]
+      }
+    ],
+    "unit": [
+      {
+        "file": "native-other.txt",
+        "passed_cases": [
+          "pq_destination_persistence_and_locked_reuse",
+          "gpu_worker_and_combined_mode_submit_genuine_v2_blocks_with_cpu_reference_device"
+        ],
+        "count": 2
+      },
+      {
+        "file": "native-solo.txt",
+        "passed_cases": [
+          "native_controller_submits_valid_pq_regtest_block",
+          "gpu_controller_accepts_native_pq_block_with_cpu_reference_test_double",
+          "solo_template_binding_wrong_work_hash_and_duplicate",
+          "native_rewards_maturity_fees_and_pq_spend",
+          "public_readiness_cooldown_and_interrupt",
+          "real_competing_tip_reorg_and_new_template"
+        ],
+        "count": 6
+      }
+    ]
+  },
+  "prior_evidence_sha256": {
+    "doc/design/mercatura-pq-b1-evidence.json": "f5bd74ca7231d16e4a71d8d356492788522b08dd53e4215df5dc6bd7f478c50e",
+    "doc/design/mercatura-pq-b2-evidence.json": "0ba3c9c5146e550cec5b633fe48222c2094b0eaa8fd6527d4e40f3bf440b080f",
+    "doc/design/mercatura-pq-b3-evidence.json": "6c4d318f078447c33e3788fa9c1910ba0e308ec2d4875ebd6170eb31c5f05802",
+    "doc/design/mercatura-pq-dependencies.json": "ada9092f91dbe43d3d5cfef429fd88575ae55da1835cdd8cd6307ebeb202b549",
+    "doc/design/mercatura-pq-p9-p11-evidence.json": "afca40e92b7a66d27c0f7c8d5d4c77008836b3ed0095bb8eb8d05531a81c32de",
+    "doc/design/mercatura-pq-stagea-benchmarks.json": "a5f77c1b269d6044ff255f09e0d3171aa4f527109b59dbbe447d0ad2777c7ecf",
+    "doc/design/mercatura-pq-stagea-evidence.json": "9e9ae602da521454a133c743e748834e607097ce45b674f422ccace4e06fd228",
+    "doc/design/mercatura-v2-pq-integrated-evidence.json": "e80589f0b2d179d91e04df974f576df1c83e19db9911be4101ab1ab608abfdd3",
+    "doc/design/mercaweave-v0.1-consensus-readiness.md": "37a688a8b96455b38b5fe2720bbdac3b7a9f6b9ec61879b04c50664c53cc4b30",
+    "doc/design/mercaweave-v0.1-isolated-consensus-integration.md": "c767d4e72a4f39458a8c21336e80bb54c7f662cff3931789938f693e933f65c0",
+    "doc/design/mercaweave-v0.1-qt-mining-integration.md": "d5888de5186196acc5521e58a9627a646d46c19202a440d6847a1296608cc7d4",
+    "doc/design/mercaweave-v0.1-security-qualification.md": "67e91434f979074701c78af0e94a57f2df96ee281373d7dd82f840a7d1e4c216",
+    "doc/design/mercaweave-v0.1-source-audit.md": "5c9bd05d274a6b4dab82f6adbc60ca599d3fd9af3e239b2be12dae1cee4d1f9b",
+    "doc/design/mercaweave-v0.1-standalone-validation.md": "6b8a443f281cd877272068978286bbdbbb46f67cbf08055d99f33cca8415583e",
+    "doc/design/mercaweave-v0.1-wallet-psbt-integration.md": "561415c53943c06af31cc5ff64acdde8a5e5690f73938e07104fdf49c500045a",
+    "src/test/mercaweave/benchmark-environment.json": "117a545ca3f6f16afba7920a71e5fc49fc24078d48728ec0dd760fcc16c4c0cc",
+    "src/test/mercaweave/benchmarks.csv": "0896a259684d85b4df92299d535c7f292ab237fefbb0a3114c4c8cd7fe83ac28",
+    "src/test/mercaweave/integration-artifacts/debug-benchmarks.csv": "ff0f87da523a9ae618ea6020e2385bd2f09b30750eb06997978b3bece03479e9",
+    "src/test/mercaweave/integration-artifacts/debug-isolation.json": "9ddcc353470fa57e71fcab0817b9c4ad22aaf43e0e618e78af70e94472c0770e",
+    "src/test/mercaweave/integration-artifacts/leak-sanitizer.txt": "46da19cffef18e9d70fa371e0b1e38bdff1a6f89006d0071e472a9af6a366bff",
+    "src/test/mercaweave/integration-artifacts/mercaweave_integration_tests.jsonl": "10e22b561f37dba524211184e315c03a807e0456dc090e28c47c65343d8013c8",
+    "src/test/mercaweave/integration-artifacts/mercaweave_isolated_control.json": "5c824d5cb5ba55210868128de4ff33ce47c6ddb2c5cd7c1e3ca37b2356885053",
+    "src/test/mercaweave/integration-artifacts/mercaweave_normal_control.json": "9a072b2e822ddef3561b651badea85a0e1c3eb5b5bb2c47bcb039c8fd7b57a63",
+    "src/test/mercaweave/integration-artifacts/mercaweave_tests.json": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7",
+    "src/test/mercaweave/integration-artifacts/qualification.json": "7fa8cc1eb8d14aa2776b46c84f37df2b49270d2097d01601a881761a4fe8f98c",
+    "src/test/mercaweave/integration-artifacts/release-benchmarks.csv": "47d7a1242477909aa1e26043b7e01bf13c50463ca6aea47874d0a61f8a850633",
+    "src/test/mercaweave/integration-artifacts/release-isolation.json": "9ddcc353470fa57e71fcab0817b9c4ad22aaf43e0e618e78af70e94472c0770e",
+    "src/test/mercaweave/integration-artifacts/sanitize-benchmarks.csv": "d46e503a3ac4a76fd9ca4b9d9dda42c53d89d2a1277860b54eae3f02aad4455e",
+    "src/test/mercaweave/integration-artifacts/sanitize-isolation.json": "9ddcc353470fa57e71fcab0817b9c4ad22aaf43e0e618e78af70e94472c0770e",
+    "src/test/mercaweave/readiness-artifacts/block-benchmarks.csv": "c8c67e28fa1363a9ad8d08dc15ffb69e97ca9cda0cf14581df0cba72ab7340ca",
+    "src/test/mercaweave/readiness-artifacts/consensus-readiness-benchmarks.json": "b73de8e5f6b813e57fb796263064253987f5c72af78838482f2bd35f769a04ca",
+    "src/test/mercaweave/readiness-artifacts/determinism-checks.json": "b9205483dd367c9201430d7b577ca7ffb576e826078e4439bbd8f9098d1c465e",
+    "src/test/mercaweave/readiness-artifacts/invalid-workloads.csv": "c5ae8b1202d12d62f75c4acbfbb8d1f4c20ba67c9b7af49654aa72cd9d84770d",
+    "src/test/mercaweave/readiness-artifacts/malleability-proof.jsonl": "d8658e03b6424addac83e692526c9176cb325075d8eb70ce3c419fa5a1bfbc09",
+    "src/test/mercaweave/readiness-artifacts/transaction-benchmarks.csv": "1f07a4555ddaa0cedbcd116e6b8707c9a087fa96204488b18ed2f7fb94906276",
+    "src/test/mercaweave/security-benchmarks.csv": "5bcdce4ef3a1625e2dfd1f2d6442daf79bb28b668dafd8234fd51bfc3569fdc6",
+    "src/test/mercaweave/security-benchmarks.json": "a2b9c3f49c19776edadef19ba4f7c73ca61dcb72bd12fca15e70148a15844cab",
+    "src/test/mercaweave/vectors.json": "ea4978206307ac21d4f544b05e6da3543e094c9a1c4bd97c44f90fad4420c49c",
+    "src/test/mercaweave/wallet-artifacts/debug-check_isolation.json": "3ab3d5d4780a71878711db5863f09e2c5cbd05b95a69142979ae16eff5b60997",
+    "src/test/mercaweave/wallet-artifacts/debug-check_wallet_isolation.json": "09a83216c95479ead3c250b3735bc3e4c0393417b4c0fa5a167d8807ce139351",
+    "src/test/mercaweave/wallet-artifacts/debug-ctest.txt": "268dd85d6ed4f185a97432555fe83736da9e03348978d462243c8ed9bffbeeda",
+    "src/test/mercaweave/wallet-artifacts/debug-workloads.csv": "dbf58f68023e240a11afaf7c67b2c5ef8087bb178d0fdf4621ab3305fa3ba0c0",
+    "src/test/mercaweave/wallet-artifacts/mercaweave_integration_tests.jsonl": "10e22b561f37dba524211184e315c03a807e0456dc090e28c47c65343d8013c8",
+    "src/test/mercaweave/wallet-artifacts/mercaweave_isolated_control.json": "5c824d5cb5ba55210868128de4ff33ce47c6ddb2c5cd7c1e3ca37b2356885053",
+    "src/test/mercaweave/wallet-artifacts/mercaweave_normal_control.json": "9a072b2e822ddef3561b651badea85a0e1c3eb5b5bb2c47bcb039c8fd7b57a63",
+    "src/test/mercaweave/wallet-artifacts/mercaweave_psbt_tests.json": "804fb0bdf3d607b2d033dd31b3622933a1a2c153b51f49ae99ba1ebc145e9a5c",
+    "src/test/mercaweave/wallet-artifacts/mercaweave_tests.json": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7",
+    "src/test/mercaweave/wallet-artifacts/mercaweave_wallet_tests.json": "996c3f99ac58b3b194c4e4c87b1dc381ef62b3b643483321a1d43f9261874b91",
+    "src/test/mercaweave/wallet-artifacts/qualification.json": "6000c56a58605c99278c467c1f82fb0f115838aeac29998148dbfdc42aed4f74",
+    "src/test/mercaweave/wallet-artifacts/release-check_isolation.json": "3ab3d5d4780a71878711db5863f09e2c5cbd05b95a69142979ae16eff5b60997",
+    "src/test/mercaweave/wallet-artifacts/release-check_wallet_isolation.json": "09a83216c95479ead3c250b3735bc3e4c0393417b4c0fa5a167d8807ce139351",
+    "src/test/mercaweave/wallet-artifacts/release-ctest.txt": "ff31bc28bb54df80909d21ed5f0b00159645a507950eb3733b65f1e0ba6821f6",
+    "src/test/mercaweave/wallet-artifacts/release-workloads.csv": "0c5eb9f7ef6ac3975bb4b418a1e38b8c63e227560d9f8021441808b85e61e520",
+    "src/test/mercaweave/wallet-artifacts/sanitize-check_isolation.json": "3ab3d5d4780a71878711db5863f09e2c5cbd05b95a69142979ae16eff5b60997",
+    "src/test/mercaweave/wallet-artifacts/sanitize-check_wallet_isolation.json": "09a83216c95479ead3c250b3735bc3e4c0393417b4c0fa5a167d8807ce139351",
+    "src/test/mercaweave/wallet-artifacts/sanitize-ctest.txt": "495e470861df8aac9b9b4bf9fd3eb6301c481b70351edba152848e651876db55",
+    "src/test/mercaweave/wallet-artifacts/sanitize-workloads.csv": "a14b5208c1b753726d8bad2bb360c5364c15d0fa2b04cf84e1ca37b050f470e7",
+    "src/test/mercaweave/work-order-02-baseline.csv": "b81d187a98415bc1be0fab7ad8ba922aa2ef44ceed4b16320ecdd19d98caa012"
+  },
+  "commands": [
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_tests",
+      "--vectors"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_wallet_bench"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_node_bench"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_parameter_probe"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_durable_tests"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-debug/mercaweave_tests",
+      "--vectors"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-debug/mercaweave_wallet_bench"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-debug/mercaweave_node_bench"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-debug/mercaweave_parameter_probe"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-debug/mercaweave_durable_tests"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_tests",
+      "--vectors"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_wallet_bench"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_node_bench"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_parameter_probe"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_durable_tests"
+    ],
+    [
+      "nm",
+      "-C",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo07-native-release/bin/mercaturad"
+    ],
+    [
+      "nm",
+      "-C",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo07-native-release/bin/mercatura-cli"
+    ],
+    [
+      "nm",
+      "-C",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo07-native-release/bin/test_mining-qt"
+    ],
+    [
+      "g++",
+      "--version"
+    ]
+  ],
+  "restrictions": [
+    "full grouped Chainstate, mempool and CWallet lifecycle remain unqualified",
+    "native node and Qt runtime Release only",
+    "headless Qt and CPU-reference GPU test doubles; no real GPU runtime",
+    "uncached grouped authorization; no experimental cache acceptance",
+    "no automatic signing or broadcast, no production durable timer",
+    "Linux GCC x86_64 only; no LSan, TSan, coverage-guided fuzzer or independent audit"
+  ]
+}
