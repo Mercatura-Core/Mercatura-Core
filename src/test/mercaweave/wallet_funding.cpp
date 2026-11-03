@@ -96,7 +96,7 @@ std::vector<Funded> Funding::Sweep(const Wallet& w,const integration::ViewPtr& v
     std::sort(available.begin(),available.end(),[](const auto& a,const auto& b){return std::tie(a.owner.pk,a.candidate.point)<std::tie(b.owner.pk,b.candidate.point);});
     std::vector<Funded> batches;std::vector<Resolved> pending;std::optional<Funded> previous;
     auto build=[&]{return Assemble(w,v,pending,std::vector<CTxOut>{CTxOut{2,destination}},nullptr,p,true);};
-    for(const auto& c:available){pending.push_back(c);try{previous=build();}catch(const WalletError& e){if(e.code!=Code::Policy)throw;Require(previous.has_value(),Code::Policy,"single sweep input exceeds policy");pending.pop_back();batches.push_back(std::move(*previous));pending={c};previous=build();}}
+    for(const auto& c:available){pending.push_back(c);try{previous=build();}catch(const WalletError& e){if(e.code!=Code::Policy)throw;const std::string_view cause=e.what();if(cause!="group member bound"&&cause!="group count bound"&&cause!="standard transaction shape or 400000 WU limit"&&cause!="block resource limit"&&cause!="existing signature cost limit")throw;Require(previous.has_value(),Code::Policy,"single sweep input exceeds policy");pending.pop_back();batches.push_back(std::move(*previous));pending={c};previous=build();}}
     if(previous)batches.push_back(std::move(*previous));return batches;
 }
 }

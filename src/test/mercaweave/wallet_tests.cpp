@@ -101,6 +101,8 @@ void FundingChecks()
     auto batches=Funding::Sweep(*w,view,independent,recipient.script,FundingMode::MercaWeave);size_t selected=0;for(const auto& batch:batches){Check(batch.sizes.weight<=400000&&batch.groups==batch.selected,"independent keys never fictitiously aggregate");selected+=batch.selected;}
     Check(batches.size()==2&&selected==100,"100-independent-key sweep splits under standard weight");
     auto shared=Funding::Sweep(*w,view,subset,recipient.script);Check(shared.size()==1&&shared[0].groups==1&&shared[0].sizes.total<10000,"same-key sweep shares anchor");
+    auto dust_coin=wt::Point(998);view->Insert(dust_coin,Coin{CTxOut{7,grouped.script},1,false});std::vector<FundingCoin> dust_set{{dust_coin}};
+    try{Funding::Sweep(*w,view,dust_set,recipient.script);throw std::runtime_error("unexpected dust sweep");}catch(const WalletError& e){Check(e.code==Code::Policy&&std::string_view(e.what())=="final dust output","sweep preserves dust cause instead of masking it as a size limit");}
     auto immature=wt::Point(999);view->Insert(immature,Coin{CTxOut{10000,grouped.script},199,true});std::vector<FundingCoin> immature_set{{immature}};Reject([&]{Funding::Exact(*w,view,immature_set,floor,nullptr);},Code::Inputs);
 }
 }
