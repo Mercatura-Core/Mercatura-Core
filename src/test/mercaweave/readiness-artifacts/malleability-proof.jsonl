@@ -1,0 +1,5 @@
+{"case":"v3_only_randomized_signature","before_txid":"e963f4a59a7300478a319cd4521c6ff40d6e1f2dbcb92e5bbc74979c187bc166","after_txid":"e963f4a59a7300478a319cd4521c6ff40d6e1f2dbcb92e5bbc74979c187bc166","wtxid_changed":true,"authorized":true,"child_resolves":true}
+{"case":"bare","before_txid":"81eff00af17d0722f9d2abcbc5cd6bd32c4e032333283a8cfc60a14a15a53569","after_txid":"5296a66c0ae5d63b57601de9587a02323e8a59e46611460dc3316386a6a2a05d","wtxid_changed":true,"digest_unchanged":true,"authorized":true,"child_resolves":false}
+{"case":"p2sh","before_txid":"df160f0e7070cf1ba1698b553b8ac4613533f98bb0fb604838a15263acb2c92d","after_txid":"e9e75d2c625c82c2d11398757556ca9f366df829fd408d6bf00500c4313b0d38","wtxid_changed":true,"digest_unchanged":true,"authorized":true,"child_resolves":false}
+{"case":"p2wsh","before_txid":"58139eb9b4815b5dd7f76492f5620f518717b7f64f52686564fb8a95977eaaeb","after_txid":"58139eb9b4815b5dd7f76492f5620f518717b7f64f52686564fb8a95977eaaeb","wtxid_changed":true,"digest_unchanged":true,"authorized":true,"child_resolves":true}
+{"assertions":41,"passed":true}

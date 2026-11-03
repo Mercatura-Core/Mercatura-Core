@@ -1,0 +1,345 @@
+{
+  "vectors": {
+    "release": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7",
+    "debug": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7",
+    "sanitize": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7"
+  },
+  "malleability": {
+    "release": "d8658e03b6424addac83e692526c9176cb325075d8eb70ce3c419fa5a1bfbc09",
+    "debug": "d8658e03b6424addac83e692526c9176cb325075d8eb70ce3c419fa5a1bfbc09",
+    "sanitize": "d8658e03b6424addac83e692526c9176cb325075d8eb70ce3c419fa5a1bfbc09"
+  },
+  "comparisons": [
+    {
+      "build": "debug",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "small",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "consolidate53",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "consolidate100",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "independent100",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "max_groups",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "max_members",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "max_inputs",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "mixed",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "late_member",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "late_signature",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "duplicate_anchor",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "final_reference",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "altered_output",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "spent_amount",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "spent_script",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "negative_amount",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "witness_final",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "groups_over",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "members_over",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "inputs_over",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "truncated",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "debug",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "oversized_count",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "small",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "consolidate53",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "consolidate100",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "independent100",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "max_groups",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "max_members",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "max_inputs",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "transaction-benchmarks.csv",
+      "scenario": "mixed",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "late_member",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "late_signature",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "duplicate_anchor",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "final_reference",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "altered_output",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "spent_amount",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "spent_script",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "negative_amount",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "witness_final",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "groups_over",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "members_over",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "inputs_over",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "truncated",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "invalid-workloads.csv",
+      "scenario": "oversized_count",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "block-benchmarks.csv",
+      "scenario": "small",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "block-benchmarks.csv",
+      "scenario": "consolidate53",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "block-benchmarks.csv",
+      "scenario": "consolidate100",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "block-benchmarks.csv",
+      "scenario": "independent100",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "block-benchmarks.csv",
+      "scenario": "max_groups",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "block-benchmarks.csv",
+      "scenario": "max_members",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "block-benchmarks.csv",
+      "scenario": "max_inputs",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "block-benchmarks.csv",
+      "scenario": "mixed",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "block-benchmarks.csv",
+      "scenario": "early_invalid",
+      "equal_verdict_and_counters": true
+    },
+    {
+      "build": "sanitize",
+      "dataset": "block-benchmarks.csv",
+      "scenario": "late_invalid",
+      "equal_verdict_and_counters": true
+    }
+  ],
+  "comparison_count": 54,
+  "source_head": "a3c35fdb50cbf7410cdbead6bba0acd45c3fbcf5",
+  "build_cmake_sha256": "f8d08fe9ffa65ac8fffc1723b1d7bccc7bbb82a958db586977a463ae68e51c84",
+  "limitations": [
+    "single x86_64 GCC 14.2 host; no independent alternate compiler or architecture",
+    "production policy.cpp alone excludes UBSan vptr metadata for discarded node-dependent functions; all new research code uses complete ASan/UBSan"
+  ]
+}

@@ -1,0 +1,15 @@
+scenario,fixture,inputs,groups,serialized_bytes,reason,stage,charged_transactions,actual_group_verifies,ownership_checks,body_passes,manifest_passes,median_ms,worst_ms,user_ms,system_ms,peak_rss_kib,cpp_new_calls,cpp_requested_bytes,cpp_largest_request
+late_member,signed_then_mutated,1000,1,85319,ownership,ownership,1,0,1000,0,0,6.561735,6.812361,6.583571,0.000000,11520,6059,773101,164226
+late_signature,signed_then_mutated,100,100,534255,signature,signature,1,100,100,1,1,15.133774,16.222735,14.500286,0.617143,11520,1180,3301142,905502
+duplicate_anchor,signed_then_mutated,256,256,1367609,duplicate_key,structure,1,0,0,0,0,0.310637,0.805833,0.378429,0.000000,12032,2110,6202125,2264752
+final_reference,signed_then_mutated,500,10,92677,reference,structure,1,0,0,0,0,0.183776,0.204909,0.190857,0.000000,11520,2643,616393,159064
+altered_output,signed_then_mutated,100,10,60675,signature,signature,1,1,100,1,1,0.896850,1.047927,0.917857,0.000000,11520,840,467206,114638
+spent_amount,signed_then_mutated,100,10,60675,signature,signature,1,1,100,1,1,1.032054,1.586868,1.174857,0.000000,11520,840,467206,114638
+spent_script,signed_then_mutated,100,1,13317,ownership,ownership,1,0,100,0,0,0.624530,0.795036,0.650286,0.000000,11520,650,86521,14934
+negative_amount,signed_then_mutated,100,1,13317,amount,structure,1,0,0,0,0,0.030556,0.038648,0.032000,0.000000,11520,438,66909,14934
+witness_final,signed_then_mutated,100,1,13318,witness,structure,1,0,0,0,0,0.032960,0.211879,0.060571,0.000000,11520,551,83329,14934
+groups_over,structural_only,257,257,1372951,groups_limit,structure,1,0,0,0,0,0.281894,0.945183,0.377429,0.000000,11520,2120,6329509,2328446
+members_over,structural_only,1025,1,87319,members_limit,structure,1,0,0,0,0,0.373302,0.492111,0.252429,0.129857,11520,5185,836845,167926
+inputs_over,structural_only,4097,5,354127,inputs_limit,structure,1,0,0,0,0,1.423943,1.660830,1.453857,0.000000,11520,20538,3032895,671744
+truncated,signed_then_mutated,100,1,6658,bounded_decode,decode,0,0,0,0,0,0.002634,0.004587,0.003857,0.000000,11520,1,45,45
+oversized_count,signed_then_mutated,100,1,11,bounded_decode,decode,0,0,0,0,0,0.002914,0.005468,0.004000,0.000000,11648,4,211,74

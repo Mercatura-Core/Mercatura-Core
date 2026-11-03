@@ -146,3 +146,63 @@ diagnostic shows why `4G+N` must not be treated as a complete CPU budget.
 See `doc/design/mercaweave-v0.1-security-qualification.md` for the eight-part
 threat model, named executable tests, supported Script malleability examples,
 limits of the accounting evidence and remaining integration gates.
+
+## Work Order 03 consensus-readiness checkpoint
+
+CTest now has eleven targets. `auth_context.{h,cpp}` provides the research
+authorization boundary: `Capture` copies transaction, vin-order authenticated
+spent outputs, genesis and all flags into an immutable request; `Prepare` always
+performs complete group and genuine native verification before publishing a
+privately constructed `ValidatedContext`. No caller-supplied bool, partial
+`Result`, arbitrary Mapping or existing Authorization can create that context.
+Use `Bind` once for a transaction, then share its immutable `InputChecks` across
+per-input workers. `Check(index)` is O(1), independent of anchor execution order.
+The convenience `CheckInput` does a full binding comparison per call; do not use
+it to perform repeated whole-transaction comparisons in a large input queue.
+Without context it rejects v3; non-v3 checks retain the real native path.
+
+The new context adds full flag binding and both transaction identities to the
+older offline record. No cross-request signature or whole-transaction cache is
+implemented. These objects do not establish UTXO existence, reorg validity,
+chain maturity, finality or full block acceptance. Low-level hashing helpers and
+the callback-taking `Verify` remain research tools, not proof-minting interfaces.
+
+`block_work.{h,cpp}` uses checked cumulative counters and explicit reference
+budgets. It reserves structurally measurable work before verification and
+retains charges for invalid authorizations. Failed reservations poison a ledger;
+no successful prefix authorizes a denied workload. It uses genuine `CBlock`
+serialization with a synthetic coinbase/header and separate full bytes, inherited
+weight, witness items, legacy/native cost, `4G+N`, PK bytes and hash-pass counters.
+It is a resource/authentication simulator, not production consensus integration.
+The current fixed snapshot is 4 MiB, 16384 witness items and 80000 sigop cost;
+weight is measured separately. No network configuration is inferred or changed.
+
+```bash
+python3 src/test/mercaweave/measure_readiness.py \
+  --binary work/build-release/mercaweave_readiness_bench \
+  --output-dir work/readiness-reproduction
+work/build-release/mercaweave_malleability_tests
+cmake -S src/test/mercaweave -B work/build-debug -DCMAKE_BUILD_TYPE=Debug
+cmake --build work/build-debug -j2
+ctest --test-dir work/build-debug --output-on-failure
+# After building Release, Debug and sanitizer configurations:
+python3 src/test/mercaweave/check_readiness_determinism.py
+```
+
+The comparison command checks the saved CSV verdicts/counters, writes the
+deterministic proof/check JSON artifacts, and deliberately ignores timing and
+allocator/RSS variation. Committed evidence is in `readiness-artifacts/`.
+The new measurements include fully signed 4096-input, 256-group and 1024-member
+cases; the earlier structural-only description refers to WO01 evidence.
+
+The malleability test links genuine production Solver, IsStandard, IsStandardTx,
+EvalScript and native verification. Whole `AreInputsStandard`/`IsWitnessStandard`
+coin-view paths are source-audited, not dynamically executed. To link Debug
+assertion support it also uses unmodified `util/check.cpp` and `clientversion.cpp`
+with generated diagnostic-only metadata from the existing project. Sanitizer
+builds exclude only UBSan vptr instrumentation on production `policy.cpp`:
+otherwise GCC retains RTTI references for discarded node-dependent functions.
+All other checks and all new research code retain full ASan/UBSan instrumentation.
+
+See `doc/design/mercaweave-v0.1-consensus-readiness.md` for the readiness decision,
+cache boundaries, measured block matrix, invalid cases and malleability options.
