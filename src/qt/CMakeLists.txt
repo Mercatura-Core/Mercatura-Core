@@ -220,6 +220,10 @@ if(ENABLE_WALLET)
       walletcontroller.h
       walletframe.cpp
       walletframe.h
+      mercaweavemodel.cpp
+      mercaweavemodel.h
+      mercaweavepanel.cpp
+      mercaweavepanel.h
       walletmodel.cpp
       walletmodel.h
       walletmodeltransaction.cpp
