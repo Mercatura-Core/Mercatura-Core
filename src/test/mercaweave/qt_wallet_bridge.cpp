@@ -107,7 +107,7 @@ MercaWeaveQt::Snapshot Bridge::Perform(const Request& request)
             }else{try{m_policy.destination=NativeDestination(request.destination);}catch(const std::exception&){state.reason=Reason::Destination;return state;}}
             auto decision=m_planner.Evaluate(*m_wallet,m_view,m_candidates,m_policy);state=Snapshot();state.reason=Map(decision.block);state.mature=decision.mature;state.immature=decision.immature;state.eligible=decision.eligible;break;}
         }
-    }catch(const WalletError& e){state=Snapshot();state.reason=e.code==Code::Locked?Reason::Locked:e.code==Code::Fee?Reason::Fee:Reason::Metadata;return state;}
+    }catch(const WalletError& e){state=Snapshot();state.preview={};switch(e.code){case Code::Locked:state.reason=Reason::Locked;break;case Code::WatchOnly:state.reason=Reason::WatchOnly;break;case Code::Fee:state.reason=Reason::Fee;break;case Code::Funds:case Code::Mode:state.reason=Reason::Funds;break;case Code::Inputs:state.reason=Reason::Stale;break;case Code::Policy:state.reason=Reason::Limits;break;case Code::PSBT:case Code::Signature:state.reason=Reason::Failed;break;default:state.reason=Reason::Metadata;break;}return state;}
     if(generation!=m_revision){m_planner.Cancel();state=Snapshot();state.reason=Reason::Stale;state.preview={};state.syntheticAddress.clear();return state;}
     ++m_revision;auto result=Snapshot();if(request.action==Action::Plan)result.reason=state.reason;return result;
 }
