@@ -175,7 +175,10 @@ add_library(mercaweave_wallet_primitives STATIC
   ${MCA_SRC}/wallet/wallet.cpp ${MCA_SRC}/wallet/crypter.cpp
   ${MCA_SRC}/wallet/coinselection.cpp ${MCA_SRC}/psbt.cpp
   ${MCA_SRC}/crypto/aes.cpp ${MCA_SRC}/crypto/ctaes/ctaes.c
-  ${MCA_SRC}/bech32.cpp ${MCA_SRC}/script/signingprovider.cpp)
+  ${MCA_SRC}/bech32.cpp ${MCA_SRC}/script/signingprovider.cpp
+  # UBSan retains native signature-creator RTTI; link its real implementation
+  # and miniscript static-initializer dependencies, never substitute test RTTI.
+  ${MCA_SRC}/script/sign.cpp ${MCA_SRC}/script/miniscript.cpp)
 target_include_directories(mercaweave_wallet_primitives PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/diagnostic)
 target_compile_definitions(mercaweave_wallet_primitives PUBLIC MERCATURA_MERCAWEAVE_WALLET_RESEARCH_TEST_ONLY=1)
 target_compile_options(mercaweave_wallet_primitives PRIVATE -ffunction-sections -fdata-sections)
