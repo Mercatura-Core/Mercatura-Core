@@ -47,6 +47,7 @@ const std::string LOCKED_UTXO{"lockedutxo"};
 const std::string MASTER_KEY{"mkey"};
 const std::string MERCATURA_PQ_STATE{"mercaturapqstate"};
 const std::string PQGROUP_RECORDS{"mercaturapqgrouprecords"};
+const std::string PQGROUP_REQUIRED{"mercaturapqgrouprequired"};
 const std::string MERCATURA_PQ_SEED{"mercaturapqseed"};
 const std::string MERCATURA_PQ_CRYPTED_SEED{"mercaturapqcryptedseed"};
 const std::string MERCATURA_PQ_KEY_LOCATOR{"mercaturapqkeylocator"};
@@ -173,7 +174,10 @@ bool WalletBatch::WriteMercaturaPQState(
 
 bool WalletBatch::WritePQGroupRecords(const PQGroupRecords& records)
 {
-    return records.StructurallyValid() && WriteIC(DBKeys::PQGROUP_RECORDS,records,true);
+    // Caller owns the native wallet transaction: the presence marker and
+    // authenticated ranges must commit or roll back together.
+    return records.StructurallyValid() && WriteIC(DBKeys::PQGROUP_REQUIRED,uint32_t{1},true) &&
+        WriteIC(DBKeys::PQGROUP_RECORDS,records,true);
 }
 
 bool WalletBatch::WriteMercaturaPQSeed(
@@ -1417,18 +1421,29 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
             LoadMercaturaPQWalletRecords(pwallet, *m_batch),
             result);
 
-        // Load tx records
+        // Check paired metadata presence before publishing grouped ownership.
+        bool group_records_loaded{false}, group_records_required{false};
+        result = std::max(LoadRecords(pwallet,*m_batch,DBKeys::PQGROUP_REQUIRED,
+            [&](CWallet*, DataStream& key, DataStream& value, std::string& error) {
+                uint32_t version; value >> version;
+                if (!key.empty() || !value.empty() || version != 1 || group_records_required) {
+                    error = "Invalid PQ group metadata presence record";
+                    return DBErrors::CORRUPT;
+                }
+                group_records_required = true; return DBErrors::LOAD_OK;
+            }).m_result,result);
         result = std::max(LoadRecords(pwallet,*m_batch,DBKeys::PQGROUP_RECORDS,
-            [](CWallet* wallet, DataStream& key, DataStream& value, std::string& error)
+            [&](CWallet* wallet, DataStream& key, DataStream& value, std::string& error)
                 EXCLUSIVE_LOCKS_REQUIRED(wallet->cs_wallet) {
                 PQGroupRecords records;
                 value >> records;
-                if (!key.empty() || !value.empty() || !wallet->LoadPQGroupRecords(records)) {
+                if (!group_records_required || !key.empty() || !value.empty() || !wallet->LoadPQGroupRecords(records)) {
                     error = "Invalid, duplicate, unauthorized or wrong-network PQ group records";
                     return DBErrors::CORRUPT;
                 }
-                return DBErrors::LOAD_OK;
+                group_records_loaded = true; return DBErrors::LOAD_OK;
             }).m_result,result);
+        if (group_records_loaded != group_records_required) result = DBErrors::CORRUPT;
 
         // Load tx records after authenticated/provisional ownership metadata.
         result = std::max(LoadTxRecords(pwallet, *m_batch, any_unordered), result);

@@ -2619,6 +2619,7 @@ std::optional<PSBTError> CWallet::FillPQGroupPSBT(PartiallySignedTransaction& so
         struct Clean { void* data; size_t size; ~Clean() { memory_cleanse(data,size); } };
         auto staged = source;
         std::map<COutPoint,Coin> queried;
+        const bool live_prevouts = authenticated_coins == nullptr;
         if (!authenticated_coins) {
             if (!m_chain) return PSBTError::MISSING_INPUTS;
             for (const auto& input : source.tx->vin) queried.emplace(input.prevout,Coin{});
@@ -2724,6 +2725,20 @@ std::optional<PSBTError> CWallet::FillPQGroupPSBT(PartiallySignedTransaction& so
             }
         }
         info = psbt::Inspect(staged,spent,*m_group_execution);
+        if (live_prevouts) {
+            // Signing may outlast the authentic chain snapshot acquired above.
+            // Recheck before publishing; ordinary admission must still validate
+            // again because the chain can always change after this API returns.
+            std::map<COutPoint,Coin> refreshed;
+            for (const auto& input : source.tx->vin) refreshed.emplace(input.prevout,Coin{});
+            m_chain->findCoins(refreshed);
+            for (const auto& [point,original] : queried) {
+                const auto& current = refreshed.at(point);
+                if (current.IsSpent() || current.out != original.out ||
+                    current.nHeight != original.nHeight || current.fCoinBase != original.fCoinBase)
+                    return PSBTError::MISSING_INPUTS;
+            }
+        }
         complete = std::all_of(info.complete.begin(),info.complete.end(),[](bool value) { return value; });
         if (finalize) FinalizePSBT(staged,*m_group_execution,spent);
         source = std::move(staged);
