@@ -1,0 +1,388 @@
+Start testing: Nov 03 05:14 UTC
+----------------------------------------------------------
+1/22 Testing: locked_python_vectors
+1/22 Test: locked_python_vectors
+Command: "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12" "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/reference.py"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"locked_python_vectors" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+{
+  "lengths": {
+    "manifest": 2030,
+    "body": 296,
+    "final": 2085
+  },
+  "actual": {
+    "C0": "e7619d364b194cbfac8edca35b48c1b8ef4f4f255943251173ece8b3be19132e",
+    "C1": "bb47c62b9598812333b43e7ac4d9093be831a6dc01a1996cd2277e36b95c92e7",
+    "Hprev": "c3a2622d72e41ba9ca4db477380f79d1695892c1aa58da363f619472458f1bae74dc68e3f35ffc1c4a25d3171ca3f8ed",
+    "Hamount": "46f69dddebc597d8a1ce461066bbf0787f0991499407edbe30f4b95320013c1ee87c9dad260cd264f381d25a8c3e61ff",
+    "Hscript": "8e19629094b3008c0402b10bdd025b52d2687f268ec3cb52717ac439e037699ab5b5641037b32b7a83f0b17bb09a7c05",
+    "Hseq": "893f60c283b397319de21743450cea825d21de5b13e84d2b2c79bded4ee6638714141ce57790cb435055faee21f7a20c",
+    "Hout": "c388bbff0ca9c57591df4ca125e192887f621a9a8a68ce685c743e247daac2780f3bebafca8456bf83a69fc76d6be119",
+    "Htx": "7fb38f5cb14b93df70207f52f1fd508a6b890583ad79bf67a6c7e17009e450562a68f5361eb03ff0b05ba4492560f262",
+    "Hmanifest": "56fe8b56240f7840e2f8eadc2cf1b05328d9a2922ab2df36233e8df42510ce31336eb5168094477823241d113b188ef8",
+    "Dgroup": "ecc046c62d0a1a8fad53fad0109cf27ecd98e6c03ac85a2a3485528ba7f0c1302fbe21c7a0feebd87c52fdfd6c76aab4"
+  },
+  "failures": []
+}
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"locked_python_vectors" end time: Nov 03 05:14 UTC
+"locked_python_vectors" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/22 Testing: mercaweave_tests
+2/22 Test: mercaweave_tests
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_tests"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"mercaweave_tests" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+PASS assertions=9855 positive_cases=16 negative_cases=86 structural_boundary_cases=3 malformed_cases=8301
+<end of output>
+Test time =   1.25 sec
+----------------------------------------------------------
+Test Passed.
+"mercaweave_tests" end time: Nov 03 05:14 UTC
+"mercaweave_tests" time elapsed: 00:00:01
+----------------------------------------------------------
+
+3/22 Testing: cross_language_vectors
+3/22 Test: cross_language_vectors
+Command: "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12" "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/crosscheck.py" "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_tests"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"cross_language_vectors" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+PASS cross-language: 8 locked hash/digest values, 4 transaction/manifest cases, 3 derivation purposes
+<end of output>
+Test time =   0.11 sec
+----------------------------------------------------------
+Test Passed.
+"cross_language_vectors" end time: Nov 03 05:14 UTC
+"cross_language_vectors" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/22 Testing: native_v2_interoperability
+4/22 Test: native_v2_interoperability
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_native_tests"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"native_v2_interoperability" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+PASS native assertions=91 accepted=14 rejected=19
+<end of output>
+Test time =   0.13 sec
+----------------------------------------------------------
+Test Passed.
+"native_v2_interoperability" end time: Nov 03 05:14 UTC
+"native_v2_interoperability" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/22 Testing: bounded_parsers
+5/22 Test: bounded_parsers
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_parser_tests"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"bounded_parsers" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+PASS parser checks=19957 rejected=7523 fuzzed=12000 seed=6291300197112828499
+<end of output>
+Test time =   3.68 sec
+----------------------------------------------------------
+Test Passed.
+"bounded_parsers" end time: Nov 03 05:14 UTC
+"bounded_parsers" time elapsed: 00:00:03
+----------------------------------------------------------
+
+6/22 Testing: hostile_followers_and_context
+6/22 Test: hostile_followers_and_context
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_attack_tests"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"hostile_followers_and_context" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+PASS attacks assertions=20067 attacks=10 reference_mutations=10000
+<end of output>
+Test time =   0.76 sec
+----------------------------------------------------------
+Test Passed.
+"hostile_followers_and_context" end time: Nov 03 05:14 UTC
+"hostile_followers_and_context" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/22 Testing: resource_qualification_smoke
+7/22 Test: resource_qualification_smoke
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_qualification_bench" "10" "1"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"resource_qualification_smoke" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+inputs,groups,label,bytes,weight,cost,verification_calls,ownership_checks,median_verify_ms,worst_verify_ms,mapping_ms,ownership_ms,manifest_build_ms,components_and_body_ms,manifest_hash_ms,final_digests_ms,mldsa_verify_ms,decode_ms,malformed_ms,early_commitment_ms,late_commitment_ms,late_signature_ms,worst_late_signature_ms,cpp_new_calls,cpp_requested_bytes,cpp_largest_request_bytes,oversized_wire_largest_request_bytes,peak_rss_kib,weight_only
+10,1,group_bounds,6117,7506,14,1,10,0.577673,0.820159,0.052710,0.099481,0.016355,0.046079,0.035003,0.032119,0.292332,0.027922,0.057988,0.051738,0.176737,0.548900,0.613427,75,28742,7548,74,24252,within_weight_only
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"resource_qualification_smoke" end time: Nov 03 05:14 UTC
+"resource_qualification_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+8/22 Testing: fail_closed_context
+8/22 Test: fail_closed_context
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_context_tests"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"fail_closed_context" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+PASS context assertions=4052 mismatches=11 mutations=2000
+<end of output>
+Test time =   1.73 sec
+----------------------------------------------------------
+Test Passed.
+"fail_closed_context" end time: Nov 03 05:14 UTC
+"fail_closed_context" time elapsed: 00:00:01
+----------------------------------------------------------
+
+9/22 Testing: checked_block_work
+9/22 Test: checked_block_work
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_block_tests"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"checked_block_work" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+PASS block assertions=5026 overflows=7 mutations=5000
+<end of output>
+Test time =   0.11 sec
+----------------------------------------------------------
+Test Passed.
+"checked_block_work" end time: Nov 03 05:14 UTC
+"checked_block_work" time elapsed: 00:00:00
+----------------------------------------------------------
+
+10/22 Testing: block_measurement_smoke
+10/22 Test: block_measurement_smoke
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_readiness_bench" "block" "small" "--smoke"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"block_measurement_smoke" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+scenario,valid,transactions,inputs,v3_inputs,groups,block_bytes,stripped_bytes,witness_bytes,legacy_weight,tx_fee_full_bytes,witness_items,existing_cost,group_cost,binding_budget,actual_group_verifies,actual_native_verifies,ownership_checks,pk_hash_bytes,body_passes,manifest_passes,component_payload_bytes,manifest_payload_bytes,median_ms,worst_ms,user_ms,system_ms,peak_rss_kib,cpp_new_calls,cpp_requested_bytes,cpp_largest_request
+small,1,2,2,2,2,10938,332,10606,11934,10794,6,0,10,0,2,0,2,3904,2,2,844,3988,1.120744,1.247005,0.558714,0.556571,26576,126,80786,6810
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"block_measurement_smoke" end time: Nov 03 05:14 UTC
+"block_measurement_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+11/22 Testing: malleability_children_and_policy
+11/22 Test: malleability_children_and_policy
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_malleability_tests"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"malleability_children_and_policy" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+{"case":"v3_only_randomized_signature","before_txid":"e963f4a59a7300478a319cd4521c6ff40d6e1f2dbcb92e5bbc74979c187bc166","after_txid":"e963f4a59a7300478a319cd4521c6ff40d6e1f2dbcb92e5bbc74979c187bc166","wtxid_changed":true,"authorized":true,"child_resolves":true}
+{"case":"bare","before_txid":"81eff00af17d0722f9d2abcbc5cd6bd32c4e032333283a8cfc60a14a15a53569","after_txid":"5296a66c0ae5d63b57601de9587a02323e8a59e46611460dc3316386a6a2a05d","wtxid_changed":true,"digest_unchanged":true,"authorized":true,"child_resolves":false}
+{"case":"p2sh","before_txid":"df160f0e7070cf1ba1698b553b8ac4613533f98bb0fb604838a15263acb2c92d","after_txid":"e9e75d2c625c82c2d11398757556ca9f366df829fd408d6bf00500c4313b0d38","wtxid_changed":true,"digest_unchanged":true,"authorized":true,"child_resolves":false}
+{"case":"p2wsh","before_txid":"58139eb9b4815b5dd7f76492f5620f518717b7f64f52686564fb8a95977eaaeb","after_txid":"58139eb9b4815b5dd7f76492f5620f518717b7f64f52686564fb8a95977eaaeb","wtxid_changed":true,"digest_unchanged":true,"authorized":true,"child_resolves":true}
+{"assertions":41,"passed":true}
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"malleability_children_and_policy" end time: Nov 03 05:14 UTC
+"malleability_children_and_policy" time elapsed: 00:00:00
+----------------------------------------------------------
+
+12/22 Testing: normal_inactive_control
+12/22 Test: normal_inactive_control
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_normal_control"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"normal_inactive_control" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+{"research_hook":false,"contextless_v3_mandatory":true,"contextless_v3_policy":false,"native_v2_verifies":20,"passed":true}
+<end of output>
+Test time =   0.05 sec
+----------------------------------------------------------
+Test Passed.
+"normal_inactive_control" end time: Nov 03 05:14 UTC
+"normal_inactive_control" time elapsed: 00:00:00
+----------------------------------------------------------
+
+13/22 Testing: isolated_missing_context_control
+13/22 Test: isolated_missing_context_control
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_isolated_control"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"isolated_missing_context_control" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+{"research_hook":true,"contextless_v3_mandatory":false,"contextless_v3_policy":false,"native_v2_verifies":20,"passed":true}
+<end of output>
+Test time =   0.06 sec
+----------------------------------------------------------
+Test Passed.
+"isolated_missing_context_control" end time: Nov 03 05:14 UTC
+"isolated_missing_context_control" time elapsed: 00:00:00
+----------------------------------------------------------
+
+14/22 Testing: authoritative_coin_view_probe
+14/22 Test: authoritative_coin_view_probe
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_coin_probe"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"authoritative_coin_view_probe" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+current policy rejects unknown v3 as expected
+PASS real coin-view/transaction validation fee=1200
+<end of output>
+Test time =   0.02 sec
+----------------------------------------------------------
+Test Passed.
+"authoritative_coin_view_probe" end time: Nov 03 05:14 UTC
+"authoritative_coin_view_probe" time elapsed: 00:00:00
+----------------------------------------------------------
+
+15/22 Testing: isolated_validation_integration
+15/22 Test: isolated_validation_integration
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_integration_tests"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"isolated_validation_integration" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+{"case":"integrated_p2sh","before_txid":"df160f0e7070cf1ba1698b553b8ac4613533f98bb0fb604838a15263acb2c92d","after_txid":"e9e75d2c625c82c2d11398757556ca9f366df829fd408d6bf00500c4313b0d38","child_valid":false}
+{"case":"integrated_p2wsh","before_txid":"58139eb9b4815b5dd7f76492f5620f518717b7f64f52686564fb8a95977eaaeb","after_txid":"58139eb9b4815b5dd7f76492f5620f518717b7f64f52686564fb8a95977eaaeb","child_valid":true}
+{"assertions":2153,"rejected_cases":31,"mutations":2000,"concurrent_script_calls":2800,"mutation_stages":{"1":3,"2":26,"5":1971},"passed":true}
+<end of output>
+Test time =   5.75 sec
+----------------------------------------------------------
+Test Passed.
+"isolated_validation_integration" end time: Nov 03 05:14 UTC
+"isolated_validation_integration" time elapsed: 00:00:05
+----------------------------------------------------------
+
+16/22 Testing: research_compile_and_cache_isolation
+16/22 Test: research_compile_and_cache_isolation
+Command: "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12" "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/check_isolation.py" "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"research_compile_and_cache_isolation" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+{"checker_abis_separate": true, "controls": {"mercaweave_isolated_control": {"contextless_v3_mandatory": false, "contextless_v3_policy": false, "native_v2_verifies": 20, "passed": true, "research_hook": true}, "mercaweave_normal_control": {"contextless_v3_mandatory": true, "contextless_v3_policy": false, "native_v2_verifies": 20, "passed": true, "research_hook": false}}, "isolated_compile_units": 56, "node_cache_symbols_absent": true, "normal_header_use_rejected": true, "normal_hook_symbol_absent": true, "normal_source_erasure_sha256": {"src/script/interpreter.cpp": "06a627b471d8542ac7af5738db20c43efefaad6f0e2ecafc155739ce3ccdadc9", "src/script/interpreter.h": "f38652f9af7c55e5998ec24e7403835f935a6ae3e5387ecc9cf03b975152ba80"}, "ordinary_compile_units": 56, "passed": true}
+<end of output>
+Test time =   1.77 sec
+----------------------------------------------------------
+Test Passed.
+"research_compile_and_cache_isolation" end time: Nov 03 05:14 UTC
+"research_compile_and_cache_isolation" time elapsed: 00:00:01
+----------------------------------------------------------
+
+17/22 Testing: integrated_resource_measurement_smoke
+17/22 Test: integrated_resource_measurement_smoke
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_integration_bench" "small" "--smoke"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"integrated_resource_measurement_smoke" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+scenario,smoke,v3_per_tx,groups_per_tx,native_per_tx,submitted_txs,submitted_inputs,submitted_groups,full_block_bytes,full_legacy_weight,tx_full_fee_bytes,submitted_witness_items,valid,stage,processed_txs,charged_txs,charged_group_cost,charged_existing_cost,charged_prefix_bytes,group_verifies,ownership_checks,native_prepare_verifies,native_dispatch_verifies,script_calls,hook_calls,body_passes,manifest_passes,ownership_pk_bytes,current_policy_pass,engine_tx_ms,engine_tx_worst_ms,engine_tx_user_ms,engine_tx_system_ms,dispatch_ms,dispatch_worst_ms,dispatch_user_ms,dispatch_system_ms,integrated_tx_ms,integrated_tx_worst_ms,integrated_tx_user_ms,integrated_tx_system_ms,wo03_block_ms,wo03_block_worst_ms,wo03_block_user_ms,wo03_block_system_ms,integrated_block_ms,integrated_block_worst_ms,integrated_block_user_ms,integrated_block_system_ms,peak_rss_kib,cpp_new_calls,cpp_requested_bytes,cpp_largest_request
+small,1,1,1,0,2,2,2,10938,11934,10794,6,1,0,2,2,10,0,10938,2,2,0,0,2,2,2,2,3904,0,0.517060,0.641497,0.545714,0.000000,0.012389,0.031727,0.008571,0.006714,0.885575,0.981700,0.442857,0.392000,1.127520,1.879142,0.757000,0.468714,2.001181,2.279836,1.868571,0.000000,51836,266,173328,6810
+<end of output>
+Test time =   0.07 sec
+----------------------------------------------------------
+Test Passed.
+"integrated_resource_measurement_smoke" end time: Nov 03 05:14 UTC
+"integrated_resource_measurement_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+18/22 Testing: native_wallet_primitives
+18/22 Test: native_wallet_primitives
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_wallet_primitive_probe"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"native_wallet_primitives" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+PASS native seed envelope, PSBT serialization/merge and coin selection
+<end of output>
+Test time =   0.04 sec
+----------------------------------------------------------
+Test Passed.
+"native_wallet_primitives" end time: Nov 03 05:14 UTC
+"native_wallet_primitives" time elapsed: 00:00:00
+----------------------------------------------------------
+
+19/22 Testing: grouped_wallet_keys_and_storage
+19/22 Test: grouped_wallet_keys_and_storage
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_wallet_tests"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"grouped_wallet_keys_and_storage" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+{"wallet_checks":247,"rejections":27,"passed":true}
+<end of output>
+Test time =   6.96 sec
+----------------------------------------------------------
+Test Passed.
+"grouped_wallet_keys_and_storage" end time: Nov 03 05:14 UTC
+"grouped_wallet_keys_and_storage" time elapsed: 00:00:06
+----------------------------------------------------------
+
+20/22 Testing: research_wallet_compile_isolation
+20/22 Test: research_wallet_compile_isolation
+Command: "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12" "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/check_wallet_isolation.py" "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"research_wallet_compile_isolation" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+{"normal_header_rejected": true, "normal_wallet_source_sha256": "a539857363ed2b42349334b7f3513877557e9cfd5ec28a9883ed8e46555a36e5", "normal_wallet_symbols_absent": true, "passed": true, "wallet_compile_units": 18}
+<end of output>
+Test time =   1.92 sec
+----------------------------------------------------------
+Test Passed.
+"research_wallet_compile_isolation" end time: Nov 03 05:14 UTC
+"research_wallet_compile_isolation" time elapsed: 00:00:01
+----------------------------------------------------------
+
+21/22 Testing: grouped_partial_psbt_and_signing
+21/22 Test: grouped_partial_psbt_and_signing
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_psbt_tests"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"grouped_partial_psbt_and_signing" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+{"psbt_checks":67,"rejections":41,"mutations":1000,"mutation_rejections":1000,"passed":true}
+<end of output>
+Test time =   1.71 sec
+----------------------------------------------------------
+Test Passed.
+"grouped_partial_psbt_and_signing" end time: Nov 03 05:14 UTC
+"grouped_partial_psbt_and_signing" time elapsed: 00:00:01
+----------------------------------------------------------
+
+22/22 Testing: wallet_workload_measurement_smoke
+22/22 Test: wallet_workload_measurement_smoke
+Command: "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_wallet_bench" "--smoke"
+Directory: /workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize
+"wallet_workload_measurement_smoke" start time: Nov 03 05:14 UTC
+Output:
+----------------------------------------------------------
+workload,scheme,transactions,inputs,outputs,distinct_keys,groups,native_inputs,signatures,serialized_bytes,sum_standard_weight,max_standard_weight,max_transaction_bytes,estimated_fee_units,actual_fee_units,verified,construction_ms,sign_and_finalize_ms,extract_and_verify_ms,native_prepare_calls,native_script_calls,deterministic_public_fixture_hash
+F_mixed_funding,grouped_or_mixed,1,20,2,3,2,10,12,64512,67260,67260,64512,65,65,true,10.003,39.265,25.402,10,10,cfaa6cc128e5684ee2405a5aaa9d371d6272bb007e442c9e8cee3edcf397c8648a9899835ec0e23dad8b467ea570138f
+F_mixed_funding,native_v2,1,20,2,3,0,20,20,106278,109026,109026,106278,107,107,true,8.454,56.286,40.319,20,20,21a09613f3f53540e1cd1c96892c7d8df49157b5d20c4c63278b51d1d0e73f31b0a2c8760eaaa75d1a47757e7064b749
+G_one_input_100_recipients,grouped_or_mixed,1,1,100,1,1,0,1,9654,22707,22707,9654,10,10,true,3.312,5.629,3.357,0,0,582b64457fd777b3500a540e9dc1419ada902b51c5e72d3255f866449ae44f0ddc6cc165472b5818b163dad34da6f8d4
+G_one_input_100_recipients,native_v2,1,1,100,1,0,1,1,9621,22674,22674,9621,10,10,true,3.053,7.433,4.521,1,1,488426371d3921d81648ccaab7a5f1740c7e96530b38b731d2df898a70c684faebc37f55a60115137bad1204a9c88967
+<end of output>
+Test time =   0.89 sec
+----------------------------------------------------------
+Test Passed.
+"wallet_workload_measurement_smoke" end time: Nov 03 05:14 UTC
+"wallet_workload_measurement_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 03 05:14 UTC

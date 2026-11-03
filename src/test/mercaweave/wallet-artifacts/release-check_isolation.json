@@ -1,0 +1,29 @@
+{
+  "checker_abis_separate": true,
+  "controls": {
+    "mercaweave_isolated_control": {
+      "contextless_v3_mandatory": false,
+      "contextless_v3_policy": false,
+      "native_v2_verifies": 20,
+      "passed": true,
+      "research_hook": true
+    },
+    "mercaweave_normal_control": {
+      "contextless_v3_mandatory": true,
+      "contextless_v3_policy": false,
+      "native_v2_verifies": 20,
+      "passed": true,
+      "research_hook": false
+    }
+  },
+  "isolated_compile_units": 56,
+  "node_cache_symbols_absent": true,
+  "normal_header_use_rejected": true,
+  "normal_hook_symbol_absent": true,
+  "normal_source_erasure_sha256": {
+    "src/script/interpreter.cpp": "06a627b471d8542ac7af5738db20c43efefaad6f0e2ecafc155739ce3ccdadc9",
+    "src/script/interpreter.h": "f38652f9af7c55e5998ec24e7403835f935a6ae3e5387ecc9cf03b975152ba80"
+  },
+  "ordinary_compile_units": 56,
+  "passed": true
+}

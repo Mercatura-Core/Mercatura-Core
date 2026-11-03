@@ -1,0 +1,3 @@
+{"case":"integrated_p2sh","before_txid":"df160f0e7070cf1ba1698b553b8ac4613533f98bb0fb604838a15263acb2c92d","after_txid":"e9e75d2c625c82c2d11398757556ca9f366df829fd408d6bf00500c4313b0d38","child_valid":false}
+{"case":"integrated_p2wsh","before_txid":"58139eb9b4815b5dd7f76492f5620f518717b7f64f52686564fb8a95977eaaeb","after_txid":"58139eb9b4815b5dd7f76492f5620f518717b7f64f52686564fb8a95977eaaeb","child_valid":true}
+{"assertions":2153,"rejected_cases":31,"mutations":2000,"concurrent_script_calls":2800,"mutation_stages":{"1":3,"2":26,"5":1971},"passed":true}

@@ -1,0 +1,655 @@
+{
+  "timestamp_utc": "2026-11-03T05:16:29.900499+00:00",
+  "start_head": "93b356af34bd1ea60fd7c58a99533f3d0e93bc31",
+  "source_head": "e15f461cce3e5f5afd2cdb27d343ac276657077a",
+  "branch": "research/mercaweave-v0.1",
+  "source_diff": "",
+  "original_head": "4b88b619fb1b08c7f30112a38eb471880b2a6af4",
+  "original_status": "",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "compiler": "g++ (Debian 14.2.0-19) 14.2.0",
+  "ctest": {
+    "release": {
+      "passed": 22,
+      "failed": 0,
+      "skipped": 0
+    },
+    "debug": {
+      "passed": 22,
+      "failed": 0,
+      "skipped": 0
+    },
+    "sanitize": {
+      "passed": 22,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "build_cache_flags": {
+    "release": [
+      "CMAKE_BUILD_TYPE:STRING=Release",
+      "CMAKE_CXX_FLAGS:STRING=",
+      "CMAKE_CXX_FLAGS_DEBUG:STRING=-g",
+      "CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG",
+      "CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING=-O2 -g -DNDEBUG",
+      "MERCAWEAVE_SANITIZERS:BOOL=OFF"
+    ],
+    "debug": [
+      "CMAKE_BUILD_TYPE:STRING=Debug",
+      "CMAKE_CXX_FLAGS:STRING=",
+      "CMAKE_CXX_FLAGS_DEBUG:STRING=-g",
+      "CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG",
+      "CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING=-O2 -g -DNDEBUG",
+      "MERCAWEAVE_SANITIZERS:BOOL=OFF"
+    ],
+    "sanitize": [
+      "CMAKE_BUILD_TYPE:STRING=RelWithDebInfo",
+      "CMAKE_CXX_FLAGS:STRING=",
+      "CMAKE_CXX_FLAGS_DEBUG:STRING=-g",
+      "CMAKE_CXX_FLAGS_RELEASE:STRING=-O3 -DNDEBUG",
+      "CMAKE_CXX_FLAGS_RELWITHDEBINFO:STRING=-O2 -g -DNDEBUG",
+      "MERCAWEAVE_SANITIZERS:BOOL=ON"
+    ]
+  },
+  "commands": [
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_tests",
+      "--vectors"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_wallet_tests"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_psbt_tests"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_integration_tests"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_normal_control"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_isolated_control"
+    ],
+    [
+      "python3",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/check_isolation.py",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-release"
+    ],
+    [
+      "python3",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/check_wallet_isolation.py",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-release"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_wallet_bench"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-debug/mercaweave_tests",
+      "--vectors"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-debug/mercaweave_wallet_tests"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-debug/mercaweave_psbt_tests"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-debug/mercaweave_integration_tests"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-debug/mercaweave_normal_control"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-debug/mercaweave_isolated_control"
+    ],
+    [
+      "python3",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/check_isolation.py",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-debug"
+    ],
+    [
+      "python3",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/check_wallet_isolation.py",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-debug"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-debug/mercaweave_wallet_bench"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_tests",
+      "--vectors"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_wallet_tests"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_psbt_tests"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_integration_tests"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_normal_control"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_isolated_control"
+    ],
+    [
+      "python3",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/check_isolation.py",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize"
+    ],
+    [
+      "python3",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/check_wallet_isolation.py",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize"
+    ],
+    [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/build-sanitize/mercaweave_wallet_bench"
+    ]
+  ],
+  "deterministic_test_output_sha256": {
+    "release": {
+      "mercaweave_tests": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7",
+      "mercaweave_wallet_tests": "996c3f99ac58b3b194c4e4c87b1dc381ef62b3b643483321a1d43f9261874b91",
+      "mercaweave_psbt_tests": "804fb0bdf3d607b2d033dd31b3622933a1a2c153b51f49ae99ba1ebc145e9a5c",
+      "mercaweave_integration_tests": "10e22b561f37dba524211184e315c03a807e0456dc090e28c47c65343d8013c8",
+      "mercaweave_normal_control": "9a072b2e822ddef3561b651badea85a0e1c3eb5b5bb2c47bcb039c8fd7b57a63",
+      "mercaweave_isolated_control": "5c824d5cb5ba55210868128de4ff33ce47c6ddb2c5cd7c1e3ca37b2356885053"
+    },
+    "debug": {
+      "mercaweave_tests": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7",
+      "mercaweave_wallet_tests": "996c3f99ac58b3b194c4e4c87b1dc381ef62b3b643483321a1d43f9261874b91",
+      "mercaweave_psbt_tests": "804fb0bdf3d607b2d033dd31b3622933a1a2c153b51f49ae99ba1ebc145e9a5c",
+      "mercaweave_integration_tests": "10e22b561f37dba524211184e315c03a807e0456dc090e28c47c65343d8013c8",
+      "mercaweave_normal_control": "9a072b2e822ddef3561b651badea85a0e1c3eb5b5bb2c47bcb039c8fd7b57a63",
+      "mercaweave_isolated_control": "5c824d5cb5ba55210868128de4ff33ce47c6ddb2c5cd7c1e3ca37b2356885053"
+    },
+    "sanitize": {
+      "mercaweave_tests": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7",
+      "mercaweave_wallet_tests": "996c3f99ac58b3b194c4e4c87b1dc381ef62b3b643483321a1d43f9261874b91",
+      "mercaweave_psbt_tests": "804fb0bdf3d607b2d033dd31b3622933a1a2c153b51f49ae99ba1ebc145e9a5c",
+      "mercaweave_integration_tests": "10e22b561f37dba524211184e315c03a807e0456dc090e28c47c65343d8013c8",
+      "mercaweave_normal_control": "9a072b2e822ddef3561b651badea85a0e1c3eb5b5bb2c47bcb039c8fd7b57a63",
+      "mercaweave_isolated_control": "5c824d5cb5ba55210868128de4ff33ce47c6ddb2c5cd7c1e3ca37b2356885053"
+    }
+  },
+  "cross_build_comparisons": [
+    {
+      "build": "debug",
+      "workload": "A_mining_rewards_reused_address",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "A_mining_rewards_reused_address",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "B_deposits_reused_address",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "B_deposits_reused_address",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "C_independent_deposit_keys",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "C_independent_deposit_keys",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "D_ten_group_keys",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "D_ten_group_keys",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "E_two_group_keys",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "E_two_group_keys",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "F_mixed_funding",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "F_mixed_funding",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "G_one_input_100_recipients",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "G_one_input_100_recipients",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "H_ten_inputs_100_recipients",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "H_ten_inputs_100_recipients",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "I_fifty_grouped_100_recipients",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "I_fifty_grouped_100_recipients",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "J_independent_exchange_sweep",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "J_independent_exchange_sweep",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "K_withdrawals_with_change",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "K_withdrawals_with_change",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "L_grouped_mining_to_native_savings",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "debug",
+      "workload": "L_grouped_mining_to_native_savings",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "A_mining_rewards_reused_address",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "A_mining_rewards_reused_address",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "B_deposits_reused_address",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "B_deposits_reused_address",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "C_independent_deposit_keys",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "C_independent_deposit_keys",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "D_ten_group_keys",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "D_ten_group_keys",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "E_two_group_keys",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "E_two_group_keys",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "F_mixed_funding",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "F_mixed_funding",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "G_one_input_100_recipients",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "G_one_input_100_recipients",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "H_ten_inputs_100_recipients",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "H_ten_inputs_100_recipients",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "I_fifty_grouped_100_recipients",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "I_fifty_grouped_100_recipients",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "J_independent_exchange_sweep",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "J_independent_exchange_sweep",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "K_withdrawals_with_change",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "K_withdrawals_with_change",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "L_grouped_mining_to_native_savings",
+      "scheme": "grouped_or_mixed",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    },
+    {
+      "build": "sanitize",
+      "workload": "L_grouped_mining_to_native_savings",
+      "scheme": "native_v2",
+      "equal_sizes_fees_signatures_and_public_hash": true
+    }
+  ],
+  "source_sha256": {
+    "src/test/mercaweave/CMakeLists.txt": "6f3334540cbee9371ae8640a28d45e45bc96706f338e1d27ffacf9c035ed92fe",
+    "src/test/mercaweave/allocation_probe.cpp": "38337b26eb97cb888d0e0100e5df1133bdb9613cb82a5a7ef2db6554e6b38f3d",
+    "src/test/mercaweave/allocation_probe.h": "42c173b2ed5779ce67e6225644408a5dccc7ccbcdf07a82856efc59e221030e9",
+    "src/test/mercaweave/attack_tests.cpp": "61a4a0d1d2fca7efeb38406d3944851a50ce8f0ef862fc5353ea70581d13d4e7",
+    "src/test/mercaweave/auth_context.cpp": "70a7650fdb2a7e8bb83678f849c53dd0b7ec2c033115aa7ab35e94b4a8f5d2db",
+    "src/test/mercaweave/auth_context.h": "f6f9dcb5fbbe2bb77d01ae6dcebcca002567fc07132c007cee771cf268f906bc",
+    "src/test/mercaweave/bench.cpp": "4f789afde8eda6f58d6799c0eb761418a505c2a61216f770730f6413010169dc",
+    "src/test/mercaweave/block_tests.cpp": "ef28f415ed8880b13ab150c03f4a5f8bef790c4f8535d2e980c5c2b551517c1d",
+    "src/test/mercaweave/block_work.cpp": "0834bdb4b79ab96408f52e7286e8fed440e646d0a489759cfcfc39910184b080",
+    "src/test/mercaweave/block_work.h": "40dba0f2cf659c905d8479b0920453ca1558cc8ca75e947b310238cd9a60e12a",
+    "src/test/mercaweave/check_isolation.py": "51d9f6808f8dcb8d007e1bb56502fae459147d6fce4b406002b6e448668e74db",
+    "src/test/mercaweave/check_readiness_determinism.py": "40205c72ed6fcf5a9caa42971099b3a4968841f5c7d59410b1de8e457f8dad2b",
+    "src/test/mercaweave/check_wallet_isolation.py": "77c249f41c0e2d2d49f1a401c17f0aa0058c108358ef800c6cb51d797dc43659",
+    "src/test/mercaweave/coin_view_probe.cpp": "31f57fd50a49fb1e947db46c110a8e5b818026620be5341d334647f967a95e78",
+    "src/test/mercaweave/context_fixtures.h": "596aec2a96b7df191b0729db111745de930dd0ffad9a6f710fb5aa294bdcfb40",
+    "src/test/mercaweave/context_tests.cpp": "82386d40ac59b59e62839301c3b3b4d115b5ae8506864f859a14c4ed8f7841fd",
+    "src/test/mercaweave/crosscheck.py": "ce05c65ce5c02f366107555b9042a74165045570a93a1a96b75873817ef359cd",
+    "src/test/mercaweave/fixtures.cpp": "10b919b35cb5ba1dcb272b2d7a1a1be3ce449e99287447f87e927d3c7eae13e6",
+    "src/test/mercaweave/fixtures.h": "f6f070611f7b4c3831874338a7a05e849a89844e8bc6be8d1cf6bcc8a6fd07fb",
+    "src/test/mercaweave/inactive_control.cpp": "73e87ec1638cf8d8b654709bbb5f73520db44d990ebc04b4e4bbd094d0b839d2",
+    "src/test/mercaweave/integration_bench.cpp": "33cc3338880af70c5f8fdfce8df8ec515ebb9bc43d7a5f705d8ad65280b4db7b",
+    "src/test/mercaweave/integration_fixtures.h": "0336b0e71f52fcafa9a8d0e2f63d345631cccee81c44d742aca6ad001dedd2f8",
+    "src/test/mercaweave/integration_tests.cpp": "b116f21aa0b660709f89051ba6ebf789a56619b4831d10639425e558be483221",
+    "src/test/mercaweave/isolated_validation.cpp": "be9f529304ee631d993a9ccbaeda322881c9a76317978a80983b2dc6615d476a",
+    "src/test/mercaweave/isolated_validation.h": "8dc86a07550dbd32e30ea33faba3f75bfb747f15cde167f01b2766c6383e7ba9",
+    "src/test/mercaweave/malleability_tests.cpp": "60bf6fa38335fc6d00f5fdfcd059858fc056575fb625676318b3f2c23e091195",
+    "src/test/mercaweave/measure_readiness.py": "c001ba5dbc98645bf379889b5d26ac1deb198dd450ac115cb4d034a1ad5ad20f",
+    "src/test/mercaweave/mercaweave.cpp": "8948feef7969c3a4d43eb499fa14d0c847d1a78680729d07c84462c94caca766",
+    "src/test/mercaweave/mercaweave.h": "1375b61160180387355e87512ec378a24fa485dd48e4a1e4e629df7ac675d7db",
+    "src/test/mercaweave/mutation_seeds.h": "9c59d56b3f0ba24d2bcdb691a4b90d25864d745f23c6459702fff800e194d1cf",
+    "src/test/mercaweave/native_tests.cpp": "66684deb1129be16c47ae04f6fe84bd7788344232fe8cca47be0833ce67f8b3b",
+    "src/test/mercaweave/native_v2.cpp": "7713ec976d2665f9b940fe0775a3faa939b5c0437cb29358276f07ed59c1083e",
+    "src/test/mercaweave/native_v2.h": "9c49f54786e8fe448d784c89dcdffc0453d9effcba6488ed31a18329873cbbaa",
+    "src/test/mercaweave/parser_tests.cpp": "09ab6f3c08787d561e81116b4c927e04c658e35db4f0953f3810b11eb8cc41bc",
+    "src/test/mercaweave/psbt_tests.cpp": "9201be43aaa9bc814dd4a647f8c932f1629bca9be73095cf7c381325233ba070",
+    "src/test/mercaweave/qualification_bench.cpp": "b868d7f508d8b9d65db34b42051767ab4eefcbfbd2164dd2400018e410d01b18",
+    "src/test/mercaweave/qualify_integration.py": "563d3f1f36dda787b1b2c6e5b3324695e184c14f9a8be6f2a9f90e371b1322fe",
+    "src/test/mercaweave/qualify_wallet.py": "c42dafcf691cf1970bb2302d62741b564316da4d26811c8238c6da4008aa9197",
+    "src/test/mercaweave/readiness_bench.cpp": "d8250d49a50d7fbcfe6d8ef88bbf0da6d3ae3c74467a71d2e97f497ea193e809",
+    "src/test/mercaweave/reference.py": "e40393313eb1879d84edc75a353da04e25b22abc92f553f89e7aec2a90ab8067",
+    "src/test/mercaweave/research_wallet.cpp": "9781b91f222a77c04adbd9e48d527f5dc3165e6947e75f78268c8b5504e95c99",
+    "src/test/mercaweave/research_wallet.h": "89803305de2165665828c908b9a3a0a1506e3254e398ac33163146171736800b",
+    "src/test/mercaweave/resource_qualification.py": "1ebba3ef029cd294ad614c9456d274a685fc287982dfefce8346970c602d67d8",
+    "src/test/mercaweave/tests.cpp": "ffb2a48aea07860bc99c9d9fc4e3feb0d2e4b72f07296d086c58fe377b452f2f",
+    "src/test/mercaweave/wallet_bench.cpp": "47e45f4f4ab60363738a985d5991b9d50ccb29599cd6ace45b11beb13e21ac4b",
+    "src/test/mercaweave/wallet_fixtures.h": "7333310129e672b63697a0c601972fd3de15259456e093be8d9d7d9f0dd2fd52",
+    "src/test/mercaweave/wallet_funding.cpp": "6ed3b2b8f529f73c4fb5d07d6375d1acee20c1712fce5abd73407cfda3f49317",
+    "src/test/mercaweave/wallet_funding.h": "4b65815d2f8aa4b97963e46180dc6e3f9dd22c08cccf57c5eaf83b9a88ca0ca8",
+    "src/test/mercaweave/wallet_primitive_probe.cpp": "fd8a2a883baa0a049e9954b7724743d9629c03aa75d20775739585d277d5dd0b",
+    "src/test/mercaweave/wallet_psbt.cpp": "404128b40f2b33242e5fdb83d76dbbc76aff96d47af632e29e8edf507d091a8d",
+    "src/test/mercaweave/wallet_psbt.h": "cdf54909acb6ba98958edae17fab14c0f25b793fd9b0516330ba69fd577e1beb",
+    "src/test/mercaweave/wallet_seed_bridge.h": "d4c1928f544a2a604ea19f1768bfc6dd709a7afdce6a4b3643e2a9d462ae6ce3",
+    "src/test/mercaweave/wallet_tests.cpp": "8d794eb7c95bc5029b5aa2b639f434d8ce6a21ad559080ffe2537f51bcdf14ae"
+  },
+  "prior_evidence_sha256": {
+    "doc/design/mercatura-pq-b1-evidence.json": "f5bd74ca7231d16e4a71d8d356492788522b08dd53e4215df5dc6bd7f478c50e",
+    "doc/design/mercatura-pq-b2-evidence.json": "0ba3c9c5146e550cec5b633fe48222c2094b0eaa8fd6527d4e40f3bf440b080f",
+    "doc/design/mercatura-pq-b3-evidence.json": "6c4d318f078447c33e3788fa9c1910ba0e308ec2d4875ebd6170eb31c5f05802",
+    "doc/design/mercatura-pq-dependencies.json": "ada9092f91dbe43d3d5cfef429fd88575ae55da1835cdd8cd6307ebeb202b549",
+    "doc/design/mercatura-pq-p9-p11-evidence.json": "afca40e92b7a66d27c0f7c8d5d4c77008836b3ed0095bb8eb8d05531a81c32de",
+    "doc/design/mercatura-pq-stagea-benchmarks.json": "a5f77c1b269d6044ff255f09e0d3171aa4f527109b59dbbe447d0ad2777c7ecf",
+    "doc/design/mercatura-pq-stagea-evidence.json": "9e9ae602da521454a133c743e748834e607097ce45b674f422ccace4e06fd228",
+    "doc/design/mercatura-v2-pq-integrated-evidence.json": "e80589f0b2d179d91e04df974f576df1c83e19db9911be4101ab1ab608abfdd3",
+    "doc/design/mercaweave-v0.1-consensus-readiness.md": "37a688a8b96455b38b5fe2720bbdac3b7a9f6b9ec61879b04c50664c53cc4b30",
+    "doc/design/mercaweave-v0.1-isolated-consensus-integration.md": "c767d4e72a4f39458a8c21336e80bb54c7f662cff3931789938f693e933f65c0",
+    "doc/design/mercaweave-v0.1-security-qualification.md": "67e91434f979074701c78af0e94a57f2df96ee281373d7dd82f840a7d1e4c216",
+    "doc/design/mercaweave-v0.1-source-audit.md": "5c9bd05d274a6b4dab82f6adbc60ca599d3fd9af3e239b2be12dae1cee4d1f9b",
+    "doc/design/mercaweave-v0.1-standalone-validation.md": "6b8a443f281cd877272068978286bbdbbb46f67cbf08055d99f33cca8415583e",
+    "src/test/mercaweave/benchmark-environment.json": "117a545ca3f6f16afba7920a71e5fc49fc24078d48728ec0dd760fcc16c4c0cc",
+    "src/test/mercaweave/benchmarks.csv": "0896a259684d85b4df92299d535c7f292ab237fefbb0a3114c4c8cd7fe83ac28",
+    "src/test/mercaweave/integration-artifacts/debug-benchmarks.csv": "ff0f87da523a9ae618ea6020e2385bd2f09b30750eb06997978b3bece03479e9",
+    "src/test/mercaweave/integration-artifacts/debug-isolation.json": "9ddcc353470fa57e71fcab0817b9c4ad22aaf43e0e618e78af70e94472c0770e",
+    "src/test/mercaweave/integration-artifacts/leak-sanitizer.txt": "46da19cffef18e9d70fa371e0b1e38bdff1a6f89006d0071e472a9af6a366bff",
+    "src/test/mercaweave/integration-artifacts/mercaweave_integration_tests.jsonl": "10e22b561f37dba524211184e315c03a807e0456dc090e28c47c65343d8013c8",
+    "src/test/mercaweave/integration-artifacts/mercaweave_isolated_control.json": "5c824d5cb5ba55210868128de4ff33ce47c6ddb2c5cd7c1e3ca37b2356885053",
+    "src/test/mercaweave/integration-artifacts/mercaweave_normal_control.json": "9a072b2e822ddef3561b651badea85a0e1c3eb5b5bb2c47bcb039c8fd7b57a63",
+    "src/test/mercaweave/integration-artifacts/mercaweave_tests.json": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7",
+    "src/test/mercaweave/integration-artifacts/qualification.json": "7fa8cc1eb8d14aa2776b46c84f37df2b49270d2097d01601a881761a4fe8f98c",
+    "src/test/mercaweave/integration-artifacts/release-benchmarks.csv": "47d7a1242477909aa1e26043b7e01bf13c50463ca6aea47874d0a61f8a850633",
+    "src/test/mercaweave/integration-artifacts/release-isolation.json": "9ddcc353470fa57e71fcab0817b9c4ad22aaf43e0e618e78af70e94472c0770e",
+    "src/test/mercaweave/integration-artifacts/sanitize-benchmarks.csv": "d46e503a3ac4a76fd9ca4b9d9dda42c53d89d2a1277860b54eae3f02aad4455e",
+    "src/test/mercaweave/integration-artifacts/sanitize-isolation.json": "9ddcc353470fa57e71fcab0817b9c4ad22aaf43e0e618e78af70e94472c0770e",
+    "src/test/mercaweave/readiness-artifacts/block-benchmarks.csv": "c8c67e28fa1363a9ad8d08dc15ffb69e97ca9cda0cf14581df0cba72ab7340ca",
+    "src/test/mercaweave/readiness-artifacts/consensus-readiness-benchmarks.json": "b73de8e5f6b813e57fb796263064253987f5c72af78838482f2bd35f769a04ca",
+    "src/test/mercaweave/readiness-artifacts/determinism-checks.json": "b9205483dd367c9201430d7b577ca7ffb576e826078e4439bbd8f9098d1c465e",
+    "src/test/mercaweave/readiness-artifacts/invalid-workloads.csv": "c5ae8b1202d12d62f75c4acbfbb8d1f4c20ba67c9b7af49654aa72cd9d84770d",
+    "src/test/mercaweave/readiness-artifacts/malleability-proof.jsonl": "d8658e03b6424addac83e692526c9176cb325075d8eb70ce3c419fa5a1bfbc09",
+    "src/test/mercaweave/readiness-artifacts/transaction-benchmarks.csv": "1f07a4555ddaa0cedbcd116e6b8707c9a087fa96204488b18ed2f7fb94906276",
+    "src/test/mercaweave/security-benchmarks.csv": "5bcdce4ef3a1625e2dfd1f2d6442daf79bb28b668dafd8234fd51bfc3569fdc6",
+    "src/test/mercaweave/security-benchmarks.json": "a2b9c3f49c19776edadef19ba4f7c73ca61dcb72bd12fca15e70148a15844cab",
+    "src/test/mercaweave/vectors.json": "ea4978206307ac21d4f544b05e6da3543e094c9a1c4bd97c44f90fad4420c49c",
+    "src/test/mercaweave/work-order-02-baseline.csv": "b81d187a98415bc1be0fab7ad8ba922aa2ef44ceed4b16320ecdd19d98caa012"
+  },
+  "controls": {
+    "release": {
+      "mercaweave_normal_control": {
+        "research_hook": false,
+        "contextless_v3_mandatory": true,
+        "contextless_v3_policy": false,
+        "native_v2_verifies": 20,
+        "passed": true
+      },
+      "mercaweave_isolated_control": {
+        "research_hook": true,
+        "contextless_v3_mandatory": false,
+        "contextless_v3_policy": false,
+        "native_v2_verifies": 20,
+        "passed": true
+      }
+    },
+    "debug": {
+      "mercaweave_normal_control": {
+        "research_hook": false,
+        "contextless_v3_mandatory": true,
+        "contextless_v3_policy": false,
+        "native_v2_verifies": 20,
+        "passed": true
+      },
+      "mercaweave_isolated_control": {
+        "research_hook": true,
+        "contextless_v3_mandatory": false,
+        "contextless_v3_policy": false,
+        "native_v2_verifies": 20,
+        "passed": true
+      }
+    },
+    "sanitize": {
+      "mercaweave_normal_control": {
+        "research_hook": false,
+        "contextless_v3_mandatory": true,
+        "contextless_v3_policy": false,
+        "native_v2_verifies": 20,
+        "passed": true
+      },
+      "mercaweave_isolated_control": {
+        "research_hook": true,
+        "contextless_v3_mandatory": false,
+        "contextless_v3_policy": false,
+        "native_v2_verifies": 20,
+        "passed": true
+      }
+    }
+  },
+  "method": "One complete real PSBT workflow per scenario per build; wall timings include repeated inspection/verification. Public fixture seeds and explicitly named zero signing entropy; production API defaults to native strong entropy. Encryption ciphertexts intentionally random and not compared or retained.",
+  "scope": "research wallet facade using native seed envelopes, derivation, PSBT parser/Merge, COutput/OutputGroup and BnB/CoinGrinder/Knapsack; actual isolated WO04 validation; no CWallet database, RPC, node, mempool, activation or live data",
+  "sanitizers": {
+    "ASAN_OPTIONS": "detect_leaks=0",
+    "UBSAN_OPTIONS": "halt_on_error=1",
+    "leak_sanitizer": "unavailable in prior ptrace probe; not passed or rerun as a supported tool",
+    "research_checks": "all address and undefined behavior checks enabled"
+  },
+  "optional_tools": {
+    "clang++": null,
+    "clang": null,
+    "afl-fuzz": null,
+    "honggfuzz": null,
+    "valgrind": null
+  },
+  "production_files": {
+    "src/wallet/wallet.cpp": "aa1914bdda91fec127274436b54c555c24fa500c6a1c9c89bb5480f694e157c7",
+    "src/script/interpreter.h": "95e0c1b5bd634cb2bcb2ded295aeed654bb76849887cf7a2b7f9635b043efd89",
+    "src/script/interpreter.cpp": "f6c5cc8aef60bc5227c0bbe49772eeda6dd7f3253e03f1c6e0329ec2f17d7eb2",
+    "src/psbt.h": "b95dceb60d48107d33e4a3f78fd0844a49b2f2791831b6b985a214de86d53ae3",
+    "src/psbt.cpp": "e5fc06c6110d10b6ac2267c810452b974034418d58411edb55ea30f3e431af2b",
+    "src/wallet/coinselection.cpp": "326a5da6102f9a271596c1ee38e2d12ce710d921aa896875b5e7e955be3ee8b2"
+  },
+  "artifact_sha256": {
+    "debug-check_isolation.json": "3ab3d5d4780a71878711db5863f09e2c5cbd05b95a69142979ae16eff5b60997",
+    "debug-check_wallet_isolation.json": "09a83216c95479ead3c250b3735bc3e4c0393417b4c0fa5a167d8807ce139351",
+    "debug-ctest.txt": "268dd85d6ed4f185a97432555fe83736da9e03348978d462243c8ed9bffbeeda",
+    "debug-workloads.csv": "dbf58f68023e240a11afaf7c67b2c5ef8087bb178d0fdf4621ab3305fa3ba0c0",
+    "mercaweave_integration_tests.jsonl": "10e22b561f37dba524211184e315c03a807e0456dc090e28c47c65343d8013c8",
+    "mercaweave_isolated_control.json": "5c824d5cb5ba55210868128de4ff33ce47c6ddb2c5cd7c1e3ca37b2356885053",
+    "mercaweave_normal_control.json": "9a072b2e822ddef3561b651badea85a0e1c3eb5b5bb2c47bcb039c8fd7b57a63",
+    "mercaweave_psbt_tests.json": "804fb0bdf3d607b2d033dd31b3622933a1a2c153b51f49ae99ba1ebc145e9a5c",
+    "mercaweave_tests.json": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7",
+    "mercaweave_wallet_tests.json": "996c3f99ac58b3b194c4e4c87b1dc381ef62b3b643483321a1d43f9261874b91",
+    "release-check_isolation.json": "3ab3d5d4780a71878711db5863f09e2c5cbd05b95a69142979ae16eff5b60997",
+    "release-check_wallet_isolation.json": "09a83216c95479ead3c250b3735bc3e4c0393417b4c0fa5a167d8807ce139351",
+    "release-ctest.txt": "ff31bc28bb54df80909d21ed5f0b00159645a507950eb3733b65f1e0ba6821f6",
+    "release-workloads.csv": "0c5eb9f7ef6ac3975bb4b418a1e38b8c63e227560d9f8021441808b85e61e520",
+    "sanitize-check_isolation.json": "3ab3d5d4780a71878711db5863f09e2c5cbd05b95a69142979ae16eff5b60997",
+    "sanitize-check_wallet_isolation.json": "09a83216c95479ead3c250b3735bc3e4c0393417b4c0fa5a167d8807ce139351",
+    "sanitize-ctest.txt": "495e470861df8aac9b9b4bf9fd3eb6301c481b70351edba152848e651876db55",
+    "sanitize-workloads.csv": "a14b5208c1b753726d8bad2bb360c5364c15d0fa2b04cf84e1ca37b050f470e7"
+  }
+}

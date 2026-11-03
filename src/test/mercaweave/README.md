@@ -3,7 +3,8 @@
 This directory is its own CMake project. Production CMake never includes it.
 It reuses Mercatura's actual `CMutableTransaction`, `CTransaction`, `CScript`,
 outpoint/output serializers, hash primitives, HKDF and pinned pure ML-DSA-65
-wrapper. No nodes, RPC, wallets, network activation or datadirs are involved.
+wrapper. No live nodes, RPC, ordinary wallet databases, network activation or existing
+datadirs are involved.
 
 ## Build and test
 
@@ -261,3 +262,34 @@ are compared only as measurements. Invalid sample dispatch is unavailable (-1),
 never a successful skipped check. See
 doc/design/mercaweave-v0.1-isolated-consensus-integration.md for the exact call path,
 isolation evidence, security boundaries, commands, measurements and verdict.
+
+## WO05 research wallet and PSBT
+
+The standalone wallet facade reuses the existing protected PQ seed envelope and
+native v2 derivation, adds locked grouped derivation and 64-address rotation,
+and uses actual native PSBT containers/parser/Merge and coin-selection routines.
+It does not instantiate CWallet or change ordinary wallet storage. Funding and
+completed PSBT extraction use the WO04 owned synthetic coin view and real native
+transaction/input/Script checks. Full-node wallet/mempool lifecycles remain
+unqualified. Current input policy still rejects grouped spends.
+
+All three builds now contain 22 CTest targets. After building/testing them with
+the commands above, preserve old evidence and collect new evidence with:
+
+```bash
+python3 src/test/mercaweave/qualify_wallet.py \
+  --release work/build-release --debug work/build-debug \
+  --sanitize work/build-sanitize
+```
+
+The runner writes only wallet-artifacts/, compares 24 workload rows across three
+builds, checks previous evidence against the WO04 HEAD, and requires all 22
+tests in each build to pass. Research storage is confined to ignored
+work/wo05-wallets; tests use only public fixture seeds and temporary encrypted
+snapshots. Production signing defaults to native strong entropy; deterministic
+workload signatures explicitly use fixture-only zero entropy.
+
+See doc/design/mercaweave-v0.1-wallet-psbt-integration.md for exact boundaries,
+results, fees, PSBT restrictions and remaining gates. Unactivated v3 outputs
+are not protected custody: normal unknown-witness permissiveness is unchanged.
+No Qt, RPC, native mining, Secure Vault, activation or deployment is included.
