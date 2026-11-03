@@ -206,3 +206,58 @@ All other checks and all new research code retain full ASan/UBSan instrumentatio
 
 See `doc/design/mercaweave-v0.1-consensus-readiness.md` for the readiness decision,
 cache boundaries, measured block matrix, invalid cases and malleability options.
+
+## Work Order 04 isolated interpreter/coin-view integration
+
+The standalone project now has seventeen CTest targets. Only explicitly isolated
+targets define MERCATURA_MERCAWEAVE_RESEARCH_TEST_ONLY. Normal production CMake
+does not include this project. Two guarded interpreter additions are erased from
+normal compilation; there is no runtime flag or network activation path.
+Normal and isolated checker ABIs live in separate executables/archives.
+
+`isolated_validation.{h,cpp}` requires the research macro at compile time.
+`integration::View` owns a real synthetic CCoinsViewCache behind a lock and
+checked epoch. Trusted fixture setup inserts coins; validation itself accepts
+only the view and transaction, never unchecked spent-output vectors.
+`Engine::Prepare` runs actual CheckTransaction/CheckTxInputs and acquires coins,
+then creates a private complete proof through WO03 verification. `Bind` makes
+fixed-index immutable ScriptJob objects. Each job invokes real VerifyScript;
+the isolated witness-v3 branch consumes matching complete evidence. No context
+means rejection, never unknown-version success. Native inputs use genuine
+production verification, including the existing PQ-v2 rules.
+
+`Engine::Validate` combines those stages. `ValidateWire` adds bounded canonical
+decoding. `Candidate` uses real layered coin caches, checked budgets and atomic
+fixture publication. Stale/foreign views, restored coins or changed tips invalidate
+old jobs. Candidate receipts never export a staging proof. Candidate is not
+ConnectBlock: no PoW/header/merkle/sequence-lock or full chainstate claim.
+
+`Policy::CurrentPolicy` executes actual IsStandardTx, AreInputsStandard and
+IsWitnessStandard; it continues to reject unknown v3. `ConsensusFixture` is an
+explicit research-only exercise of the guarded interpreter. No relay, fee,
+400000-WU standardness or 4MiB network-capacity rule is changed. Unactivated v3
+outputs must never be advertised as protected MercaWeave custody.
+
+This uncached wrapper does not execute node CheckInputScripts/CScriptCheck or
+their caches/queue. Native v2 is genuinely verified during complete WO03
+preverification and again during Script dispatch; both passes and their
+precomputation/copy overhead are measured. Group signatures run once per group.
+There is no production cache optimization or proof import/export format.
+
+```bash
+cmake --build work/build-release -j2
+ctest --test-dir work/build-release --output-on-failure
+python3 src/test/mercaweave/check_isolation.py work/build-release
+# After building/testing all three configurations:
+python3 src/test/mercaweave/qualify_integration.py \
+  --release work/build-release --debug work/build-debug \
+  --sanitize work/build-sanitize --output-dir work/wo04-reproduction
+```
+
+Committed results are under integration-artifacts/. They preserve every earlier
+qualification file. The new runner compares exact vectors/proof/control outputs
+and twenty cross-build workload counter cases; timing, allocator and RSS values
+are compared only as measurements. Invalid sample dispatch is unavailable (-1),
+never a successful skipped check. See
+doc/design/mercaweave-v0.1-isolated-consensus-integration.md for the exact call path,
+isolation evidence, security boundaries, commands, measurements and verdict.
