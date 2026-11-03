@@ -194,3 +194,6 @@ add_test(NAME research_wallet_compile_isolation
 add_executable(mercaweave_psbt_tests psbt_tests.cpp)
 target_link_libraries(mercaweave_psbt_tests PRIVATE mercaweave_wallet)
 add_test(NAME grouped_partial_psbt_and_signing COMMAND mercaweave_psbt_tests)
+add_executable(mercaweave_wallet_bench wallet_bench.cpp)
+target_link_libraries(mercaweave_wallet_bench PRIVATE mercaweave_wallet)
+add_test(NAME wallet_workload_measurement_smoke COMMAND mercaweave_wallet_bench --smoke)
