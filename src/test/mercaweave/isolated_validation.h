@@ -57,6 +57,7 @@ struct Prepared {
     Charge charged;
     Statistics work;
     size_t native_prepare_calls{0};
+    uint64_t acquisition_epoch{0}; // Data freshness only; never a proof.
     CAmount fee{0};
     int64_t fee_bytes{0}, legacy_weight{0}, existing_sigops{0};
 };
@@ -97,6 +98,9 @@ class Engine final {
     static Prepared PrepareImpl(const ViewPtr&, const CMutableTransaction&, const B32&, script_verify_flags, int, Policy, Ledger*);
     static TransactionResult Finish(const ViewPtr&, const CMutableTransaction&, const B32&, script_verify_flags, int, Prepared, std::span<const uint32_t>);
 public:
+    // Authoritative unsigned/partial signing preflight. Returns data only, no
+    // authorization or script jobs. Identical native checks to Prepare.
+    static Prepared AcquireInputs(const ViewPtr&, const CMutableTransaction&, const B32&, script_verify_flags, int spend_height = 200, Policy = Policy::ConsensusFixture);
     // Genuine CheckTransaction, CheckTxInputs, coin acquisition, optional CURRENT
     // policy, then complete WO03 verification. Never accepts external spent data.
     static Prepared Prepare(const ViewPtr&, const CMutableTransaction&, const B32&, script_verify_flags, int spend_height = 200, Policy = Policy::ConsensusFixture);

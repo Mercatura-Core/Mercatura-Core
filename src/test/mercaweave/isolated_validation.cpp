@@ -116,8 +116,8 @@ ScriptResult ScriptJob::Run() const
     return out;
 }
 
-Prepared Engine::PrepareImpl(const ViewPtr& view, const CMutableTransaction& mutable_tx, const B32& genesis,
-        script_verify_flags flags, int height, Policy policy, Ledger* ledger)
+Prepared Engine::AcquireInputs(const ViewPtr& view, const CMutableTransaction& mutable_tx, const B32& genesis,
+        script_verify_flags flags, int height, Policy policy)
 {
     Prepared out;
     if (!view || height < 0) { out.failure = {Stage::State, "invalid-view-or-height"}; return out; }
@@ -166,6 +166,16 @@ Prepared Engine::PrepareImpl(const ViewPtr& view, const CMutableTransaction& mut
         epoch = view->m_state->epoch;
     }
     out.acquired = request;
+    out.acquisition_epoch = epoch;
+    return out;
+}
+Prepared Engine::PrepareImpl(const ViewPtr& view, const CMutableTransaction& mutable_tx, const B32& genesis,
+        script_verify_flags flags, int height, Policy policy, Ledger* ledger)
+{
+    auto out = AcquireInputs(view, mutable_tx, genesis, flags, height, policy);
+    if (!out.acquired) return out;
+    const auto& request = out.acquired;
+    const auto epoch = out.acquisition_epoch;
     out.charged = Estimate(*request);
     Ledger single;
     const auto budget = (ledger ? ledger : &single)->Reserve(out.charged);
