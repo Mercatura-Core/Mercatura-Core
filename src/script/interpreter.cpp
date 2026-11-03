@@ -2119,6 +2119,12 @@ static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, 
         }
 
         return set_success(serror);
+#ifdef MERCATURA_MERCAWEAVE_RESEARCH_TEST_ONLY
+    } else if (witversion == 3) {
+        // This branch does not exist in normal node/wallet compilation.
+        // No unknown-witness fallback is permitted in the isolated target.
+        return checker.CheckMercaWeaveResearchAuthorization(witness, program, flags, is_p2sh, serror);
+#endif
     } else if (!is_p2sh && CScript::IsPayToAnchor(witversion, program)) {
         return true;
     } else {

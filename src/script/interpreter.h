@@ -285,6 +285,17 @@ uint256 SignatureHash(const CScript& scriptCode, const T& txTo, unsigned int nIn
 class BaseSignatureChecker
 {
 public:
+#ifdef MERCATURA_MERCAWEAVE_RESEARCH_TEST_ONLY
+    // Defined ONLY by isolated research targets. No normal-node ABI or runtime
+    // activation surface. Absence of a complete research checker fails closed.
+    virtual bool CheckMercaWeaveResearchAuthorization(
+        const CScriptWitness&, const std::vector<unsigned char>&,
+        script_verify_flags, bool, ScriptError* serror) const
+    {
+        if (serror) *serror = SCRIPT_ERR_WITNESS_PROGRAM_MISMATCH;
+        return false;
+    }
+#endif
     virtual bool CheckECDSASignature(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, SigVersion sigversion) const
     {
         return false;

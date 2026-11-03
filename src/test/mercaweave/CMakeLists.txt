@@ -5,6 +5,7 @@ project(mercaweave_research LANGUAGES C CXX)
 # Standalone configure only; never included by production CMakeLists.txt.
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Match Mercatura's requirement that verification is built with assertions.
 add_compile_options(-UNDEBUG)
 option(MERCAWEAVE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
@@ -119,6 +120,49 @@ target_link_libraries(mercaweave_malleability_tests PRIVATE mercaweave_context)
 # Exclude ONLY vptr for that unmodified production TU. All other ASan/UBSan
 # checks, and every check on new research code, remain enabled.
 if(MERCAWEAVE_SANITIZERS)
-  set_source_files_properties(${MCA_SRC}/policy/policy.cpp PROPERTIES COMPILE_OPTIONS -fno-sanitize=vptr)
+  set_source_files_properties(${MCA_SRC}/policy/policy.cpp PROPERTIES COMPILE_OPTIONS
+    "$<$<STREQUAL:$<TARGET_PROPERTY:NAME>,mercaweave_malleability_tests>:-fno-sanitize=vptr>")
 endif()
 add_test(NAME malleability_children_and_policy COMMAND mercaweave_malleability_tests)
+
+# WO04: isolated checker ABI is never linked with mercaweave_native in one binary.
+# This standalone project is not included by normal production CMake.
+add_library(mercaweave_native_isolated STATIC
+  native_v2.cpp ${MCA_SRC}/script/interpreter.cpp ${MCA_SRC}/pubkey.cpp
+  ${MCA_SRC}/hash.cpp ${MCA_SRC}/crypto/sha1.cpp ${MCA_SRC}/crypto/sha512.cpp
+  ${MCA_SRC}/crypto/hmac_sha512.cpp)
+target_compile_definitions(mercaweave_native_isolated PUBLIC MERCATURA_MERCAWEAVE_RESEARCH_TEST_ONLY=1)
+target_link_libraries(mercaweave_native_isolated PUBLIC mercaweave PRIVATE secp256k1)
+add_library(mercaweave_context_isolated STATIC auth_context.cpp)
+target_link_libraries(mercaweave_context_isolated PUBLIC mercaweave_native_isolated)
+add_library(mercaweave_block_isolated STATIC block_work.cpp)
+target_link_libraries(mercaweave_block_isolated PUBLIC mercaweave_context_isolated)
+add_executable(mercaweave_normal_control inactive_control.cpp fixtures.cpp)
+target_link_libraries(mercaweave_normal_control PRIVATE mercaweave_native)
+add_executable(mercaweave_isolated_control inactive_control.cpp fixtures.cpp)
+target_link_libraries(mercaweave_isolated_control PRIVATE mercaweave_context_isolated)
+add_test(NAME normal_inactive_control COMMAND mercaweave_normal_control)
+add_test(NAME isolated_missing_context_control COMMAND mercaweave_isolated_control)
+
+add_library(mercaweave_coin_validation STATIC
+  ${MCA_SRC}/coins.cpp ${MCA_SRC}/consensus/tx_check.cpp ${MCA_SRC}/consensus/tx_verify.cpp
+  ${MCA_SRC}/policy/policy.cpp ${MCA_SRC}/policy/feerate.cpp ${MCA_SRC}/script/solver.cpp
+  ${MCA_SRC}/util/check.cpp ${MCA_SRC}/clientversion.cpp ${MCA_SRC}/util/moneystr.cpp
+  ${MCA_SRC}/util/hasher.cpp ${MCA_SRC}/crypto/siphash.cpp
+  ${MCA_SRC}/random.cpp ${MCA_SRC}/randomenv.cpp ${MCA_SRC}/crypto/chacha20.cpp
+  ${MCA_SRC}/logging.cpp ${MCA_SRC}/util/time.cpp ${MCA_SRC}/util/threadnames.cpp
+  ${MCA_SRC}/support/lockedpool.cpp ${MCA_SRC}/util/fs.cpp)
+target_include_directories(mercaweave_coin_validation PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/diagnostic)
+target_compile_options(mercaweave_coin_validation PRIVATE -ffunction-sections -fdata-sections)
+target_link_libraries(mercaweave_coin_validation PUBLIC mercaweave_context_isolated Threads::Threads)
+target_link_options(mercaweave_coin_validation INTERFACE -Wl,--gc-sections)
+add_executable(mercaweave_coin_probe coin_view_probe.cpp fixtures.cpp)
+target_link_libraries(mercaweave_coin_probe PRIVATE mercaweave_coin_validation)
+add_test(NAME authoritative_coin_view_probe COMMAND mercaweave_coin_probe)
+add_library(mercaweave_integration STATIC isolated_validation.cpp)
+target_link_libraries(mercaweave_integration PUBLIC mercaweave_coin_validation mercaweave_block_isolated)
+add_executable(mercaweave_integration_tests integration_tests.cpp fixtures.cpp)
+target_link_libraries(mercaweave_integration_tests PRIVATE mercaweave_integration)
+add_test(NAME isolated_validation_integration COMMAND mercaweave_integration_tests)
+add_test(NAME research_compile_and_cache_isolation
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/check_isolation.py ${CMAKE_CURRENT_BINARY_DIR})
