@@ -183,7 +183,7 @@ target_link_libraries(mercaweave_wallet_primitives PUBLIC mercaweave_integration
 add_executable(mercaweave_wallet_primitive_probe wallet_primitive_probe.cpp fixtures.cpp)
 target_link_libraries(mercaweave_wallet_primitive_probe PRIVATE mercaweave_wallet_primitives)
 add_test(NAME native_wallet_primitives COMMAND mercaweave_wallet_primitive_probe)
-add_library(mercaweave_wallet STATIC research_wallet.cpp wallet_psbt.cpp)
+add_library(mercaweave_wallet STATIC research_wallet.cpp wallet_psbt.cpp wallet_funding.cpp)
 target_compile_definitions(mercaweave_wallet PRIVATE MERCAWEAVE_RESEARCH_STORAGE_ROOT="${MCA_SRC}/../work/wo05-wallets")
 target_link_libraries(mercaweave_wallet PUBLIC mercaweave_wallet_primitives)
 add_executable(mercaweave_wallet_tests wallet_tests.cpp)

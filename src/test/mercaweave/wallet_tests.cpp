@@ -1,6 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "research_wallet.h"
+#include "wallet_fixtures.h"
+#include "wallet_funding.h"
 #include <bech32.h>
 #include <future>
 #include <iostream>
@@ -65,9 +66,39 @@ void Keys()
     Check(w->Records().size()==before+16,"serialized concurrent high-water state");
     Reject([&]{w->Save("/workspace/not-a-research-wallet");},Code::Metadata);
 }
+void FundingChecks()
+{
+    namespace wt=mercaweave::wallet_research::test;
+    auto w=wt::Owner();auto grouped=w->Issue(),native=w->Issue(0,0,2),change=w->Issue(0,1,2),group_change=w->Issue(0,1,3),recipient=w->Issue(1,0,2);
+    auto view=integration::View::Create(wt::Genesis());std::vector<FundingCoin> coins;
+    for(uint32_t i=0;i<10;++i){auto point=wt::Point(100+i);view->Insert(point,Coin{CTxOut{1000,grouped.script},1,false});coins.push_back({point});}
+    for(uint32_t i=0;i<2;++i){auto point=wt::Point(200+i);view->Insert(point,Coin{CTxOut{5000,native.script},1,false});coins.push_back({point});}
+    std::vector<CTxOut> pay{CTxOut{7000,recipient.script}};
+    auto automatic=Funding::Fund(*w,view,coins,pay,change);auto v2=Funding::Fund(*w,view,coins,pay,change,FundingMode::StandardPQ);auto v3=Funding::Fund(*w,view,coins,pay,group_change,FundingMode::MercaWeave);
+    Check(automatic.groups==1&&automatic.native_inputs==0&&automatic.selected>2&&automatic.selected<10&&automatic.fee<v2.fee,"final cost prefers useful grouped subset over fewer native inputs");
+    Check(v2.native_inputs==2&&v2.groups==0&&v2.current_policy,"strict standard mode uses native ownership and current policy");Check(v3.groups==1&&!v3.current_policy&&v3.policy_reason=="inputs-not-standard","strict grouped mode remains research under unchanged input policy");
+    auto signed_psbt=automatic.psbt;auto progress=GroupPSBT::Sign(signed_psbt,*w,view,wt::ZeroFixture());Check(progress.group_signatures==1&&progress.native_signatures==0,"selected subset signs one real group");auto tx=GroupPSBT::Extract(signed_psbt,view,wt::Genesis());Check(Measure(tx).total==automatic.sizes.total&&Measure(tx).weight==automatic.sizes.weight,"exact fixed-witness estimate matches final transaction");
+    CAmount total=0;for(const auto& in:tx.vin)total+=view->CoinAt(in.prevout)->out.nValue;for(const auto& out:tx.vout)total-=out.nValue;Check(total==automatic.fee,"estimated fee equals actual integer fee");
+    Check(Funding::Fee(0,{})==1&&Funding::Fee(1000,{})==1&&Funding::Fee(1001,{})==2&&Funding::Fee(2000,{})==2,"one-unit minimum and integer ceil per full 1000 bytes");
+    auto high=Funding::Fund(*w,view,coins,pay,change,FundingMode::Automatic,FeePolicy{10,20,1000});Check(high.fee>=20&&high.fee==Funding::Fee(high.sizes.total,FeePolicy{10,20,1000}),"higher user fees preserved");
+    Reject([&]{Funding::Fee(1000,FeePolicy{0});},Code::Fee);Reject([&]{Funding::Fee(10000,FeePolicy{1,1,1});},Code::Fee);
+    auto subset=std::span(coins).first(10);Reject([&]{Funding::Fund(*w,view,subset,pay,change,FundingMode::StandardPQ);},Code::Funds);
+    Reject([&]{Funding::Exact(*w,view,std::span(coins).last(2),pay,&group_change,FundingMode::StandardPQ);},Code::Mode);
+    auto duplicate=coins;duplicate.push_back(coins[0]);Reject([&]{Funding::Fund(*w,view,duplicate,pay,change);},Code::Inputs);
+    auto unsafe=coins;for(auto& c:unsafe)c.safe=false;Reject([&]{Funding::Fund(*w,view,unsafe,pay,change);},Code::Funds);
+    auto unconfirmed=coins;for(auto& c:unconfirmed)c.depth=0;Reject([&]{Funding::Fund(*w,view,unconfirmed,pay,change);},Code::Funds);
+    std::vector<CTxOut> dust{CTxOut{1,recipient.script}};Reject([&]{Funding::Fund(*w,view,coins,dust,change);},Code::Policy);
+    std::vector<CTxOut> floor{CTxOut{2,recipient.script}};Check(Funding::Fund(*w,view,coins,floor,change).fee>=1,"native two-unit dust floor accepted");
+    auto watch=Wallet::Watch(wt::Genesis(),w->Records());Check(Funding::Fund(*watch,view,coins,pay,change).sizes.total==automatic.sizes.total,"watch-only can plan from explicit verified public records");
+    std::vector<FundingCoin> independent;for(uint32_t i=0;i<100;++i){w->Rotate(2,0);auto a=w->Issue(2,0);auto point=wt::Point(300+i);view->Insert(point,Coin{CTxOut{10000,a.script},1,false});independent.push_back({point});}
+    auto batches=Funding::Sweep(*w,view,independent,recipient.script,FundingMode::MercaWeave);size_t selected=0;for(const auto& batch:batches){Check(batch.sizes.weight<=400000&&batch.groups==batch.selected,"independent keys never fictitiously aggregate");selected+=batch.selected;}
+    Check(batches.size()==2&&selected==100,"100-independent-key sweep splits under standard weight");
+    auto shared=Funding::Sweep(*w,view,subset,recipient.script);Check(shared.size()==1&&shared[0].groups==1&&shared[0].sizes.total<10000,"same-key sweep shares anchor");
+    auto immature=wt::Point(999);view->Insert(immature,Coin{CTxOut{10000,grouped.script},199,true});std::vector<FundingCoin> immature_set{{immature}};Reject([&]{Funding::Exact(*w,view,immature_set,floor,nullptr);},Code::Inputs);
+}
 }
 int main()
 {
-    try{Keys();std::cout<<"{\"key_checks\":"<<checks<<",\"rejections\":"<<rejections<<",\"passed\":true}\n";}
+    try{Keys();FundingChecks();std::cout<<"{\"key_checks\":"<<checks<<",\"rejections\":"<<rejections<<",\"passed\":true}\n";}
     catch(const std::exception& e){std::cerr<<"FAIL wallet: "<<e.what()<<'\n';return 1;}
 }
