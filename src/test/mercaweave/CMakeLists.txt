@@ -87,3 +87,14 @@ target_link_libraries(mercaweave_block_work PUBLIC mercaweave_context)
 add_executable(mercaweave_block_tests block_tests.cpp fixtures.cpp)
 target_link_libraries(mercaweave_block_tests PRIVATE mercaweave_block_work)
 add_test(NAME checked_block_work COMMAND mercaweave_block_tests)
+add_executable(mercaweave_readiness_bench readiness_bench.cpp allocation_probe.cpp fixtures.cpp)
+target_link_libraries(mercaweave_readiness_bench PRIVATE mercaweave_block_work)
+add_test(NAME block_measurement_smoke COMMAND mercaweave_readiness_bench block small --smoke)
+# Link selected unmodified policy routines. Function sections allow the standalone
+# executable to discard CCoinsView/node-dependent routines it never invokes.
+add_executable(mercaweave_malleability_tests malleability_tests.cpp fixtures.cpp
+  ${MCA_SRC}/script/solver.cpp ${MCA_SRC}/policy/policy.cpp ${MCA_SRC}/policy/feerate.cpp)
+target_compile_options(mercaweave_malleability_tests PRIVATE -ffunction-sections -fdata-sections)
+target_link_options(mercaweave_malleability_tests PRIVATE -Wl,--gc-sections)
+target_link_libraries(mercaweave_malleability_tests PRIVATE mercaweave_context)
+add_test(NAME malleability_children_and_policy COMMAND mercaweave_malleability_tests)
