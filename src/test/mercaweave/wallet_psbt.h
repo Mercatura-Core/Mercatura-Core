@@ -19,13 +19,13 @@ public:
     // Complete public metadata is necessary; private keys are not. Native PSBT
     // containers/parser/Merge remain the storage/transport implementation.
     static PartiallySignedTransaction Create(const CMutableTransaction&,std::span<const CTxOut>,std::span<const Address>);
-    static Inspection Inspect(const PartiallySignedTransaction&,const integration::ViewPtr&,const B32&);
-    static Progress Sign(PartiallySignedTransaction&,const Wallet&,const integration::ViewPtr&,const RandomSource& = SecureRandom);
+    static Inspection Inspect(const PartiallySignedTransaction&,const integration::ViewPtr&,const B32&,int spend_height=200);
+    static Progress Sign(PartiallySignedTransaction&,const Wallet&,const integration::ViewPtr&,const RandomSource& = SecureRandom,int spend_height=200);
     // Fail closed on different values for one key, including distinct valid
     // randomized signatures. This is an explicit local combine policy.
-    static PartiallySignedTransaction Combine(const PartiallySignedTransaction&,const PartiallySignedTransaction&,const integration::ViewPtr&,const B32&);
-    static Progress FinalizeAvailable(PartiallySignedTransaction&,const integration::ViewPtr&,const B32&);
-    static CMutableTransaction Extract(const PartiallySignedTransaction&,const integration::ViewPtr&,const B32&);
+    static PartiallySignedTransaction Combine(const PartiallySignedTransaction&,const PartiallySignedTransaction&,const integration::ViewPtr&,const B32&,int spend_height=200);
+    static Progress FinalizeAvailable(PartiallySignedTransaction&,const integration::ViewPtr&,const B32&,int spend_height=200);
+    static CMutableTransaction Extract(const PartiallySignedTransaction&,const integration::ViewPtr&,const B32&,int spend_height=200);
     static Bytes Encode(const PartiallySignedTransaction&);
     static PartiallySignedTransaction Decode(std::span<const unsigned char>);
 };

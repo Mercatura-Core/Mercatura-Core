@@ -58,9 +58,9 @@ PartiallySignedTransaction GroupPSBT::Create(const CMutableTransaction& tx,std::
         else{Require(a.location.witness==2,Code::PSBT,"unsupported input program");Require(SetMercaturaPQPSBTPublicKey(p.inputs[i],a.pk),Code::PSBT,"native public key");}
     }return p;
 }
-Inspection GroupPSBT::Inspect(const PartiallySignedTransaction& p,const integration::ViewPtr& view,const B32& genesis)
+Inspection GroupPSBT::Inspect(const PartiallySignedTransaction& p,const integration::ViewPtr& view,const B32& genesis,int height)
 {
-    Shape(p);auto acquired=integration::Engine::AcquireInputs(view,*p.tx,genesis,MANDATORY_SCRIPT_VERIFY_FLAGS);
+    Shape(p);auto acquired=integration::Engine::AcquireInputs(view,*p.tx,genesis,MANDATORY_SCRIPT_VERIFY_FLAGS,height);
     Require(acquired.acquired!=nullptr,Code::Inputs,"authoritative input preflight");
     Inspection out{*p.tx,acquired.acquired->spent,{}, {},std::vector<bool>(p.inputs.size(),false),acquired.acquisition_epoch};
     for(uint32_t i=0;i<p.inputs.size();++i){const auto& in=p.inputs[i];
@@ -87,12 +87,12 @@ Inspection GroupPSBT::Inspect(const PartiallySignedTransaction& p,const integrat
         if(!p.inputs[i].final_script_witness.IsNull())Require(out.complete[i]&&p.inputs[i].final_script_witness.stack==out.tx.vin[i].scriptWitness.stack,Code::PSBT,"final witness differs from verified fields");}
     Fresh(view,out.epoch);return out;
 }
-Progress GroupPSBT::Sign(PartiallySignedTransaction& p,const Wallet& wallet,const integration::ViewPtr& view,const RandomSource& random)
+Progress GroupPSBT::Sign(PartiallySignedTransaction& p,const Wallet& wallet,const integration::ViewPtr& view,const RandomSource& random,int height)
 {
     Require(!wallet.IsWatchOnly(),Code::WatchOnly,"watch wallet cannot sign");Require(!wallet.IsLocked(),Code::Locked,"wallet locked");
     PartiallySignedTransaction staged=p;Progress progress;
     const bool accessed=wallet.WithMercaturaPQMasterSeed([&](const wallet::CKeyingMaterial&){
-        auto inspected=Inspect(staged,view,wallet.Genesis());
+        auto inspected=Inspect(staged,view,wallet.Genesis(),height);
         for(const auto& group:inspected.mapping.groups){if(inspected.complete[group.anchor])continue;std::optional<Address> anchor;
             bool owns=true;for(const auto& member:group.members){auto a=wallet.Find(inspected.spent[member.index].scriptPubKey);
                 if(!a||a->pk!=group.pk||a->nonce!=member.nonce){owns=false;break;}if(member.index==group.anchor)anchor=a;}
@@ -108,12 +108,12 @@ Progress GroupPSBT::Sign(PartiallySignedTransaction& p,const Wallet& wallet,cons
             Require(SetMercaturaPQPSBTSignature(staged.inputs[i],sig),Code::PSBT,"native signature publication");++progress.native_signatures;}
         Fresh(view,inspected.epoch);return true;
     });
-    Require(accessed,Code::Locked,"wallet locked during signing");auto final=Inspect(staged,view,wallet.Genesis());
+    Require(accessed,Code::Locked,"wallet locked during signing");auto final=Inspect(staged,view,wallet.Genesis(),height);
     progress.complete_inputs=std::count(final.complete.begin(),final.complete.end(),true);progress.complete=progress.complete_inputs==staged.inputs.size();p=std::move(staged);return progress;
 }
-PartiallySignedTransaction GroupPSBT::Combine(const PartiallySignedTransaction& a,const PartiallySignedTransaction& b,const integration::ViewPtr& v,const B32& g)
+PartiallySignedTransaction GroupPSBT::Combine(const PartiallySignedTransaction& a,const PartiallySignedTransaction& b,const integration::ViewPtr& v,const B32& g,int height)
 {
-    auto ia=Inspect(a,v,g);auto ib=Inspect(b,v,g);Require(Wire(*a.tx,false)==Wire(*b.tx,false),Code::Conflict,"different unsigned transaction bodies");
+    auto ia=Inspect(a,v,g,height);auto ib=Inspect(b,v,g,height);Require(Wire(*a.tx,false)==Wire(*b.tx,false),Code::Conflict,"different unsigned transaction bodies");
     auto conflict=[](const auto& x,const auto& y){for(const auto& [k,value]:x){auto it=y.find(k);Require(it==y.end()||it->second==value,Code::Conflict,"different unknown field values");}};
     conflict(a.unknown,b.unknown);
     auto props=[](const auto& x,const auto& y){for(const auto& p:x){auto it=y.find(p);Require(it==y.end()||it->value==p.value,Code::Conflict,"different values for same proprietary key");}};
@@ -122,18 +122,18 @@ PartiallySignedTransaction GroupPSBT::Combine(const PartiallySignedTransaction& 
         const auto& x=a.inputs[i].final_script_witness;const auto& y=b.inputs[i].final_script_witness;
         Require(x.IsNull()||y.IsNull()||x.stack==y.stack,Code::Conflict,"different finalized witnesses");}
     for(size_t i=0;i<a.outputs.size();++i){props(a.outputs[i].m_proprietary,b.outputs[i].m_proprietary);conflict(a.outputs[i].unknown,b.outputs[i].unknown);}
-    auto merged=a;Require(merged.Merge(b),Code::Conflict,"native PSBT merge failed");Inspect(merged,v,g);Fresh(v,ia.epoch);Fresh(v,ib.epoch);return merged;
+    auto merged=a;Require(merged.Merge(b),Code::Conflict,"native PSBT merge failed");Inspect(merged,v,g,height);Fresh(v,ia.epoch);Fresh(v,ib.epoch);return merged;
 }
-Progress GroupPSBT::FinalizeAvailable(PartiallySignedTransaction& p,const integration::ViewPtr& v,const B32& g)
+Progress GroupPSBT::FinalizeAvailable(PartiallySignedTransaction& p,const integration::ViewPtr& v,const B32& g,int height)
 {
-    auto info=Inspect(p,v,g);auto staged=p;Progress result;
+    auto info=Inspect(p,v,g,height);auto staged=p;Progress result;
     for(size_t i=0;i<p.inputs.size();++i)if(info.complete[i]){staged.inputs[i].final_script_witness=info.tx.vin[i].scriptWitness;++result.complete_inputs;}
     result.complete=result.complete_inputs==p.inputs.size();Fresh(v,info.epoch);p=std::move(staged);return result;
 }
-CMutableTransaction GroupPSBT::Extract(const PartiallySignedTransaction& p,const integration::ViewPtr& v,const B32& g)
+CMutableTransaction GroupPSBT::Extract(const PartiallySignedTransaction& p,const integration::ViewPtr& v,const B32& g,int height)
 {
-    auto info=Inspect(p,v,g);Require(std::all_of(info.complete.begin(),info.complete.end(),[](bool b){return b;}),Code::Signature,"incomplete PSBT");
-    auto result=integration::Engine::Validate(v,info.tx,g,MANDATORY_SCRIPT_VERIFY_FLAGS);Require(result.valid,Code::Signature,"completed transaction failed isolated validation");Fresh(v,info.epoch);return info.tx;
+    auto info=Inspect(p,v,g,height);Require(std::all_of(info.complete.begin(),info.complete.end(),[](bool b){return b;}),Code::Signature,"incomplete PSBT");
+    auto result=integration::Engine::Validate(v,info.tx,g,MANDATORY_SCRIPT_VERIFY_FLAGS,height);Require(result.valid,Code::Signature,"completed transaction failed isolated validation");Fresh(v,info.epoch);return info.tx;
 }
 Bytes GroupPSBT::Encode(const PartiallySignedTransaction& p){Shape(p);return SerializeBytes(p);}
 PartiallySignedTransaction GroupPSBT::Decode(std::span<const unsigned char> bytes)

@@ -17,11 +17,11 @@ public:
     static CAmount Fee(size_t bytes,const FeePolicy&);
     // Exact selection is also the sweep/batch assembly path; all values/scripts
     // come from View, ownership from verified wallet records. No arbitrary coins.
-    static Funded Exact(const Wallet&,const integration::ViewPtr&,std::span<const FundingCoin>,std::span<const CTxOut>,const Address* change,FundingMode=FundingMode::Automatic,FeePolicy={});
-    static Funded Fund(const Wallet&,const integration::ViewPtr&,std::span<const FundingCoin>,std::span<const CTxOut>,const Address& change,FundingMode=FundingMode::Automatic,FeePolicy={});
+    static Funded Exact(const Wallet&,const integration::ViewPtr&,std::span<const FundingCoin>,std::span<const CTxOut>,const Address* change,FundingMode=FundingMode::Automatic,FeePolicy={},int spend_height=200);
+    static Funded Fund(const Wallet&,const integration::ViewPtr&,std::span<const FundingCoin>,std::span<const CTxOut>,const Address& change,FundingMode=FundingMode::Automatic,FeePolicy={},int spend_height=200);
     // Spend the requested eligible set, partitioned under existing standard
     // weight/resource limits. Each output receives its batch total minus fee.
-    static std::vector<Funded> Sweep(const Wallet&,const integration::ViewPtr&,std::span<const FundingCoin>,const CScript& destination,FundingMode=FundingMode::Automatic,FeePolicy={});
+    static std::vector<Funded> Sweep(const Wallet&,const integration::ViewPtr&,std::span<const FundingCoin>,const CScript& destination,FundingMode=FundingMode::Automatic,FeePolicy={},int spend_height=200);
 };
 }
 #endif
