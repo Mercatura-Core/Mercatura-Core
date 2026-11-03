@@ -11,12 +11,13 @@ from decimal import Decimal
 ROOT=pathlib.Path(__file__).resolve().parents[4]
 sys.path.insert(0,str(ROOT/'test/functional'))
 sys.path.insert(0,str(ROOT/'src/test/mercaweave'))
+from simulation.lifecycle import Lifecycle
 from simulation.core import Ledger,Manifest,Metrics,mca,units,write_json
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.messages import CTransaction,CTxIn,COutPoint,CTxOut,from_hex
 from test_framework.util import assert_equal
 
-class NativeSimulation(BitcoinTestFramework):
+class NativeSimulation(Lifecycle,BitcoinTestFramework):
     def add_options(self,parser):
         parser.add_argument('--manifest',type=pathlib.Path,required=True)
         parser.add_argument('--output',type=pathlib.Path,required=True)
@@ -32,12 +33,13 @@ class NativeSimulation(BitcoinTestFramework):
     def mine(self,count=1):
         results=[]
         for _ in range(count):
-            start=time.monotonic();blockhash=self.generatetoaddress(self.nodes[0],1,self.reward['address'])[0]
+            start=time.monotonic();blockhash=self.generatetoaddress(self.nodes[0],1,self.reward['address'],sync_fun=self.no_op)[0]
+            generated=time.monotonic();self.sync_blocks();converged=time.monotonic()
             block=self.nodes[0].getblock(blockhash,2);fees,claim=self.ledger.block(block)
             stats=self.nodes[0].getblockstats(blockhash,['subsidy','totalfee'])
             assert_equal(fees,stats['totalfee']);assert_equal(claim,fees+stats['subsidy'])
             for node in self.nodes:assert_equal(node.getbestblockhash(),blockhash)
-            event=dict(height=block['height'],bytes=block['size'],weight=block['weight'],transactions=len(block['tx'])-1,fees=fees,generate_validate_propagate_ms=(time.monotonic()-start)*1000)
+            event=dict(mining_local_validation_ms=(generated-start)*1000,block_convergence_ms=(converged-generated)*1000,height=block['height'],bytes=block['size'],weight=block['weight'],transactions=len(block['tx'])-1,fees=fees,generate_validate_propagate_ms=(time.monotonic()-start)*1000)
             self.metrics.event('block',**event);results.append(event)
             included={t['txid'] for t in block['tx'][1:]}
             for row in self.metrics.rows:
@@ -120,7 +122,9 @@ class NativeSimulation(BitcoinTestFramework):
             recipient=self.deposit_shared if self.manifest.custody=='reused' else self.address('exchange')
             out=dict(**recipient,value=200,customer=str(len(self.metrics.rows)))
             rows.append(self.submit(self.transaction('customers',[coin],[out],'deposit')))
-            if self.manifest.mining_interval and len(rows)%self.manifest.mining_interval==0:self.propagate(rows);self.settle();rows=[]
+            interval=([190,385,580,700,775][self.capacity_index%5] if self.manifest.capacity_steps else self.manifest.mining_interval)
+            if interval and len(rows)>=interval:
+                self.propagate(rows);self.settle();rows=[];self.capacity_index+=1
         if rows:self.propagate(rows)
         self.settle()
         expected_credit=sum(self.ledger.credits.values());assert_equal(expected_credit,200*sum(r['phase']=='deposit' for r in self.metrics.rows))
@@ -141,12 +145,20 @@ class NativeSimulation(BitcoinTestFramework):
             outputs=[dict(**self.address('customers'),value=100) for _ in range(size)]
             available_accounts=[k for k,v in self.ledger.credits.items() if v-self.ledger.debits.get(k,0)>=100]
             assert len(available_accounts)>=size
-            for account in available_accounts[:size]:self.ledger.debits[account]=self.ledger.debits.get(account,0)+100
             # One deposit UTXO can fund one withdrawal; batching combines independent keys.
             selected=[]
             while inventory and sum(c['value'] for c in selected)<100*size+10*len(selected)+(43*size+999)//1000:
                 selected.append(inventory.pop(0))
-            self.submit(self.transaction('exchange',selected,outputs,'withdrawal'));done+=size
+            if sum(c['value'] for c in selected)<100*size+10*len(selected)+(43*size+999)//1000:
+                pending=[r for r in self.metrics.rows if not r['confirmed']]
+                if not pending:raise ValueError('insufficient total confirmed withdrawal assets')
+                self.propagate(pending);self.settle()
+                self.metrics.event('withdrawal_inventory_epoch',reason='confirm change before reuse')
+                inventory=self.ledger.inventory('exchange');selected=[]
+                while inventory and sum(c['value'] for c in selected)<100*size+10*len(selected)+(43*size+999)//1000:selected.append(inventory.pop(0))
+            self.submit(self.transaction('exchange',selected,outputs,'withdrawal'))
+            for account in available_accounts[:size]:self.ledger.debits[account]=self.ledger.debits.get(account,0)+100
+            done+=size
         pending=[r for r in self.metrics.rows if not r['confirmed']];self.propagate(pending);self.settle()
         assert self.ledger.balance('exchange')>=expected_credit-sum(self.ledger.debits.values())
         self.metrics.event('accounting',credited_units=expected_credit,withdrawn_units=sum(self.ledger.debits.values()),offchain_liabilities=expected_credit-sum(self.ledger.debits.values()),offchain_transfers=0)
@@ -161,7 +173,7 @@ class NativeSimulation(BitcoinTestFramework):
         self.restart_node(self.num_nodes-1);self.connect_nodes(self.num_nodes-2,self.num_nodes-1);self.sync_all()
         self.metrics.event('restart',tip=self.nodes[0].getbestblockhash());self.settle()
     def run_test(self):
-        self.metrics=Metrics(self.options.output);self.ledger=Ledger();self.wallets={};self.rng=random.Random(self.manifest.seed)
+        self.capacity_index=0;self.metrics=Metrics(self.options.output);self.ledger=Ledger();self.wallets={};self.rng=random.Random(self.manifest.seed)
         write_json(self.options.output/'manifest.json',dataclasses.asdict(self.manifest))
         write_json(self.options.output/'source-hashes.json',{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in pathlib.Path(__file__).parent.glob('*.py')})
         for owner in ('miner','customers','exchange'):
@@ -169,7 +181,11 @@ class NativeSimulation(BitcoinTestFramework):
         self.change={owner:self.address(owner) for owner in self.wallets};self.reward=self.change['miner'];self.deposit_shared=self.address('exchange')
         self.metrics.event('isolation',chain=self.nodes[0].getblockchaininfo()['chain'],nodes=self.num_nodes,transport='loopback-native-v2',standard_policy=True,synchronous_sqlite=True)
         assert_equal(self.nodes[0].getblockchaininfo()['chain'],'regtest')
-        self.mine(101);completed=0
+        self.metrics.sample(self.nodes,self.options.tmpdir)
+        self.mine(self.manifest.bootstrap_blocks)
+        template=self.nodes[0].getblocktemplate({'rules':['segwit']})
+        self.metrics.event('active_rules',height=template['height'],capacity_bytes=template['sizelimit'],compatibility_weightlimit=template['weightlimit'],sigoplimit=template['sigoplimit'])
+        self.metrics.sample(self.nodes,self.options.tmpdir);completed=0
         while completed<self.manifest.transactions:
             count=min(self.manifest.epoch_size,self.manifest.transactions-completed);self.epoch(count);completed+=count
             self.metrics.checkpoint(completed_deposits=completed,height=self.ledger.height,credits=self.ledger.credits)
@@ -177,7 +193,10 @@ class NativeSimulation(BitcoinTestFramework):
         stop=time.monotonic()+self.manifest.soak_seconds;cycles=0;start=time.monotonic()
         while time.monotonic()<stop and cycles<self.manifest.max_soak_cycles:
             self.epoch(min(10,self.manifest.epoch_size));self.network();cycles+=1
-        self.metrics.event('soak',requested_seconds=self.manifest.soak_seconds,actual_seconds=time.monotonic()-start,cycles=cycles)
+        soak_elapsed=time.monotonic()-start
+        if self.manifest.lifecycle:
+            self.hostile();self.psbt_roundtrip();self.credited_reorg();self.reward_consolidation();self.encrypted_backup()
+        self.metrics.event('soak',requested_seconds=self.manifest.soak_seconds,actual_seconds=soak_elapsed,cycles=cycles,cycle_bound=cycles>=self.manifest.max_soak_cycles)
         self.metrics.checkpoint(completed_deposits=completed,height=self.ledger.height,credits=self.ledger.credits)
         self.log.info('WO07B_NATIVE_SIMULATION_PASS')
 

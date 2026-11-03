@@ -7,7 +7,7 @@ class Accounting(unittest.TestCase):
         self.assertEqual(units('1.23'),123)
         for value in ['1.001','0.009']:
             with self.assertRaises(ValueError):units(value)
-        for changed in [dict(nodes=1),dict(transactions=100001),dict(transactions=50000),dict(batch_size=65),dict(soak_seconds=-1)]:
+        for changed in [dict(nodes=1),dict(transactions=100001),dict(transactions=50000),dict(batch_size=65),dict(soak_seconds=-1),dict(seed=-1),dict(nodes=2.5),dict(bootstrap_blocks=100)]:
             with self.assertRaises(ValueError):Manifest(**changed).validate()
         self.assertEqual(Manifest(transactions=50000,extended=True).validate().transactions,50000)
     def test_confirmation_credit_maturity_and_duplicate(self):

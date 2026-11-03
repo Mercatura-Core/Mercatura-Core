@@ -36,8 +36,14 @@ class Manifest:
     max_soak_cycles:int=10
     disruptions:bool=True
     extended:bool=False
+    lifecycle:bool=False
+    capacity_steps:bool=False
+    bootstrap_blocks:int=101
 
     def validate(self):
+        for name in ('seed','transactions','nodes','epoch_size','batch_size','mining_interval','soak_seconds','max_soak_cycles','bootstrap_blocks'):
+            if type(getattr(self,name)) is not int:raise ValueError('integer manifest field: '+name)
+        if not 0<=self.seed<=0xffffffff or not 101<=self.bootstrap_blocks<=400:raise ValueError('seed/bootstrap bounds')
         if not 1<=self.transactions<=100000:raise ValueError('transaction bound')
         if self.transactions>10000 and not self.extended:raise ValueError('extended workloads require explicit opt-in')
         if not 2<=self.nodes<=4:raise ValueError('2-4 isolated nodes required')
@@ -98,7 +104,7 @@ class Metrics:
                 hwm=int(next(x for x in status.splitlines() if x.startswith('VmHWM:')).split()[1])
                 data.append(dict(pid=pid,rss_kib=rss,high_water_kib=hwm,cpu_seconds=(int(fields[13])+int(fields[14]))/ticks))
             except FileNotFoundError:continue
-        # Allocated file bytes are bounded by the dedicated campaign directory.
+        # Logical file bytes within the dedicated campaign directory.
         disk=0
         for p in pathlib.Path(datadir).rglob('*'):
             try:
