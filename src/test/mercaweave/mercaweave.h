@@ -62,6 +62,7 @@ struct Hashes {
 };
 struct Statistics {
     size_t groups{0}, inputs{0}, ownership_checks{0}, verification_calls{0}, non_v3_calls{0};
+    size_t body_hash_passes{0}, manifest_hash_passes{0}, final_digest_hashes{0};
     size_t cost() const { return 4 * groups + inputs; }
 };
 class Authorization;
@@ -114,8 +115,14 @@ class Authorization final {
     const std::vector<CTxOut> m_spent;
     const B32 m_genesis;
     const std::vector<uint32_t> m_inputs;
-    Authorization(Bytes wire, std::vector<CTxOut> spent, B32 genesis, std::vector<uint32_t> inputs)
-        : m_transaction(std::move(wire)), m_spent(std::move(spent)), m_genesis(genesis), m_inputs(std::move(inputs)) {}
+    const Mapping m_mapping;
+    const Bytes m_manifest;
+    const Hashes m_hashes;
+    const std::vector<H48> m_digests;
+    Authorization(Bytes wire, std::vector<CTxOut> spent, B32 genesis, std::vector<uint32_t> inputs,
+                  Mapping mapping, Bytes manifest, Hashes hashes, std::vector<H48> digests)
+        : m_transaction(std::move(wire)), m_spent(std::move(spent)), m_genesis(genesis), m_inputs(std::move(inputs)),
+          m_mapping(std::move(mapping)), m_manifest(std::move(manifest)), m_hashes(hashes), m_digests(std::move(digests)) {}
     friend Result Verify(const CMutableTransaction&, const std::vector<CTxOut>&, const B32&, const NonV3Verifier&);
 public:
     bool Matches(const CMutableTransaction& tx, const std::vector<CTxOut>& spent, const B32& genesis) const
@@ -123,6 +130,10 @@ public:
         return genesis == m_genesis && spent == m_spent && Wire(tx) == m_transaction;
     }
     std::span<const uint32_t> Inputs() const { return m_inputs; }
+    const Mapping& Groups() const { return m_mapping; }
+    const Bytes& ManifestBytes() const { return m_manifest; }
+    const Hashes& Commitments() const { return m_hashes; }
+    std::span<const H48> GroupDigests() const { return m_digests; }
 };
 Result Verify(const CMutableTransaction& tx, const std::vector<CTxOut>& spent,
               const B32& genesis, const NonV3Verifier& non_v3 = {});

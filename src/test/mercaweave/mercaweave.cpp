@@ -345,16 +345,24 @@ Result Verify(const CMutableTransaction& tx, const std::vector<CTxOut>& spent,
 {
     Result r;
     try {
-        const auto map = Reconstruct(tx, spent);
+        auto map = Reconstruct(tx, spent);
         r.stats.groups = map.groups.size();
         r.stats.inputs = map.inputs;
         CheckOwnership(map, spent, genesis, r.stats);
-        const auto h = TransactionHashes(tx, spent, genesis, map);
+        auto manifest = Manifest(map);
+        auto h = BodyHashes(tx, spent, genesis);
+        ++r.stats.body_hash_passes;
+        h.manifest = PQH384("Mercatura/PQGroupAuth/v1/Manifest", manifest);
+        ++r.stats.manifest_hash_passes;
+        std::vector<H48> digests;
         std::vector<bool> covered(tx.vin.size(), false);
         for (const auto& group : map.groups) {
+            const auto digest = Digest(genesis, h, group);
+            ++r.stats.final_digest_hashes;
             ++r.stats.verification_calls;
-            Require(VerifyDigest(Digest(genesis, h, group), group.pk,
+            Require(VerifyDigest(digest, group.pk,
                                  tx.vin[group.anchor].scriptWitness.stack[0]), Error::Signature);
+            digests.push_back(digest);
             for (const auto& member : group.members) covered[member.index] = true;
         }
         for (size_t i = 0; i < covered.size(); ++i) {
@@ -364,7 +372,8 @@ Result Verify(const CMutableTransaction& tx, const std::vector<CTxOut>& spent,
                 Require(non_v3(tx, spent, genesis, static_cast<uint32_t>(i)), Error::NonV3);
             } else r.authorized_inputs.push_back(static_cast<uint32_t>(i));
         }
-        r.authorization = std::shared_ptr<const Authorization>(new Authorization(Wire(tx), spent, genesis, r.authorized_inputs));
+        r.authorization = std::shared_ptr<const Authorization>(new Authorization(Wire(tx), spent, genesis, r.authorized_inputs,
+            std::move(map), std::move(manifest), h, std::move(digests)));
         r.valid = true;
     } catch (const Failure& f) {
         r.error = f.code;
