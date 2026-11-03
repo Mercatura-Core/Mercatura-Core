@@ -153,7 +153,7 @@ Prepared Engine::AcquireInputs(const ViewPtr& view, const CMutableTransaction& m
         out.legacy_weight = GetTransactionWeight(tx);
         if (policy == Policy::CurrentPolicy) {
             std::string reason;
-            if (!IsStandardTx(tx, std::nullopt, true, CFeeRate{1000}, reason)) {
+            if (!IsStandardTx(tx, std::nullopt, true, CFeeRate{DUST_RELAY_TX_FEE}, reason)) {
                 out.failure = {Stage::Policy, reason}; return out;
             }
             if (!AreInputsStandard(tx, view->m_state->coins)) { out.failure = {Stage::Policy, "inputs-not-standard"}; return out; }

@@ -88,7 +88,7 @@ void FundingChecks()
     auto unsafe=coins;for(auto& c:unsafe)c.safe=false;Reject([&]{Funding::Fund(*w,view,unsafe,pay,change);},Code::Funds);
     auto unconfirmed=coins;for(auto& c:unconfirmed)c.depth=0;Reject([&]{Funding::Fund(*w,view,unconfirmed,pay,change);},Code::Funds);
     std::vector<CTxOut> dust{CTxOut{1,recipient.script}};Reject([&]{Funding::Fund(*w,view,coins,dust,change);},Code::Policy);
-    std::vector<CTxOut> floor{CTxOut{2,recipient.script}};Check(Funding::Fund(*w,view,coins,floor,change).fee>=1,"native two-unit dust floor accepted");
+    std::vector<CTxOut> floor{CTxOut{2,recipient.script}};Check(Funding::Fund(*w,view,coins,floor,change).fee>=1,"native two-unit dust floor accepted");Check(Funding::Fund(*w,view,coins,floor,change,FundingMode::StandardPQ).current_policy,"native two-unit output passes actual dust relay policy");
     auto watch=Wallet::Watch(wt::Genesis(),w->Records());Check(Funding::Fund(*watch,view,coins,pay,change).sizes.total==automatic.sizes.total,"watch-only can plan from explicit verified public records");
     std::vector<FundingCoin> independent;for(uint32_t i=0;i<100;++i){w->Rotate(2,0);auto a=w->Issue(2,0);auto point=wt::Point(300+i);view->Insert(point,Coin{CTxOut{10000,a.script},1,false});independent.push_back({point});}
     auto batches=Funding::Sweep(*w,view,independent,recipient.script,FundingMode::MercaWeave);size_t selected=0;for(const auto& batch:batches){Check(batch.sizes.weight<=400000&&batch.groups==batch.selected,"independent keys never fictitiously aggregate");selected+=batch.selected;}
@@ -99,6 +99,6 @@ void FundingChecks()
 }
 int main()
 {
-    try{Keys();FundingChecks();std::cout<<"{\"key_checks\":"<<checks<<",\"rejections\":"<<rejections<<",\"passed\":true}\n";}
+    try{Keys();FundingChecks();std::cout<<"{\"wallet_checks\":"<<checks<<",\"rejections\":"<<rejections<<",\"passed\":true}\n";}
     catch(const std::exception& e){std::cerr<<"FAIL wallet: "<<e.what()<<'\n';return 1;}
 }
