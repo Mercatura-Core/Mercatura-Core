@@ -293,3 +293,31 @@ See doc/design/mercaweave-v0.1-wallet-psbt-integration.md for exact boundaries,
 results, fees, PSBT restrictions and remaining gates. Unactivated v3 outputs
 are not protected custody: normal unknown-witness permissiveness is unchanged.
 No Qt, RPC, native mining, Secure Vault, activation or deployment is included.
+
+## WO06 Qt and mining integration
+
+Normal Qt has optional collapsed panels and a permanently closed grouped-network
+gate. The isolated backend, reward planner and positive capability injection are
+compiled only by the standalone test project. Ordinary v2 receive/send and native
+mining controls retain their existing paths. No grouped broadcaster, background
+signer, activation or deployed scheduler exists.
+
+Enable the focused headless suite with `-DMERCAWEAVE_QT_TESTS=ON`. It requires
+Qt6 Core/Widgets/Network/Test/Concurrent, Boost headers and libqrencode development
+files. Use `CMAKE_PREFIX_PATH` for a workspace-local SDK if needed. Build with at
+most four jobs; qualification here used two. The 28-target suite also compiles
+the actual affected application translation units without research definitions.
+After three complete green configurations, run:
+
+```bash
+python3 src/test/mercaweave/qualify_qt_mining.py \
+  --release work/build-release --debug work/build-debug \
+  --sanitize work/build-sanitize
+```
+
+The runner compares locked vectors, unit summaries and all WO05 workload rows,
+runs 2×-scale widget checks and verifies earlier evidence unchanged. It writes
+only an ignored work/ summary. Do not replace older artifacts or commit logs,
+SDKs, wallet snapshots or experiment output. See
+doc/design/mercaweave-v0.1-qt-mining-integration.md for boundaries and the exact
+qualification matrix. Full linked node/wallet/miner runtime is deferred to WO07.
