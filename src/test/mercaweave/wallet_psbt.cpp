@@ -140,7 +140,7 @@ PartiallySignedTransaction GroupPSBT::Decode(std::span<const unsigned char> byte
 {
     Require(bytes.size()<=16*1024*1024,Code::PSBT,"PSBT size bound");Reader r(bytes);std::array<unsigned char,5> magic{};r>>magic;
     Require(std::equal(magic.begin(),magic.end(),PSBT_MAGIC_BYTES),Code::PSBT,"PSBT magic");std::optional<CMutableTransaction> tx;
-    auto map=[&](bool global){std::set<Bytes> keys;while(true){auto n=ReadCompactSize(r);if(n==0)break;Require(n<=4096&&n<=r.remaining(),Code::PSBT,"PSBT key bound");Bytes key(n);r.read(std::as_writable_bytes(std::span(key)));Require(keys.insert(key).second,Code::PSBT,"duplicate PSBT key");
+    size_t total_fields=0;auto map=[&](bool global){std::set<Bytes> keys;while(true){auto n=ReadCompactSize(r);if(n==0)break;Require(++total_fields<=32768&&keys.size()<256,Code::PSBT,"PSBT map field bound");Require(n<=4096&&n<=r.remaining(),Code::PSBT,"PSBT key bound");Bytes key(n);r.read(std::as_writable_bytes(std::span(key)));Require(keys.insert(key).second,Code::PSBT,"duplicate PSBT key");
         auto size=ReadCompactSize(r);Require(size<=4*1024*1024&&size<=r.remaining(),Code::PSBT,"PSBT value bound");Bytes value(size);r.read(std::as_writable_bytes(std::span(value)));
         if(global&&key==Bytes{0}){Require(!tx,Code::PSBT,"duplicate unsigned body");tx=DecodeTransaction(value);}}};
     map(true);Require(tx.has_value(),Code::PSBT,"missing unsigned body");for(size_t i=0;i<tx->vin.size()+tx->vout.size();++i)map(false);Require(r.remaining()==0,Code::PSBT,"trailing PSBT maps");

@@ -9,7 +9,7 @@ using namespace mercaweave;
 using namespace mercaweave::wallet_research;
 namespace wt=mercaweave::wallet_research::test;
 namespace {
-size_t checks=0,rejected=0;
+size_t checks=0,rejected=0,mutation_total=0,mutation_rejected=0;
 void Check(bool b,const char* m){++checks;if(!b)throw std::runtime_error(m);}
 template<class F>void Reject(F&& f){bool bad=false;try{f();}catch(const std::exception&){bad=true;}Check(bad,"expected PSBT rejection");++rejected;}
 void Run()
@@ -34,9 +34,10 @@ void Run()
     auto atomic=p;auto original=GroupPSBT::Encode(atomic);int entropy_calls=0;
     Reject([&]{GroupPSBT::Sign(atomic,*a,view,[&](B32& out){out.fill(0);return ++entropy_calls<2;});});Check(GroupPSBT::Encode(atomic)==original,"entropy failure never publishes partial signatures");
     a->Lock();Reject([&]{GroupPSBT::Sign(atomic,*a,view);});Check(a->Unlock(SecureString{"public research fixture"}),"unlock signer");
-    auto watch=Wallet::Watch(wt::Genesis(),a->Records());Reject([&]{GroupPSBT::Sign(atomic,*watch,view);});auto wrong=wt::Owner(0x44);Check(GroupPSBT::Sign(atomic,*wrong,view).complete_inputs==0,"wrong seed cannot claim public commitments");
+    auto watch=Wallet::Watch(wt::Genesis(),a->Records());Reject([&]{GroupPSBT::Sign(atomic,*watch,view);});auto recovered=Wallet::Restore(a->Backup(),wt::Genesis());Check(recovered->Unlock(SecureString{"public research fixture"}),"recovered signer unlock");auto recovered_psbt=p;Check(GroupPSBT::Sign(recovered_psbt,*recovered,view,wt::ZeroFixture()).complete_inputs==3,"backup discovers issued coins and signs deterministically");auto wrong=wt::Owner(0x44);Check(GroupPSBT::Sign(atomic,*wrong,view).complete_inputs==0,"wrong seed cannot claim public commitments");
     auto changed=pa;changed.tx->version++;Reject([&]{GroupPSBT::Inspect(changed,view,wt::Genesis());});changed=pa;changed.tx->vin[0].nSequence--;Reject([&]{GroupPSBT::Inspect(changed,view,wt::Genesis());});changed=pa;std::swap(changed.tx->vin[0],changed.tx->vin[1]);std::swap(changed.inputs[0],changed.inputs[1]);Reject([&]{GroupPSBT::Inspect(changed,view,wt::Genesis());});changed=pa;changed.tx->vout[0].nValue--;Reject([&]{GroupPSBT::Inspect(changed,view,wt::Genesis());});changed=pa;std::swap(changed.tx->vout[0],changed.tx->vout[1]);Reject([&]{GroupPSBT::Inspect(changed,view,wt::Genesis());});changed=pa;changed.tx->nLockTime++;Reject([&]{GroupPSBT::Inspect(changed,view,wt::Genesis());});
     changed=pa;changed.inputs[0].witness_utxo.nValue++;Reject([&]{GroupPSBT::Inspect(changed,view,wt::Genesis());});changed=pa;changed.inputs[0].witness_utxo.scriptPubKey=bb.script;Reject([&]{GroupPSBT::Inspect(changed,view,wt::Genesis());});
+    auto excessive=p;excessive.tx->vin.resize(MAX_INPUTS+1);excessive.inputs.resize(MAX_INPUTS+1);Reject([&]{GroupPSBT::Inspect(excessive,view,wt::Genesis());});
     auto g=wt::Genesis();g[0]^=1;Reject([&]{GroupPSBT::Inspect(pa,view,g);});
     for(uint64_t sub=1;sub<=4;++sub){auto bad=p;PutField(bad.inputs[0],sub,Bytes(1));Reject([&]{GroupPSBT::Inspect(bad,view,wt::Genesis());});}
     changed=p;PutField(changed.inputs[2],3,aa.pk);Reject([&]{GroupPSBT::Inspect(changed,view,wt::Genesis());});
@@ -51,6 +52,7 @@ void Run()
     changed=p;auto nonce=aa.nonce;nonce[0]^=1;PutField(changed.inputs[0],1,nonce);Reject([&]{GroupPSBT::Inspect(changed,view,wt::Genesis());});
     changed=pa;auto signature=*GetField(pa.inputs[0],4);signature[0]^=1;PutField(changed.inputs[0],4,signature);Reject([&]{GroupPSBT::Inspect(changed,view,wt::Genesis());});
     Writer pair;pair<<key.key<<key.value;auto pos=std::search(bytes.begin(),bytes.end(),pair.bytes.begin(),pair.bytes.end());Check(pos!=bytes.end(),"raw duplicate fixture location");auto dup=bytes;dup.insert(dup.begin()+(pos-bytes.begin()),pair.bytes.begin(),pair.bytes.end());Reject([&]{GroupPSBT::Decode(dup);});
+    auto bomb=p;for(uint32_t n=0;n<257;++n)bomb.inputs[0].unknown[Bytes{0x90,static_cast<unsigned char>(n),static_cast<unsigned char>(n>>8)}]={};Reject([&]{GroupPSBT::Decode(SerializeBytes(bomb));});
     auto trailing=bytes;trailing.push_back(0);Reject([&]{GroupPSBT::Decode(trailing);});for(size_t n:{size_t(0),size_t(5),bytes.size()-1})Reject([&]{GroupPSBT::Decode(std::span(bytes).first(n));});
     auto unknown=p;unknown.inputs[0].unknown[Bytes{0x90}]=Bytes{1,2,3};Check(GroupPSBT::Encode(GroupPSBT::Decode(GroupPSBT::Encode(unknown)))==GroupPSBT::Encode(unknown),"unrelated unknown field preserved");
     auto deterministic=p;GroupPSBT::Sign(deterministic,*a,view,wt::ZeroFixture());std::vector<std::future<Bytes>> jobs;for(int i=0;i<4;++i)jobs.push_back(std::async(std::launch::async,[&]{auto copy=p;GroupPSBT::Sign(copy,*a,view,wt::ZeroFixture());return GroupPSBT::Encode(copy);}));for(auto& j:jobs)Check(j.get()==GroupPSBT::Encode(deterministic),"concurrent deterministic signing");
@@ -58,9 +60,9 @@ void Run()
     auto complete_bytes=GroupPSBT::Encode(merged);size_t mutations=0;
     for(uint32_t n=1;n<=1000;++n){auto fuzz=complete_bytes;size_t at=(static_cast<uint64_t>(n)*2654435761ULL)%fuzz.size();fuzz[at]^=static_cast<unsigned char>(1U<<(n%8));
         std::optional<CMutableTransaction> extracted;try{auto decoded=GroupPSBT::Decode(fuzz);GroupPSBT::Inspect(decoded,view,wt::Genesis());extracted=GroupPSBT::Extract(decoded,view,wt::Genesis());}catch(const std::exception&){++mutations;}if(extracted)Check(integration::Engine::Validate(view,*extracted,wt::Genesis(),MANDATORY_SCRIPT_VERIFY_FLAGS).valid,"accepted PSBT mutation still verifies");}
-    Check(mutations>900,"malformed/stale PSBT mutation coverage");
+    mutation_total=1000;mutation_rejected=mutations;Check(mutations>900,"malformed/stale PSBT mutation coverage");
     auto stale=p;Reject([&]{GroupPSBT::Sign(stale,*a,view,[&](B32& r){r.fill(0);view->SetTip(uint256{1});return true;});});Check(GroupPSBT::Encode(stale)==original,"view mutation cannot publish staged signatures");
     Check(view->Spend(tx.vin[0].prevout),"spend fixture");Reject([&]{GroupPSBT::Inspect(merged,view,wt::Genesis());});
 }
 }
-int main(){try{Run();std::cout<<"{\"psbt_checks\":"<<checks<<",\"rejections\":"<<rejected<<",\"passed\":true}\n";}catch(const std::exception& e){std::cerr<<"FAIL PSBT: "<<e.what()<<'\n';return 1;}}
+int main(){try{Run();std::cout<<"{\"psbt_checks\":"<<checks<<",\"rejections\":"<<rejected<<",\"mutations\":"<<mutation_total<<",\"mutation_rejections\":"<<mutation_rejected<<",\"passed\":true}\n";}catch(const std::exception& e){std::cerr<<"FAIL PSBT: "<<e.what()<<'\n';return 1;}}
