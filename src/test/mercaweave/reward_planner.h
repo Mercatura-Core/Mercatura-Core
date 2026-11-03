@@ -19,7 +19,7 @@ struct Policy {
     std::set<COutPoint> external_reservations;
 };
 struct Proposal {
-    uint64_t id{0},epoch{0},revision{0};Phase phase{Phase::Ready};
+    uint64_t id{0},epoch{0},revision{0};int spend_height{200};Phase phase{Phase::Ready};
     B32 fingerprint{};PublicKey key{};CScript destination;
     std::vector<Funded> transactions;
     std::set<COutPoint> inputs;
