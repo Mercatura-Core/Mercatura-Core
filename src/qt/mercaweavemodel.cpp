@@ -74,17 +74,17 @@ Model::~Model()
 }
 void Model::observeNativeWallet(bool locked,bool watch)
 {
-    Q_ASSERT(QThread::currentThread()==thread());++m_generation;m_busy=false;
+    if(QThread::currentThread()!=thread())return;++m_generation;m_busy=false;
     m_state.capability.locked=locked;m_state.capability.watchOnly=watch;
     m_state.reason=Availability(m_state.capability,Action::Inspect);Q_EMIT changed();
 }
 void Model::nativePreview(Preview preview)
 {
-    Q_ASSERT(QThread::currentThread()==thread());++m_generation;m_busy=false;m_state.preview=std::move(preview);Q_EMIT changed();
+    if(QThread::currentThread()!=thread())return;++m_generation;m_busy=false;m_state.preview=std::move(preview);m_state.reason=Availability(m_state.capability,Action::Inspect);Q_EMIT changed();
 }
 void Model::invalidate(Reason reason)
 {
-    Q_ASSERT(QThread::currentThread()==thread());++m_generation;m_busy=false;m_busy=false;
+    if(QThread::currentThread()!=thread())return;++m_generation;m_busy=false;m_busy=false;
 #ifdef MERCATURA_MERCAWEAVE_QT_RESEARCH_TEST_ONLY
     if(m_backend)m_backend->Invalidate(reason);
 #endif
@@ -93,7 +93,7 @@ void Model::invalidate(Reason reason)
 }
 void Model::setOptIn(bool enabled)
 {
-    Q_ASSERT(QThread::currentThread()==thread());++m_generation;m_busy=false;m_state.capability.optedIn=enabled;
+    if(QThread::currentThread()!=thread())return;++m_generation;m_busy=false;m_state.capability.optedIn=enabled;
 #ifdef MERCATURA_MERCAWEAVE_QT_RESEARCH_TEST_ONLY
     if(!enabled&&m_backend)m_backend->Invalidate(Reason::Cancelled);
 #endif
@@ -102,7 +102,7 @@ void Model::setOptIn(bool enabled)
 }
 bool Model::request(Request request)
 {
-    Q_ASSERT(QThread::currentThread()==thread());
+    if(QThread::currentThread()!=thread())return false;
     auto blocked=Availability(m_state.capability,request.action);
     if(m_busy)blocked=Reason::Busy;
     if(blocked!=Reason::None){m_state.reason=blocked;Q_EMIT changed();return false;}
@@ -128,7 +128,7 @@ bool Model::request(Request request)
 #ifdef MERCATURA_MERCAWEAVE_QT_RESEARCH_TEST_ONLY
 void Model::attachIsolated(std::shared_ptr<Backend> backend,Snapshot state)
 {
-    Q_ASSERT(QThread::currentThread()==thread());++m_generation;m_busy=false;m_busy=false;
+    if(QThread::currentThread()!=thread())return;++m_generation;m_busy=false;m_busy=false;
     if(!state.capability.isolated){m_state={};m_backend.reset();m_state.reason=Reason::Network;}
     else{m_backend=std::move(backend);m_state=std::move(state);}Q_EMIT changed();
 }

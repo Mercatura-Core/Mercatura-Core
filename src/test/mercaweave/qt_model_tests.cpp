@@ -11,6 +11,7 @@
 #include <QTest>
 #include <atomic>
 #include <iostream>
+#include <thread>
 using namespace MercaWeaveQt;
 namespace {
 size_t checks=0;void Check(bool b,const char* m){++checks;if(!b)throw std::runtime_error(m);}
@@ -41,6 +42,7 @@ void Run()
     auto dying=new Model;Panel detached(Panel::View::Receive);detached.setModel(dying);delete dying;Check(!detached.findChild<QPushButton*>("issueGroupedAddress")->isEnabled(),"panel weak model lifetime");
 #endif
     Check(Availability(all,static_cast<Action>(999))==Reason::Unavailable,"indeterminate action fails closed");
+    auto generation=model.generation();std::atomic<bool> rejected{false};std::thread wrong_thread([&]{model.setOptIn(true);Request request;request.action=Action::Plan;rejected=!model.request(request);});wrong_thread.join();Check(rejected&&model.generation()==generation,"cross-thread model mutations fail closed in every build");
     Check(Money(1)=="0.01 MCA"&&Money(100)=="1.00 MCA"&&Money(12345)=="123.45 MCA","integer fee formatting");
     Check(model.state().recoveryAddresses==100&&model.state().recoveryGroups==20,"locked recovery hints");
 }
