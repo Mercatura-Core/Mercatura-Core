@@ -93,8 +93,32 @@ add_test(NAME block_measurement_smoke COMMAND mercaweave_readiness_bench block s
 # Link selected unmodified policy routines. Function sections allow the standalone
 # executable to discard CCoinsView/node-dependent routines it never invokes.
 add_executable(mercaweave_malleability_tests malleability_tests.cpp fixtures.cpp
-  ${MCA_SRC}/script/solver.cpp ${MCA_SRC}/policy/policy.cpp ${MCA_SRC}/policy/feerate.cpp)
+  ${MCA_SRC}/script/solver.cpp ${MCA_SRC}/policy/policy.cpp ${MCA_SRC}/policy/feerate.cpp
+  ${MCA_SRC}/util/check.cpp ${MCA_SRC}/clientversion.cpp)
+# Debug policy code needs real production assertion support. Generate diagnostic
+# metadata from the existing project values, without configuring a node build.
+file(STRINGS "${MCA_SRC}/../CMakeLists.txt" research_metadata
+  REGEX "^set\\((CLIENT_NAME|CLIENT_VERSION_(MAJOR|MINOR|BUILD|IS_RELEASE)|MERCATURA_VERSION_(MAJOR|MINOR|BUILD|STRING)|COPYRIGHT_YEAR) ")
+foreach(metadata_line IN LISTS research_metadata)
+  cmake_language(EVAL CODE "${metadata_line}")
+endforeach()
+set(COPYRIGHT_HOLDERS "The %s developers")
+set(COPYRIGHT_HOLDERS_FINAL "The ${CLIENT_NAME} developers")
+set(CLIENT_BUGREPORT "https://github.com/Mercatura-Core/Mercatura-Core/issues")
+set(PROJECT_HOMEPAGE_URL "https://github.com/Mercatura-Core/Mercatura-Core")
+set(CLIENT_VERSION_STRING "${CLIENT_VERSION_MAJOR}.${CLIENT_VERSION_MINOR}.${CLIENT_VERSION_BUILD}")
+configure_file(${MCA_SRC}/../cmake/bitcoin-build-config.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/diagnostic/bitcoin-build-config.h @ONLY)
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/diagnostic/bitcoin-build-info.h "// Standalone research diagnostics only.\n")
+target_include_directories(mercaweave_malleability_tests PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/diagnostic)
 target_compile_options(mercaweave_malleability_tests PRIVATE -ffunction-sections -fdata-sections)
 target_link_options(mercaweave_malleability_tests PRIVATE -Wl,--gc-sections)
 target_link_libraries(mercaweave_malleability_tests PRIVATE mercaweave_context)
+# GCC retains UBSan vptr metadata for discarded CCoinsView-dependent functions
+# in policy.cpp, requiring node RTTI that this standalone target does not link.
+# Exclude ONLY vptr for that unmodified production TU. All other ASan/UBSan
+# checks, and every check on new research code, remain enabled.
+if(MERCAWEAVE_SANITIZERS)
+  set_source_files_properties(${MCA_SRC}/policy/policy.cpp PROPERTIES COMPILE_OPTIONS -fno-sanitize=vptr)
+endif()
 add_test(NAME malleability_children_and_policy COMMAND mercaweave_malleability_tests)
