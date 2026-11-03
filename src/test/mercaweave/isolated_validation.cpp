@@ -249,6 +249,14 @@ BlockResult Engine::Candidate(const ViewPtr& view, std::span<const CMutableTrans
     auto staged = ViewPtr(new View(view->m_state->genesis, &view->m_state->coins));
     staged->m_state->coins.SetBestBlock(view->m_state->coins.GetBestBlock());
     Ledger ledger{budget};
+    // Even an empty candidate has header/count/coinbase bytes. Check those
+    // before the per-transaction loop, which an empty candidate never enters.
+    const auto envelope = ledger.Reserve({});
+    if (envelope != BudgetError::None) {
+        out.failure = {Stage::Budget, "block-envelope-budget", {}, SCRIPT_ERR_OK, envelope};
+        out.bytes = ledger.BlockBytes(); out.weight = ledger.BlockWeight();
+        return out;
+    }
     std::vector<RequestPtr> requests;
     for (const auto& tx : txs) {
         auto prepared = PrepareImpl(staged, tx, g, flags, height, Policy::ConsensusFixture, &ledger);

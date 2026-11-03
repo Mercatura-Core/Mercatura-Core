@@ -199,6 +199,9 @@ void Blocks()
 {
     auto f=Make(3,1);
     auto view=View::Create(f.genesis);
+    auto tiny=Budget{};tiny.bytes=0;
+    const auto empty=Engine::Candidate(view,{},f.genesis,FLAGS,false,200,tiny);
+    Check(!empty.valid && empty.failure.budget_error==BudgetError::Bytes,"empty candidate must reserve its block envelope");
     std::vector<CMutableTransaction> txs;
     for(uint32_t serial=1;serial<=3;++serial) { fixture::UniqueAndSign(f,serial,3);fixture::Fund(view,f);txs.push_back(f.tx); }
     const auto old_epoch=view->Epoch();
