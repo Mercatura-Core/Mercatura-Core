@@ -9,15 +9,23 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 MACRO = "MERCATURA_MERCAWEAVE_WALLET_RESEARCH_TEST_ONLY"
+BASE = "f353b4efa5f3585fa45131893cae6c11f5a1348d"  # Reviewed dormant CWallet/PSBT integration.
+
+
+def project(text):
+    ordinary, count = re.subn(r"#ifdef " + MACRO + r"\n.*?#else\n", "", text, flags=re.S)
+    ordinary = re.sub(r"#endif // " + MACRO + r" (prefix|suffix)\n", "", ordinary)
+    if count != 2:
+        raise RuntimeError("wallet research guard count changed")
+    return ordinary
 
 
 def main():
     build = pathlib.Path(sys.argv[1]).resolve(strict=True)
     text = (ROOT / "src/wallet/wallet.cpp").read_text()
-    ordinary, count = re.subn(r"#ifdef " + MACRO + r"\n.*?#else\n", "", text, flags=re.S)
-    ordinary = re.sub(r"#endif // " + MACRO + r" (prefix|suffix)\n", "", ordinary)
-    original = subprocess.check_output(["git", "-C", str(ROOT), "show", "93b356a:src/wallet/wallet.cpp"], text=True)
-    if count != 2 or ordinary != original:
+    ordinary = project(text)
+    original = project(subprocess.check_output(["git", "-C", str(ROOT), "show", BASE+":src/wallet/wallet.cpp"], text=True))
+    if ordinary != original:
         raise RuntimeError("normal wallet source changed")
     definitions = subprocess.check_output(["git", "-C", str(ROOT), "grep", "-l", MACRO, "--", "*CMakeLists.txt"], text=True).splitlines()
     if definitions != ["src/test/mercaweave/CMakeLists.txt"]:

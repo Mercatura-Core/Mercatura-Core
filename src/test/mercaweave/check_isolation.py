@@ -13,7 +13,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 MACRO = "MERCATURA_MERCAWEAVE_RESEARCH_TEST_ONLY"
-BASE = "2ff60be0b6c5f58f36110ecba5cb72ca2663126d"
+BASE = "326fd09" # WO07C authorized dormant production implementation checkpoint
 
 
 def require(ok, message):
@@ -28,6 +28,7 @@ def main():
         source = (ROOT / name).read_text()
         normal, count = re.subn(r"#ifdef " + MACRO + r"\n.*?#endif\n", "", source, flags=re.DOTALL)
         original = subprocess.check_output(["git", "-C", str(ROOT), "show", BASE + ":" + name], text=True)
+        original = re.sub(r"#ifdef " + MACRO + r"\n.*?#endif\n", "", original, flags=re.DOTALL)
         require(count == 1 and normal == original, "normal-source erasure mismatch: " + name)
         erased[name] = hashlib.sha256(normal.encode()).hexdigest()
     commands = json.loads((build / "compile_commands.json").read_text())
@@ -36,6 +37,7 @@ def main():
         "mercaweave_isolated_control", "mercaweave_coin_validation", "mercaweave_coin_probe",
         "mercaweave_integration", "mercaweave_integration_tests", "mercaweave_integration_bench",
         "mercaweave_simulation_research", "mercaweave_node_validation", "mercaweave_node_tests", "mercaweave_node_bench", "mercaweave_sqlite_native", "mercaweave_parameter_probe", "mercaweave_durable_wallet", "mercaweave_durable_tests",
+        "mercaweave_production_context_tests",
         "mercaweave_wallet_primitives", "mercaweave_wallet_primitive_probe", "mercaweave_wallet",
         "mercaweave_wallet_tests", "mercaweave_wallet_bench", "mercaweave_psbt_tests", "mercaweave_reward_planner", "mercaweave_reward_tests", "mercaweave_qt_bridge", "mercaweave_qt_integration_tests",
     }

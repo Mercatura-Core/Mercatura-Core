@@ -6,6 +6,7 @@
 #define MERCATURA_TEST_PRODUCTION_PATH_ACCESS_H
 #include <script/pqgroup_context.h>
 #include <validation.h>
+namespace wallet { class CWallet; struct PQGroupRecord; struct PQGroupRecords; }
 
 namespace mercaweave {
 class ProductionPathTestAccess final {
@@ -19,6 +20,10 @@ public:
         LOCK(cs_main);
         state.m_group_execution = std::move(execution);
     }
+    static void Attach(wallet::CWallet&, std::shared_ptr<const IsolatedExecution>);
+    static std::optional<wallet::PQGroupRecord> Issue(wallet::CWallet&, uint32_t account = 0, uint8_t purpose = 0);
+    static void Entropy(wallet::CWallet&, RandomSource);
+    static wallet::PQGroupRecords Records(const wallet::CWallet&);
 };
 }
 #endif

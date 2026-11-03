@@ -4,6 +4,7 @@
 #include "../context_fixtures.h"
 #include <consensus/validation.h>
 #include <future>
+#include <chrono>
 #include <iostream>
 #include <random>
 
@@ -55,7 +56,9 @@ void Shapes()
             {4096,4,0}, {1,1,1}, {53,1,2}, {10,2,1}}) {
         auto fixture = MixedFixture(n,g,v);
         Statistics work;
+        const auto started = std::chrono::steady_clock::now();
         Check(Validate(fixture,cache,false,&work), "inline production Script");
+        const auto inline_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-started).count();
         Check(work.verification_calls == size_t(g), "exact one ML-DSA verification per group");
         Check(work.body_hash_passes == 1 && work.manifest_hash_passes == 1, "single hash passes");
         Check(Validate(fixture,cache,true), "owned asynchronous reversed jobs");
@@ -63,7 +66,7 @@ void Shapes()
         if (n == 100 && g == 1 && !v) Check(bytes.total == 13317, "unchanged 100-input vector");
         std::cout << "{\"v3\":" << n << ",\"groups\":" << g << ",\"v2\":" << v
                   << ",\"bytes\":" << bytes.total << ",\"weight\":" << bytes.weight
-                  << ",\"group_verifications\":" << work.verification_calls << "}\n";
+                  << ",\"group_verifications\":" << work.verification_calls << ",\"inline_us\":" << inline_us << "}\n";
     }
 }
 void Negatives()

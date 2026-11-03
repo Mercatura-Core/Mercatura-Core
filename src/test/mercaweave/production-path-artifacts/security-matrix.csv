@@ -1,0 +1,51 @@
+id,case,status,layer,evidence,restriction
+1,wrong public key,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+2,altered signature,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+3,wrong signature length,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+4,wrong public key length,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+5,wrong nonce length,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+6,wrong anchor reference,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+7,anchor references follower,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+8,anchor outside transaction,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+9,duplicate anchors,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+10,missing anchor,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+11,extra anchor,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+12,missing follower,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+13,duplicate membership,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,duplicate outpoint and anchor-role rejection
+14,wrong commitment,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+15,wrong genesis,PASS,production input entry+wallet,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+16,changed prevout,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+17,changed amount,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+18,changed spent script,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+19,changed sequence,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+20,changed version,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+21,changed locktime,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+22,changed output value,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+23,changed output script,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+24,reordered inputs,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+25,reordered outputs,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+26,added member,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+27,removed member,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+28,moved input between groups,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,isolated capability
+29,mixed independent keys,PASS,production input entry+actual CWallet,pqgroup_security+pqgroup_cwallet,distinct owners retain separate keys
+30,wrong signing context,PASS,production input entry,pqgroup_security/ordinary_unknown_witness_boundary_and_group_limits,native context cannot authorize group
+31,missing PSBT metadata,PASS,production PSBT inspector,pqgroup_security/actual_wallet_metadata_and_atomic_entropy_failures,actual native containers
+32,contradictory PSBT data,PASS,production PSBT+actual CWallet,pqgroup_security+pqgroup_cwallet,atomic rejection
+33,incomplete PSBT finalization,PASS,production PSBT+actual CWallet,pqgroup_security+pqgroup_cwallet,extract refuses partial authorization
+34,invalid derivation metadata,PASS,actual WalletBatch+CWallet,pqgroup_security/actual_wallet_metadata_and_atomic_entropy_failures,authenticated derivation and presence records
+35,unknown wallet ownership,PASS,actual CWallet,pqgroup_cwallet/ownership_funding_raw_signing_and_multiple_signer_psbt,foreign groups remain incomplete
+36,locked signing,PASS,actual encrypted CWallet,pqgroup_cwallet/native_sqlite_encryption_backup_restore_rotation_and_failed_issuance,native encryption lifecycle
+37,corrupt encrypted metadata,PASS,actual SQLite+CWallet unlock,pqgroup_cwallet/native_sqlite_encryption_backup_restore_rotation_and_failed_issuance,no provisional ownership
+38,stale signing context,PASS,actual FillPSBT,pqgroup_cwallet/ownership_funding_raw_signing_and_multiple_signer_psbt,changed body rejected unchanged
+39,invalid cache reuse,PASS,actual ScriptExecutionCache+CScriptCheck,pqgroup_security/real_cache_and_negative_authorization_matrix,poisoned legacy entry bypassed
+40,reorg invalidates spent inputs,PASS,actual Chainstate+CWallet,pqgroup_chainstate+pqgroup_cwallet,actual missing-coins rejection and undo
+41,oversized witness,PASS,production input entry,pqgroup_security/real_cache_and_negative_authorization_matrix,unchanged native resource limits
+42,oversized group,PASS,production input entry,pqgroup_security/ordinary_unknown_witness_boundary_and_group_limits,rejected before ML-DSA
+43,excess groups,PASS,production input entry,pqgroup_security/ordinary_unknown_witness_boundary_and_group_limits,rejected before ML-DSA
+44,excess inputs,PASS,production input entry,pqgroup_security/ordinary_unknown_witness_boundary_and_group_limits,rejected before ML-DSA
+45,malformed serialization,PASS,shared parser+native decoder,mercaweave_parser_tests and existing vector suite,bounded parser campaign
+46,concurrent authorization jobs,PASS WITH RESTRICTIONS,actual CCheckQueue+CScriptCheck,mercaweave_production_context_tests,two workers; reversed jobs; TSAN not executed
+47,allocation failure,NOT TESTED,production allocator,existing research allocation-bound tests are separate,no safe native bad_alloc injector
+48,repeated invalid submission,PASS WITH RESTRICTIONS,production grouped entry,1000 context signature mutations+250 actual PSBT nonce mutations,bounded in-process campaign; no positive v3 network route
+49,premature network acceptance,PASS WITH RESTRICTIONS,ordinary Script+build boundary,ordinary_unknown_witness_boundary_and_group_limits+audit.py,standard policy rejects; inherited mandatory unknown-v3 permissiveness remains; real-node grouped readiness NOT TESTED
+50,premature wallet creation,PASS,ordinary CWallet+compile boundary,actual CWallet ordinary destination and private issuance rejection,normal destination remains independent native v2

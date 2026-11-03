@@ -1,0 +1,20 @@
+log,classification,observed failure,correction,final evidence
+work/wo07c/context-release-build.log,build harness,new CMake target not configured,regenerate standalone CMake,final context CTest
+work/wo07c/native-wallet-build.log,implementation compile,ambiguous KeyPair alias,fully qualify mercaweave::KeyPair,native library builds
+work/wo07c/native-wallet-build-attempt2.log,implementation compile,if-initializer key name redeclaration,rename generated key variable,native library builds
+work/wo07c/native-probe-build.log,test compile,Boost cannot print uint256 equality operands,use boolean comparisons,native focused runner
+work/wo07c/native-probe-build-attempt2.log,test compile,Boost message precedence and project filesystem API,use explicit message and PathToString and copy_options,native focused runner
+work/wo07c/native-probe-build-attempt5.log,test compile,witness hash byte pointer type,use ToUint256 for native SHA256 hasher,native cache tests
+work/wo07c/native-psbt-build.log,implementation compile,unqualified Writer outside namespace,fully qualify mercaweave::Writer,native PSBT builds
+work/wo07c/native-probe-build-attempt8.log,test compile,Signature array assignment and noncopyable fixture copy,assign signature span and copy transaction only,native negative matrix
+work/wo07c/native-release-tests-attempt1.log,fixture funding,undo fixture used reserved height-zero encoding,establish actual block and fund non-coinbase coins at height one,actual disconnect and exact coins map restoration
+work/wo07c/native-release-tests-attempt1.log,production wallet,birthday absent for new grouped issuance skipped wallet notification scan,update birthday on issuance and use conservative zero on record load,actual balances and AvailableCoins and rescan
+work/wo07c/native-release-tests-attempt2.log,fixture orchestration,reconsideration omitted RecalculateBestHeader and triggered native invariant,use same best-header recalculation as native RPC,real invalidate and reconsider cycles
+work/wo07c/native-release-tests-attempt2.log,abort fallout,duplicate ArgsManager arguments in subsequent fixtures after SIGABRT,fix originating chain fixture and first rerun suites separately,native suites complete normally
+work/wo07c/native-release-expanded.log,test expectation,two trusted-balance assertions ignored retained unconfirmed spend reservations,assert inactive state and restored coins then native abandonment and reconnection,native wallet reorg lifecycle
+work/wo07c/native-debug-configure-attempt1.log,build environment,SQLite SDK prefix missing,configure explicit local SDK prefix,native Debug configuration
+work/wo07c/native-sanitize-configure-attempt1.log,build environment,SQLite SDK prefix missing,configure explicit local SDK prefix,native sanitizer configuration
+work/wo07c/boundary-audit.log,audit harness,native compile_commands not exported,enable CMAKE_EXPORT_COMPILE_COMMANDS,boundary-audit-final.json
+work/wo07c/standalone-release-build.log,test header,core helper pulled full-wallet generated header into standalone build,split core access declaration and native wallet access definition,standalone Release Debug sanitizer builds
+work/wo07c/native-probe-presence-build.log,test compile,GetValueOut called on CMutableTransaction,use native immutable CTransaction value accessor,native funded PSBT case
+work/wo07c/native-wallet-stale-reproduction.log,production wallet,live input spent during signing still published PSBT with complete=true and changed bytes,requery live coins before complete flag and atomic publication,actual wallet deterministic stale-input regression

@@ -7,7 +7,7 @@ import re
 import subprocess
 import sys
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-BASE = '6cc3925bd7431bd03a07d9b0b04de07550d95022'
+BASE = '326fd09' # Includes the reviewed WO07C dormant production call path.
 MACROS = {'MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY', 'MERCATURA_MERCAWEAVE_VALIDATION_COMPONENTS_TEST_ONLY'}
 
 
@@ -34,14 +34,14 @@ def main():
     hashes = {}
     for file in ['src/validation.cpp', 'src/validation.h']:
         text = ordinary((ROOT/file).read_text())
-        before = subprocess.check_output(['git','-C',str(ROOT),'show',BASE+':'+file],text=True)
+        before = ordinary(subprocess.check_output(['git','-C',str(ROOT),'show',BASE+':'+file],text=True))
         # Inserted guard boundaries add blank lines, but ordinary source bytes
         # on every nonempty line must exactly match the pre-WO07 source.
         normalize = lambda s: '\n'.join(line for line in s.splitlines() if line.strip())
         if normalize(text) != normalize(before):
             raise RuntimeError('ordinary validation source changed: '+file)
         hashes[file] = hashlib.sha256(text.encode()).hexdigest()
-    allowed = {'mercaweave_node_validation','mercaweave_node_tests','mercaweave_node_bench'}
+    allowed = {'mercaweave_node_validation','mercaweave_node_tests','mercaweave_node_bench','mercaweave_production_context_tests'}
     counts = {m:0 for m in MACROS}
     for item in json.loads((build/'compile_commands.json').read_text()):
         command = item['command']
