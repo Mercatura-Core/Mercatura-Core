@@ -122,7 +122,9 @@ Address Wallet::Issue(uint32_t account,uint8_t purpose,uint8_t version)
     std::lock_guard lock(m_mutex);Require(!m_watch,Code::WatchOnly,"watch-only-wallet");Require(m_seed.size()==32,Code::Locked,"locked-wallet");
     Require(purpose<=2&&(version==3||(version==2&&purpose<2)),Code::Metadata,"unsupported-wallet-branch");
     Require(m_addresses.size()<MAX_RECORDS,Code::Index,"research-record-limit");
-    Branch branch{account,purpose,version};auto [used,next]=NextCursor(m_cursors[branch],version);
+    Branch branch{account,purpose,version};auto it=m_cursors.find(branch);
+    Require(it!=m_cursors.end()||m_cursors.size()<MAX_RECORDS,Code::Index,"research-cursor-limit");
+    auto [used,next]=NextCursor(it==m_cursors.end()?Cursor{}:it->second,version);
     auto a=DeriveRecord({account,purpose,used.group,used.next,version});
     Require(!m_index.contains(a.script),Code::Metadata,"duplicate-issued-address");
     m_index.emplace(a.script,m_addresses.size());m_addresses.push_back(a);m_cursors[branch]=next;Authenticate();return a;
@@ -130,7 +132,8 @@ Address Wallet::Issue(uint32_t account,uint8_t purpose,uint8_t version)
 void Wallet::Rotate(uint32_t account,uint8_t purpose)
 {
     std::lock_guard lock(m_mutex);Require(m_seed.size()==32&&!m_watch,Code::Locked,"locked-wallet");Require(purpose<=2,Code::Metadata,"purpose");
-    auto& c=m_cursors[{account,purpose,3}];Require(c.group<UINT32_MAX,Code::Index,"group-index-exhausted");++c.group;c.next=0;Authenticate();
+    Branch branch{account,purpose,3};Require(m_cursors.contains(branch)||m_cursors.size()<MAX_RECORDS,Code::Index,"research-cursor-limit");
+    auto& c=m_cursors[branch];Require(c.group<UINT32_MAX,Code::Index,"group-index-exhausted");++c.group;c.next=0;Authenticate();
 }
 std::vector<Address> Wallet::Records()const{std::lock_guard lock(m_mutex);Require(m_verified,Code::Metadata,"unverified-restored-metadata");return m_addresses;}
 std::optional<Address> Wallet::Find(const CScript& script)const

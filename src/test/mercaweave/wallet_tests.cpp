@@ -65,6 +65,9 @@ void Keys()
     std::set<CScript> concurrent;for(auto& job:pending)Check(concurrent.insert(job.get().script).second,"concurrent address issuance unique");
     Check(w->Records().size()==before+16,"serialized concurrent high-water state");
     Reject([&]{w->Save("/workspace/not-a-research-wallet");},Code::Metadata);
+    auto cursor_limit=Wallet::Create(seed,genesis,pass);Check(cursor_limit->Unlock(pass),"cursor-limit fixture unlock");for(uint32_t i=0;i<Wallet::MAX_RECORDS;++i)cursor_limit->Rotate(i,0);
+    auto bounded_backup=cursor_limit->Backup();Reject([&]{cursor_limit->Rotate(Wallet::MAX_RECORDS,0);},Code::Index);Reject([&]{cursor_limit->Issue(0,1);},Code::Index);
+    Check(cursor_limit->Backup()==bounded_backup,"cursor limit preserves authenticated metadata atomically");auto bounded_restore=Wallet::Restore(bounded_backup,genesis);Check(bounded_restore->Unlock(pass),"maximum cursor table remains restorable");
 }
 void FundingChecks()
 {
