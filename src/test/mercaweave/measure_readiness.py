@@ -50,7 +50,7 @@ def main():
             print(f"{label}: {case} passed", flush=True)
         target = out / f"{label}.csv"
         with target.open("w", newline="") as stream:
-            writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+            writer = csv.DictWriter(stream, fieldnames=list(rows[0]), lineterminator="\n")
             writer.writeheader()
             writer.writerows(rows)
         records[label] = rows
