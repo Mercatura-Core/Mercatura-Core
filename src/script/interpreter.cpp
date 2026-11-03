@@ -2030,6 +2030,11 @@ bool CheckMercaturaPQWitnessStructureV1(
 
 static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, const std::vector<unsigned char>& program, script_verify_flags flags, const BaseSignatureChecker& checker, ScriptError* serror, bool is_p2sh)
 {
+    if (witversion == 3) {
+        if (const auto grouped = checker.CheckPQGroupAuthorization(witness, program, flags, is_p2sh)) {
+            return *grouped ? set_success(serror) : set_error(serror, SCRIPT_ERR_WITNESS_PROGRAM_MISMATCH);
+        }
+    }
     CScript exec_script; //!< Actually executed script (last stack item in P2WSH; implied P2PKH script in P2WPKH; leaf script in P2TR)
     std::span stack{witness.stack};
     ScriptExecutionData execdata;

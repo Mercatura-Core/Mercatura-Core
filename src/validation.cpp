@@ -2038,6 +2038,8 @@ void Chainstate::InvalidBlockFound(CBlockIndex* pindex, const BlockValidationSta
 
 #endif // MERCATURA_MERCAWEAVE_VALIDATION_COMPONENTS_TEST_ONLY prefix
 
+#include <script/pqgroup_context.h>
+
 #ifdef MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY
 #include <test/mercaweave/node_validation.h>
 #endif
@@ -2058,6 +2060,33 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txund
 }
 
 std::optional<std::pair<ScriptError, std::string>> CScriptCheck::operator()() {
+    if (m_group_context) {
+        if (!m_group_context->MatchesJob(ptxTo, txdata, nIn, m_tx_out, m_flags, m_pq_genesis_hash)) {
+            return std::make_pair(SCRIPT_ERR_WITNESS_PROGRAM_MISMATCH, "pqgroup-job-binding");
+        }
+        class GroupChecker final : public CachingTransactionSignatureChecker {
+            const mercaweave::GroupContext& m_context;
+            const unsigned int m_index;
+        public:
+            GroupChecker(const mercaweave::GroupContext& context, unsigned int index,
+                         SignatureCache& cache, std::optional<uint256> genesis)
+                : CachingTransactionSignatureChecker(&context.Transaction(), index,
+                      context.Spent()[index].nValue, false, cache, context.Native(), genesis),
+                  m_context(context), m_index(index) {}
+            std::optional<bool> CheckPQGroupAuthorization(const CScriptWitness& witness,
+                const std::vector<unsigned char>& program, script_verify_flags flags,
+                bool is_p2sh) const override
+            {
+                return m_context.Authorize(m_index, witness, program, flags, is_p2sh);
+            }
+        };
+        ScriptError error{SCRIPT_ERR_UNKNOWN_ERROR};
+        const auto& input = m_group_context->Transaction().vin[nIn];
+        if (VerifyScript(input.scriptSig, m_tx_out.scriptPubKey, &input.scriptWitness,
+                         m_flags, GroupChecker(*m_group_context, nIn, *m_signature_cache,
+                                               m_pq_genesis_hash), &error)) return std::nullopt;
+        return std::make_pair(error, "pqgroup-script-input-" + std::to_string(nIn));
+    }
 #ifdef MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY
     if (m_research_context) {
         if (!m_research_context->MatchesJob(ptxTo, txdata, nIn, m_tx_out, m_flags, m_pq_genesis_hash)) {
@@ -2255,6 +2284,47 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
         validation_cache.m_script_execution_cache.insert(hashCacheEntry);
     }
 
+    return true;
+}
+
+bool CheckInputScriptsWithPQGroups(
+    const CTransaction& tx, TxValidationState& state, const CCoinsViewCache& inputs,
+    script_verify_flags flags, ValidationCache& cache, std::vector<CScriptCheck>* checks,
+    const std::shared_ptr<const mercaweave::IsolatedExecution>& execution,
+    const uint256& genesis, mercaweave::Statistics* work)
+{
+    AssertLockHeld(cs_main);
+    if (work) *work = {};
+    if (!execution) return state.Invalid(TxValidationResult::TX_CONSENSUS, "pqgroup-context-unavailable");
+    if (tx.IsCoinBase()) return true;
+    std::vector<CTxOut> spent;
+    spent.reserve(tx.vin.size());
+    for (const auto& in : tx.vin) {
+        const auto& coin = inputs.AccessCoin(in.prevout);
+        if (coin.IsSpent()) return state.Invalid(TxValidationResult::TX_CONSENSUS, "pqgroup-input-missing");
+        spent.push_back(coin.out);
+    }
+    std::optional<mercaweave::Error> error;
+    const auto context = mercaweave::GroupContext::Prepare(*execution, tx, std::move(spent),
+                                                        flags, genesis, error, work);
+    if (!context) return state.Invalid(TxValidationResult::TX_CONSENSUS,
+        "pqgroup-authorization-" + std::to_string(static_cast<int>(error.value_or(mercaweave::Error::Context))));
+    // Never consult OR populate the legacy whole-script cache. A cache key based
+    // on wtxid/flags/genesis does not bind arbitrary authenticated spent records.
+    // Jobs retain their complete owned immutable context, including native data.
+    std::vector<CScriptCheck> staged;
+    if (checks) staged.reserve(tx.vin.size());
+    for (unsigned int i = 0; i < tx.vin.size(); ++i) {
+        CScriptCheck check(context->Spent()[i], context->Transaction(), cache.m_signature_cache,
+                           i, flags, false, &context->Native(), genesis, context);
+        if (checks) staged.emplace_back(std::move(check));
+        else if (auto failure = check())
+            return state.Invalid(TxValidationResult::TX_CONSENSUS, failure->second);
+    }
+    if (checks) {
+        checks->reserve(checks->size() + staged.size());
+        std::move(staged.begin(), staged.end(), std::back_inserter(*checks));
+    }
     return true;
 }
 
@@ -2668,7 +2738,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
              Ticks<SecondsDouble>(m_chainman.time_forks),
              Ticks<MillisecondsDouble>(m_chainman.time_forks) / m_chainman.num_blocks_total);
 
-    const bool fScriptChecks{!!script_check_reason};
+    const bool fScriptChecks{!!script_check_reason || bool(m_group_execution)};
     const kernel::ChainstateRole role{GetRole()};
     if (script_check_reason != m_last_script_check_reason_logged && role.validated && !role.historical) {
         if (fScriptChecks) {
@@ -2742,6 +2812,21 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         // * p2sh (when P2SH enabled in flags and excludes coinbase)
         // * witness (when witness enabled in flags and excludes coinbase)
         nSigOpsCost += GetTransactionSigOpCost(tx, view, flags);
+        if (m_group_execution && !tx.IsCoinBase()) {
+            // Structural work is bounded and charged before ML-DSA verification.
+            // Ordinary blocks never enter this dormant fixture-only route.
+            std::vector<CTxOut> spent;
+            spent.reserve(tx.vin.size());
+            for (const auto& in : tx.vin) spent.push_back(view.AccessCoin(in.prevout).out);
+            try {
+                const auto mapping = mercaweave::Reconstruct(CMutableTransaction(tx), spent);
+                nSigOpsCost += 4 * mapping.groups.size() + mapping.inputs;
+            } catch (const mercaweave::Failure& failure) {
+                state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
+                    "pqgroup-structure-" + std::to_string(static_cast<int>(failure.code)));
+                break;
+            }
+        }
         if (nSigOpsCost > MAX_BLOCK_SIGOPS_COST) {
             state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-sigops", "too many sigops");
             break;
@@ -2754,7 +2839,13 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
             TxValidationState tx_state;
             // If CheckInputScripts is called with a pointer to a checks vector, the resulting checks are appended to it. In that case
             // they need to be added to control which runs them asynchronously. Otherwise, CheckInputScripts runs the checks before returning.
-            if (control) {
+            if (m_group_execution) {
+                std::vector<CScriptCheck> checks;
+                tx_ok = CheckInputScriptsWithPQGroups(tx, tx_state, view, flags,
+                    m_chainman.m_validation_cache, control ? &checks : nullptr,
+                    m_group_execution, m_chainman.GetConsensus().hashGenesisBlock);
+                if (control && tx_ok) control->Add(std::move(checks));
+            } else if (control) {
                 std::vector<CScriptCheck> vChecks;
                 tx_ok = CheckInputScripts(
                     tx,

@@ -73,7 +73,7 @@ public:
         const CAmount& amountIn,
         bool storeIn,
         SignatureCache& signature_cache,
-        PrecomputedTransactionData& txdataIn,
+        const PrecomputedTransactionData& txdataIn,
         std::optional<uint256> pq_genesis_hash = std::nullopt)
         : TransactionSignatureChecker(
               txToIn,

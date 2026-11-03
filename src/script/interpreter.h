@@ -285,6 +285,11 @@ uint256 SignatureHash(const CScript& scriptCode, const T& txTo, unsigned int nIn
 class BaseSignatureChecker
 {
 public:
+    // nullopt preserves inactive unknown-witness semantics. A value can only
+    // come from an explicit transaction-scoped grouped checker, never the wire.
+    virtual std::optional<bool> CheckPQGroupAuthorization(
+        const CScriptWitness&, const std::vector<unsigned char>&,
+        script_verify_flags, bool) const { return std::nullopt; }
 #ifdef MERCATURA_MERCAWEAVE_RESEARCH_TEST_ONLY
     // Defined ONLY by isolated research targets. No normal-node ABI or runtime
     // activation surface. Absence of a complete research checker fails closed.

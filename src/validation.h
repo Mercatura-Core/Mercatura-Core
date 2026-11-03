@@ -52,6 +52,8 @@
 #include <vector>
 
 class Chainstate;
+class ValidationCache;
+namespace mercaweave { class GroupContext; class IsolatedExecution; class ProductionPathTestAccess; struct Statistics; }
 class CTxMemPool;
 class ChainstateManager;
 class PoWHashContext;
@@ -340,6 +342,7 @@ namespace mercaweave::node_research { class Context; }
 class CScriptCheck
 {
 private:
+    std::shared_ptr<const mercaweave::GroupContext> m_group_context;
 #ifdef MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY
     std::shared_ptr<const mercaweave::node_research::Context> m_research_context;
 #endif
@@ -348,7 +351,7 @@ private:
     unsigned int nIn;
     script_verify_flags m_flags;
     bool cacheStore;
-    PrecomputedTransactionData *txdata;
+    const PrecomputedTransactionData *txdata;
     SignatureCache* m_signature_cache;
     std::optional<uint256> m_pq_genesis_hash;
 
@@ -363,8 +366,10 @@ public:
         unsigned int nInIn,
         script_verify_flags flags,
         bool cacheIn,
-        PrecomputedTransactionData* txdataIn,
-        std::optional<uint256> pq_genesis_hash = std::nullopt) :
+        const PrecomputedTransactionData* txdataIn,
+        std::optional<uint256> pq_genesis_hash = std::nullopt,
+        std::shared_ptr<const mercaweave::GroupContext> group_context = {}) :
+        m_group_context(std::move(group_context)),
         m_tx_out(outIn),
         ptxTo(&txToIn),
         nIn(nInIn),
@@ -386,6 +391,14 @@ public:
 static_assert(std::is_nothrow_move_assignable_v<CScriptCheck>);
 static_assert(std::is_nothrow_move_constructible_v<CScriptCheck>);
 static_assert(std::is_nothrow_destructible_v<CScriptCheck>);
+
+// Dormant internal path: ordinary node entry points have no fixture capability.
+// The capability is not a validation result; complete group checks are mandatory.
+bool CheckInputScriptsWithPQGroups(
+    const CTransaction&, TxValidationState&, const CCoinsViewCache&,
+    script_verify_flags, ValidationCache&, std::vector<CScriptCheck>*,
+    const std::shared_ptr<const mercaweave::IsolatedExecution>&, const uint256&,
+    mercaweave::Statistics* work = nullptr) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
 /**
  * Convenience class for initializing and passing the script execution cache
@@ -602,6 +615,10 @@ enum class Assumeutxo {
  */
 class Chainstate
 {
+private:
+    friend class mercaweave::ProductionPathTestAccess;
+    // No production setter or constructor parameter. Never persisted.
+    std::shared_ptr<const mercaweave::IsolatedExecution> m_group_execution;
 protected:
     /**
      * The ChainState Mutex

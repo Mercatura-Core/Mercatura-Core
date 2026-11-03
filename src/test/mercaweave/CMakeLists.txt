@@ -292,6 +292,7 @@ if(MERCAWEAVE_FULL_INTEGRATION)
   find_package(SQLite3 REQUIRED)
   # Actual selected validation.cpp bodies, never a normal node dependency.
   add_library(mercaweave_node_validation STATIC node_validation.cpp
+    ${MCA_SRC}/script/pqgroup_context.cpp
     ${MCA_SRC}/validation.cpp ${MCA_SRC}/script/sigcache.cpp
     ${MCA_SRC}/kernel/cs_main.cpp ${MCA_SRC}/script/script_error.cpp)
   target_compile_definitions(mercaweave_node_validation PUBLIC MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY=1
@@ -345,4 +346,8 @@ if(MERCAWEAVE_FULL_INTEGRATION)
   add_test(NAME simulation_accounting_oracle COMMAND ${Python3_EXECUTABLE} -m unittest simulation.test_core)
   set_tests_properties(simulation_accounting_oracle PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}")
   add_test(NAME research_signed_simulation COMMAND mercaweave_simulation_research 7)
+  add_executable(mercaweave_production_context_tests production_path/context_tests.cpp fixtures.cpp)
+  target_link_libraries(mercaweave_production_context_tests PRIVATE mercaweave_node_validation)
+  target_compile_definitions(mercaweave_production_context_tests PRIVATE MERCATURA_MERCAWEAVE_PRODUCTION_PATH_TEST_ONLY=1)
+  add_test(NAME dormant_production_group_context COMMAND mercaweave_production_context_tests)
 endif()

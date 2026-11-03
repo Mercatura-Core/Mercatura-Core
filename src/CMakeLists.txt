@@ -72,6 +72,8 @@ add_library(bitcoin_consensus STATIC EXCLUDE_FROM_ALL
   primitives/transaction.cpp
   pubkey.cpp
   script/interpreter.cpp
+  script/pqgroup.cpp
+  script/pqgroup_context.cpp
   script/script.cpp
   script/script_error.cpp
   uint256.cpp
