@@ -18,7 +18,7 @@ class Bridge final:public MercaWeaveQt::Backend {
     reward_research::Planner m_planner;
     reward_research::Policy m_policy;
     std::optional<wallet_research::Address> m_destination;
-    std::optional<PartiallySignedTransaction> m_preview;
+    std::vector<PartiallySignedTransaction> m_previews;
     std::vector<CTxOut> m_payments;std::optional<wallet_research::Address> m_change;
     std::map<QString,PublicKey> m_keys;
     mutable std::mutex m_mutex;
@@ -26,6 +26,7 @@ class Bridge final:public MercaWeaveQt::Backend {
     std::atomic<MercaWeaveQt::Reason> m_invalid{MercaWeaveQt::Reason::None};
     bool m_opted{false};QString m_synthetic;
     MercaWeaveQt::Snapshot Snapshot();
+    void FillBatch(MercaWeaveQt::Snapshot&,std::span<const PartiallySignedTransaction>);
     void FillPreview(MercaWeaveQt::Snapshot&,const PartiallySignedTransaction&);
 public:
     Bridge(std::shared_ptr<wallet_research::Wallet>,integration::ViewPtr,std::vector<wallet_research::FundingCoin>,reward_research::Policy={},std::vector<wallet_research::Address> inventory={});
@@ -33,6 +34,7 @@ public:
     MercaWeaveQt::Snapshot Perform(const MercaWeaveQt::Request&)override;
     void Invalidate(MercaWeaveQt::Reason)override;
     void SetPreview(PartiallySignedTransaction);
+    void SetPreviewBatch(std::vector<PartiallySignedTransaction>);
     void SetFunding(std::vector<CTxOut>,wallet_research::Address change);
 };
 }

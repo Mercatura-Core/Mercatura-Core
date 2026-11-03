@@ -24,7 +24,7 @@ struct Preview {
     bool available{false},complete{false};
     int inputs{0},outputs{0},nativeInputs{0},groups{0},anchors{0},followers{0},signatures{0};
     quint64 bytes{0},weight{0};qint64 fee{0},perK{1};
-    QString changeType,summary;
+    QString changeType,summary;int transactions{1};quint64 maxWeight{0};
 };
 struct Snapshot {
     Capabilities capability;

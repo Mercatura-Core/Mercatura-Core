@@ -24,7 +24,8 @@ Bridge::Bridge(std::shared_ptr<Wallet> wallet,integration::ViewPtr view,std::vec
 :m_wallet(std::move(wallet)),m_view(std::move(view)),m_candidates(std::move(coins)),m_inventory(std::move(inventory)),m_policy(std::move(policy)){}
 void Bridge::Invalidate(Reason reason){m_invalid=reason;++m_revision;}
 void Bridge::SetFunding(std::vector<CTxOut> payments,Address change){std::lock_guard lock(m_mutex);m_payments=std::move(payments);m_change=std::move(change);++m_revision;}
-void Bridge::SetPreview(PartiallySignedTransaction psbt){std::lock_guard lock(m_mutex);m_preview=std::move(psbt);++m_revision;}
+void Bridge::SetPreviewBatch(std::vector<PartiallySignedTransaction> psbts){std::lock_guard lock(m_mutex);m_previews=std::move(psbts);++m_revision;}
+void Bridge::SetPreview(PartiallySignedTransaction psbt){std::lock_guard lock(m_mutex);m_previews={std::move(psbt)};++m_revision;}
 Snapshot Bridge::Snapshot()
 {
     MercaWeaveQt::Snapshot s;s.revision=m_revision.load();auto& c=s.capability;
@@ -43,10 +44,20 @@ Snapshot Bridge::Snapshot()
         for(const auto& input:m_candidates){auto coin=m_view->CoinAt(input.point);if(!coin||!coin->IsCoinBase())continue;auto owner=m_wallet->Find(coin->out.scriptPubKey);if(!owner||owner->location.witness!=3||owner->location.purpose!=2)continue;
             if(static_cast<uint64_t>(coin->nHeight)+COINBASE_MATURITY<=static_cast<uint64_t>(m_policy.spend_height)){++s.mature;if(input.safe&&input.depth>0&&!input.ancestors&&input.cluster_count<=25)++s.eligible;}else ++s.immature;}
         s.reason=Availability(c,Action::Inspect);s.recoveryStatus=QStringLiteral("Issued ranges only. Live and resumable discovery are unavailable.");
-        if(m_preview)FillPreview(s,*m_preview);
-        if(m_planner.Pending()){s.proposal=QString::number(m_planner.Pending()->id);if(!m_planner.Pending()->transactions.empty())FillPreview(s,m_planner.Pending()->transactions.front().psbt);}
+        if(!m_previews.empty())FillBatch(s,m_previews);
+        if(m_planner.Pending()){s.proposal=QString::number(m_planner.Pending()->id);std::vector<PartiallySignedTransaction> psbts;for(const auto& tx:m_planner.Pending()->transactions)psbts.push_back(tx.psbt);if(!psbts.empty())FillBatch(s,psbts);}
     }catch(const WalletError& e){if(e.code==Code::Fee){s.reason=Reason::Fee;s.preview.complete=false;}else{c.metadata=false;s.reason=Reason::Metadata;s.preview={};}}catch(const std::exception&){c.metadata=false;s.reason=Reason::Metadata;s.preview={};}
     return s;
+}
+void Bridge::FillBatch(MercaWeaveQt::Snapshot& s,std::span<const PartiallySignedTransaction> psbts)
+{
+    Preview sum;sum.available=!psbts.empty();sum.complete=!psbts.empty();sum.transactions=psbts.size();sum.perK=m_policy.fee.per_k;sum.changeType=QStringLiteral("No change");
+    for(const auto& p:psbts){MercaWeaveQt::Snapshot part;FillPreview(part,p);const auto& v=part.preview;
+        sum.inputs+=v.inputs;sum.outputs+=v.outputs;sum.nativeInputs+=v.nativeInputs;sum.groups+=v.groups;sum.anchors+=v.anchors;sum.followers+=v.followers;sum.signatures+=v.signatures;
+        sum.bytes+=v.bytes;sum.weight+=v.weight;sum.maxWeight=std::max(sum.maxWeight,v.weight);sum.fee+=v.fee;sum.complete&=v.complete;
+        if(v.changeType!=QStringLiteral("No change"))sum.changeType=v.changeType;if(part.reason==Reason::Fee)s.reason=Reason::Fee;
+    }
+    if(sum.fee>m_policy.fee.maximum)s.reason=Reason::Fee;s.preview=std::move(sum);
 }
 void Bridge::FillPreview(MercaWeaveQt::Snapshot& s,const PartiallySignedTransaction& p)
 {
@@ -82,8 +93,8 @@ MercaWeaveQt::Snapshot Bridge::Perform(const Request& request)
         case Action::Cancel:m_planner.Cancel();m_destination.reset();m_synthetic.clear();state=Snapshot();state.reason=Reason::Cancelled;return state;
         case Action::Preview:
             if(request.mode<0||request.mode>2){state.reason=Reason::Unsupported;return state;}
-            if(!m_payments.empty()&&m_change){auto funded=Funding::Fund(*m_wallet,m_view,m_candidates,m_payments,*m_change,static_cast<FundingMode>(request.mode),m_policy.fee,m_policy.spend_height);m_preview=std::move(funded.psbt);}
-            if(!m_preview){state.reason=Reason::Unsupported;return state;}FillPreview(state,*m_preview);if(state.reason==Reason::Fee)return state;if((request.mode==1&&state.preview.groups)||(request.mode==2&&state.preview.nativeInputs)){state.reason=Reason::Funds;state.preview.complete=false;return state;}state.reason=state.preview.complete?Reason::None:Reason::Partial;return state;
+            if(!m_payments.empty()&&m_change){auto funded=Funding::Fund(*m_wallet,m_view,m_candidates,m_payments,*m_change,static_cast<FundingMode>(request.mode),m_policy.fee,m_policy.spend_height);m_previews={std::move(funded.psbt)};}
+            if(m_previews.empty()){state.reason=Reason::Unsupported;return state;}FillBatch(state,m_previews);if(state.reason==Reason::Fee)return state;if((request.mode==1&&state.preview.groups)||(request.mode==2&&state.preview.nativeInputs)){state.reason=Reason::Funds;state.preview.complete=false;return state;}state.reason=state.preview.complete?Reason::None:Reason::Partial;return state;
         case Action::Plan:{m_policy.enabled=request.sweepEnabled;m_policy.opted_in=request.optedIn;m_policy.threshold=request.threshold;m_policy.fee.per_k=request.perK;m_policy.fee.maximum=request.maximumFee;
             if(!request.group.isEmpty()){auto key=m_keys.find(request.group);if(key==m_keys.end()){state.reason=Reason::Metadata;return state;}m_policy.selected=key->second;}
             if(!m_policy.enabled){m_planner.Cancel();state.reason=Reason::OptIn;return state;}
