@@ -169,3 +169,25 @@ add_test(NAME research_compile_and_cache_isolation
 add_executable(mercaweave_integration_bench integration_bench.cpp allocation_probe.cpp fixtures.cpp)
 target_link_libraries(mercaweave_integration_bench PRIVATE mercaweave_integration)
 add_test(NAME integrated_resource_measurement_smoke COMMAND mercaweave_integration_bench small --smoke)
+
+# WO05: no normal wallet/node target includes this standalone project.
+add_library(mercaweave_wallet_primitives STATIC
+  ${MCA_SRC}/wallet/wallet.cpp ${MCA_SRC}/wallet/crypter.cpp
+  ${MCA_SRC}/wallet/coinselection.cpp ${MCA_SRC}/psbt.cpp
+  ${MCA_SRC}/crypto/aes.cpp ${MCA_SRC}/crypto/ctaes/ctaes.c
+  ${MCA_SRC}/bech32.cpp ${MCA_SRC}/script/signingprovider.cpp)
+target_include_directories(mercaweave_wallet_primitives PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/diagnostic)
+target_compile_definitions(mercaweave_wallet_primitives PUBLIC MERCATURA_MERCAWEAVE_WALLET_RESEARCH_TEST_ONLY=1)
+target_compile_options(mercaweave_wallet_primitives PRIVATE -ffunction-sections -fdata-sections)
+target_link_libraries(mercaweave_wallet_primitives PUBLIC mercaweave_integration)
+add_executable(mercaweave_wallet_primitive_probe wallet_primitive_probe.cpp fixtures.cpp)
+target_link_libraries(mercaweave_wallet_primitive_probe PRIVATE mercaweave_wallet_primitives)
+add_test(NAME native_wallet_primitives COMMAND mercaweave_wallet_primitive_probe)
+add_library(mercaweave_wallet STATIC research_wallet.cpp)
+target_compile_definitions(mercaweave_wallet PRIVATE MERCAWEAVE_RESEARCH_STORAGE_ROOT="${MCA_SRC}/../work/wo05-wallets")
+target_link_libraries(mercaweave_wallet PUBLIC mercaweave_wallet_primitives)
+add_executable(mercaweave_wallet_tests wallet_tests.cpp)
+target_link_libraries(mercaweave_wallet_tests PRIVATE mercaweave_wallet)
+add_test(NAME grouped_wallet_keys_and_storage COMMAND mercaweave_wallet_tests)
+add_test(NAME research_wallet_compile_isolation
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/check_wallet_isolation.py ${CMAKE_CURRENT_BINARY_DIR})

@@ -3,6 +3,13 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef MERCATURA_MERCAWEAVE_WALLET_RESEARCH_TEST_ONLY
+// Only the isolated research target compiles this minimal primitive bridge.
+// The existing seed-encryption function bodies below are shared unchanged.
+#include <test/mercaweave/wallet_seed_bridge.h>
+#include <crypto/sha256.h>
+namespace wallet {
+#else
 #include <wallet/wallet.h>
 #include <chainparams.h>
 #include <crypto/mercatura_mldsa.h>
@@ -656,6 +663,7 @@ static bool EncryptMasterKey(const SecureString& wallet_passphrase, const CKeyin
 }
 
 
+#endif // MERCATURA_MERCAWEAVE_WALLET_RESEARCH_TEST_ONLY prefix
 template <size_t N>
 static std::array<unsigned char, CSHA256::OUTPUT_SIZE>
 MercaturaPQWalletTaggedSHA256(
@@ -791,6 +799,17 @@ static bool DecryptMercaturaPQMasterSeedV1(
     return true;
 }
 
+#ifdef MERCATURA_MERCAWEAVE_WALLET_RESEARCH_TEST_ONLY
+bool ResearchEncryptPQSeed(const CKeyingMaterial& key, const CKeyingMaterial& seed, MercaturaPQCryptedSeed& out)
+{
+    return EncryptMercaturaPQMasterSeedV1(key, seed, out);
+}
+bool ResearchDecryptPQSeed(const CKeyingMaterial& key, const MercaturaPQCryptedSeed& in, CKeyingMaterial& out)
+{
+    return DecryptMercaturaPQMasterSeedV1(key, in, out);
+}
+} // namespace wallet
+#else
 static bool DecryptMasterKey(const SecureString& wallet_passphrase, const CMasterKey& master_key, CKeyingMaterial& plain_master_key)
 {
     CCrypter crypter;
@@ -6033,3 +6052,4 @@ void CWallet::DisconnectChainNotifications()
 }
 
 } // namespace wallet
+#endif // MERCATURA_MERCAWEAVE_WALLET_RESEARCH_TEST_ONLY suffix

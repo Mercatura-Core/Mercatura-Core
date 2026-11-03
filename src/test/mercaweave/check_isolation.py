@@ -35,6 +35,8 @@ def main():
         "mercaweave_native_isolated", "mercaweave_context_isolated", "mercaweave_block_isolated",
         "mercaweave_isolated_control", "mercaweave_coin_validation", "mercaweave_coin_probe",
         "mercaweave_integration", "mercaweave_integration_tests", "mercaweave_integration_bench",
+        "mercaweave_wallet_primitives", "mercaweave_wallet_primitive_probe", "mercaweave_wallet",
+        "mercaweave_wallet_tests", "mercaweave_wallet_bench", "mercaweave_psbt_tests",
     }
     flags, ordinary, interpreters = 0, 0, []
     for entry in commands:
