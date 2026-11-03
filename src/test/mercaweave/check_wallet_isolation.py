@@ -22,7 +22,7 @@ def main():
     definitions = subprocess.check_output(["git", "-C", str(ROOT), "grep", "-l", MACRO, "--", "*CMakeLists.txt"], text=True).splitlines()
     if definitions != ["src/test/mercaweave/CMakeLists.txt"]:
         raise RuntimeError("wallet macro outside standalone target")
-    allowed = {"mercaweave_wallet_primitives", "mercaweave_wallet_primitive_probe", "mercaweave_wallet", "mercaweave_wallet_tests", "mercaweave_psbt_tests", "mercaweave_reward_planner", "mercaweave_reward_tests", "mercaweave_qt_bridge", "mercaweave_qt_integration_tests", "mercaweave_wallet_bench"}
+    allowed = {"mercaweave_sqlite_native", "mercaweave_parameter_probe", "mercaweave_durable_wallet", "mercaweave_durable_tests", "mercaweave_wallet_primitives", "mercaweave_wallet_primitive_probe", "mercaweave_wallet", "mercaweave_wallet_tests", "mercaweave_psbt_tests", "mercaweave_reward_planner", "mercaweave_reward_tests", "mercaweave_qt_bridge", "mercaweave_qt_integration_tests", "mercaweave_wallet_bench"}
     isolated = 0
     for entry in json.loads((build / "compile_commands.json").read_text()):
         command = entry["command"]

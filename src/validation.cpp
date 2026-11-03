@@ -3,6 +3,15 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef MERCATURA_MERCAWEAVE_VALIDATION_COMPONENTS_TEST_ONLY
+#include <validation.h>
+#include <consensus/validation.h>
+#include <random.h>
+#include <script/sigcache.h>
+#include <undo.h>
+#include <util/log.h>
+#include <tinyformat.h>
+#else
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
 #include <validation.h>
@@ -2027,6 +2036,12 @@ void Chainstate::InvalidBlockFound(CBlockIndex* pindex, const BlockValidationSta
     }
 }
 
+#endif // MERCATURA_MERCAWEAVE_VALIDATION_COMPONENTS_TEST_ONLY prefix
+
+#ifdef MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY
+#include <test/mercaweave/node_validation.h>
+#endif
+
 void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txundo, int nHeight)
 {
     // mark inputs spent
@@ -2043,6 +2058,18 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txund
 }
 
 std::optional<std::pair<ScriptError, std::string>> CScriptCheck::operator()() {
+#ifdef MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY
+    if (m_research_context) {
+        if (!m_research_context->MatchesJob(ptxTo, txdata, nIn, m_tx_out, m_flags, m_pq_genesis_hash)) {
+            return std::make_pair(SCRIPT_ERR_UNKNOWN_ERROR, "research-job-binding");
+        }
+        if (m_research_context->IsGrouped(nIn)) {
+            const auto result = m_research_context->Run(nIn);
+            if (result.valid) return std::nullopt;
+            return std::make_pair(SCRIPT_ERR_UNKNOWN_ERROR, "research-job-stale-or-invalid");
+        }
+    }
+#endif
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
     const CScriptWitness *witness = &ptxTo->vin[nIn].scriptWitness;
     ScriptError error{SCRIPT_ERR_UNKNOWN_ERROR};
@@ -2107,8 +2134,40 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
                        bool cacheFullScriptStore, PrecomputedTransactionData& txdata,
                        ValidationCache& validation_cache,
                        std::vector<CScriptCheck>* pvChecks,
+#ifdef MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY
+                       std::optional<uint256> pq_genesis_hash,
+                       std::shared_ptr<const mercaweave::node_research::Context> research_context)
+#else
                        std::optional<uint256> pq_genesis_hash)
+#endif
 {
+#ifdef MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY
+    // Never consult a production cache for research authorization. Merely setting
+    // cacheFullScriptStore=false would still accept an existing cached entry.
+    if (tx.IsCoinBase()) return true;
+    AssertLockHeld(cs_main);
+    bool grouped{false};
+    for (const auto& in : tx.vin) {
+        const auto& coin = inputs.AccessCoin(in.prevout);
+        if (coin.IsSpent()) return state.Invalid(TxValidationResult::TX_CONSENSUS, "research-input-missing");
+        int version; std::vector<unsigned char> program;
+        grouped |= coin.out.scriptPubKey.IsWitnessProgram(version, program) && version == 3;
+    }
+    if (research_context || grouped) {
+        if (!research_context || !research_context->Matches(tx, inputs, txdata, flags, pq_genesis_hash))
+            return state.Invalid(TxValidationResult::TX_CONSENSUS, "research-context-binding");
+        if (pvChecks) pvChecks->reserve(tx.vin.size());
+        for (unsigned int i = 0; i < tx.vin.size(); ++i) {
+            CScriptCheck check(txdata.m_spent_outputs[i], tx, validation_cache.m_signature_cache,
+                               i, flags, false, &txdata, pq_genesis_hash);
+            check.SetResearchContext(research_context);
+            if (pvChecks) pvChecks->emplace_back(std::move(check));
+            else if (auto result = check())
+                return state.Invalid(TxValidationResult::TX_CONSENSUS, result->second);
+        }
+        return true;
+    }
+#endif
     if (tx.IsCoinBase()) return true;
 
     if (pvChecks) {
@@ -2199,11 +2258,14 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
     return true;
 }
 
+#ifndef MERCATURA_MERCAWEAVE_VALIDATION_COMPONENTS_TEST_ONLY
 bool FatalError(Notifications& notifications, BlockValidationState& state, const bilingual_str& message)
 {
     notifications.fatalError(message);
     return state.Error(message.original);
 }
+
+#endif // MERCATURA_MERCAWEAVE_VALIDATION_COMPONENTS_TEST_ONLY fatal
 
 /**
  * Restore the UTXO in a Coin at a given COutPoint
@@ -2240,6 +2302,7 @@ int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out)
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
 
+#ifndef MERCATURA_MERCAWEAVE_VALIDATION_COMPONENTS_TEST_ONLY
 /** Undo the effects of this block (with given index) on the UTXO set represented by coins.
  *  When FAILED is returned, view is left in an indeterminate state. */
 DisconnectResult Chainstate::DisconnectBlock(const CBlock& block, const CBlockIndex* pindex, CCoinsViewCache& view)
@@ -6996,3 +7059,5 @@ util::Result<void> ChainstateManager::ActivateBestChains()
     }
     return {};
 }
+
+#endif // MERCATURA_MERCAWEAVE_VALIDATION_COMPONENTS_TEST_ONLY suffix

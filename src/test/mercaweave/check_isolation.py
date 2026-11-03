@@ -35,6 +35,7 @@ def main():
         "mercaweave_native_isolated", "mercaweave_context_isolated", "mercaweave_block_isolated",
         "mercaweave_isolated_control", "mercaweave_coin_validation", "mercaweave_coin_probe",
         "mercaweave_integration", "mercaweave_integration_tests", "mercaweave_integration_bench",
+        "mercaweave_node_validation", "mercaweave_node_tests", "mercaweave_node_bench", "mercaweave_sqlite_native", "mercaweave_parameter_probe", "mercaweave_durable_wallet", "mercaweave_durable_tests",
         "mercaweave_wallet_primitives", "mercaweave_wallet_primitive_probe", "mercaweave_wallet",
         "mercaweave_wallet_tests", "mercaweave_wallet_bench", "mercaweave_psbt_tests", "mercaweave_reward_planner", "mercaweave_reward_tests", "mercaweave_qt_bridge", "mercaweave_qt_integration_tests",
     }

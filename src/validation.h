@@ -334,9 +334,15 @@ bool CheckSequenceLocksAtTip(CBlockIndex* tip,
  * Closure representing one script verification
  * Note that this stores references to the spending transaction
  */
+#ifdef MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY
+namespace mercaweave::node_research { class Context; }
+#endif
 class CScriptCheck
 {
 private:
+#ifdef MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY
+    std::shared_ptr<const mercaweave::node_research::Context> m_research_context;
+#endif
     CTxOut m_tx_out;
     const CTransaction *ptxTo;
     unsigned int nIn;
@@ -347,6 +353,9 @@ private:
     std::optional<uint256> m_pq_genesis_hash;
 
 public:
+#ifdef MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY
+    void SetResearchContext(std::shared_ptr<const mercaweave::node_research::Context> context) { m_research_context = std::move(context); }
+#endif
     CScriptCheck(
         const CTxOut& outIn,
         const CTransaction& txToIn,

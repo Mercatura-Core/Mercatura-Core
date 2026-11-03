@@ -32,7 +32,7 @@ def main():
     definitions = git("grep", "-l", MACRO, "--", "*CMakeLists.txt").splitlines()
     if definitions != ["src/test/mercaweave/CMakeLists.txt"]:
         raise RuntimeError("mock capability macro exposed outside standalone project")
-    allowed = {"mercaweave_qt_isolated", "mercaweave_qt_model_tests", "mercaweave_reward_planner", "mercaweave_reward_tests", "mercaweave_qt_bridge", "mercaweave_qt_integration_tests"}
+    allowed = {"mercaweave_durable_wallet", "mercaweave_durable_tests", "mercaweave_qt_isolated", "mercaweave_qt_model_tests", "mercaweave_reward_planner", "mercaweave_reward_tests", "mercaweave_qt_bridge", "mercaweave_qt_integration_tests"}
     commands = json.loads((build / "compile_commands.json").read_text())
     normal_command = None
     application = set()

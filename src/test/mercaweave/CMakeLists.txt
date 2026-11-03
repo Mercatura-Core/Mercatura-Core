@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Match Mercatura's requirement that verification is built with assertions.
 add_compile_options(-UNDEBUG)
+add_compile_definitions($<$<CONFIG:Debug>:_GLIBCXX_ASSERTIONS=1>)
 option(MERCAWEAVE_SANITIZERS "Enable address and undefined behavior sanitizers" OFF)
 get_filename_component(MCA_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 if(MERCAWEAVE_SANITIZERS)
@@ -282,4 +283,55 @@ if(MERCAWEAVE_QT_TESTS)
   set_tests_properties(qt_production_capability_closed qt_capability_lifetime_and_previews
     qt_wo05_wallet_and_mining_bridge qt_native_v2_qr_and_copy_regression PROPERTIES
     ENVIRONMENT "XDG_CACHE_HOME=${CMAKE_CURRENT_BINARY_DIR}/qt-cache")
+endif()
+
+# WO07: opt-in dependencies do not affect earlier standalone configurations.
+option(MERCAWEAVE_FULL_INTEGRATION "Build guarded WO07 validation and durable wallet tests" OFF)
+if(MERCAWEAVE_FULL_INTEGRATION)
+  find_package(Boost 1.73 REQUIRED CONFIG)
+  find_package(SQLite3 REQUIRED)
+  # Actual selected validation.cpp bodies, never a normal node dependency.
+  add_library(mercaweave_node_validation STATIC node_validation.cpp
+    ${MCA_SRC}/validation.cpp ${MCA_SRC}/script/sigcache.cpp
+    ${MCA_SRC}/kernel/cs_main.cpp ${MCA_SRC}/script/script_error.cpp)
+  target_compile_definitions(mercaweave_node_validation PUBLIC MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY=1
+    PRIVATE MERCATURA_MERCAWEAVE_VALIDATION_COMPONENTS_TEST_ONLY=1)
+  target_include_directories(mercaweave_node_validation PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/diagnostic)
+  target_compile_options(mercaweave_node_validation PRIVATE -ffunction-sections -fdata-sections)
+  target_link_libraries(mercaweave_node_validation PUBLIC mercaweave_integration Boost::headers)
+  add_executable(mercaweave_node_tests node_tests.cpp fixtures.cpp)
+  target_link_libraries(mercaweave_node_tests PRIVATE mercaweave_node_validation)
+  add_test(NAME actual_script_queue_cache_and_undo COMMAND mercaweave_node_tests)
+
+  # Genuine wallet SQLite backend and unchanged native network parameters.
+  add_library(mercaweave_sqlite_native STATIC
+    ${MCA_SRC}/wallet/sqlite.cpp ${MCA_SRC}/wallet/db.cpp
+    ${MCA_SRC}/chainparams.cpp ${MCA_SRC}/chainparamsbase.cpp ${MCA_SRC}/kernel/chainparams.cpp
+    ${MCA_SRC}/consensus/merkle.cpp ${MCA_SRC}/primitives/block.cpp
+    ${MCA_SRC}/common/args.cpp ${MCA_SRC}/common/settings.cpp
+    ${MCA_SRC}/util/fs_helpers.cpp ${MCA_SRC}/util/chaintype.cpp
+    ${MCA_SRC}/util/strencodings.cpp ${MCA_SRC}/util/string.cpp
+    ${MCA_SRC}/arith_uint256.cpp ${MCA_SRC}/univalue/lib/univalue.cpp
+    ${MCA_SRC}/univalue/lib/univalue_read.cpp ${MCA_SRC}/univalue/lib/univalue_write.cpp
+    ${MCA_SRC}/univalue/lib/univalue_get.cpp ${MCA_SRC}/deploymentinfo.cpp)
+  target_include_directories(mercaweave_sqlite_native PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/diagnostic
+    PUBLIC ${MCA_SRC}/univalue/include)
+  target_include_directories(mercaweave_sqlite_native PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/diagnostic)
+  target_compile_options(mercaweave_sqlite_native PRIVATE -ffunction-sections -fdata-sections)
+  target_link_libraries(mercaweave_sqlite_native PUBLIC mercaweave_wallet SQLite::SQLite3 Boost::headers)
+  if(MERCAWEAVE_QT_TESTS)
+    add_library(mercaweave_durable_wallet STATIC durable_wallet.cpp)
+    target_compile_definitions(mercaweave_durable_wallet PRIVATE MERCAWEAVE_DURABLE_STORAGE_ROOT="${CMAKE_CURRENT_BINARY_DIR}/wo07-wallets")
+    target_link_libraries(mercaweave_durable_wallet PUBLIC mercaweave_sqlite_native mercaweave_reward_planner)
+    add_executable(mercaweave_durable_tests durable_tests.cpp)
+    target_link_libraries(mercaweave_durable_tests PRIVATE mercaweave_durable_wallet)
+    add_test(NAME native_sqlite_wallet_and_durable_reservations COMMAND mercaweave_durable_tests)
+  endif()
+  add_executable(mercaweave_node_bench node_bench.cpp fixtures.cpp)
+  target_link_libraries(mercaweave_node_bench PRIVATE mercaweave_node_validation)
+  add_test(NAME actual_script_resource_measurement_smoke COMMAND mercaweave_node_bench --smoke)
+  add_test(NAME node_validation_compile_isolation
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/check_node_isolation.py ${CMAKE_CURRENT_BINARY_DIR})
+  add_executable(mercaweave_parameter_probe parameter_probe.cpp)
+  target_link_libraries(mercaweave_parameter_probe PRIVATE mercaweave_sqlite_native)
 endif()
