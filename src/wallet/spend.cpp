@@ -205,6 +205,7 @@ int CalculateMaximumSignedInputSize(const CTxOut& txout, const COutPoint outpoin
 
 int CalculateMaximumSignedInputSize(const CTxOut& txout, const CWallet* wallet, const CCoinControl* coin_control)
 {
+    if (wallet->GetPQGroupRecord(txout.scriptPubKey)) return 41 + 5301;
     const std::unique_ptr<SigningProvider> provider = wallet->GetSolvingProvider(txout.scriptPubKey);
     return CalculateMaximumSignedInputSize(txout, COutPoint(), provider.get(), wallet->CanGrindR(), coin_control);
 }
@@ -228,6 +229,7 @@ int CalculateMaximumSignedInputWeight(const CTxOut& txout, const COutPoint outpo
 
 int CalculateMaximumSignedInputWeight(const CTxOut& txout, const CWallet* wallet, const CCoinControl* coin_control)
 {
+    if (wallet->GetPQGroupRecord(txout.scriptPubKey)) return 41 * WITNESS_SCALE_FACTOR + 5301;
     const std::unique_ptr<SigningProvider> provider = wallet->GetSolvingProvider(txout.scriptPubKey);
     return CalculateMaximumSignedInputWeight(txout, COutPoint(), provider.get(), wallet->CanGrindR(), coin_control);
 }
@@ -297,6 +299,8 @@ static std::optional<int64_t> GetSignedTxinFeeSize(const CWallet* wallet, const 
 // txouts needs to be in the order of tx.vin
 TxSize CalculateMaximumSignedTxSize(const CTransaction &tx, const CWallet *wallet, const std::vector<CTxOut>& txouts, const CCoinControl* coin_control)
 {
+    if (const auto grouped = wallet->EstimatePQGroupTransaction(tx,txouts))
+        return TxSize{static_cast<int64_t>(grouped->fee_bytes),static_cast<int64_t>(grouped->weight)};
     // version + nLockTime + input count + output count
     const int64_t base_size{
         4 + 4 +
@@ -641,6 +645,10 @@ CoinsResult AvailableCoins(const CWallet& wallet,
 
         int input_bytes = CalculateMaximumSignedInputSize(output, COutPoint(), provider.get(), can_grind_r, coinControl);
         int input_weight = CalculateMaximumSignedInputWeight(output, COutPoint(), provider.get(), can_grind_r, coinControl);
+        if (wallet.GetPQGroupRecord(output.scriptPubKey)) {
+            input_bytes = 41 + 5301; // conservative independent anchor during selection
+            input_weight = 41 * WITNESS_SCALE_FACTOR + 5301;
+        }
         // Both estimates are derived from the same solvable descriptor. Mercatura
         // uses input_bytes for fees and input_weight for transaction limits.
         bool solvable = input_bytes > -1 && input_weight > -1;

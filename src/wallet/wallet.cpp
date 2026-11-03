@@ -50,6 +50,7 @@ namespace wallet {
 #include <random.h>
 #include <script/descriptor.h>
 #include <script/interpreter.h>
+#include <script/pqgroup_psbt.h>
 #include <script/script.h>
 #include <script/sign.h>
 #include <script/signingprovider.h>
@@ -373,13 +374,15 @@ private:
     void AddMercaturaPQScriptPubKeys()
     {
         LOCK(m_wallet.cs_wallet);
-        const size_t count{m_wallet.GetMercaturaPQKeyLocatorCount()};
+        const auto grouped = m_wallet.GetPQGroupScripts();
+        const size_t count{m_wallet.GetMercaturaPQKeyLocatorCount() + grouped.size()};
         if (count == m_last_pq_key_count) return;
         // Committed PQ ownership records are append-only. Refresh after new
         // receive/change destinations are registered, including while scanning.
         for (const auto& script : m_wallet.GetMercaturaPQScriptPubKeys()) {
             m_filter_set.emplace(script.begin(), script.end());
         }
+        for (const auto& script : grouped) m_filter_set.emplace(script.begin(),script.end());
         m_last_pq_key_count = count;
     }
 
@@ -1887,6 +1890,7 @@ bool CWallet::IsMine(const CTxDestination& dest) const
 bool CWallet::IsMine(const CScript& script) const
 {
     AssertLockHeld(cs_wallet);
+    if (GetPQGroupRecord(script)) return true;
 
     // Mercatura PQ ownership is deliberately independent from
     // Bitcoin's secp256k1 ScriptPubKeyManagers. A locked encrypted
@@ -2278,6 +2282,10 @@ bool CWallet::SubmitTxMemoryPoolAndRelay(CWalletTx& wtx,
                                          node::TxBroadcast broadcast_method) const
 {
     AssertLockHeld(cs_wallet);
+    if (m_group_execution) {
+        err_string = "Isolated grouped wallet fixtures cannot submit or broadcast";
+        return false;
+    }
 
     // Can't relay if wallet is not broadcasting
     if (!GetBroadcastTransactions()) return false;
@@ -2597,6 +2605,164 @@ SignMercaturaPQInput(
     return result;
 }
 
+std::optional<PSBTError> CWallet::FillPQGroupPSBT(PartiallySignedTransaction& source, bool& complete,
+    std::optional<int> sighash, bool sign, size_t* signed_inputs, bool finalize,
+    const std::map<COutPoint,Coin>* authenticated_coins) const
+{
+    AssertLockHeld(cs_wallet);
+    complete = false;
+    if (signed_inputs) *signed_inputs = 0;
+    if (!m_group_execution || !source.tx || (sighash && *sighash != SIGHASH_DEFAULT))
+        return PSBTError::SIGHASH_MISMATCH;
+    try {
+        using namespace mercaweave;
+        struct Clean { void* data; size_t size; ~Clean() { memory_cleanse(data,size); } };
+        auto staged = source;
+        std::map<COutPoint,Coin> queried;
+        if (!authenticated_coins) {
+            if (!m_chain) return PSBTError::MISSING_INPUTS;
+            for (const auto& input : source.tx->vin) queried.emplace(input.prevout,Coin{});
+            m_chain->findCoins(queried);
+            authenticated_coins = &queried;
+        }
+        std::vector<CTxOut> spent;
+        for (const auto& input : source.tx->vin) {
+            const auto found = authenticated_coins->find(input.prevout);
+            if (found == authenticated_coins->end() || found->second.IsSpent()) return PSBTError::MISSING_INPUTS;
+            spent.push_back(found->second.out);
+        }
+        if (staged.inputs.size() != spent.size()) return PSBTError::MISSING_INPUTS;
+        B32 master{}; Clean clean_master{master.data(),master.size()};
+        const bool unlocked = m_mercatura_pq_master_seed.size() == master.size();
+        if (unlocked) std::copy(m_mercatura_pq_master_seed.begin(),m_mercatura_pq_master_seed.end(),master.begin());
+        const auto genesis = Params().GetConsensus().hashGenesisBlock;
+        if (!std::equal(genesis.begin(),genesis.end(),m_group_execution->Genesis().begin())) return PSBTError::UNSUPPORTED;
+        std::vector<psbt::InputRecord> records;
+        for (uint32_t i = 0; i < spent.size(); ++i) {
+            int version; Bytes program;
+            if (!spent[i].scriptPubKey.IsWitnessProgram(version,program) || program.size() != 32) return PSBTError::UNSUPPORTED;
+            psbt::InputRecord record{}; record.witness_version = version;
+            if (version == 3) {
+                if (const auto owned = GetPQGroupRecord(spent[i].scriptPubKey)) {
+                    record.pk = owned->pk; record.nonce = owned->nonce;
+                } else {
+                    const auto nonce = psbt::Get(staged.inputs[i],1);
+                    const auto reference = psbt::Get(staged.inputs[i],2);
+                    auto key = psbt::Get(staged.inputs[i],3);
+                    if (!key && reference && reference->size() == 4) {
+                        const auto anchor = ReadLE32(reference->data());
+                        if (anchor < i) key = psbt::Get(staged.inputs[anchor],3);
+                    }
+                    if (!nonce || nonce->size() != 32 || !key || key->size() != 1952) return PSBTError::MISSING_INPUTS;
+                    std::copy(nonce->begin(),nonce->end(),record.nonce.begin());
+                    std::copy(key->begin(),key->end(),record.pk.begin());
+                }
+            } else if (version == 2) {
+                if (const auto key = GetMercaturaPQPSBTPublicKey(staged.inputs[i])) {
+                    if (key->size() != record.pk.size()) return PSBTError::INCOMPLETE;
+                    std::copy(key->begin(),key->end(),record.pk.begin());
+                } else {
+                    MercaturaPQKeyCommitment commitment{}; std::copy(program.begin(),program.end(),commitment.begin());
+                    const auto locator = GetMercaturaPQKeyLocator(commitment);
+                    if (!locator || !unlocked) return PSBTError::INCOMPLETE;
+                    auto child = DeriveMercaturaPQChildSeed(master,genesis,locator->account,locator->branch,locator->index);
+                    if (!child) return PSBTError::INCOMPLETE;
+                    Clean clean_child{child->data(),child->size()}; mercaweave::KeyPair generated_key(*child); record.pk = generated_key.pk;
+                }
+            } else return PSBTError::UNSUPPORTED;
+            records.push_back(record);
+        }
+        const auto canonical = psbt::Create(*staged.tx,spent,records,*m_group_execution);
+        for (size_t i = 0; i < staged.inputs.size(); ++i) {
+            // Existing UTXO descriptions are never overwritten on disagreement.
+            if (!staged.inputs[i].witness_utxo.IsNull() && staged.inputs[i].witness_utxo != spent[i])
+                return PSBTError::MISSING_INPUTS;
+            staged.inputs[i].witness_utxo = spent[i];
+            for (const auto& field : canonical.inputs[i].m_proprietary) {
+                const auto found = staged.inputs[i].m_proprietary.find(field);
+                if (found != staged.inputs[i].m_proprietary.end() && found->value != field.value) return PSBTError::INCOMPLETE;
+                staged.inputs[i].m_proprietary.insert(field);
+            }
+        }
+        auto info = psbt::Inspect(staged,spent,*m_group_execution);
+        size_t count{0};
+        if (sign) {
+            for (const auto& group : info.mapping.groups) {
+                if (info.complete[group.anchor]) continue;
+                const auto anchor = GetPQGroupRecord(spent[group.anchor].scriptPubKey);
+                if (!anchor) continue;
+                bool owned{true};
+                for (const auto& member : group.members) {
+                    const auto record = GetPQGroupRecord(spent[member.index].scriptPubKey);
+                    owned &= record && record->pk == group.pk && record->nonce == member.nonce;
+                }
+                if (!owned) return PSBTError::INCOMPLETE;
+                if (!unlocked) return PSBTError::INCOMPLETE;
+                auto child = Derive(master,m_group_execution->Genesis(),anchor->account,anchor->purpose,anchor->group);
+                Clean clean_child{child.data(),child.size()}; mercaweave::KeyPair key(child);
+                if (key.pk != group.pk) return PSBTError::INCOMPLETE;
+                B32 randomness{}; Clean clean_randomness{randomness.data(),randomness.size()};
+                if (m_pq_group_test_entropy) {
+                    if (!m_pq_group_test_entropy(randomness)) return PSBTError::INCOMPLETE;
+                } else GetStrongRandBytes(randomness);
+                const auto signature = SignDigest(Digest(m_group_execution->Genesis(),info.hashes,group),key,randomness);
+                psbt::Put(staged.inputs[group.anchor],4,signature); count += group.members.size();
+            }
+            PrecomputedTransactionData native; auto outputs = spent;
+            native.Init(info.tx,std::move(outputs),true);
+            for (uint32_t i = 0; i < spent.size(); ++i) {
+                int version; Bytes program; spent[i].scriptPubKey.IsWitnessProgram(version,program);
+                if (version != 2 || info.complete[i]) continue;
+                MercaturaPQKeyCommitment commitment{}; std::copy(program.begin(),program.end(),commitment.begin());
+                const auto locator = GetMercaturaPQKeyLocator(commitment);
+                if (!locator) continue;
+                if (!unlocked) return PSBTError::INCOMPLETE;
+                std::string error;
+                const auto signature = SignMercaturaPQInput(master,*locator,commitment,info.tx,i,genesis,native,error);
+                if (!signature || !SetMercaturaPQPSBTSignature(staged.inputs[i],signature->signature)) return PSBTError::INCOMPLETE;
+                ++count;
+            }
+        }
+        info = psbt::Inspect(staged,spent,*m_group_execution);
+        complete = std::all_of(info.complete.begin(),info.complete.end(),[](bool value) { return value; });
+        if (finalize) FinalizePSBT(staged,*m_group_execution,spent);
+        source = std::move(staged);
+        if (signed_inputs) *signed_inputs = count;
+        return {};
+    } catch (const mercaweave::Failure&) { return PSBTError::INCOMPLETE; }
+}
+
+bool CWallet::SignPQGroupTransaction(CMutableTransaction& tx, const std::map<COutPoint,Coin>& coins,
+                                    int sighash, std::map<int,bilingual_str>& errors) const
+{
+    AssertLockHeld(cs_wallet);
+    if (sighash != SIGHASH_DEFAULT) return false;
+    std::vector<CTxOut> spent;
+    for (const auto& input : tx.vin) {
+        const auto found = coins.find(input.prevout);
+        if (found == coins.end() || found->second.IsSpent()) return false;
+        spent.push_back(found->second.out);
+    }
+    // Preserve already complete, independently verified randomized witnesses.
+    PrecomputedTransactionData native; auto outputs = spent;
+    native.Init(tx,std::move(outputs),true);
+    const auto verified = mercaweave::Verify(tx,spent,m_group_execution->Genesis(),
+        [&](const auto& body, const auto& prevouts, const auto& genesis, uint32_t index) {
+            return mercaweave::psbt::VerifyNative(body,prevouts,genesis,index,native);
+        });
+    if (verified.valid) { errors.clear(); return true; }
+    CMutableTransaction body(tx);
+    for (auto& input : body.vin) { input.scriptSig.clear(); input.scriptWitness.SetNull(); }
+    PartiallySignedTransaction psbt(body);
+    bool complete{false};
+    if (const auto error = FillPQGroupPSBT(psbt,complete,sighash,true,nullptr,true,&coins); error || !complete) {
+        errors[0] = Untranslated("Grouped authorization is incomplete, locked or inconsistent"); return false;
+    }
+    CMutableTransaction signed_tx;
+    if (!FinalizeAndExtractPSBT(psbt,signed_tx,*m_group_execution,spent)) return false;
+    tx = std::move(signed_tx); errors.clear(); return true;
+}
+
 bool CWallet::SignTransaction(CMutableTransaction& tx) const
 {
     AssertLockHeld(cs_wallet);
@@ -2619,6 +2785,14 @@ bool CWallet::SignTransaction(CMutableTransaction& tx) const
 bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors) const
 {
     AssertLockHeld(cs_wallet);
+    if (m_group_execution) {
+        for (const auto& input : tx.vin) {
+            const auto found = coins.find(input.prevout);
+            int version; std::vector<unsigned char> program;
+            if (found != coins.end() && found->second.out.scriptPubKey.IsWitnessProgram(version,program) && version == 3)
+                return SignPQGroupTransaction(tx,coins,sighash,input_errors);
+        }
+    }
 
     // Detect whether this transaction contains any Mercatura PQ inputs.
     //
@@ -2887,6 +3061,10 @@ bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint,
 
 std::optional<PSBTError> CWallet::FillPSBT(PartiallySignedTransaction& psbtx, bool& complete, std::optional<int> sighash_type, bool sign, bool bip32derivs, size_t * n_signed, bool finalize) const
 {
+    {
+        LOCK(cs_wallet);
+        if (m_group_execution) return FillPQGroupPSBT(psbtx,complete,sighash_type,sign,n_signed,finalize);
+    }
     if (n_signed) {
         *n_signed = 0;
     }
@@ -4590,6 +4768,12 @@ bool CWallet::Unlock(
             }
         }
 
+        if (!AuthenticatePQGroups(pq_master_seed)) {
+            memory_cleanse(m_mercatura_pq_master_seed.data(),m_mercatura_pq_master_seed.size());
+            m_mercatura_pq_master_seed.clear();
+            memory_cleanse(vMasterKey.data(),vMasterKey.size()); vMasterKey.clear();
+            return false;
+        }
         vMasterKey = vMasterKeyIn;
 
         if (!pq_master_seed.empty()) {

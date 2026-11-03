@@ -15,6 +15,7 @@ add_library(bitcoin_wallet STATIC EXCLUDE_FROM_ALL
   fees.cpp
   interfaces.cpp
   mining.cpp
+  pqgroup.cpp
   load.cpp
   migrate.cpp
   receive.cpp

@@ -30,6 +30,7 @@
 #include <util/time.h>
 #include <util/ui_change_type.h>
 #include <wallet/mercatura_pqwallet.h>
+#include <wallet/pqgroup.h>
 #include <wallet/crypter.h>
 #include <wallet/db.h>
 #include <wallet/scriptpubkeyman.h>
@@ -58,6 +59,7 @@ class CKey;
 class CKeyID;
 class CPubKey;
 class Coin;
+namespace mercaweave { class IsolatedExecution; class ProductionPathTestAccess; }
 class SigningProvider;
 enum class MemPoolRemovalReason;
 enum class SigningResult;
@@ -481,6 +483,22 @@ private:
         m_mercatura_pq_key_locators
         GUARDED_BY(cs_wallet);
 
+    friend class mercaweave::ProductionPathTestAccess;
+    std::shared_ptr<const mercaweave::IsolatedExecution> m_group_execution GUARDED_BY(cs_wallet);
+    std::optional<PQGroupRecords> m_pq_group_records GUARDED_BY(cs_wallet);
+    std::map<CScript,size_t> m_pq_group_index GUARDED_BY(cs_wallet);
+    bool m_pq_group_verified GUARDED_BY(cs_wallet){false};
+    // Empty in production: GetStrongRandBytes is mandatory. Only the guarded
+    // fixture friend can inject deterministic/failing entropy for tests.
+    mercaweave::RandomSource m_pq_group_test_entropy GUARDED_BY(cs_wallet);
+    bool AuthenticatePQGroups(const CKeyingMaterial&) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    std::optional<PQGroupRecord> IssuePQGroupAddress(uint32_t account, uint8_t purpose);
+    std::optional<common::PSBTError> FillPQGroupPSBT(PartiallySignedTransaction&, bool& complete,
+        std::optional<int> sighash, bool sign, size_t* signed_inputs, bool finalize,
+        const std::map<COutPoint,Coin>* authenticated_coins = nullptr) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    bool SignPQGroupTransaction(CMutableTransaction&, const std::map<COutPoint,Coin>&,
+        int sighash, std::map<int,bilingual_str>&) const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
 public:
     /**
      * Main wallet lock.
@@ -574,6 +592,12 @@ public:
 
     bool WithMercaturaPQMasterSeed(
         std::function<bool(const CKeyingMaterial&)> cb) const;
+
+    bool LoadPQGroupRecords(const PQGroupRecords&) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    std::optional<PQGroupRecord> GetPQGroupRecord(const CScript&) const;
+    std::vector<CScript> GetPQGroupScripts() const;
+    std::optional<mercaweave::Sizes> EstimatePQGroupTransaction(const CTransaction&,
+        const std::vector<CTxOut>&) const;
 
 
     /**

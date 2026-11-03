@@ -7,6 +7,7 @@
 #define BITCOIN_WALLET_WALLETDB_H
 
 #include <wallet/mercatura_pqwallet.h>
+#include <wallet/pqgroup.h>
 #include <wallet/crypter.h>
 #include <key.h>
 #include <primitives/transaction_identifier.h>
@@ -91,6 +92,7 @@ extern const std::string WALLETDESCRIPTORCKEY;
 extern const std::string WALLETDESCRIPTORKEY;
 extern const std::string WATCHMETA;
 extern const std::string WATCHS;
+extern const std::string PQGROUP_RECORDS;
 
 // Keys in this set pertain only to the legacy wallet (LegacyScriptPubKeyMan) and are removed during migration from legacy to descriptors.
 extern const std::unordered_set<std::string> LEGACY_TYPES;
@@ -240,6 +242,7 @@ public:
     bool EraseMasterKey(unsigned int id);
 
     bool WriteMercaturaPQState(const MercaturaPQWalletState& state);
+    bool WritePQGroupRecords(const PQGroupRecords&);
     bool WriteMercaturaPQSeed(const CKeyingMaterial& seed);
     bool EraseMercaturaPQSeed();
     bool WriteMercaturaPQCryptedSeed(

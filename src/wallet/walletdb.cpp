@@ -46,6 +46,7 @@ const std::string KEY{"key"};
 const std::string LOCKED_UTXO{"lockedutxo"};
 const std::string MASTER_KEY{"mkey"};
 const std::string MERCATURA_PQ_STATE{"mercaturapqstate"};
+const std::string PQGROUP_RECORDS{"mercaturapqgrouprecords"};
 const std::string MERCATURA_PQ_SEED{"mercaturapqseed"};
 const std::string MERCATURA_PQ_CRYPTED_SEED{"mercaturapqcryptedseed"};
 const std::string MERCATURA_PQ_KEY_LOCATOR{"mercaturapqkeylocator"};
@@ -168,6 +169,11 @@ bool WalletBatch::WriteMercaturaPQState(
     const MercaturaPQWalletState& state)
 {
     return WriteIC(DBKeys::MERCATURA_PQ_STATE, state, true);
+}
+
+bool WalletBatch::WritePQGroupRecords(const PQGroupRecords& records)
+{
+    return records.StructurallyValid() && WriteIC(DBKeys::PQGROUP_RECORDS,records,true);
 }
 
 bool WalletBatch::WriteMercaturaPQSeed(
@@ -1412,6 +1418,19 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
             result);
 
         // Load tx records
+        result = std::max(LoadRecords(pwallet,*m_batch,DBKeys::PQGROUP_RECORDS,
+            [](CWallet* wallet, DataStream& key, DataStream& value, std::string& error)
+                EXCLUSIVE_LOCKS_REQUIRED(wallet->cs_wallet) {
+                PQGroupRecords records;
+                value >> records;
+                if (!key.empty() || !value.empty() || !wallet->LoadPQGroupRecords(records)) {
+                    error = "Invalid, duplicate, unauthorized or wrong-network PQ group records";
+                    return DBErrors::CORRUPT;
+                }
+                return DBErrors::LOAD_OK;
+            }).m_result,result);
+
+        // Load tx records after authenticated/provisional ownership metadata.
         result = std::max(LoadTxRecords(pwallet, *m_batch, any_unordered), result);
     } catch (std::runtime_error& e) {
         // Exceptions that can be ignored or treated as non-critical are handled by the individual loading functions.
