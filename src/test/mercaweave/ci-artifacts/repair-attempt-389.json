@@ -1,0 +1,61 @@
+{
+  "run_id": 41783525497,
+  "url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41783525497",
+  "commit": "1ffb0021c2d37b286fca57729218628a34550904",
+  "jobs": [
+    {
+      "id": 126420308324,
+      "name": "Windows native x86_64 MSVC",
+      "status": "completed",
+      "conclusion": "cancelled"
+    },
+    {
+      "id": 126420308677,
+      "name": "[meta] determine runners",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 126420308713,
+      "name": "macOS native ARM64",
+      "status": "completed",
+      "conclusion": "cancelled"
+    },
+    {
+      "id": 126420346046,
+      "name": "macOS Intel x86_64 cross-compile",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 126420346119,
+      "name": "macOS ARM64 cross-compile",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 126420346135,
+      "name": "Windows x86_64 UCRT cross-compile",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 126420346168,
+      "name": "Linux native x86_64, headless",
+      "status": "completed",
+      "conclusion": "cancelled"
+    },
+    {
+      "id": 126420346197,
+      "name": "lint",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "follow_up": {
+    "commit": "95833e792079ee828b85960e2ef1479a0ff01746",
+    "cause": "UCRT -Werror=misleading-indentation in Qt; local normal/research probes also cover panel and isolated model",
+    "fix": "Whitespace-only control statement line separation; no warning suppressions",
+    "cancelled_jobs": "Workflow concurrency cancellation on corrected push; cancelled jobs do not qualify."
+  }
+}

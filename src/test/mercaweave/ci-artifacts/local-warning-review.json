@@ -1,0 +1,220 @@
+{
+  "note": "Includes intermediate repair builds; diagnostics were not suppressed. See the report for scope and platform limitations.",
+  "diagnostics": [
+    {
+      "path": "work/ci-repair/debug-build.log",
+      "line": 45,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/debug-build.log",
+      "line": 54,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/debug-build.log",
+      "line": 63,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/debug-build.log",
+      "line": 72,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/debug-build.log",
+      "line": 81,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/debug-build.log",
+      "line": 90,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/debug-build.log",
+      "line": 99,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/debug-build.log",
+      "line": 108,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/debug-build.log",
+      "line": 117,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/debug-build.log",
+      "line": 126,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/debug-build.log",
+      "line": 135,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/release-build-1.log",
+      "line": 45,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/release-build-1.log",
+      "line": 54,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/release-build-1.log",
+      "line": 63,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/release-build-1.log",
+      "line": 72,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/release-build-1.log",
+      "line": 81,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/release-build-1.log",
+      "line": 90,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/release-build-1.log",
+      "line": 99,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/release-build-1.log",
+      "line": 108,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/release-build-1.log",
+      "line": 117,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/release-build-1.log",
+      "line": 126,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/release-build-1.log",
+      "line": 135,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/release-build-1.log",
+      "line": 333,
+      "diagnostic": "/usr/include/c++/14/bits/stl_algobase.h:1884:39: warning: \u2018int __builtin_memcmp(const void*, const void*, long unsigned int)\u2019 specified bound [9223372036854775808, 18446744073709551615] exceeds maximum object size 9223372036854775807 [-Wstringop-overread]"
+    },
+    {
+      "path": "work/ci-repair/release-build-1.log",
+      "line": 342,
+      "diagnostic": "/usr/include/c++/14/bits/stl_algobase.h:1884:39: warning: \u2018int __builtin_memcmp(const void*, const void*, long unsigned int)\u2019 specified bound [9223372036854775808, 18446744073709551615] exceeds maximum object size 9223372036854775807 [-Wstringop-overread]"
+    },
+    {
+      "path": "work/ci-repair/release-build-1.log",
+      "line": 349,
+      "diagnostic": "/usr/include/c++/14/bits/stl_algobase.h:1884:39: warning: \u2018int __builtin_memcmp(const void*, const void*, long unsigned int)\u2019 specified bound [9223372036854775808, 18446744073709551615] exceeds maximum object size 9223372036854775807 [-Wstringop-overread]"
+    },
+    {
+      "path": "work/ci-repair/release-build-1.log",
+      "line": 358,
+      "diagnostic": "/usr/include/c++/14/bits/stl_algobase.h:1884:39: warning: \u2018int __builtin_memcmp(const void*, const void*, long unsigned int)\u2019 specified bound [9223372036854775808, 18446744073709551615] exceeds maximum object size 9223372036854775807 [-Wstringop-overread]"
+    },
+    {
+      "path": "work/ci-repair/release-build-2.log",
+      "line": 62,
+      "diagnostic": "/usr/include/c++/14/bits/stl_algobase.h:1884:39: warning: \u2018int __builtin_memcmp(const void*, const void*, long unsigned int)\u2019 specified bound [9223372036854775808, 18446744073709551615] exceeds maximum object size 9223372036854775807 [-Wstringop-overread]"
+    },
+    {
+      "path": "work/ci-repair/release-build-2.log",
+      "line": 69,
+      "diagnostic": "/usr/include/c++/14/bits/stl_algobase.h:1884:39: warning: \u2018int __builtin_memcmp(const void*, const void*, long unsigned int)\u2019 specified bound [9223372036854775808, 18446744073709551615] exceeds maximum object size 9223372036854775807 [-Wstringop-overread]"
+    },
+    {
+      "path": "work/ci-repair/release-build-2.log",
+      "line": 76,
+      "diagnostic": "/usr/include/c++/14/bits/stl_algobase.h:1884:39: warning: \u2018int __builtin_memcmp(const void*, const void*, long unsigned int)\u2019 specified bound [9223372036854775808, 18446744073709551615] exceeds maximum object size 9223372036854775807 [-Wstringop-overread]"
+    },
+    {
+      "path": "work/ci-repair/release-build-2.log",
+      "line": 85,
+      "diagnostic": "/usr/include/c++/14/bits/stl_algobase.h:1884:39: warning: \u2018int __builtin_memcmp(const void*, const void*, long unsigned int)\u2019 specified bound [9223372036854775808, 18446744073709551615] exceeds maximum object size 9223372036854775807 [-Wstringop-overread]"
+    },
+    {
+      "path": "work/ci-repair/release-build-2.log",
+      "line": 106,
+      "diagnostic": "/usr/include/c++/14/bits/stl_algobase.h:1884:39: warning: \u2018int __builtin_memcmp(const void*, const void*, long unsigned int)\u2019 specified bound [9223372036854775808, 18446744073709551615] exceeds maximum object size 9223372036854775807 [-Wstringop-overread]"
+    },
+    {
+      "path": "work/ci-repair/release-build-2.log",
+      "line": 113,
+      "diagnostic": "/usr/include/c++/14/bits/stl_algobase.h:1884:39: warning: \u2018int __builtin_memcmp(const void*, const void*, long unsigned int)\u2019 specified bound [9223372036854775808, 18446744073709551615] exceeds maximum object size 9223372036854775807 [-Wstringop-overread]"
+    },
+    {
+      "path": "work/ci-repair/sanitize-build.log",
+      "line": 45,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/sanitize-build.log",
+      "line": 54,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/sanitize-build.log",
+      "line": 63,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/sanitize-build.log",
+      "line": 72,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/sanitize-build.log",
+      "line": 81,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/sanitize-build.log",
+      "line": 90,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/sanitize-build.log",
+      "line": 99,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/sanitize-build.log",
+      "line": 108,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/sanitize-build.log",
+      "line": 117,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/sanitize-build.log",
+      "line": 126,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    },
+    {
+      "path": "work/ci-repair/sanitize-build.log",
+      "line": 135,
+      "diagnostic": "CMake Warning (author) at CMakeLists.txt:322 (target_link_libraries):"
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "source_commit": "1ffb0021c2d37b286fca57729218628a34550904",
+  "standalone_source": "src/test/mercaweave",
+  "common_cmake": {
+    "MERCAWEAVE_FULL_INTEGRATION": "ON",
+    "MERCAWEAVE_QT_TESTS": "ON",
+    "CMAKE_PREFIX_PATH": "$PWD/work/wo06-tools/qt-sdk/usr"
+  },
+  "configurations": [
+    {
+      "build": "work/build-release",
+      "CMAKE_BUILD_TYPE": "Release",
+      "MERCAWEAVE_SANITIZERS": "OFF"
+    },
+    {
+      "build": "work/build-debug",
+      "CMAKE_BUILD_TYPE": "Debug",
+      "MERCAWEAVE_SANITIZERS": "OFF"
+    },
+    {
+      "build": "work/build-sanitize",
+      "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+      "MERCAWEAVE_SANITIZERS": "ON"
+    }
+  ],
+  "sanitizer_environment": {
+    "ASAN_OPTIONS": "detect_leaks=0:halt_on_error=1",
+    "UBSAN_OPTIONS": "halt_on_error=1"
+  },
+  "parallelism": 2,
+  "kernel_configure": [
+    "cmake",
+    "-S",
+    ".",
+    "-B",
+    "work/ci-kernel-build",
+    "-DCMAKE_BUILD_TYPE=Release",
+    "-DBUILD_GUI=OFF",
+    "-DENABLE_IPC=OFF",
+    "-DBUILD_TESTS=OFF",
+    "-DBUILD_BENCH=OFF",
+    "-DBUILD_KERNEL_LIB=ON",
+    "-DBUILD_SHARED_LIBS=ON",
+    "-DWITH_USDT=OFF",
+    "-DWITH_ZMQ=OFF",
+    "-DWITH_CCACHE=OFF",
+    "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+    "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,--no-undefined",
+    "-DCMAKE_PREFIX_PATH=$PWD/work/wo06-tools/qt-sdk/usr"
+  ],
+  "kernel_build": [
+    "cmake",
+    "--build",
+    "work/ci-kernel-build",
+    "--target",
+    "bitcoinkernel",
+    "-j2"
+  ],
+  "native_functional": [
+    "python3",
+    "work/wo07-native-release/test/functional/test_runner.py",
+    "--jobs=2",
+    "--tmpdirprefix=$PWD/work/ci-repair/reproduction-functional",
+    "mercatura_pq_reorg.py",
+    "mercatura_pq_psbt.py",
+    "mercatura_wallet_encryption_persistence.py"
+  ],
+  "lint_environment": {
+    "PATH": "$PWD/work/ci-tools/cargo/bin:$PWD/work/ci-tools/bin:$PATH",
+    "RUSTUP_HOME": "$PWD/work/ci-tools/rustup",
+    "CARGO_HOME": "$PWD/work/ci-tools/cargo",
+    "CARGO_TARGET_DIR": "$PWD/work/ci-lint-target",
+    "CARGO_PROFILE_DEV_DEBUG": "0"
+  },
+  "lint": [
+    "cargo",
+    "run",
+    "--manifest-path",
+    "test/lint/test_runner/Cargo.toml"
+  ],
+  "tools": {
+    "rust": "1.90.0",
+    "ruff": "0.15.5",
+    "mypy": "1.19.1",
+    "lief": "0.16.6",
+    "pyzmq": "27.1.0",
+    "vulture": "2.14",
+    "shellcheck": "0.11.0",
+    "mlc": "1.2.0"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "run_id": 41769365713,
+  "commit": "a9c0f03ef997ef7dc3f2a3d11afa1e02c195d07c",
+  "jobs": [
+    {
+      "id": 126375185086,
+      "name": "Windows native x86_64 MSVC",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 126375185339,
+      "name": "macOS native ARM64",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 126375185343,
+      "name": "[meta] determine runners",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 126375224584,
+      "name": "Linux native x86_64, headless",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 126375224636,
+      "name": "lint",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 126375224640,
+      "name": "Windows x86_64 UCRT cross-compile",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 126375224642,
+      "name": "macOS Intel x86_64 cross-compile",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 126375224723,
+      "name": "macOS ARM64 cross-compile",
+      "status": "completed",
+      "conclusion": "failure"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+test,status,duration(seconds)
+mercatura_pq_psbt.py,Passed,73
+mercatura_pq_reorg.py,Passed,96
+mercatura_wallet_encryption_persistence.py,Passed,67
+ALL,Passed,141

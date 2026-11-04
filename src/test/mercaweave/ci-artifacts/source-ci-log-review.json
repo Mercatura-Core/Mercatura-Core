@@ -1,0 +1,114 @@
+{
+  "run_id": 41786009094,
+  "commit": "95833e792079ee828b85960e2ef1479a0ff01746",
+  "url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/41786009094",
+  "note": "SHA256s identify complete decoded log copies saved locally with normalized line endings. Diagnostic selection matches warning:, warning Cxxxx and CMake Warning; no compiler flags or diagnostics were suppressed.",
+  "jobs": [
+    {
+      "id": 126428770189,
+      "name": "[meta] determine runners",
+      "conclusion": "success",
+      "saved_log": "work/ci-repair/source-390-126428770189.log",
+      "bytes": 3217,
+      "sha256_saved_log": "a15eda2177c3b009c9dd20731b4b8443cb8c12aca5df5c7340a8932bad950834",
+      "selected_diagnostics": []
+    },
+    {
+      "id": 126428770442,
+      "name": "Windows native x86_64 MSVC",
+      "conclusion": "success",
+      "saved_log": "work/ci-repair/source-390-126428770442.log",
+      "bytes": 219622,
+      "sha256_saved_log": "58367af814e0061aea85993194e9b4879307240bc39584163cbc2d00aa367399",
+      "selected_diagnostics": [
+        "CMake Warning at scripts/cmake/vcpkg_replace_string.cmake:17 (message):"
+      ]
+    },
+    {
+      "id": 126428770492,
+      "name": "macOS native ARM64",
+      "conclusion": "success",
+      "saved_log": "work/ci-repair/source-390-126428770492.log",
+      "bytes": 168692,
+      "sha256_saved_log": "71e3c85dbac5319327c8da9aafae170b7dd9d1742f8d7b2bc6d2e693bcc2f52e",
+      "selected_diagnostics": [
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/test/witness_resource_tests.cpp:511:21: warning: calling function 'ProcessMessagesOnce' requires holding  'g_msgproc_mutex' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/test/witness_resource_tests.cpp:394:38: warning: calling function 'ActiveChain' requires holding  'cs_main' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/test/witness_resource_tests.cpp:406:34: warning: calling function 'ActiveChain' requires holding  'cs_main' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/test/witness_resource_tests.cpp:483:42: warning: calling function 'ProcessTransaction' requires holding  'cs_main' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/test/witness_resource_tests.cpp:487:44: warning: calling function 'ProcessTransaction' requires holding  'cs_main' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/test/witness_resource_tests.cpp:525:36: warning: calling function 'ActiveChain' requires holding  'cs_main' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/test/witness_resource_tests.cpp:566:34: warning: calling function 'ActiveChain' requires holding  'cs_main' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/test/witness_resource_tests.cpp:592:42: warning: calling function 'ActiveChain' requires holding  'cs_main' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/test/witness_resource_tests.cpp:600:40: warning: calling function 'ActiveChain' requires holding  'cs_main' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/test/witness_resource_tests.cpp:601:34: warning: calling function 'ActiveChain' requires holding  'cs_main' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/test/witness_resource_tests.cpp:630:17: warning: calling function 'ProcessMessagesOnce' requires holding  'g_msgproc_mutex' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/test/witness_resource_tests.cpp:656:40: warning: calling function 'ActiveChain' requires holding  'cs_main' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/test/witness_resource_tests.cpp:661:40: warning: calling function 'ActiveChain' requires holding  'cs_main' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/test/witness_resource_tests.cpp:674:40: warning: calling function 'ActiveChain' requires holding  'cs_main' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/test/testnet_capacity_tests.cpp:249:21: warning: calling function 'ProcessMessagesOnce' requires holding  'g_msgproc_mutex' exclusively [-Wthread-safety-analysis]",
+        "ld: warning: ignoring duplicate libraries: 'lib/libbitcoin_crypto.a', 'src/univalue/libunivalue.a'",
+        "ld: warning: ignoring duplicate libraries: 'lib/libbitcoin_consensus.a', 'src/secp256k1/lib/libsecp256k1.a'",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/wallet/test/wallet_tests.cpp:5392:18: warning: calling function 'IsMine' requires holding  'wallet->cs_wallet' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/wallet/test/wallet_tests.cpp:5508:17: warning: calling function 'IsMine' requires holding  'wallet->cs_wallet' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/wallet/test/wallet_tests.cpp:5530:26: warning: calling function 'IsMine' requires holding  'wallet->cs_wallet' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/wallet/test/wallet_tests.cpp:5831:9: warning: calling function 'CalculateMaximumSignedTxSize' requires holding  'wallet->cs_wallet' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/wallet/test/wallet_tests.cpp:6016:18: warning: calling function 'IsMine' requires holding  'wallet->cs_wallet' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/wallet/test/wallet_tests.cpp:6020:18: warning: calling function 'IsMine' requires holding  'wallet->cs_wallet' exclusively [-Wthread-safety-analysis]",
+        "/Users/runner/work/Mercatura-Core/Mercatura-Core/src/wallet/test/wallet_tests.cpp:6133:25: warning: calling function 'IsMine' requires holding  'wallet->cs_wallet' exclusively [-Wthread-safety-analysis]",
+        "ld: warning: ignoring duplicate libraries: 'lib/libbitcoin_consensus.a', 'src/secp256k1/lib/libsecp256k1.a'"
+      ]
+    },
+    {
+      "id": 126428808309,
+      "name": "macOS Intel x86_64 cross-compile",
+      "conclusion": "success",
+      "saved_log": "work/ci-repair/source-390-126428808309.log",
+      "bytes": 227245,
+      "sha256_saved_log": "4d682a3a9d76604939da75b056e113a6036fec4d03fcc5c3ed6d6fbafc1376e6",
+      "selected_diagnostics": [
+        "Warning: Could not detect Qt's path, skipping plugin deployment!",
+        "Warning: Could not find any external frameworks to deploy in dist/Mercatura Core.app."
+      ]
+    },
+    {
+      "id": 126428808371,
+      "name": "lint",
+      "conclusion": "success",
+      "saved_log": "work/ci-repair/source-390-126428808371.log",
+      "bytes": 65211,
+      "sha256_saved_log": "7cda508007b594df09f2c1d7ed1fdb3e855d29a82e6ca59e4e3c8957e1e59eaf",
+      "selected_diagnostics": []
+    },
+    {
+      "id": 126428808383,
+      "name": "Windows x86_64 UCRT cross-compile",
+      "conclusion": "success",
+      "saved_log": "work/ci-repair/source-390-126428808383.log",
+      "bytes": 274215,
+      "sha256_saved_log": "7edf940af813d70c7c3890aae50d272cb032a526e32f80f7de5ebe3e95d914ce",
+      "selected_diagnostics": []
+    },
+    {
+      "id": 126428808389,
+      "name": "macOS ARM64 cross-compile",
+      "conclusion": "success",
+      "saved_log": "work/ci-repair/source-390-126428808389.log",
+      "bytes": 226339,
+      "sha256_saved_log": "c6ff7795b8397ec95427d73ab749124ac8643e65d4ca573170b799300fd2496b",
+      "selected_diagnostics": [
+        "Warning: Could not detect Qt's path, skipping plugin deployment!",
+        "Warning: Could not find any external frameworks to deploy in dist/Mercatura Core.app."
+      ]
+    },
+    {
+      "id": 126428808465,
+      "name": "Linux native x86_64, headless",
+      "conclusion": "success",
+      "saved_log": "work/ci-repair/source-390-126428808465.log",
+      "bytes": 294276,
+      "sha256_saved_log": "a98d7bd29f1092a4e4a3b16f23cc91da1a7f1599d79bdb7739c3834027dd60ac",
+      "selected_diagnostics": []
+    }
+  ]
+}

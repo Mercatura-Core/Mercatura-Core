@@ -1,0 +1,40 @@
+{
+  "run_id": 41786009094,
+  "commit": "95833e792079ee828b85960e2ef1479a0ff01746",
+  "note": "Counts are executions on each native platform, not unique tests across platforms; cross-build and lint jobs remain separately qualified.",
+  "native": [
+    {
+      "id": 126428770442,
+      "name": "Windows native x86_64 MSVC",
+      "ctest_passed": 187,
+      "ctest_total": 187,
+      "ctest_wall_seconds": 1144.31,
+      "functional_passed": 45,
+      "functional_total": 45,
+      "functional_skipped": 0
+    },
+    {
+      "id": 126428770492,
+      "name": "macOS native ARM64",
+      "ctest_passed": 187,
+      "ctest_total": 187,
+      "ctest_wall_seconds": 1921.69,
+      "functional_passed": 45,
+      "functional_total": 45,
+      "functional_skipped": 0
+    },
+    {
+      "id": 126428808465,
+      "name": "Linux native x86_64, headless",
+      "ctest_passed": 187,
+      "ctest_total": 187,
+      "ctest_wall_seconds": 1826.74,
+      "functional_passed": 45,
+      "functional_total": 45,
+      "functional_skipped": 0
+    }
+  ],
+  "windows_turnover_repetitions": 20,
+  "native_ctest_executions": 561,
+  "native_functional_executions": 135
+}

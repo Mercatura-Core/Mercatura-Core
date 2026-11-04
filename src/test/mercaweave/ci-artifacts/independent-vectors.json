@@ -1,0 +1,33 @@
+{
+  "passed": true,
+  "locked": {
+    "ten_locked_values_matched": true,
+    "manifest_bytes": 2030,
+    "body_bytes": 296,
+    "final_bytes": 2085
+  },
+  "configurations": [
+    {
+      "log": "work/ci-repair/native-component-tests.log",
+      "vectors": 4,
+      "sha256": "fe2662594401ee195169302580e466aa3b997eabeed12d2be53b11c9a936655c"
+    },
+    {
+      "log": "work/wo08/final-release.log",
+      "vectors": 4,
+      "sha256": "fe2662594401ee195169302580e466aa3b997eabeed12d2be53b11c9a936655c"
+    },
+    {
+      "log": "work/wo08/final-debug.log",
+      "vectors": 4,
+      "sha256": "fe2662594401ee195169302580e466aa3b997eabeed12d2be53b11c9a936655c"
+    },
+    {
+      "log": "work/wo08/final-sanitize.log",
+      "vectors": 4,
+      "sha256": "fe2662594401ee195169302580e466aa3b997eabeed12d2be53b11c9a936655c"
+    }
+  ],
+  "byte_identical": true,
+  "independent_crypto_implementation": false
+}
