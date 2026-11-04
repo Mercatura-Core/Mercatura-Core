@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <crypto/hkdf_sha3_384.h>
+#include <support/cleanse.h>
 
 #include <array>
 #include <algorithm>
@@ -33,4 +34,5 @@ void CHKDF_HMAC_SHA3_384_L32::Expand32(
         .Finalize(t1);
 
     std::copy_n(t1.begin(), OUTPUT_SIZE, output.begin());
+    memory_cleanse(t1.data(), t1.size());
 }
