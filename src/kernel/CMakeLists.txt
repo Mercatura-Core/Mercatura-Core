@@ -9,6 +9,7 @@ include(GNUInstallDirs)
 #       consensus engine, this list will shrink to only those
 #       which are absolutely necessary.
 add_library(bitcoinkernel
+  $<TARGET_OBJECTS:bitcoin_pqgroup>
   bitcoinkernel.cpp
   chain.cpp
   checks.cpp
@@ -99,6 +100,7 @@ endif()
 # Also manually apply the warnings to the kernel's internal dependencies
 target_link_libraries(bitcoin_clientversion PRIVATE kernel_warn_interface)
 target_link_libraries(bitcoin_crypto PRIVATE kernel_warn_interface)
+target_link_libraries(bitcoin_pqgroup PRIVATE kernel_warn_interface)
 target_link_libraries(leveldb PRIVATE kernel_warn_interface)
 target_link_libraries(crc32c PRIVATE kernel_warn_interface)
 
@@ -111,6 +113,7 @@ target_link_libraries(bitcoinkernel
     $<TARGET_NAME_IF_EXISTS:USDT::headers>
     Boost::headers
 )
+add_dependencies(bitcoinkernel bitcoin_pqgroup)
 
 target_include_directories(bitcoinkernel PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/leveldb/include>)
 

@@ -1,7 +1,8 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "node_validation.h"
-#include "integration_fixtures.h"
+#include <test/mercaweave/node_validation.h>
+#include <validation.h>
+#include <test/mercaweave/integration_fixtures.h>
 #include <algorithm>
 #include <chrono>
 #include <iomanip>

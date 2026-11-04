@@ -1,6 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "native_fixture.h"
+#include <test/mercaweave/production_path/native_fixture.h>
 #include <script/pqgroup_psbt.h>
 #include <iostream>
 #include <random>
@@ -34,7 +34,7 @@ bool Validate(const CMutableTransaction& mutable_tx, const std::vector<CTxOut>& 
                                         execution,G(genesis),&work);
 }
 }
-BOOST_FIXTURE_TEST_SUITE(pqgroup_security,NativeSetup)
+BOOST_FIXTURE_TEST_SUITE(security_tests_pqgroup, NativeSetup)
 BOOST_AUTO_TEST_CASE(real_cache_and_negative_authorization_matrix)
 {
     auto good = Fixture(10,2,900);

@@ -37,9 +37,19 @@ fn get_pathspecs_exclude_whitespace() -> Vec<String> {
 }
 
 pub fn lint_trailing_whitespace() -> LintResult {
+    // This WO07C measurement is immutable historical evidence. Its original
+    // CRLF bytes must not be rewritten to satisfy a source-formatting check.
+    // Pin the complete blob before granting this single-file exception.
+    let archived_csv = "src/test/mercaweave/production-path-artifacts/build-provenance.csv";
+    if check_output(git().args(["hash-object", "--no-filters", "--", archived_csv]))?
+        != "f0077af11ea76a72bd16d0aac2360a642d86660d"
+    {
+        return Err("The archived WO07C provenance CSV must retain its original bytes".into());
+    }
     let trailing_space = git()
         .args(["grep", "-I", "--line-number", "\\s$", "--"])
         .args(get_pathspecs_exclude_whitespace())
+        .arg(format!(":(exclude){archived_csv}"))
         .status()
         .expect("command error")
         .success();

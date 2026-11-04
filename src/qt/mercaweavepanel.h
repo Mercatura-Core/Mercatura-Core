@@ -21,4 +21,4 @@ private:
     void refresh();void dispatch(Action);
 };
 }
-#endif
+#endif // BITCOIN_QT_MERCAWEAVEPANEL_H

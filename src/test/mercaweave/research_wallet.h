@@ -1,10 +1,10 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_MERCAWEAVE_RESEARCH_WALLET_H
-#define MERCATURA_MERCAWEAVE_RESEARCH_WALLET_H
-#include "wallet_seed_bridge.h"
-#include "isolated_validation.h"
-#include <filesystem>
+#ifndef BITCOIN_TEST_MERCAWEAVE_RESEARCH_WALLET_H
+#define BITCOIN_TEST_MERCAWEAVE_RESEARCH_WALLET_H
+#include <test/mercaweave/wallet_seed_bridge.h>
+#include <test/mercaweave/isolated_validation.h>
+#include <util/fs.h>
 #include <map>
 #include <mutex>
 #include <tuple>
@@ -76,11 +76,11 @@ public:
     // Import rederives every owned record; watch-only never derives children.
     void RecoverIssued(std::span<const Address>);
     Bytes Backup()const;
-    static std::filesystem::path StorageRoot();
-    void Save(const std::filesystem::path&)const;
-    static std::unique_ptr<Wallet> Load(const std::filesystem::path&,B32);
+    static fs::path StorageRoot();
+    void Save(const fs::path&)const;
+    static std::unique_ptr<Wallet> Load(const fs::path&,B32);
     static std::string EncodeResearchAddress(const Address&,std::string_view native_hrp);
 };
 bool SecureRandom(B32&);
 } // namespace mercaweave::wallet_research
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_RESEARCH_WALLET_H

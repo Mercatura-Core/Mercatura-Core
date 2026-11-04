@@ -1,6 +1,6 @@
 // Executable-local, one-shot, thread-local allocation faults. Disarm before
 // throwing so unwinding, SQLite rollback and the test framework can allocate.
-#include "allocation.h"
+#include <test/mercaweave/security_audit/allocation.h>
 #include <cstdlib>
 #include <new>
 namespace {

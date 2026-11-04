@@ -1,6 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "wallet_psbt.h"
+#include <test/mercaweave/wallet_psbt.h>
 #include <crypto/mercatura_pqkey.h>
 #include <support/cleanse.h>
 namespace mercaweave::wallet_research {

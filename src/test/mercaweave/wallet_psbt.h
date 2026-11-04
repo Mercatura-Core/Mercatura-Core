@@ -1,8 +1,8 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_MERCAWEAVE_WALLET_PSBT_H
-#define MERCATURA_MERCAWEAVE_WALLET_PSBT_H
-#include "research_wallet.h"
+#ifndef BITCOIN_TEST_MERCAWEAVE_WALLET_PSBT_H
+#define BITCOIN_TEST_MERCAWEAVE_WALLET_PSBT_H
+#include <test/mercaweave/research_wallet.h>
 #include <psbt.h>
 namespace mercaweave::wallet_research {
 inline constexpr std::string_view PSBT_ID="MercaWeave"; // ten ASCII bytes
@@ -30,4 +30,4 @@ public:
     static PartiallySignedTransaction Decode(std::span<const unsigned char>);
 };
 }
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_WALLET_PSBT_H

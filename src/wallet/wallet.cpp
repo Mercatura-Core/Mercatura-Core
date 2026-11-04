@@ -3,11 +3,12 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <crypto/sha256.h>
+
 #ifdef MERCATURA_MERCAWEAVE_WALLET_RESEARCH_TEST_ONLY
 // Only the isolated research target compiles this minimal primitive bridge.
 // The existing seed-encryption function bodies below are shared unchanged.
 #include <test/mercaweave/wallet_seed_bridge.h>
-#include <crypto/sha256.h>
 namespace wallet {
 #else
 #include <wallet/wallet.h>
@@ -15,7 +16,6 @@ namespace wallet {
 #include <crypto/mercatura_mldsa.h>
 #include <crypto/mercatura_pqderive.h>
 #include <crypto/mercatura_pqkey.h>
-#include <crypto/sha256.h>
 
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 #include <addresstype.h>

@@ -1,8 +1,8 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_MERCAWEAVE_BLOCK_WORK_H
-#define MERCATURA_MERCAWEAVE_BLOCK_WORK_H
-#include "auth_context.h"
+#ifndef BITCOIN_TEST_MERCAWEAVE_BLOCK_WORK_H
+#define BITCOIN_TEST_MERCAWEAVE_BLOCK_WORK_H
+#include <test/mercaweave/auth_context.h>
 #include <primitives/block.h>
 #include <limits>
 
@@ -64,4 +64,4 @@ Workload VerifyWorkload(const std::vector<RequestPtr>&, Budget = {});
 // coinbase. Only for measurement; no header/merkle/PoW validity is claimed.
 CBlock SerializeWorkload(const std::vector<RequestPtr>&);
 } // namespace mercaweave::research
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_BLOCK_WORK_H

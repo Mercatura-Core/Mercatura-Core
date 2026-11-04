@@ -1,7 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_SCRIPT_PQGROUP_CONTEXT_H
-#define MERCATURA_SCRIPT_PQGROUP_CONTEXT_H
+#ifndef BITCOIN_SCRIPT_PQGROUP_CONTEXT_H
+#define BITCOIN_SCRIPT_PQGROUP_CONTEXT_H
 
 #include <script/interpreter.h>
 #include <script/pqgroup.h>
@@ -54,4 +54,4 @@ public:
                     std::optional<uint256>) const;
 };
 } // namespace mercaweave
-#endif
+#endif // BITCOIN_SCRIPT_PQGROUP_CONTEXT_H

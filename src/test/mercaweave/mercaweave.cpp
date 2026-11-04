@@ -1,3 +1,4 @@
-// Compatibility translation unit for existing standalone build commands.
-// No duplicate implementation: ordinary and research builds compile this source.
-#include <script/pqgroup.cpp>
+// Copyright (c) 2026 The Mercatura Core developers
+// Distributed under the MIT software license, see the accompanying file COPYING.
+// Compatibility header only; CMake compiles script/pqgroup.cpp directly.
+#include <test/mercaweave/mercaweave.h>

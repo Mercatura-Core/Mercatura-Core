@@ -1,6 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "integration_fixtures.h"
+#include <test/mercaweave/integration_fixtures.h>
 #include <crypto/sha256.h>
 #include <barrier>
 #include <future>

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "fixtures.h"
-#include "mutation_seeds.h"
+#include <test/mercaweave/fixtures.h>
+#include <test/mercaweave/mutation_seeds.h>
 #include <future>
 #include <iostream>
 #include <random>

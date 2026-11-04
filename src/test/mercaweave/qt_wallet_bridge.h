@@ -1,11 +1,11 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_MERCAWEAVE_QT_WALLET_BRIDGE_H
-#define MERCATURA_MERCAWEAVE_QT_WALLET_BRIDGE_H
+#ifndef BITCOIN_TEST_MERCAWEAVE_QT_WALLET_BRIDGE_H
+#define BITCOIN_TEST_MERCAWEAVE_QT_WALLET_BRIDGE_H
 #ifndef MERCATURA_MERCAWEAVE_QT_RESEARCH_TEST_ONLY
 #error "Mock wallet capability injection is forbidden in production"
 #endif
-#include "reward_planner.h"
+#include <test/mercaweave/reward_planner.h>
 #include <qt/mercaweavemodel.h>
 #include <atomic>
 #include <mutex>
@@ -38,4 +38,4 @@ public:
     void SetFunding(std::vector<CTxOut>,wallet_research::Address change);
 };
 }
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_QT_WALLET_BRIDGE_H

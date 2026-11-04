@@ -2,8 +2,8 @@
 #ifndef MERCATURA_MERCAWEAVE_PRODUCTION_PATH_TEST_ONLY
 #error "Production-path fixture access is forbidden in ordinary builds"
 #endif
-#ifndef MERCATURA_TEST_PRODUCTION_PATH_ACCESS_H
-#define MERCATURA_TEST_PRODUCTION_PATH_ACCESS_H
+#ifndef BITCOIN_TEST_MERCAWEAVE_PRODUCTION_PATH_ACCESS_H
+#define BITCOIN_TEST_MERCAWEAVE_PRODUCTION_PATH_ACCESS_H
 #include <script/pqgroup_context.h>
 #include <validation.h>
 namespace wallet { class CWallet; struct PQGroupRecord; struct PQGroupRecords; }
@@ -26,4 +26,4 @@ public:
     static wallet::PQGroupRecords Records(const wallet::CWallet&);
 };
 }
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_PRODUCTION_PATH_ACCESS_H

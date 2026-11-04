@@ -1,7 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "qt_wallet_bridge.h"
-#include "wallet_fixtures.h"
+#include <test/mercaweave/qt_wallet_bridge.h>
+#include <test/mercaweave/wallet_fixtures.h>
 #include <QApplication>
 #include <QCheckBox>
 #include <QClipboard>

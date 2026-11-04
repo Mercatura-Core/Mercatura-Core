@@ -1,7 +1,8 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
 // In-process only. No node, networking, activation, CWallet or real funding.
-#include "../integration_fixtures.h"
+#include <test/mercaweave/decimal_argument.h>
+#include <test/mercaweave/integration_fixtures.h>
 #include <crypto/sha256.h>
 #include <chrono>
 #include <iomanip>
@@ -34,7 +35,7 @@ void Run(size_t inputs,size_t groups,size_t natives,uint32_t seed)
 }
 int main(int argc,char** argv)
 {
-    try{Check(argc<=2);const auto parsed=argc>1?std::stoull(argv[1]):7;Check(parsed<=0xffffffffULL);uint32_t seed=parsed;
+    try{Check(argc<=2);const auto parsed=argc>1?mercaweave::test::DecimalArgument(argv[1]):7;Check(parsed<=0xffffffffULL);uint32_t seed=parsed;
         std::cout<<std::fixed<<std::setprecision(3)<<"v3_inputs,groups,native_inputs,witness_signatures,actual_verifications,bytes,weight,seed,research_valid,standard_relay,real_node_v3_execution,construction_ms,signing_ms,verification_ms,late_invalid_ms,maxrss_kib,wire_sha256\n";
         for(size_t n:{1,10,53,100,1000,1024})Run(n,1,0,seed);
         Run(100,10,0,seed);Run(100,100,0,seed);Run(53,1,2,seed);Run(256,256,0,seed);Run(4096,4,0,seed);

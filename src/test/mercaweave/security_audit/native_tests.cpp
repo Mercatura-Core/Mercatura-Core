@@ -1,6 +1,6 @@
 // Actual production components, ordinary native ABI, synthetic private wallets.
-#include "../production_path/native_fixture.h"
-#include "allocation.h"
+#include <test/mercaweave/production_path/native_fixture.h>
+#include <test/mercaweave/security_audit/allocation.h>
 #include <script/pqgroup_psbt.h>
 #include <sqlite3.h>
 #include <iostream>
@@ -10,7 +10,7 @@
 
 using namespace mercaweave;
 using namespace mercaweave::production_test;
-BOOST_FIXTURE_TEST_SUITE(pqgroup_final_security,NativeSetup)
+BOOST_FIXTURE_TEST_SUITE(native_tests_security, NativeSetup)
 BOOST_AUTO_TEST_CASE(no_allocation_after_sqlite_issuance_commit)
 {
     const auto path=m_path_root/"allocation-wallet";

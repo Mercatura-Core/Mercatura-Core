@@ -30,7 +30,7 @@
 #include <util/time.h>
 #include <util/ui_change_type.h>
 #include <wallet/mercatura_pqwallet.h>
-#include <wallet/pqgroup.h>
+#include <wallet/pqgroup_records.h>
 #include <wallet/crypter.h>
 #include <wallet/db.h>
 #include <wallet/scriptpubkeyman.h>

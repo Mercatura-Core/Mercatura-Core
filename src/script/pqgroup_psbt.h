@@ -1,7 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_SCRIPT_PQGROUP_PSBT_H
-#define MERCATURA_SCRIPT_PQGROUP_PSBT_H
+#ifndef BITCOIN_SCRIPT_PQGROUP_PSBT_H
+#define BITCOIN_SCRIPT_PQGROUP_PSBT_H
 #include <psbt.h>
 #include <script/pqgroup_context.h>
 
@@ -35,4 +35,4 @@ bool FinalizeAndExtractPSBT(PartiallySignedTransaction&, CMutableTransaction&,
                            const mercaweave::IsolatedExecution&, std::span<const CTxOut>);
 bool CombinePSBTs(PartiallySignedTransaction&, const std::vector<PartiallySignedTransaction>&,
                   const mercaweave::IsolatedExecution&, std::span<const CTxOut>);
-#endif
+#endif // BITCOIN_SCRIPT_PQGROUP_PSBT_H

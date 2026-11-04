@@ -16,7 +16,7 @@ if(MERCAWEAVE_SANITIZERS)
   add_link_options(-fsanitize=address,undefined)
 endif()
 add_library(mercaweave STATIC
-  mercaweave.cpp
+  ${MCA_SRC}/script/pqgroup.cpp
   ${MCA_SRC}/primitives/transaction.cpp
   ${MCA_SRC}/script/script.cpp
   ${MCA_SRC}/uint256.cpp

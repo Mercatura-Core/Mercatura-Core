@@ -1,7 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_SCRIPT_PQGROUP_H
-#define MERCATURA_SCRIPT_PQGROUP_H
+#ifndef BITCOIN_SCRIPT_PQGROUP_H
+#define BITCOIN_SCRIPT_PQGROUP_H
 
 #include <crypto/mercatura_mldsa.h>
 #include <crypto/mercatura_pqhash.h>
@@ -142,4 +142,4 @@ B32 Derive(const B32& master, const B32& genesis, uint32_t account, uint8_t purp
 struct Sizes { size_t total, stripped, witness, weight, fee_bytes; };
 Sizes Measure(const CMutableTransaction& tx);
 } // namespace mercaweave
-#endif
+#endif // BITCOIN_SCRIPT_PQGROUP_H

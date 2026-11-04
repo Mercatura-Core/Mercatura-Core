@@ -1,6 +1,6 @@
 // Minimal separate-toolchain control for the WO08 witness construction failure.
 // The unsafe form is deliberately retained ONLY in this standalone probe.
-#include "allocation.h"
+#include <test/mercaweave/security_audit/allocation.h>
 #include <iostream>
 #include <vector>
 using Bytes=std::vector<unsigned char>;

@@ -1,11 +1,12 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_MERCAWEAVE_DURABLE_WALLET_H
-#define MERCATURA_MERCAWEAVE_DURABLE_WALLET_H
+#ifndef BITCOIN_TEST_MERCAWEAVE_DURABLE_WALLET_H
+#define BITCOIN_TEST_MERCAWEAVE_DURABLE_WALLET_H
 #ifndef MERCATURA_MERCAWEAVE_QT_RESEARCH_TEST_ONLY
 #error "Durable research wallet is forbidden in normal builds"
 #endif
-#include "reward_planner.h"
+#include <util/fs.h>
+#include <test/mercaweave/reward_planner.h>
 #include <wallet/sqlite.h>
 namespace mercaweave::durable_research {
 using namespace wallet_research;
@@ -32,7 +33,7 @@ class Store final {
     void Commit(const Bytes&);
 public:
     static constexpr size_t MAX_ENTRIES{256};
-    static std::filesystem::path Root();
+    static fs::path Root();
     static std::unique_ptr<Store> Create(std::string_view name, std::unique_ptr<Wallet>);
     static std::unique_ptr<Store> Load(std::string_view name, B32);
     bool Unlock(const SecureString&); // explicit caller action; never automatic
@@ -42,9 +43,9 @@ public:
     void Mark(uint64_t, Status); // simulation/cancellation only, no acceptance proof
     void Reconcile(const integration::ViewPtr&); // spending invalidates reservation
     std::vector<Entry> Entries() const;
-    bool Backup(const std::filesystem::path&) const;
+    bool Backup(const fs::path&) const;
     // Native backend exposed only in this isolated target for fault injection.
     wallet::SQLiteDatabase& DatabaseForTests() { return *m_database; }
 };
 }
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_DURABLE_WALLET_H

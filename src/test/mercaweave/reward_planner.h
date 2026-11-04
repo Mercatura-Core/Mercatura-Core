@@ -1,11 +1,11 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_MERCAWEAVE_REWARD_PLANNER_H
-#define MERCATURA_MERCAWEAVE_REWARD_PLANNER_H
+#ifndef BITCOIN_TEST_MERCAWEAVE_REWARD_PLANNER_H
+#define BITCOIN_TEST_MERCAWEAVE_REWARD_PLANNER_H
 #ifndef MERCATURA_MERCAWEAVE_QT_RESEARCH_TEST_ONLY
 #error "Reward planner accepts synthetic research state only"
 #endif
-#include "wallet_funding.h"
+#include <test/mercaweave/wallet_funding.h>
 #include <set>
 namespace mercaweave::reward_research {
 using namespace wallet_research;
@@ -40,4 +40,4 @@ public:
     size_t HistorySize()const{return m_history.size();}
 };
 }
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_REWARD_PLANNER_H

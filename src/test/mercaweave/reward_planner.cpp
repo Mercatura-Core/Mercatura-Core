@@ -1,6 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "reward_planner.h"
+#include <test/mercaweave/reward_planner.h>
 #include <crypto/sha256.h>
 namespace mercaweave::reward_research {
 namespace {

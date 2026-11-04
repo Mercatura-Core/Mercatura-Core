@@ -1,8 +1,8 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_MERCAWEAVE_FIXTURES_H
-#define MERCATURA_MERCAWEAVE_FIXTURES_H
-#include "mercaweave.h"
+#ifndef BITCOIN_TEST_MERCAWEAVE_FIXTURES_H
+#define BITCOIN_TEST_MERCAWEAVE_FIXTURES_H
+#include <test/mercaweave/mercaweave.h>
 #include <memory>
 
 namespace mercaweave::test {
@@ -25,4 +25,4 @@ void ConvertToV2(Fixture& f);
 std::string Hex(std::span<const unsigned char> bytes);
 Bytes Unhex(std::string_view text);
 } // namespace mercaweave::test
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_FIXTURES_H

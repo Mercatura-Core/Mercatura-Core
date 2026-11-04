@@ -1,6 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "qt_wallet_bridge.h"
+#include <test/mercaweave/qt_wallet_bridge.h>
 #include <bech32.h>
 #include <util/strencodings.h>
 namespace mercaweave::qt_research {

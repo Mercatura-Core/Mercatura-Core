@@ -1,8 +1,8 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_MERCAWEAVE_WALLET_FUNDING_H
-#define MERCATURA_MERCAWEAVE_WALLET_FUNDING_H
-#include "wallet_psbt.h"
+#ifndef BITCOIN_TEST_MERCAWEAVE_WALLET_FUNDING_H
+#define BITCOIN_TEST_MERCAWEAVE_WALLET_FUNDING_H
+#include <test/mercaweave/wallet_psbt.h>
 namespace mercaweave::wallet_research {
 enum class FundingMode { Automatic, StandardPQ, MercaWeave };
 struct FundingCoin {COutPoint point;int depth{10};bool safe{true};size_t ancestors{0},cluster_count{1};};
@@ -24,4 +24,4 @@ public:
     static std::vector<Funded> Sweep(const Wallet&,const integration::ViewPtr&,std::span<const FundingCoin>,const CScript& destination,FundingMode=FundingMode::Automatic,FeePolicy={},int spend_height=200);
 };
 }
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_WALLET_FUNDING_H

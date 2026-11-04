@@ -1,7 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "access.h"
-#include "../context_fixtures.h"
+#include <test/mercaweave/production_path/access.h>
+#include <test/mercaweave/context_fixtures.h>
 #include <consensus/validation.h>
 #include <future>
 #include <chrono>

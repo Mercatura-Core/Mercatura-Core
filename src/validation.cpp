@@ -3,7 +3,10 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifdef MERCATURA_MERCAWEAVE_VALIDATION_COMPONENTS_TEST_ONLY
+#ifndef MERCATURA_MERCAWEAVE_VALIDATION_COMPONENTS_TEST_ONLY
+#include <bitcoin-build-config.h> // IWYU pragma: keep
+#endif // MERCATURA_MERCAWEAVE_VALIDATION_COMPONENTS_TEST_ONLY config
+
 #include <validation.h>
 #include <consensus/validation.h>
 #include <random.h>
@@ -11,10 +14,9 @@
 #include <undo.h>
 #include <util/log.h>
 #include <tinyformat.h>
-#else
-#include <bitcoin-build-config.h> // IWYU pragma: keep
 
-#include <validation.h>
+#ifndef MERCATURA_MERCAWEAVE_VALIDATION_COMPONENTS_TEST_ONLY
+
 
 #include <arith_uint256.h>
 #include <chain.h>
@@ -26,7 +28,6 @@
 #include <consensus/merkle.h>
 #include <consensus/tx_check.h>
 #include <consensus/tx_verify.h>
-#include <consensus/validation.h>
 #include <cuckoocache.h>
 #include <flatfile.h>
 #include <hash.h>
@@ -49,20 +50,15 @@
 #include <pow.h>
 #include <primitives/block.h>
 #include <primitives/transaction.h>
-#include <random.h>
 #include <script/script.h>
-#include <script/sigcache.h>
 #include <signet.h>
-#include <tinyformat.h>
 #include <txdb.h>
 #include <txmempool.h>
 #include <uint256.h>
-#include <undo.h>
 #include <util/check.h>
 #include <util/fs.h>
 #include <util/fs_helpers.h>
 #include <util/hasher.h>
-#include <util/log.h>
 #include <util/moneystr.h>
 #include <util/rbf.h>
 #include <util/result.h>
@@ -2085,7 +2081,7 @@ std::optional<std::pair<ScriptError, std::string>> CScriptCheck::operator()() {
         if (VerifyScript(input.scriptSig, m_tx_out.scriptPubKey, &input.scriptWitness,
                          m_flags, GroupChecker(*m_group_context, nIn, *m_signature_cache,
                                                m_pq_genesis_hash), &error)) return std::nullopt;
-        return std::make_pair(error, "pqgroup-script-input-" + std::to_string(nIn));
+        return std::make_pair(error, "pqgroup-script-input-" + strprintf("%u", nIn));
     }
 #ifdef MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY
     if (m_research_context) {
@@ -2308,7 +2304,7 @@ bool CheckInputScriptsWithPQGroups(
     const auto context = mercaweave::GroupContext::Prepare(*execution, tx, std::move(spent),
                                                         flags, genesis, error, work);
     if (!context) return state.Invalid(TxValidationResult::TX_CONSENSUS,
-        "pqgroup-authorization-" + std::to_string(static_cast<int>(error.value_or(mercaweave::Error::Context))));
+        "pqgroup-authorization-" + strprintf("%d", static_cast<int>(error.value_or(mercaweave::Error::Context))));
     // Never consult OR populate the legacy whole-script cache. A cache key based
     // on wtxid/flags/genesis does not bind arbitrary authenticated spent records.
     // Jobs retain their complete owned immutable context, including native data.
@@ -2823,7 +2819,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
                 nSigOpsCost += 4 * mapping.groups.size() + mapping.inputs;
             } catch (const mercaweave::Failure& failure) {
                 state.Invalid(BlockValidationResult::BLOCK_CONSENSUS,
-                    "pqgroup-structure-" + std::to_string(static_cast<int>(failure.code)));
+                    "pqgroup-structure-" + strprintf("%d", static_cast<int>(failure.code)));
                 break;
             }
         }

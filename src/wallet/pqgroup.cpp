@@ -45,12 +45,12 @@ bool PQGroupRecords::StructurallyValid() const
 }
 mercaweave::H48 PQGroupRecords::Authenticate(std::span<const unsigned char> seed) const
 {
-    static constexpr std::string_view DOMAIN{"Mercatura/PQGroupCWalletRecords/v1"};
+    static constexpr std::string_view records_authentication_domain{"Mercatura/PQGroupCWalletRecords/v1"};
     mercaweave::Writer metadata;
     metadata << version << derivation << genesis << issued;
     mercaweave::H48 result;
     CHMAC_SHA3_384(seed.data(),seed.size())
-        .Write({reinterpret_cast<const unsigned char*>(DOMAIN.data()),DOMAIN.size()})
+        .Write({reinterpret_cast<const unsigned char*>(records_authentication_domain.data()),records_authentication_domain.size()})
         .Write(metadata.bytes).Finalize(result);
     return result;
 }

@@ -1,12 +1,15 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_MERCAWEAVE_NODE_VALIDATION_H
-#define MERCATURA_MERCAWEAVE_NODE_VALIDATION_H
+#ifndef BITCOIN_TEST_MERCAWEAVE_NODE_VALIDATION_H
+#define BITCOIN_TEST_MERCAWEAVE_NODE_VALIDATION_H
 #ifndef MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY
 #error "Node integration is forbidden in normal builds"
 #endif
-#include "isolated_validation.h"
-#include <validation.h>
+#include <test/mercaweave/isolated_validation.h>
+class CCoinsViewCache;
+class CScriptCheck;
+class TxValidationState;
+struct ValidationCache;
 
 namespace mercaweave::node_research {
 // This object can only be minted by complete uncached verification against an
@@ -35,4 +38,4 @@ public:
 bool CheckInputScripts(const CTransaction&, TxValidationState&, const CCoinsViewCache&, script_verify_flags,
                        bool, bool, PrecomputedTransactionData&, ValidationCache&, std::vector<CScriptCheck>*,
                        std::optional<uint256>, std::shared_ptr<const mercaweave::node_research::Context> = {});
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_NODE_VALIDATION_H

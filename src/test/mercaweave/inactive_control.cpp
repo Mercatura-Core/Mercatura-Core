@@ -1,6 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "context_fixtures.h"
+#include <test/mercaweave/context_fixtures.h>
 #include <iostream>
 using namespace mercaweave;
 using namespace mercaweave::test;

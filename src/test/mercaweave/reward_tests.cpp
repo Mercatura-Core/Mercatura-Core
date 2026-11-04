@@ -1,7 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "reward_planner.h"
-#include "wallet_fixtures.h"
+#include <test/mercaweave/reward_planner.h>
+#include <test/mercaweave/wallet_fixtures.h>
 #include <iostream>
 #include <util/translation.h>
 const TranslateFn G_TRANSLATION_FUN{nullptr};

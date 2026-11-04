@@ -1,7 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "wallet_fixtures.h"
-#include "wallet_funding.h"
+#include <test/mercaweave/wallet_fixtures.h>
+#include <test/mercaweave/wallet_funding.h>
 #include <chrono>
 #include <iomanip>
 #include <iostream>

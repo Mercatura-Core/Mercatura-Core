@@ -1,6 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "node_validation.h"
+#include <test/mercaweave/node_validation.h>
+#include <coins.h>
 namespace mercaweave::node_research {
 Context::Context(integration::ViewPtr view, uint64_t epoch, research::RequestPtr request, std::vector<integration::ScriptJob> jobs)
     : m_view(std::move(view)), m_epoch(epoch), m_request(std::move(request)), m_tx(m_request->tx), m_jobs(std::move(jobs))

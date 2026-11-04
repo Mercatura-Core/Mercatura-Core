@@ -1,7 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "block_work.h"
-#include "context_fixtures.h"
+#include <test/mercaweave/block_work.h>
+#include <test/mercaweave/context_fixtures.h>
 #include <iostream>
 #include <random>
 

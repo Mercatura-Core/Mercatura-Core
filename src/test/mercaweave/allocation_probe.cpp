@@ -1,6 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "allocation_probe.h"
+#include <test/mercaweave/allocation_probe.h>
 #include <algorithm>
 #include <cstdlib>
 #include <new>

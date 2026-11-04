@@ -7,7 +7,7 @@
 #define BITCOIN_WALLET_WALLETDB_H
 
 #include <wallet/mercatura_pqwallet.h>
-#include <wallet/pqgroup.h>
+#include <wallet/pqgroup_records.h>
 #include <wallet/crypter.h>
 #include <key.h>
 #include <primitives/transaction_identifier.h>

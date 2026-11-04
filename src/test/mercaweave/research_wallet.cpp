@@ -1,6 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "research_wallet.h"
+#include <util/fs.h>
+#include <test/mercaweave/research_wallet.h>
 #include <bech32.h>
 #include <crypto/hmac_sha3_384.h>
 #include <crypto/mercatura_pqderive.h>
@@ -32,12 +33,12 @@ CScript NativeOutput(const PublicKey& pk)
     MercaturaPQKeyCommitment c;Require(ComputeMercaturaPQKeyCommitmentV1(c,pk),Code::Ownership,"native-commitment");
     return CScript{}<<OP_2<<Bytes(c.begin(),c.end());
 }
-std::filesystem::path SafePath(const std::filesystem::path& path)
+fs::path SafePath(const fs::path& path)
 {
-    auto configured=std::filesystem::absolute(Wallet::StorageRoot()).lexically_normal();
-    auto root=std::filesystem::weakly_canonical(configured);
+    auto configured=fs::absolute(Wallet::StorageRoot()).lexically_normal();
+    auto root=fs::weakly_canonical(configured);
     Require(root==configured,Code::Metadata,"research-storage-root-symlink");
-    auto p=std::filesystem::weakly_canonical(path);
+    auto p=fs::weakly_canonical(path);
     auto rel=p.lexically_relative(root);
     Require(!rel.empty()&&!rel.is_absolute()&&*rel.begin()!="..",Code::Metadata,"research-storage-path-only");
     return p;
@@ -203,19 +204,19 @@ std::unique_ptr<Wallet> Wallet::Restore(std::span<const unsigned char> bytes,B32
     else Require(w->m_master.vchCryptedKey.size()==48&&w->m_master.vchSalt.size()==8&&w->m_master.nDerivationMethod==0&&w->m_master.nDeriveIterations>=25000&&w->m_master.nDeriveIterations<=1000000&&w->m_encrypted.ciphertext.size()==48,Code::Metadata,"seed-envelope");
     return w;
 }
-std::filesystem::path Wallet::StorageRoot(){return MERCAWEAVE_RESEARCH_STORAGE_ROOT;}
-void Wallet::Save(const std::filesystem::path& path)const
+fs::path Wallet::StorageRoot(){return MERCAWEAVE_RESEARCH_STORAGE_ROOT;}
+void Wallet::Save(const fs::path& path)const
 {
     auto p=SafePath(path);
-    std::filesystem::create_directories(StorageRoot());std::filesystem::permissions(StorageRoot(),std::filesystem::perms::owner_all);
-    auto temp=p;temp+=".tmp";Require(!std::filesystem::is_symlink(temp),Code::Metadata,"snapshot-symlink");
-    auto bytes=Backup();{std::ofstream stream(temp,std::ios::binary|std::ios::trunc);Require(bool(stream),Code::Metadata,"snapshot-open");stream.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());Require(bool(stream),Code::Metadata,"snapshot-write");}
-    std::filesystem::permissions(temp,std::filesystem::perms::owner_read|std::filesystem::perms::owner_write);std::filesystem::rename(temp,p);
+    fs::create_directories(StorageRoot());fs::permissions(StorageRoot(),fs::perms::owner_all);
+    auto temp=p;temp+=".tmp";Require(!fs::is_symlink(temp),Code::Metadata,"snapshot-symlink");
+    auto bytes=Backup();{std::ofstream stream(temp.std_path(),std::ios::binary|std::ios::trunc);Require(bool(stream),Code::Metadata,"snapshot-open");stream.write(reinterpret_cast<const char*>(bytes.data()),bytes.size());Require(bool(stream),Code::Metadata,"snapshot-write");}
+    fs::permissions(temp,fs::perms::owner_read|fs::perms::owner_write);fs::rename(temp,p);
 }
-std::unique_ptr<Wallet> Wallet::Load(const std::filesystem::path& path,B32 genesis)
+std::unique_ptr<Wallet> Wallet::Load(const fs::path& path,B32 genesis)
 {
-    auto p=SafePath(path);Require(std::filesystem::file_size(p)<=SNAPSHOT_LIMIT,Code::Metadata,"snapshot-size");
-    std::ifstream stream(p,std::ios::binary);Bytes bytes((std::istreambuf_iterator<char>(stream)),{});Require(bool(stream)||stream.eof(),Code::Metadata,"snapshot-read");return Restore(bytes,genesis);
+    auto p=SafePath(path);Require(fs::file_size(p)<=SNAPSHOT_LIMIT,Code::Metadata,"snapshot-size");
+    std::ifstream stream(p.std_path(),std::ios::binary);Bytes bytes((std::istreambuf_iterator<char>(stream)),{});Require(bool(stream)||stream.eof(),Code::Metadata,"snapshot-read");return Restore(bytes,genesis);
 }
 std::string Wallet::EncodeResearchAddress(const Address& a,std::string_view hrp)
 {

@@ -5,6 +5,7 @@
 
 The patterned public key is structural data, not a valid signing fixture.
 """
+
 import hashlib
 import json
 import struct
@@ -12,13 +13,13 @@ import sys
 
 
 def compact(n):
-    if not 0 <= n <= 0xffffffffffffffff:
+    if not 0 <= n <= 0xFFFFFFFFFFFFFFFF:
         raise ValueError("CompactSize range")
     if n < 253:
         return bytes([n])
-    if n <= 0xffff:
+    if n <= 0xFFFF:
         return b"\xfd" + struct.pack("<H", n)
-    if n <= 0xffffffff:
+    if n <= 0xFFFFFFFF:
         return b"\xfe" + struct.pack("<I", n)
     return b"\xff" + struct.pack("<Q", n)
 
@@ -59,19 +60,36 @@ def fixture():
         b"\xa1" * 32 + struct.pack("<I", 1) + b"\xb2" * 32 + struct.pack("<I", 2),
         struct.pack("<qq", 100, 200),
         b"".join(compact(len(s)) + s for s in scripts),
-        struct.pack("<II", 0xfffffffe, 0xfffffffd),
+        struct.pack("<II", 0xFFFFFFFE, 0xFFFFFFFD),
         struct.pack("<q", 250) + compact(34) + b"\x52\x20" + b"\xcc" * 32,
     ]
     suffixes = ["Prevouts", "Amounts", "ScriptPubKeys", "Sequences", "Outputs"]
-    hashes = [pqh("Mercatura/PQGroupAuth/v1/" + t, v) for t, v in zip(suffixes, components)]
+    hashes = [
+        pqh("Mercatura/PQGroupAuth/v1/" + t, v) for t, v in zip(suffixes, components)
+    ]
     body = struct.pack("<IIQQ", 2, 0, 2, 1) + g + b"".join(hashes)
     manifest = compact(1) + struct.pack("<I", 0) + pk + compact(2)
     manifest += b"".join(struct.pack("<I", i) + nonce for i, nonce in enumerate(nonces))
     htx = pqh("Mercatura/PQGroupAuth/v1/Tx", body)
     hm = pqh("Mercatura/PQGroupAuth/v1/Manifest", manifest)
     final = b"\x01" + g + htx + hm + struct.pack("<I", 0) + pk
-    values = dict(zip(["C0", "C1", "Hprev", "Hamount", "Hscript", "Hseq", "Hout", "Htx", "Hmanifest", "Dgroup"],
-                      c + hashes + [htx, hm, pqh("Mercatura/PQGroupAuth/v1/Final", final)]))
+    values = dict(
+        zip(
+            [
+                "C0",
+                "C1",
+                "Hprev",
+                "Hamount",
+                "Hscript",
+                "Hseq",
+                "Hout",
+                "Htx",
+                "Hmanifest",
+                "Dgroup",
+            ],
+            c + hashes + [htx, hm, pqh("Mercatura/PQGroupAuth/v1/Final", final)],
+        )
+    )
     lengths = {"manifest": len(manifest), "body": len(body), "final": len(final)}
     assert lengths == {"manifest": 2030, "body": 296, "final": 2085}
     failures = []
@@ -79,9 +97,19 @@ def fixture():
         expected = bytes.fromhex(EXPECTED[name])
         if actual != expected:
             first = next(i for i, (a, b) in enumerate(zip(actual, expected)) if a != b)
-            failures.append({"name": name, "first_differing_byte_zero_based": first,
-                             "expected": expected.hex(), "actual": actual.hex()})
-    result = {"lengths": lengths, "actual": {k: v.hex() for k, v in values.items()}, "failures": failures}
+            failures.append(
+                {
+                    "name": name,
+                    "first_differing_byte_zero_based": first,
+                    "expected": expected.hex(),
+                    "actual": actual.hex(),
+                }
+            )
+    result = {
+        "lengths": lengths,
+        "actual": {k: v.hex() for k, v in values.items()},
+        "failures": failures,
+    }
     print(json.dumps(result, indent=2))
     if failures:
         sys.exit(1)

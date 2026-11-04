@@ -4,6 +4,7 @@
 Run after building the standalone Release target. Each case has a fresh process;
 fixtures/signing are outside its timed section. Writes CSV plus provenance JSON.
 """
+
 import argparse
 import csv
 import datetime
@@ -41,7 +42,9 @@ def main():
         rows = []
         for case in cases:
             command = [str(binary), mode, case, *extra]
-            run = subprocess.run(command, check=True, text=True, capture_output=True, timeout=60)
+            run = subprocess.run(
+                command, check=True, text=True, capture_output=True, timeout=60
+            )
             parsed = list(csv.DictReader(io.StringIO(run.stdout)))
             if len(parsed) != 1:
                 raise RuntimeError(f"expected one row: {command}")
@@ -50,25 +53,49 @@ def main():
             print(f"{label}: {case} passed", flush=True)
         target = out / f"{label}.csv"
         with target.open("w", newline="") as stream:
-            writer = csv.DictWriter(stream, fieldnames=list(rows[0]), lineterminator="\n")
+            writer = csv.DictWriter(
+                stream, fieldnames=list(rows[0]), lineterminator="\n"
+            )
             writer.writeheader()
             writer.writerows(rows)
         records[label] = rows
-    git = lambda *opts: subprocess.check_output(["git", "-C", str(root), *opts], text=True).strip()
+    git = lambda *opts: subprocess.check_output(
+        ["git", "-C", str(root), *opts], text=True
+    ).strip()
     cache = binary.parent / "CMakeCache.txt"
-    flags = [line for line in cache.read_text().splitlines() if line.startswith((
-        "CMAKE_BUILD_TYPE:", "CMAKE_CXX_COMPILER:", "CMAKE_CXX_FLAGS:", "CMAKE_CXX_FLAGS_RELEASE:", "MERCAWEAVE_SANITIZERS:"))]
+    flags = [
+        line
+        for line in cache.read_text().splitlines()
+        if line.startswith(
+            (
+                "CMAKE_BUILD_TYPE:",
+                "CMAKE_CXX_COMPILER:",
+                "CMAKE_CXX_FLAGS:",
+                "CMAKE_CXX_FLAGS_RELEASE:",
+                "MERCAWEAVE_SANITIZERS:",
+            )
+        )
+    ]
     metadata = {
         "timestamp_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "source_head": git("rev-parse", "HEAD"),
         "source_branch": git("branch", "--show-current"),
         "tracked_diff_at_measurement": git("diff", "--stat"),
-        "binary": str(binary), "binary_sha256": sha(binary), "build_cache": flags,
+        "binary": str(binary),
+        "binary_sha256": sha(binary),
+        "build_cache": flags,
         "platform": platform.platform(),
         "cpu": subprocess.check_output(["lscpu"], text=True),
         "memory": pathlib.Path("/proc/meminfo").read_text().splitlines()[:4],
-        "compiler": subprocess.check_output(["g++", "--version"], text=True).splitlines()[0],
-        "reference_budgets": {"bytes": 4194304, "witness_items": 16384, "sigops": 80000, "legacy_weight": "measured_only"},
+        "compiler": subprocess.check_output(
+            ["g++", "--version"], text=True
+        ).splitlines()[0],
+        "reference_budgets": {
+            "bytes": 4194304,
+            "witness_items": 16384,
+            "sigops": 80000,
+            "legacy_weight": "measured_only",
+        },
         "method": "one warmup; seven wall samples; median/max; mean per-run user/system CPU; separate untimed ordinary C++ new probe",
         "limitations": [
             "single x86_64 host and compiler; local self-review; no independent audit",
@@ -80,11 +107,16 @@ def main():
         ],
         "commands": commands,
         "artifact_sha256": {p.name: sha(p) for p in sorted(out.glob("*.csv"))},
-        "source_sha256": {p.name: sha(p) for p in sorted(pathlib.Path(__file__).parent.glob("*"))
-                          if p.suffix in (".cpp", ".h", ".py") or p.name == "CMakeLists.txt"},
+        "source_sha256": {
+            p.name: sha(p)
+            for p in sorted(pathlib.Path(__file__).parent.glob("*"))
+            if p.suffix in (".cpp", ".h", ".py") or p.name == "CMakeLists.txt"
+        },
         "records": records,
     }
-    (out / "consensus-readiness-benchmarks.json").write_text(json.dumps(metadata, indent=2) + "\n")
+    (out / "consensus-readiness-benchmarks.json").write_text(
+        json.dumps(metadata, indent=2) + "\n"
+    )
 
 
 if __name__ == "__main__":

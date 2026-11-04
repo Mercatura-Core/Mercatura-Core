@@ -1,7 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "fixtures.h"
-#include "native_v2.h"
+#include <test/mercaweave/fixtures.h>
+#include <test/mercaweave/native_v2.h>
 #include <crypto/sha256.h>
 #include <iostream>
 

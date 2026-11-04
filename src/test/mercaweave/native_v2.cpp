@@ -1,6 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "native_v2.h"
+#include <test/mercaweave/native_v2.h>
 
 namespace mercaweave::test {
 namespace {

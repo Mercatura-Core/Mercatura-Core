@@ -1,8 +1,8 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_MERCAWEAVE_WALLET_FIXTURES_H
-#define MERCATURA_MERCAWEAVE_WALLET_FIXTURES_H
-#include "wallet_psbt.h"
+#ifndef BITCOIN_TEST_MERCAWEAVE_WALLET_FIXTURES_H
+#define BITCOIN_TEST_MERCAWEAVE_WALLET_FIXTURES_H
+#include <test/mercaweave/wallet_psbt.h>
 #include <crypto/common.h>
 namespace mercaweave::wallet_research::test {
 inline B32 Genesis(){B32 g{};g[0]=0x39;return g;}
@@ -12,4 +12,4 @@ inline void Add(CMutableTransaction& tx,std::vector<CTxOut>& spent,std::vector<A
 {auto point=Point(n);tx.vin.emplace_back(point);spent.emplace_back(value,a.script);addresses.push_back(a);view->Insert(point,Coin{CTxOut(spent.back()),1,coinbase});}
 inline RandomSource ZeroFixture(){return [](B32& r){r.fill(0);return true;};}
 }
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_WALLET_FIXTURES_H

@@ -1,6 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "native_fixture.h"
+#include <test/mercaweave/production_path/native_fixture.h>
 #include <crypto/mercatura_pqderive.h>
 #include <script/pqgroup_psbt.h>
 #include <support/cleanse.h>
@@ -26,7 +26,7 @@ std::map<COutPoint,Coin> Coins(const CTransaction& tx, const std::vector<CTxOut>
 }
 }
 
-BOOST_FIXTURE_TEST_SUITE(pqgroup_cwallet,NativeSetup)
+BOOST_FIXTURE_TEST_SUITE(wallet_tests_cwallet, NativeSetup)
 BOOST_AUTO_TEST_CASE(ownership_funding_raw_signing_and_multiple_signer_psbt)
 {
     ProductionPathTestAccess::Attach(State(),Execution());

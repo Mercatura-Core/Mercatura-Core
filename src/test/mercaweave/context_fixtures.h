@@ -1,9 +1,9 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_MERCAWEAVE_CONTEXT_FIXTURES_H
-#define MERCATURA_MERCAWEAVE_CONTEXT_FIXTURES_H
-#include "auth_context.h"
-#include "fixtures.h"
+#ifndef BITCOIN_TEST_MERCAWEAVE_CONTEXT_FIXTURES_H
+#define BITCOIN_TEST_MERCAWEAVE_CONTEXT_FIXTURES_H
+#include <test/mercaweave/auth_context.h>
+#include <test/mercaweave/fixtures.h>
 namespace mercaweave::test {
 // Public deterministic TEST seeds/randomness only. All metadata is frozen
 // before either scheme signs. V2 signing uses the genuine production digest.
@@ -28,4 +28,4 @@ inline Fixture MixedFixture(size_t inputs, size_t groups, size_t native_count)
     return f;
 }
 }
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_CONTEXT_FIXTURES_H

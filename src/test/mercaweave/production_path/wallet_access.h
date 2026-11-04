@@ -1,7 +1,7 @@
 // Test-only full-wallet helper; core queue tests need no generated node headers.
-#ifndef MERCATURA_TEST_PRODUCTION_PATH_WALLET_ACCESS_H
-#define MERCATURA_TEST_PRODUCTION_PATH_WALLET_ACCESS_H
-#include "access.h"
+#ifndef BITCOIN_TEST_MERCAWEAVE_PRODUCTION_PATH_WALLET_ACCESS_H
+#define BITCOIN_TEST_MERCAWEAVE_PRODUCTION_PATH_WALLET_ACCESS_H
+#include <test/mercaweave/production_path/access.h>
 #include <wallet/wallet.h>
 namespace mercaweave {
 inline void ProductionPathTestAccess::Attach(wallet::CWallet& wallet, std::shared_ptr<const IsolatedExecution> execution)
@@ -21,4 +21,4 @@ inline wallet::PQGroupRecords ProductionPathTestAccess::Records(const wallet::CW
     LOCK(wallet.cs_wallet); return wallet.m_pq_group_records.value();
 }
 }
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_PRODUCTION_PATH_WALLET_ACCESS_H

@@ -78,4 +78,4 @@ Q_SIGNALS:
     void changed();
 };
 }
-#endif
+#endif // BITCOIN_QT_MERCAWEAVEMODEL_H

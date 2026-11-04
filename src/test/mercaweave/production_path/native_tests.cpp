@@ -1,6 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "native_fixture.h"
+#include <test/mercaweave/production_path/native_fixture.h>
 #include <iostream>
 #include <chrono>
 #include <random>
@@ -8,7 +8,7 @@
 using namespace mercaweave;
 using namespace mercaweave::production_test;
 
-BOOST_FIXTURE_TEST_SUITE(pqgroup_chainstate,NativeSetup)
+BOOST_FIXTURE_TEST_SUITE(native_tests_chainstate, NativeSetup)
 BOOST_AUTO_TEST_CASE(real_connect_disconnect_undo_rollback_and_reload)
 {
     ProductionPathTestAccess::Attach(State(),Execution());

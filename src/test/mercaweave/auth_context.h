@@ -1,8 +1,8 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_MERCAWEAVE_AUTH_CONTEXT_H
-#define MERCATURA_MERCAWEAVE_AUTH_CONTEXT_H
-#include "native_v2.h"
+#ifndef BITCOIN_TEST_MERCAWEAVE_AUTH_CONTEXT_H
+#define BITCOIN_TEST_MERCAWEAVE_AUTH_CONTEXT_H
+#include <test/mercaweave/native_v2.h>
 
 namespace mercaweave::research {
 // An immutable request is data, never an authorization. Its spent outputs must
@@ -69,4 +69,4 @@ Binding Bind(const RequestPtr&, const ContextPtr&);
 // checks can run; v3 never reaches production unknown-witness permissiveness.
 ContextError CheckInput(const RequestPtr&, uint32_t index, const ContextPtr& = {});
 } // namespace mercaweave::research
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_AUTH_CONTEXT_H

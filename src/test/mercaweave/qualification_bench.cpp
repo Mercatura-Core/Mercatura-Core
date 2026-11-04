@@ -1,6 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "fixtures.h"
+#include <test/mercaweave/decimal_argument.h>
+#include <test/mercaweave/fixtures.h>
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
@@ -140,7 +141,7 @@ int main(int argc, char** argv)
     try {
         if (argc < 3 || argc > 4) throw std::runtime_error("usage: qualification_bench INPUTS GROUPS [--large-output]");
         if (argc == 4 && std::string_view(argv[3]) != "--large-output") throw std::runtime_error("unknown workload option");
-        const auto n = std::stoull(argv[1]), g = std::stoull(argv[2]);
+        const auto n = mercaweave::test::DecimalArgument(argv[1]), g = mercaweave::test::DecimalArgument(argv[2]);
         if (n > MAX_INPUTS || g > MAX_GROUPS || g == 0 || n == 0 || g > n || (n + g - 1) / g > MAX_MEMBERS) throw std::runtime_error("workload outside locked limits");
         Run(n, g, argc == 4 && std::string_view(argv[3]) == "--large-output");
         return 0;

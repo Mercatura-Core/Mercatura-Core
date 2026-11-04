@@ -1,11 +1,11 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_MERCAWEAVE_ISOLATED_VALIDATION_H
-#define MERCATURA_MERCAWEAVE_ISOLATED_VALIDATION_H
+#ifndef BITCOIN_TEST_MERCAWEAVE_ISOLATED_VALIDATION_H
+#define BITCOIN_TEST_MERCAWEAVE_ISOLATED_VALIDATION_H
 #ifndef MERCATURA_MERCAWEAVE_RESEARCH_TEST_ONLY
 #error "Isolated validation must never be included by a normal node target"
 #endif
-#include "block_work.h"
+#include <test/mercaweave/block_work.h>
 #include <coins.h>
 
 namespace mercaweave::integration {
@@ -115,4 +115,4 @@ public:
     static BlockResult Candidate(const ViewPtr&, std::span<const CMutableTransaction>, const B32&, script_verify_flags, bool commit = false, int height = 200, Budget = {});
 };
 } // namespace mercaweave::integration
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_ISOLATED_VALIDATION_H

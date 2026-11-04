@@ -1,6 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "fixtures.h"
+#include <test/mercaweave/fixtures.h>
 #include <crypto/mercatura_pqderive.h>
 #include <crypto/sha3.h>
 #include <algorithm>

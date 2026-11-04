@@ -1,6 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "auth_context.h"
+#include <test/mercaweave/auth_context.h>
 #include <limits>
 
 namespace mercaweave::research {

@@ -1,7 +1,9 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "wallet_fixtures.h"
-#include "wallet_funding.h"
+#include <tinyformat.h>
+#include <util/fs.h>
+#include <test/mercaweave/wallet_fixtures.h>
+#include <test/mercaweave/wallet_funding.h>
 #include <bech32.h>
 #include <future>
 #include <iostream>
@@ -39,8 +41,8 @@ void Keys()
     auto restored=Wallet::Restore(backup,genesis);Reject([&]{restored->Records();},Code::Metadata);
     Check(restored->Unlock(pass)&&restored->Records()==records,"encrypted restart and complete issued-range recovery");
     Check(w->Unlock(pass)&&restored->Issue()==w->Issue(),"restart continues exact next address");
-    auto path=Wallet::StorageRoot()/("keys-"+std::to_string(getpid())+".snapshot");w->Save(path);
-    auto disk=Wallet::Load(path,genesis);Check(disk->IsLocked()&&disk->Unlock(pass)&&disk->Records()==w->Records(),"native encrypted snapshot disk restart");std::filesystem::remove(path);
+    auto path=Wallet::StorageRoot()/fs::PathFromString("keys-"+strprintf("%d",getpid())+".snapshot");w->Save(path);
+    auto disk=Wallet::Load(path,genesis);Check(disk->IsLocked()&&disk->Unlock(pass)&&disk->Records()==w->Records(),"native encrypted snapshot disk restart");fs::remove(path);
     Reject([&]{Wallet::Restore(backup,other_genesis);},Code::Network);
     auto tampered=backup;tampered.back()^=1;auto bad_mac=Wallet::Restore(tampered,genesis);
     Check(!bad_mac->Unlock(pass)&&bad_mac->IsLocked(),"metadata authentication fails closed");
@@ -65,10 +67,10 @@ void Keys()
     std::set<CScript> concurrent;for(auto& job:pending)Check(concurrent.insert(job.get().script).second,"concurrent address issuance unique");
     Check(w->Records().size()==before+16,"serialized concurrent high-water state");
     Reject([&]{w->Save("/workspace/not-a-research-wallet");},Code::Metadata);
-    auto root=std::filesystem::absolute(Wallet::StorageRoot()).lexically_normal();auto parked=root;parked+=".parked-"+std::to_string(getpid());auto target=root;target+=".target-"+std::to_string(getpid());
-    std::filesystem::create_directory(target);std::filesystem::rename(root,parked);std::filesystem::create_directory_symlink(target,root);
+    auto root=fs::absolute(Wallet::StorageRoot()).lexically_normal();auto parked=root;parked+=".parked-"+strprintf("%d",getpid());auto target=root;target+=".target-"+strprintf("%d",getpid());
+    fs::create_directory(target);fs::rename(root,parked);fs::create_directory_symlink(target,root);
     bool escaped=false;try{w->Save(root/"escape.snapshot");escaped=true;}catch(const WalletError& e){Check(e.code==Code::Metadata,"root symlink error provenance");}
-    std::filesystem::remove(root);std::filesystem::rename(parked,root);if(escaped)std::filesystem::remove(target/"escape.snapshot");std::filesystem::remove(target);Check(!escaped,"configured storage root cannot redirect through symlink");
+    fs::remove(root);fs::rename(parked,root);if(escaped)fs::remove(target/"escape.snapshot");fs::remove(target);Check(!escaped,"configured storage root cannot redirect through symlink");
     auto cursor_limit=Wallet::Create(seed,genesis,pass);Check(cursor_limit->Unlock(pass),"cursor-limit fixture unlock");for(uint32_t i=0;i<Wallet::MAX_RECORDS;++i)cursor_limit->Rotate(i,0);
     auto bounded_backup=cursor_limit->Backup();Reject([&]{cursor_limit->Rotate(Wallet::MAX_RECORDS,0);},Code::Index);Reject([&]{cursor_limit->Issue(0,1);},Code::Index);
     Check(cursor_limit->Backup()==bounded_backup,"cursor limit preserves authenticated metadata atomically");auto bounded_restore=Wallet::Restore(bounded_backup,genesis);Check(bounded_restore->Unlock(pass),"maximum cursor table remains restorable");

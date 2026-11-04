@@ -1,6 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "context_fixtures.h"
+#include <test/mercaweave/context_fixtures.h>
 #include <coins.h>
 #include <consensus/tx_check.h>
 #include <consensus/tx_verify.h>

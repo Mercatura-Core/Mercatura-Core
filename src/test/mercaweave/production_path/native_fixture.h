@@ -1,10 +1,10 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_TEST_PRODUCTION_PATH_NATIVE_FIXTURE_H
-#define MERCATURA_TEST_PRODUCTION_PATH_NATIVE_FIXTURE_H
-#include "wallet_access.h"
-#include "../fixtures.h"
-#include "../native_v2.h"
+#ifndef BITCOIN_TEST_MERCAWEAVE_PRODUCTION_PATH_NATIVE_FIXTURE_H
+#define BITCOIN_TEST_MERCAWEAVE_PRODUCTION_PATH_NATIVE_FIXTURE_H
+#include <test/mercaweave/production_path/wallet_access.h>
+#include <test/mercaweave/fixtures.h>
+#include <test/mercaweave/native_v2.h>
 #include <chainparams.h>
 #include <consensus/validation.h>
 #include <node/miner.h>
@@ -145,4 +145,4 @@ struct NativeSetup : TestingSetup {
     }
 };
 }
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_PRODUCTION_PATH_NATIVE_FIXTURE_H

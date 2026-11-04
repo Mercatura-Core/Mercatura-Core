@@ -1,6 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "durable_wallet.h"
+#include <util/fs.h>
+#include <test/mercaweave/durable_wallet.h>
 #include <crypto/hmac_sha3_384.h>
 #include <crypto/sha256.h>
 #include <util/translation.h>
@@ -33,25 +34,25 @@ B32 Body(const reward_research::Proposal& proposal)
     Writer w;WriteCompactSize(w,proposal.transactions.size());for(const auto& funded:proposal.transactions){Require(bool(funded.psbt.tx),Code::Metadata,"missing proposal body");w<<funded.psbt.tx->GetHash();}
     B32 result;CSHA256{}.Write(w.bytes.data(),w.bytes.size()).Finalize(result.data());return result;
 }
-std::filesystem::path CheckedRoot()
+fs::path CheckedRoot()
 {
-    const auto root=std::filesystem::absolute(Store::Root()).lexically_normal();
-    std::filesystem::path path;
-    for(const auto& part:root){path/=part;Require(!std::filesystem::is_symlink(std::filesystem::symlink_status(path)),Code::Metadata,"research root symlink");}
+    const auto root=fs::absolute(Store::Root()).lexically_normal();
+    fs::path path;
+    for(const auto& part:root){path/=part;Require(!fs::is_symlink(fs::symlink_status(path)),Code::Metadata,"research root symlink");}
     return root;
 }
 void Name(std::string_view name){Require(!name.empty()&&name.size()<100&&std::all_of(name.begin(),name.end(),[](unsigned char c){return (c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='-';}),Code::Metadata,"isolated database name");}
 }
-std::filesystem::path Store::Root(){return MERCAWEAVE_DURABLE_STORAGE_ROOT;}
+fs::path Store::Root(){return MERCAWEAVE_DURABLE_STORAGE_ROOT;}
 Store::Store(std::string_view name,B32 genesis):m_genesis(genesis)
 {
     Name(name);const auto root=CheckedRoot();
-    const auto dir=root/std::string(name);Require(!std::filesystem::is_symlink(std::filesystem::symlink_status(dir)),Code::Metadata,"research database symlink");
-    Require(!std::filesystem::is_symlink(std::filesystem::symlink_status(dir/"wallet.dat")),Code::Metadata,"research file symlink");
-    std::filesystem::create_directories(dir);std::filesystem::permissions(root,std::filesystem::perms::owner_all);std::filesystem::permissions(dir,std::filesystem::perms::owner_all);
+    const auto dir=root/fs::PathFromString(std::string(name));Require(!fs::is_symlink(fs::symlink_status(dir)),Code::Metadata,"research database symlink");
+    Require(!fs::is_symlink(fs::symlink_status(dir/"wallet.dat")),Code::Metadata,"research file symlink");
+    fs::create_directories(dir);fs::permissions(root,fs::perms::owner_all);fs::permissions(dir,fs::perms::owner_all);
     m_database=std::make_unique<wallet::SQLiteDatabase>(dir,dir/"wallet.dat",wallet::DatabaseOptions{});
     sqlite3_limit(m_database->m_db,SQLITE_LIMIT_LENGTH,MAX_STATE+1024);
-    std::filesystem::permissions(dir/"wallet.dat",std::filesystem::perms::owner_read|std::filesystem::perms::owner_write);
+    fs::permissions(dir/"wallet.dat",fs::perms::owner_read|fs::perms::owner_write);
     bilingual_str error;Require(m_database->Verify(error),Code::Metadata,"native SQLite verification");
 }
 Bytes Store::Encode(const Wallet& wallet,const std::vector<Entry>& entries,uint64_t next)const
@@ -75,15 +76,15 @@ void Store::Commit(const Bytes& sealed)
 }
 std::unique_ptr<Store> Store::Create(std::string_view name,std::unique_ptr<Wallet> wallet)
 {
-    Name(name);CheckedRoot();Require(bool(wallet),Code::Metadata,"missing wallet");Require(!std::filesystem::exists(Root()/std::string(name)),Code::Metadata,"refuse existing database");
-    std::filesystem::create_directories(Root());
-    Require(std::filesystem::create_directory(Root()/std::string(name)),Code::Metadata,"research directory already claimed");
+    Name(name);CheckedRoot();Require(bool(wallet),Code::Metadata,"missing wallet");Require(!fs::exists(Root()/fs::PathFromString(std::string(name))),Code::Metadata,"refuse existing database");
+    fs::create_directories(Root());
+    Require(fs::create_directory(Root()/fs::PathFromString(std::string(name))),Code::Metadata,"research directory already claimed");
     auto store=std::unique_ptr<Store>(new Store(name,wallet->Genesis()));store->m_wallet=std::move(wallet);
     auto sealed=store->Encode(*store->m_wallet,{},1);store->Commit(sealed);store->m_sealed=std::move(sealed);store->m_authenticated=true;return store;
 }
 std::unique_ptr<Store> Store::Load(std::string_view name,B32 genesis)
 {
-    Name(name);CheckedRoot();Require(std::filesystem::is_regular_file(Root()/std::string(name)/"wallet.dat"),Code::Metadata,"research database absent");
+    Name(name);CheckedRoot();Require(fs::is_regular_file(Root()/fs::PathFromString(std::string(name))/"wallet.dat"),Code::Metadata,"research database absent");
     auto store=std::unique_ptr<Store>(new Store(name,genesis));Bounded sealed;
     auto batch=store->m_database->MakeBatch();Require(batch->Read(std::string(KEY),sealed),Code::Metadata,"missing research state");
     auto envelope=Decode(sealed.bytes,genesis);store->m_wallet=Wallet::Restore(envelope.backup,genesis);store->m_sealed=std::move(sealed.bytes);
@@ -132,9 +133,9 @@ void Store::Reconcile(const integration::ViewPtr& view)
     auto bytes=Encode(*m_wallet,entries,m_next);Commit(bytes);m_entries=std::move(entries);m_sealed=std::move(bytes);
 }
 std::vector<Entry> Store::Entries()const{std::lock_guard lock{m_mutex};Require(m_authenticated&&!m_wallet->IsLocked(),Code::Locked,"journal unavailable while locked");return m_entries;}
-bool Store::Backup(const std::filesystem::path& path)const
+bool Store::Backup(const fs::path& path)const
 {
-    std::lock_guard lock{m_mutex};CheckedRoot();Require(path.parent_path()==Root()&&path.filename().string().ends_with(".backup")&&!std::filesystem::exists(path),Code::Metadata,"isolated backup path");
-    const bool success=m_database->Backup(path.string());if(success)std::filesystem::permissions(path,std::filesystem::perms::owner_read|std::filesystem::perms::owner_write);return success;
+    std::lock_guard lock{m_mutex};CheckedRoot();Require(path.parent_path()==Root()&&fs::PathToString(path.filename()).ends_with(".backup")&&!fs::exists(path),Code::Metadata,"isolated backup path");
+    const bool success=m_database->Backup(fs::PathToString(path));if(success)fs::permissions(path,fs::perms::owner_read|fs::perms::owner_write);return success;
 }
 }

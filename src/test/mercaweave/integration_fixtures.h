@@ -1,9 +1,9 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_MERCAWEAVE_INTEGRATION_FIXTURES_H
-#define MERCATURA_MERCAWEAVE_INTEGRATION_FIXTURES_H
-#include "context_fixtures.h"
-#include "isolated_validation.h"
+#ifndef BITCOIN_TEST_MERCAWEAVE_INTEGRATION_FIXTURES_H
+#define BITCOIN_TEST_MERCAWEAVE_INTEGRATION_FIXTURES_H
+#include <test/mercaweave/context_fixtures.h>
+#include <test/mercaweave/isolated_validation.h>
 namespace mercaweave::integration::test {
 inline void Fund(const ViewPtr& view, const mercaweave::test::Fixture& f, int height = 1, bool coinbase = false)
 {
@@ -32,4 +32,4 @@ inline void UniqueAndSign(mercaweave::test::Fixture& f, uint32_t serial, size_t 
     mercaweave::test::SignFixture(f);
 }
 } // namespace mercaweave::integration::test
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_INTEGRATION_FIXTURES_H

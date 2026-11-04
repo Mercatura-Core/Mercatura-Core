@@ -59,7 +59,18 @@ if(ENABLE_IPC)
   add_subdirectory(ipc)
 endif()
 
+# Shared normal-ABI objects are embedded in both consensus consumers. The
+# kernel builds its own validation/interpreter objects and does not link the
+# bitcoin_consensus archive, so it must also own these grouped dependencies.
+add_library(bitcoin_pqgroup OBJECT
+  script/pqgroup.cpp
+  script/pqgroup_context.cpp
+)
+set_target_properties(bitcoin_pqgroup PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(bitcoin_pqgroup PRIVATE core_interface bitcoin_crypto secp256k1)
+
 add_library(bitcoin_consensus STATIC EXCLUDE_FROM_ALL
+  $<TARGET_OBJECTS:bitcoin_pqgroup>
   arith_uint256.cpp
   consensus/mercatura_controller.cpp
   consensus/mercatura_controller_blockindex.cpp
@@ -72,8 +83,6 @@ add_library(bitcoin_consensus STATIC EXCLUDE_FROM_ALL
   primitives/transaction.cpp
   pubkey.cpp
   script/interpreter.cpp
-  script/pqgroup.cpp
-  script/pqgroup_context.cpp
   script/script.cpp
   script/script_error.cpp
   uint256.cpp
@@ -84,6 +93,7 @@ target_link_libraries(bitcoin_consensus
     bitcoin_crypto
     secp256k1
 )
+add_dependencies(bitcoin_consensus bitcoin_pqgroup)
 
 if(WITH_ZMQ)
   add_subdirectory(zmq)

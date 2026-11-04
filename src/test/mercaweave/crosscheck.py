@@ -6,7 +6,7 @@
 This verifies serialization, hashes and derivation, not ML-DSA mathematics.
 ML-DSA signatures are actually verified by the pinned C wrapper in C++ tests.
 """
-import hashlib
+
 import hmac
 import json
 from pathlib import Path
@@ -25,7 +25,7 @@ class Reader:
     def read(self, n):
         if n < 0 or self.pos + n > len(self.data):
             raise ValueError("truncated bytes")
-        result = self.data[self.pos:self.pos + n]
+        result = self.data[self.pos : self.pos + n]
         self.pos += n
         return result
 
@@ -53,7 +53,9 @@ def parse(wire):
         n = r.count()
     inputs = []
     for _ in range(n):
-        inputs.append({"prevout": r.read(36), "scriptSig": r.varbytes(), "sequence": r.read(4)})
+        inputs.append(
+            {"prevout": r.read(36), "scriptSig": r.varbytes(), "sequence": r.read(4)}
+        )
     outputs = []
     for _ in range(r.count()):
         amount, script = r.read(8), r.varbytes()
@@ -95,27 +97,52 @@ def analyze(case):
     components = [
         b"".join(txin["prevout"] for txin in inputs),
         b"".join(struct.pack("<q", p["amount"]) for p in spent),
-        b"".join(compact(len(bytes.fromhex(p["script"]))) + bytes.fromhex(p["script"]) for p in spent),
+        b"".join(
+            compact(len(bytes.fromhex(p["script"]))) + bytes.fromhex(p["script"])
+            for p in spent
+        ),
         b"".join(txin["sequence"] for txin in inputs),
         b"".join(outputs),
     ]
     names = ["Hprev", "Hamount", "Hscript", "Hseq", "Hout"]
     tags = ["Prevouts", "Amounts", "ScriptPubKeys", "Sequences", "Outputs"]
-    hashes = [pqh("Mercatura/PQGroupAuth/v1/" + tag, data) for tag, data in zip(tags, components)]
-    htx = pqh("Mercatura/PQGroupAuth/v1/Tx", version + locktime + struct.pack("<QQ", len(inputs), len(outputs)) + g + b"".join(hashes))
+    hashes = [
+        pqh("Mercatura/PQGroupAuth/v1/" + tag, data)
+        for tag, data in zip(tags, components)
+    ]
+    htx = pqh(
+        "Mercatura/PQGroupAuth/v1/Tx",
+        version
+        + locktime
+        + struct.pack("<QQ", len(inputs), len(outputs))
+        + g
+        + b"".join(hashes),
+    )
     manifest = compact(len(groups))
     for anchor, group in groups.items():
-        manifest += struct.pack("<I", anchor) + group["pk"] + compact(len(group["members"]))
-        manifest += b"".join(struct.pack("<I", i) + nonce for i, nonce in group["members"])
+        manifest += (
+            struct.pack("<I", anchor) + group["pk"] + compact(len(group["members"]))
+        )
+        manifest += b"".join(
+            struct.pack("<I", i) + nonce for i, nonce in group["members"]
+        )
     hm = pqh("Mercatura/PQGroupAuth/v1/Manifest", manifest)
     expected = dict(zip(names, [h.hex() for h in hashes]))
     expected.update(Htx=htx.hex(), Hmanifest=hm.hex(), manifest=manifest.hex())
-    expected["digests"] = [pqh("Mercatura/PQGroupAuth/v1/Final", b"\x01" + g + htx + hm + struct.pack("<I", a) + gr["pk"]).hex() for a, gr in groups.items()]
+    expected["digests"] = [
+        pqh(
+            "Mercatura/PQGroupAuth/v1/Final",
+            b"\x01" + g + htx + hm + struct.pack("<I", a) + gr["pk"],
+        ).hex()
+        for a, gr in groups.items()
+    ]
     assert expected == case["hashes"]
     # Independently parse the corresponding genuine-signature v2 wire image.
     v2version, v2in, v2out, v2locktime = parse(bytes.fromhex(case["v2_wire"]))
     assert v2version == version and v2locktime == locktime and v2out == outputs
-    assert len(v2in) == len(inputs) - sum(bytes.fromhex(p["script"])[:2] != b"\x53\x20" for p in spent)
+    assert len(v2in) == len(inputs) - sum(
+        bytes.fromhex(p["script"])[:2] != b"\x53\x20" for p in spent
+    )
     assert all([len(item) for item in txin["witness"]] == [3309, 1952] for txin in v2in)
 
 
@@ -129,16 +156,25 @@ def check(vectors):
         analyze(case)
     master, genesis = bytes(range(32, 64)), bytes(range(32))
     prk = hmac.digest(b"Mercatura/PQGroupWalletMaster/v1", master, "sha3_384")
+
     def expand(info):
         return hmac.digest(prk, info + b"\x01", "sha3_384")[:32]
+
     for purpose, vector in enumerate(vectors["derivation"]):
         path = genesis + struct.pack("<IBI", 7, purpose, 9)
         seed = expand(b"Mercatura/PQGroupMLDSA65Key/v1\x00" + path)
-        nonce = expand(b"Mercatura/PQGroupAddrNonce/v1\x00" + path + struct.pack("<I", 11))
+        nonce = expand(
+            b"Mercatura/PQGroupAddrNonce/v1\x00" + path + struct.pack("<I", 11)
+        )
         assert vector["seed"] == seed.hex()
         assert vector["nonce"] == nonce.hex()
-        assert vector["commitment"] == commitment(genesis, bytes.fromhex(vector["pk"]), nonce).hex()
-    print("PASS cross-language: 8 locked hash/digest values, 4 transaction/manifest cases, 3 derivation purposes")
+        assert (
+            vector["commitment"]
+            == commitment(genesis, bytes.fromhex(vector["pk"]), nonce).hex()
+        )
+    print(
+        "PASS cross-language: 8 locked hash/digest values, 4 transaction/manifest cases, 3 derivation purposes"
+    )
 
 
 if __name__ == "__main__":
@@ -148,7 +184,9 @@ if __name__ == "__main__":
     check(vectors)
     permanent = Path(__file__).with_name("vectors.json")
     if permanent.exists():
-        assert json.loads(permanent.read_text()) == vectors, "permanent deterministic vectors differ"
+        assert json.loads(permanent.read_text()) == vectors, (
+            "permanent deterministic vectors differ"
+        )
     if len(sys.argv) == 4 and sys.argv[2] == "--save":
         path = Path(sys.argv[3])
         content = json.dumps(vectors, indent=2) + "\n"

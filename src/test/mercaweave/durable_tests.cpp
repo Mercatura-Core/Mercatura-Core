@@ -1,7 +1,9 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "durable_wallet.h"
-#include "wallet_fixtures.h"
+#include <tinyformat.h>
+#include <util/fs.h>
+#include <test/mercaweave/durable_wallet.h>
+#include <test/mercaweave/wallet_fixtures.h>
 #include <chainparams.h>
 #include <util/translation.h>
 #include <sqlite3.h>
@@ -21,10 +23,10 @@ const SecureString PASS{"public research fixture"};
 struct FailCommit:wallet::SQliteExecHandler {int Exec(wallet::SQLiteDatabase& db,const std::string& sql)override {if(sql=="COMMIT TRANSACTION")return SQLITE_IOERR;return SQliteExecHandler::Exec(db,sql);}};
 void Run(const char* binary)
 {
-    const auto name="lifecycle-"+std::to_string(getpid());auto owner=wt::Owner();auto group=owner->Issue(0,2);auto native=owner->Issue(0,0,2);auto destination=owner->Issue(7,0,2);
+    const auto name="lifecycle-"+strprintf("%d",getpid());auto owner=wt::Owner();auto group=owner->Issue(0,2);auto native=owner->Issue(0,0,2);auto destination=owner->Issue(7,0,2);
     for(int i=0;i<64;++i)owner->Issue(0,2);const auto records=owner->Records();
     auto store=Store::Create(name,std::move(owner));
-    Check(std::filesystem::is_regular_file(Store::Root()/name/"wallet.dat"),"genuine native SQLite database exists");
+    Check(fs::is_regular_file(Store::Root()/fs::PathFromString(name)/"wallet.dat"),"genuine native SQLite database exists");
     Check(!store->DatabaseForTests().m_use_unsafe_sync,"native durability sync enabled");
     auto view=integration::View::Create(wt::Genesis());std::vector<FundingCoin> coins;
     for(uint32_t i=0;i<50;++i){auto p=wt::Point(500+i);view->Insert(p,Coin{CTxOut{10000,group.script},1,true});coins.push_back({p});}
@@ -54,7 +56,7 @@ void Run(const char* binary)
     Check(store->Reserve(*decision.proposal).status==Status::Conflicted,"reorg cannot revive retired body automatically");
     Reject([&]{GroupPSBT::Extract(psbt,view,wt::Genesis());},Code::Inputs);
     store->Owner().Lock();Reject([&]{store->Reserve(*decision.proposal);},Code::Locked);Check(store->Unlock(PASS),"explicit unlock recovers safe state");
-    const auto backup=Store::Root()/(name+".backup");Check(store->Backup(backup),"native SQLite online backup");
+    const auto backup=Store::Root()/fs::PathFromString(name+".backup");Check(store->Backup(backup),"native SQLite online backup");
     // Real native transaction abort: no application-level mock persistence.
     {auto batch=store->DatabaseForTests().MakeBatch();Check(batch->TxnBegin(),"begin interrupted update");Check(batch->Write(std::string{"mercaweave/wo07/state"},Bytes{0xff}),"write uncommitted corruption");}
     store.reset();store=Store::Load(name,wt::Genesis());Check(store->Unlock(PASS)&&store->Entries().size()==1,"batch destruction rolls interrupted write back");
@@ -67,20 +69,20 @@ void Run(const char* binary)
     // Authentication failure after a structurally valid checkpoint mutation.
     auto batch=store->DatabaseForTests().MakeBatch();Bytes raw;Check(batch->Read(std::string{"mercaweave/wo07/state"},raw),"read authenticated fixture");raw.back()^=1;Check(batch->Write(std::string{"mercaweave/wo07/state"},raw),"inject journal MAC corruption");batch.reset();store.reset();
     store=Store::Load(name,wt::Genesis());Check(!store->Unlock(PASS)&&store->Owner().IsLocked(),"corrupt journal fails closed and clears unlocked seed");store.reset();
-    const auto restored=name+"-backup";std::filesystem::create_directory(Store::Root()/restored);std::filesystem::copy_file(backup,Store::Root()/restored/"wallet.dat");store=Store::Load(restored,wt::Genesis());Check(store->Unlock(PASS)&&store->Owner().Records()==records,"native backup restores encrypted ownership and durable reservations");store.reset();
+    const auto restored=name+"-backup";fs::create_directory(Store::Root()/fs::PathFromString(restored));fs::copy_file(backup,Store::Root()/fs::PathFromString(restored)/"wallet.dat",fs::copy_options::none);store=Store::Load(restored,wt::Genesis());Check(store->Unlock(PASS)&&store->Owner().Records()==records,"native backup restores encrypted ownership and durable reservations");store.reset();
     auto watch=Store::Create(name+"-watch",Wallet::Watch(wt::Genesis(),records));watch.reset();watch=Store::Load(name+"-watch",wt::Genesis());
     Check(watch->Owner().IsWatchOnly()&&watch->Owner().Records()==records&&!watch->Unlock(PASS),"actual watch-only SQLite reload has public metadata and no seed");
-    Reject([&]{watch->Reserve(*decision.proposal);},Code::Locked);watch->Checkpoint();watch.reset();std::filesystem::remove_all(Store::Root()/(name+"-watch"));
+    Reject([&]{watch->Reserve(*decision.proposal);},Code::Locked);watch->Checkpoint();watch.reset();fs::remove_all(Store::Root()/fs::PathFromString(name+"-watch"));
     Reject([&]{Store::Load("../outside",wt::Genesis());},Code::Metadata);
-    auto link=Store::Root()/(name+"-link");std::filesystem::create_directory_symlink(Store::Root()/name,link);
-    Reject([&]{Store::Load(name+"-link",wt::Genesis());},Code::Metadata);std::filesystem::remove(link);
-    const auto parked=Store::Root().string()+"-parked-"+std::to_string(getpid());
-    const auto target=Store::Root().string()+"-target-"+std::to_string(getpid());
-    std::filesystem::create_directory(target);std::filesystem::rename(Store::Root(),parked);std::filesystem::create_directory_symlink(target,Store::Root());
+    auto link=Store::Root()/fs::PathFromString(name+"-link");fs::create_directory_symlink(Store::Root()/fs::PathFromString(name),link);
+    Reject([&]{Store::Load(name+"-link",wt::Genesis());},Code::Metadata);fs::remove(link);
+    const auto parked=fs::PathFromString(fs::PathToString(Store::Root())+"-parked-"+strprintf("%d",getpid()));
+    const auto target=fs::PathFromString(fs::PathToString(Store::Root())+"-target-"+strprintf("%d",getpid()));
+    fs::create_directory(target);fs::rename(Store::Root(),parked);fs::create_directory_symlink(target,Store::Root());
     bool rejected_root=false;try{Store::Create(name+"-escape",wt::Owner());}catch(const WalletError& e){rejected_root=e.code==Code::Metadata;}
-    std::filesystem::remove(Store::Root());std::filesystem::rename(parked,Store::Root());
-    Check(rejected_root&&std::filesystem::is_empty(target),"root symlink rejected before creating any directory or file");std::filesystem::remove(target);
-    std::filesystem::remove_all(Store::Root()/name);std::filesystem::remove_all(Store::Root()/restored);std::filesystem::remove(backup);
+    fs::remove(Store::Root());fs::rename(parked,Store::Root());
+    Check(rejected_root&&fs::is_empty(target),"root symlink rejected before creating any directory or file");fs::remove(target);
+    fs::remove_all(Store::Root()/fs::PathFromString(name));fs::remove_all(Store::Root()/fs::PathFromString(restored));fs::remove(backup);
 }
 }
 int main(int argc,char** argv)
@@ -88,6 +90,6 @@ int main(int argc,char** argv)
     try{SelectParams(ChainType::REGTEST);
         if(argc==3&&std::string_view{argv[1]}=="--crash-after-accept"){auto store=Store::Load(argv[2],wt::Genesis());if(!store->Unlock(PASS))return 97;store->Mark(1,Status::SimulatedAccepted);_exit(95);}
         if(argc==3&&std::string_view{argv[1]}=="--crash") {auto store=Store::Load(argv[2],wt::Genesis());auto batch=store->DatabaseForTests().MakeBatch();if(!batch->TxnBegin()||!batch->Write(std::string{"mercaweave/wo07/state"},Bytes{0xff}))return 97;_exit(96);}
-        Run(std::filesystem::absolute(argv[0]).c_str());std::cout<<"{\"passed\":true,\"assertions\":"<<checks<<",\"native_sqlite\":true,\"abrupt_process_crash\":true,\"full_cwallet_v3\":false,\"automatic_sign_or_broadcast\":false}\n";
+        Run(fs::absolute(argv[0]).c_str());std::cout<<"{\"passed\":true,\"assertions\":"<<checks<<",\"native_sqlite\":true,\"abrupt_process_crash\":true,\"full_cwallet_v3\":false,\"automatic_sign_or_broadcast\":false}\n";
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

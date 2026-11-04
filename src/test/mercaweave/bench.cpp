@@ -1,6 +1,6 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#include "fixtures.h"
+#include <test/mercaweave/fixtures.h>
 #include <algorithm>
 #include <chrono>
 #include <iomanip>

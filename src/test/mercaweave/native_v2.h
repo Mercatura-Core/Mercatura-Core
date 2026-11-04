@@ -1,8 +1,8 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#ifndef MERCATURA_MERCAWEAVE_NATIVE_V2_H
-#define MERCATURA_MERCAWEAVE_NATIVE_V2_H
-#include "mercaweave.h"
+#ifndef BITCOIN_TEST_MERCAWEAVE_NATIVE_V2_H
+#define BITCOIN_TEST_MERCAWEAVE_NATIVE_V2_H
+#include <test/mercaweave/mercaweave.h>
 #include <policy/policy.h>
 #include <script/interpreter.h>
 
@@ -30,4 +30,4 @@ public:
     NativeResult VerifyMixed() const;
 };
 } // namespace mercaweave::test
-#endif
+#endif // BITCOIN_TEST_MERCAWEAVE_NATIVE_V2_H
