@@ -1,0 +1,19 @@
+{
+  "command": [
+    "work/wo08/native-mining/wo07c_native_tests",
+    "--run_test=mining_tests*",
+    "--log_level=test_suite",
+    "--report_level=detailed",
+    "--color_output=no",
+    "--",
+    "-testdatadir=/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-native-mining-final"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 130.10879197400027,
+  "cpu_user_seconds": 92.993228,
+  "cpu_system_seconds": 5.401448,
+  "max_rss_kib": 455732,
+  "minor_page_faults": 4047546,
+  "major_page_faults": 0,
+  "binary_sha256": "5f939fe7d4953e20f5a547ed761b00a57b28f28a004cce5e852fb39a3609afbd"
+}

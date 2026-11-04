@@ -1,0 +1,34 @@
+==================
+WARNING: ThreadSanitizer: data race (pid=14384)
+  Read of size 4 at 0x562807b710f0 by thread T2:
+    #0 operator() /workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/tool_probe.cpp:17 (control-thread-race+0x13d0) (BuildId: 2b113ce7eb12dda6768a3c43d4d1024959444539)
+    #1 __invoke_impl<void, main(int, char**)::<lambda()> > /usr/include/c++/14/bits/invoke.h:61 (control-thread-race+0x13d0)
+    #2 __invoke<main(int, char**)::<lambda()> > /usr/include/c++/14/bits/invoke.h:96 (control-thread-race+0x13d0)
+    #3 _M_invoke<0> /usr/include/c++/14/bits/std_thread.h:301 (control-thread-race+0x13d0)
+    #4 operator() /usr/include/c++/14/bits/std_thread.h:308 (control-thread-race+0x13d0)
+    #5 _M_run /usr/include/c++/14/bits/std_thread.h:253 (control-thread-race+0x13d0)
+    #6 <null> <null> (libstdc++.so.6+0xe1223) (BuildId: 133b71e0013695cc7832680a74edb51008c4fc4c)
+
+  Previous write of size 4 at 0x562807b710f0 by thread T1:
+    #0 operator() /workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/tool_probe.cpp:17 (control-thread-race+0x13e1) (BuildId: 2b113ce7eb12dda6768a3c43d4d1024959444539)
+    #1 __invoke_impl<void, main(int, char**)::<lambda()> > /usr/include/c++/14/bits/invoke.h:61 (control-thread-race+0x13e1)
+    #2 __invoke<main(int, char**)::<lambda()> > /usr/include/c++/14/bits/invoke.h:96 (control-thread-race+0x13e1)
+    #3 _M_invoke<0> /usr/include/c++/14/bits/std_thread.h:301 (control-thread-race+0x13e1)
+    #4 operator() /usr/include/c++/14/bits/std_thread.h:308 (control-thread-race+0x13e1)
+    #5 _M_run /usr/include/c++/14/bits/std_thread.h:253 (control-thread-race+0x13e1)
+    #6 <null> <null> (libstdc++.so.6+0xe1223) (BuildId: 133b71e0013695cc7832680a74edb51008c4fc4c)
+
+  Location is global 'shared_value' of size 4 at 0x562807b710f0 (control-thread-race+0x40f0)
+
+  Thread T2 (tid=14387, running) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x568a6) (BuildId: 99ef88596cb10a8ccf307fe1a9070f66a44b1624)
+    #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xe12f8) (BuildId: 133b71e0013695cc7832680a74edb51008c4fc4c)
+    #2 main /workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/tool_probe.cpp:21 (control-thread-race+0x15c9) (BuildId: 2b113ce7eb12dda6768a3c43d4d1024959444539)
+
+  Thread T1 (tid=14386, finished) created by main thread at:
+    #0 pthread_create ../../../../src/libsanitizer/tsan/tsan_interceptors_posix.cpp:1022 (libtsan.so.2+0x568a6) (BuildId: 99ef88596cb10a8ccf307fe1a9070f66a44b1624)
+    #1 std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) <null> (libstdc++.so.6+0xe12f8) (BuildId: 133b71e0013695cc7832680a74edb51008c4fc4c)
+    #2 main /workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/tool_probe.cpp:21 (control-thread-race+0x1582) (BuildId: 2b113ce7eb12dda6768a3c43d4d1024959444539)
+
+SUMMARY: ThreadSanitizer: data race /workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/tool_probe.cpp:17 in operator()
+==================

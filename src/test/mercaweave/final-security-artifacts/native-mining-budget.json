@@ -1,0 +1,9 @@
+{
+  "original_source": "src/wallet/test/mining_tests.cpp",
+  "original_sha256": "ec1b8eb32cc0353158e09e13b2c30dec6c8335df73801b4bb8ee63582e86db7c",
+  "timeout_seconds": 180,
+  "original_timeout_seconds": 180,
+  "only_change": "wall-clock fixture deadline",
+  "assertions_and_mining_implementation_unchanged": true,
+  "transformed_sha256": "ec1b8eb32cc0353158e09e13b2c30dec6c8335df73801b4bb8ee63582e86db7c"
+}

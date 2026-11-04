@@ -1,0 +1,61 @@
+{
+  "passed": true,
+  "native_receive_requests": [
+    {
+      "request": null,
+      "witness_version": 2,
+      "ismine": true
+    },
+    {
+      "request": "legacy",
+      "witness_version": 2,
+      "ismine": true
+    },
+    {
+      "request": "p2sh-segwit",
+      "witness_version": 2,
+      "ismine": true
+    },
+    {
+      "request": "bech32",
+      "witness_version": 2,
+      "ismine": true
+    },
+    {
+      "request": "bech32m",
+      "witness_version": 2,
+      "ismine": true
+    }
+  ],
+  "native_change_version": 2,
+  "private_wallet_raw_v3_import": {
+    "success": false,
+    "error": {
+      "code": -4,
+      "message": "Cannot import descriptor without private keys to a wallet with private keys enabled"
+    }
+  },
+  "explicit_watch_only_import": {
+    "success": true
+  },
+  "watch_only_v3_information": {
+    "ismine": true,
+    "iswatchonly": false,
+    "solvable": false,
+    "witness_version": 3
+  },
+  "tracking_wallet_receive_error": {
+    "code": -4,
+    "message": "Error: This wallet has no available keys"
+  },
+  "active_v3_import": {
+    "success": false,
+    "error": {
+      "code": -8,
+      "message": "Active descriptors must be ranged"
+    }
+  },
+  "v3_funding_outputs_created": 0,
+  "v3_transactions_broadcast": 0,
+  "grouped_network_authorization_tested": false
+}

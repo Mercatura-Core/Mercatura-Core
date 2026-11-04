@@ -1,0 +1,65 @@
+{
+  "changes": [
+    {
+      "path": "allocation-repro-before.txt",
+      "copied_text_before_sha256": "ce5521f25dc5db8964ac61eb593e635d13939e3cea05c603426023e86c743a22",
+      "normalized_sha256": "9d8b9fce40c68ad324d63de6af1f485ed5764c327313e572c54bf84cd61ac11c",
+      "only_change": "LF line endings, trailing whitespace and terminal blank lines"
+    },
+    {
+      "path": "completion-repro-before.txt",
+      "copied_text_before_sha256": "d7bc3295377a14922fb9260d3bf3cbde040420c1908a6915caf5cbba41d7fbc3",
+      "normalized_sha256": "801cb7229fdfe0f1a925b0b0c304a4407d27e3f8b1ac95f57fc50a225645e309",
+      "only_change": "LF line endings, trailing whitespace and terminal blank lines"
+    },
+    {
+      "path": "native-debug-summary.txt",
+      "copied_text_before_sha256": "2a6f537c30a7a841e2069af667047ddc8ef674982fc036f30e1025ccd69a5388",
+      "normalized_sha256": "8168583583317e862e8cbe8be7875136e84ccd5ec2b96c2a7487464be7855028",
+      "only_change": "LF line endings, trailing whitespace and terminal blank lines"
+    },
+    {
+      "path": "native-functional-final-results.csv",
+      "copied_text_before_sha256": "b460827e79219b963fde8524eeb502b5ec207767efbfc4bb12666e69b061992c",
+      "normalized_sha256": "734319877ad2be977336d4c259b75b6a38f36fcc6488b501feeb50e5682b9785",
+      "only_change": "LF line endings, trailing whitespace and terminal blank lines"
+    },
+    {
+      "path": "native-mining-summary.txt",
+      "copied_text_before_sha256": "9f5e96fa399c523e9c680bd54d21b967c252a4bc394793155ba9defa36c041f8",
+      "normalized_sha256": "93328d6857537d1bfd959f449980c8b3e09693cab2be9bdbe19b4cdfa9b5cfb4",
+      "only_change": "LF line endings, trailing whitespace and terminal blank lines"
+    },
+    {
+      "path": "native-release-summary.txt",
+      "copied_text_before_sha256": "5b293ea94aa95199966a935d952c3f1af0ad21b3c32795744af454bad43fac98",
+      "normalized_sha256": "2e6e570053083e964fc46300b8118663bb9bfcb90d251d100956021bfad1f5db",
+      "only_change": "LF line endings, trailing whitespace and terminal blank lines"
+    },
+    {
+      "path": "native-sanitize-summary.txt",
+      "copied_text_before_sha256": "5b293ea94aa95199966a935d952c3f1af0ad21b3c32795744af454bad43fac98",
+      "normalized_sha256": "2e6e570053083e964fc46300b8118663bb9bfcb90d251d100956021bfad1f5db",
+      "only_change": "LF line endings, trailing whitespace and terminal blank lines"
+    },
+    {
+      "path": "native-tsan-summary.txt",
+      "copied_text_before_sha256": "c65726d81f7dabce9aaafb67004923aed18ecbc37c7abe3e928eb773194c69db",
+      "normalized_sha256": "729e0984bf109c967070b2fa8dd9d7849e185aa3276742cf7e37284ce0a92124",
+      "only_change": "LF line endings, trailing whitespace and terminal blank lines"
+    },
+    {
+      "path": "qualification-sanitize.txt",
+      "copied_text_before_sha256": "a54ccc1476b7d1a5c9cfbcfe50a38e73b86833e78544a9800d2456e26d221361",
+      "normalized_sha256": "2121a020145362477598d689b1c9a0483f19fc927f9a9628923a07ac53f2bcc4",
+      "only_change": "LF line endings, trailing whitespace and terminal blank lines"
+    },
+    {
+      "path": "unwind-probe-debug.txt",
+      "copied_text_before_sha256": "1ad29c5fe0b39a1266f99d8779e57016135fcced9ed1c7c05dbed5c7475f58d7",
+      "normalized_sha256": "befbc5022792adaf2cfac11f4df7329ee6c797e73ebeec5d57be8f0c87bd279d",
+      "only_change": "LF line endings, trailing whitespace and terminal blank lines"
+    }
+  ],
+  "raw_logs_preserved_under": "work/wo08"
+}

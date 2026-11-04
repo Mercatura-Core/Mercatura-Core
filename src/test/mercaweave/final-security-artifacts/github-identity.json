@@ -1,0 +1,8 @@
+{
+  "repository_full_name": "Mercatura-Core/Mercatura-Core",
+  "clone_url": "https://github.com/Mercatura-Core/Mercatura-Core.git",
+  "default_branch": "v0.1",
+  "visibility": "public",
+  "connector_push_permission": true,
+  "method": "connected GitHub get_repo read-only identity check"
+}

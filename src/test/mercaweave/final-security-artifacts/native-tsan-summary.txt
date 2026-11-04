@@ -1,0 +1,23 @@
+Test module "Bitcoin Core Test Suite" has passed with:
+  5 test cases out of 14 passed
+  9 test cases out of 14 skipped
+  2398 assertions out of 2398 passed
+
+  Test suite "pqgroup_final_security" has passed with:
+    5 test cases out of 5 passed
+    2398 assertions out of 2398 passed
+
+    Test case "pqgroup_final_security/no_allocation_after_sqlite_issuance_commit" has passed with:
+      16 assertions out of 16 passed
+
+    Test case "pqgroup_final_security/owned_context_allocation_and_parallel_jobs" has passed with:
+      265 assertions out of 265 passed
+
+    Test case "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication" has passed with:
+      1035 assertions out of 1035 passed
+
+    Test case "pqgroup_final_security/independent_vectors_and_bounded_mutations" has passed with:
+      1028 assertions out of 1028 passed
+
+    Test case "pqgroup_final_security/multiblock_reorg_during_actual_wallet_signing" has passed with:
+      54 assertions out of 54 passed

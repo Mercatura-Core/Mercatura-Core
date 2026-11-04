@@ -1,0 +1,24 @@
+{
+  "functional": [
+    "python3",
+    "work/wo07-native-release/test/functional/test_runner.py",
+    "--jobs=1",
+    "--tmpdirprefix=/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-functional-final",
+    "--resultsfile=/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-functional-final-results.csv",
+    "mercatura_pq_reorg.py",
+    "mercatura_pq_mempool_persistence.py",
+    "mercatura_wallet_encryption_persistence.py",
+    "mercatura_pq_psbt.py",
+    "mercatura_pq_rescan.py",
+    "mercatura_fee_policy.py",
+    "mercatura_pq_invalid_auth.py"
+  ],
+  "inactive_wallet": [
+    "python3",
+    "src/test/mercaweave/security_audit/inactive_wallet_safety.py",
+    "--configfile=/workspace/Mercatura-MercaWeave-v0.1/work/wo07-native-release/test/config.ini",
+    "--tmpdir=/workspace/Mercatura-MercaWeave-v0.1/work/wo08/inactive-wallet-runtime-final",
+    "--randomseed=8",
+    "--evidence=/workspace/Mercatura-MercaWeave-v0.1/work/wo08/inactive-wallet-safety.json"
+  ]
+}

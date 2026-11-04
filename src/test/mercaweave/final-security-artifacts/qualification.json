@@ -1,0 +1,377 @@
+{
+  "passed": true,
+  "profiles": [
+    {
+      "mode": "release",
+      "command": [
+        "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-release/wo08_native_tests",
+        "--log_level=test_suite",
+        "--report_level=detailed",
+        "--color_output=no",
+        "--",
+        "-testdatadir=/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-final-release"
+      ],
+      "exit_code": 0,
+      "timeout": false,
+      "wall_seconds": 84.88660987299954,
+      "user_seconds": 28.33302,
+      "system_seconds": 1.099885,
+      "max_rss_kib": 308440,
+      "major_faults": 0,
+      "binary_sha256": "2bf00a79ffb555ee8a201511de8be5e47913786c2375d0cb1e39edbca98540b4",
+      "source_sha256": {
+        "src/wallet/pqgroup.cpp": "b5b23d69105465647b2de68f1ad47a44cbaec0be7cd0f5c50f8675474f0a6cc4",
+        "src/wallet/sqlite.cpp": "b399d8354cdfe0546a11645ff3e3815d902e3a1129a90efc26ce7e39630e834f",
+        "src/wallet/wallet.cpp": "34c129598fb299408d570533c2e458227e660b726b8e7bf3d240a49601659906",
+        "src/crypto/hkdf_sha3_384.cpp": "84c20b8781cb401afc39d6c478b69ed0b664baf9d90e6488169654c7f13763c1",
+        "src/script/pqgroup.cpp": "32a92ea9971983e89df4047d438d93639a3950531043ab975f76ee3ba3644037",
+        "src/test/mercaweave/security_audit/native_tests.cpp": "0fc6c489a1ba35fb775e92753dec2b5be7dbd4488964e393b8e1f55def306aed",
+        "src/test/mercaweave/security_audit/allocation.cpp": "71e2d9a4a930a1d029ba130c1e4961950866640e560919fe718c83f35f0a5692"
+      },
+      "test_cases": 14,
+      "available_cases": 14,
+      "assertions": 23945,
+      "scenarios": [
+        {
+          "scenario": "allocation-after-sqlite-commit",
+          "threw": 0,
+          "records": 1,
+          "ownership_entries": 1
+        },
+        {
+          "scenario": "context-allocation-and-concurrency",
+          "allocation_points": 256,
+          "faults": 189,
+          "successes": 67,
+          "parallel_jobs": 2400
+        },
+        {
+          "scenario": "actual-wallet-psbt-allocation",
+          "psbt_points_per_operation": 512,
+          "fill_points": 512,
+          "fill_faults": 338,
+          "fill_complete": 174,
+          "finalizer_faults": 89,
+          "combine_faults": 254,
+          "parallel_wallet_rounds": 32
+        },
+        {
+          "scenario": "bounded-production-mutations",
+          "seed": "574f303841554449",
+          "cases": 1024,
+          "rejected": 1024
+        },
+        {
+          "scenario": "actual-multiblock-reorg-during-signing",
+          "disconnected_blocks": 2,
+          "staged_psbt_unchanged": true,
+          "wallet_reopened_after_rollback": true,
+          "utxo_exact": true
+        }
+      ]
+    },
+    {
+      "mode": "debug",
+      "command": [
+        "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-debug/wo08_native_tests",
+        "--log_level=test_suite",
+        "--report_level=detailed",
+        "--color_output=no",
+        "--",
+        "-testdatadir=/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-final-debug"
+      ],
+      "exit_code": 0,
+      "timeout": false,
+      "wall_seconds": 599.9045487120002,
+      "user_seconds": 373.089085,
+      "system_seconds": 1.359401,
+      "max_rss_kib": 319568,
+      "major_faults": 0,
+      "binary_sha256": "d40cd802a73a42a629b723d0726384f13b25388771be45c3f43285d33c6e2929",
+      "source_sha256": {
+        "src/wallet/pqgroup.cpp": "b5b23d69105465647b2de68f1ad47a44cbaec0be7cd0f5c50f8675474f0a6cc4",
+        "src/wallet/sqlite.cpp": "b399d8354cdfe0546a11645ff3e3815d902e3a1129a90efc26ce7e39630e834f",
+        "src/wallet/wallet.cpp": "34c129598fb299408d570533c2e458227e660b726b8e7bf3d240a49601659906",
+        "src/crypto/hkdf_sha3_384.cpp": "84c20b8781cb401afc39d6c478b69ed0b664baf9d90e6488169654c7f13763c1",
+        "src/script/pqgroup.cpp": "32a92ea9971983e89df4047d438d93639a3950531043ab975f76ee3ba3644037",
+        "src/test/mercaweave/security_audit/native_tests.cpp": "0fc6c489a1ba35fb775e92753dec2b5be7dbd4488964e393b8e1f55def306aed",
+        "src/test/mercaweave/security_audit/allocation.cpp": "71e2d9a4a930a1d029ba130c1e4961950866640e560919fe718c83f35f0a5692"
+      },
+      "test_cases": 14,
+      "available_cases": 14,
+      "assertions": 23267,
+      "scenarios": [
+        {
+          "scenario": "allocation-after-sqlite-commit",
+          "threw": 0,
+          "records": 1,
+          "ownership_entries": 1
+        },
+        {
+          "scenario": "context-allocation-and-concurrency",
+          "allocation_points": 256,
+          "faults": 189,
+          "successes": 67,
+          "parallel_jobs": 2400
+        },
+        {
+          "scenario": "actual-wallet-psbt-allocation",
+          "psbt_points_per_operation": 512,
+          "fill_points": 0,
+          "fill_faults": 0,
+          "fill_complete": 0,
+          "finalizer_faults": 89,
+          "combine_faults": 254,
+          "parallel_wallet_rounds": 32
+        },
+        {
+          "scenario": "bounded-production-mutations",
+          "seed": "574f303841554449",
+          "cases": 1024,
+          "rejected": 1024
+        },
+        {
+          "scenario": "actual-multiblock-reorg-during-signing",
+          "disconnected_blocks": 2,
+          "staged_psbt_unchanged": true,
+          "wallet_reopened_after_rollback": true,
+          "utxo_exact": true
+        }
+      ]
+    },
+    {
+      "mode": "sanitize",
+      "command": [
+        "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests",
+        "--log_level=test_suite",
+        "--report_level=detailed",
+        "--color_output=no",
+        "--",
+        "-testdatadir=/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-final-sanitize"
+      ],
+      "exit_code": 0,
+      "timeout": false,
+      "wall_seconds": 394.9218615519985,
+      "user_seconds": 195.813895,
+      "system_seconds": 2.117293,
+      "max_rss_kib": 1255576,
+      "major_faults": 0,
+      "binary_sha256": "778d670bd191cf168fe26fbeab81c6afa484f6314861a3226aa8e9d2207d4a72",
+      "source_sha256": {
+        "src/wallet/pqgroup.cpp": "b5b23d69105465647b2de68f1ad47a44cbaec0be7cd0f5c50f8675474f0a6cc4",
+        "src/wallet/sqlite.cpp": "b399d8354cdfe0546a11645ff3e3815d902e3a1129a90efc26ce7e39630e834f",
+        "src/wallet/wallet.cpp": "34c129598fb299408d570533c2e458227e660b726b8e7bf3d240a49601659906",
+        "src/crypto/hkdf_sha3_384.cpp": "84c20b8781cb401afc39d6c478b69ed0b664baf9d90e6488169654c7f13763c1",
+        "src/script/pqgroup.cpp": "32a92ea9971983e89df4047d438d93639a3950531043ab975f76ee3ba3644037",
+        "src/test/mercaweave/security_audit/native_tests.cpp": "0fc6c489a1ba35fb775e92753dec2b5be7dbd4488964e393b8e1f55def306aed",
+        "src/test/mercaweave/security_audit/allocation.cpp": "71e2d9a4a930a1d029ba130c1e4961950866640e560919fe718c83f35f0a5692"
+      },
+      "test_cases": 14,
+      "available_cases": 14,
+      "assertions": 23945,
+      "scenarios": [
+        {
+          "scenario": "allocation-after-sqlite-commit",
+          "threw": 0,
+          "records": 1,
+          "ownership_entries": 1
+        },
+        {
+          "scenario": "context-allocation-and-concurrency",
+          "allocation_points": 256,
+          "faults": 189,
+          "successes": 67,
+          "parallel_jobs": 2400
+        },
+        {
+          "scenario": "actual-wallet-psbt-allocation",
+          "psbt_points_per_operation": 512,
+          "fill_points": 512,
+          "fill_faults": 338,
+          "fill_complete": 174,
+          "finalizer_faults": 89,
+          "combine_faults": 254,
+          "parallel_wallet_rounds": 32
+        },
+        {
+          "scenario": "bounded-production-mutations",
+          "seed": "574f303841554449",
+          "cases": 1024,
+          "rejected": 1024
+        },
+        {
+          "scenario": "actual-multiblock-reorg-during-signing",
+          "disconnected_blocks": 2,
+          "staged_psbt_unchanged": true,
+          "wallet_reopened_after_rollback": true,
+          "utxo_exact": true
+        }
+      ]
+    },
+    {
+      "mode": "tsan",
+      "command": [
+        "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-tsan/wo08_native_tests",
+        "--log_level=test_suite",
+        "--report_level=detailed",
+        "--color_output=no",
+        "--run_test=pqgroup_final_security",
+        "--",
+        "-testdatadir=/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-final-tsan"
+      ],
+      "exit_code": 0,
+      "timeout": false,
+      "wall_seconds": 209.11797144100092,
+      "user_seconds": 76.952118,
+      "system_seconds": 2.073961,
+      "max_rss_kib": 862540,
+      "major_faults": 0,
+      "binary_sha256": "9c1ddfa1df9ac5726df9fd9d740957b689ef4a9922cbabb7d1b39a2ca4eb8385",
+      "source_sha256": {
+        "src/wallet/pqgroup.cpp": "b5b23d69105465647b2de68f1ad47a44cbaec0be7cd0f5c50f8675474f0a6cc4",
+        "src/wallet/sqlite.cpp": "b399d8354cdfe0546a11645ff3e3815d902e3a1129a90efc26ce7e39630e834f",
+        "src/wallet/wallet.cpp": "34c129598fb299408d570533c2e458227e660b726b8e7bf3d240a49601659906",
+        "src/crypto/hkdf_sha3_384.cpp": "84c20b8781cb401afc39d6c478b69ed0b664baf9d90e6488169654c7f13763c1",
+        "src/script/pqgroup.cpp": "32a92ea9971983e89df4047d438d93639a3950531043ab975f76ee3ba3644037",
+        "src/test/mercaweave/security_audit/native_tests.cpp": "0fc6c489a1ba35fb775e92753dec2b5be7dbd4488964e393b8e1f55def306aed",
+        "src/test/mercaweave/security_audit/allocation.cpp": "71e2d9a4a930a1d029ba130c1e4961950866640e560919fe718c83f35f0a5692"
+      },
+      "test_cases": 5,
+      "available_cases": 14,
+      "assertions": 2398,
+      "scenarios": [
+        {
+          "scenario": "allocation-after-sqlite-commit",
+          "threw": 0,
+          "records": 1,
+          "ownership_entries": 1
+        },
+        {
+          "scenario": "context-allocation-and-concurrency",
+          "allocation_points": 256,
+          "faults": 189,
+          "successes": 67,
+          "parallel_jobs": 2400
+        },
+        {
+          "scenario": "actual-wallet-psbt-allocation",
+          "psbt_points_per_operation": 512,
+          "fill_points": 512,
+          "fill_faults": 338,
+          "fill_complete": 174,
+          "finalizer_faults": 89,
+          "combine_faults": 254,
+          "parallel_wallet_rounds": 32
+        },
+        {
+          "scenario": "bounded-production-mutations",
+          "seed": "574f303841554449",
+          "cases": 1024,
+          "rejected": 1024
+        },
+        {
+          "scenario": "actual-multiblock-reorg-during-signing",
+          "disconnected_blocks": 2,
+          "staged_psbt_unchanged": true,
+          "wallet_reopened_after_rollback": true,
+          "utxo_exact": true
+        }
+      ]
+    }
+  ],
+  "logs": [
+    {
+      "path": "work/wo08/final-release.log",
+      "sha256": "de2c75e97c82697f9444b42cfad5161fc7c6fa7d9f1f4e4fe6b2e6d8c637ccf4",
+      "bytes": 290125
+    },
+    {
+      "path": "work/wo08/final-debug.log",
+      "sha256": "fb482121c142ace440acad997d6eb89ae0248269bd42a08bc141b141d161b005",
+      "bytes": 276922
+    },
+    {
+      "path": "work/wo08/final-sanitize.log",
+      "sha256": "8ebe40e707143f4e6c8328fdf6c155968da820726722638f4bba7acc6e121e5b",
+      "bytes": 290155
+    },
+    {
+      "path": "work/wo08/final-tsan.log",
+      "sha256": "8718a2b978c7ffd9a7b6cfc0c16bf813dbf153d247a2ae40eb94aa3b34150340",
+      "bytes": 277891
+    },
+    {
+      "path": "work/wo08/baseline-release-ctest.log",
+      "sha256": "cad8204193ad0ab340000c1abe83255edfd12f4276ce7141f1b0dd9afe40ab74",
+      "bytes": 4809
+    },
+    {
+      "path": "work/wo08/baseline-debug-ctest.log",
+      "sha256": "2a1b7dd7ee88e1726f7e67a955e43874582ac0a24c97da214b3189d429551703",
+      "bytes": 4807
+    },
+    {
+      "path": "work/wo08/baseline-sanitize-ctest.log",
+      "sha256": "2d745d69c9a91ced0147c6ac5d5910c8935d7fefbdaccf8a4da9630861945c41",
+      "bytes": 4810
+    },
+    {
+      "path": "work/wo08/final-standalone-release-ctest.log",
+      "sha256": "314f5bc6483da0a671ac187d62116c140a7f93d7fdb9655e66b40a46c8951fe7",
+      "bytes": 4809
+    },
+    {
+      "path": "work/wo08/final-standalone-debug-ctest.log",
+      "sha256": "2490495498e7fa57388971625758d1aaf7f8919969ef46f90684ca7877ca9948",
+      "bytes": 4807
+    },
+    {
+      "path": "work/wo08/final-standalone-sanitize-ctest.log",
+      "sha256": "9fd50fa4d121820a3d7b649feb4da8c2f3a233264e9b5738f1a37d116991e8f2",
+      "bytes": 4810
+    },
+    {
+      "path": "work/wo08/native-release-1.log",
+      "sha256": "c9d19829b0e9c1f9d61de6374e5ca6ae1e0eaee13ba1be1a67ed311b470fd7bc",
+      "bytes": 15639
+    }
+  ],
+  "mutation_seed": "0x574f303841554449",
+  "qualified_production_commit": "0e4a9c78e0cacb076aa69200d002ee218b2b8b74",
+  "qualified_production_sha256": {
+    "src/wallet/pqgroup.cpp": "b5b23d69105465647b2de68f1ad47a44cbaec0be7cd0f5c50f8675474f0a6cc4",
+    "src/wallet/sqlite.cpp": "b399d8354cdfe0546a11645ff3e3815d902e3a1129a90efc26ce7e39630e834f",
+    "src/wallet/wallet.cpp": "34c129598fb299408d570533c2e458227e660b726b8e7bf3d240a49601659906",
+    "src/crypto/hkdf_sha3_384.cpp": "84c20b8781cb401afc39d6c478b69ed0b664baf9d90e6488169654c7f13763c1",
+    "src/script/pqgroup_psbt.cpp": "a60d5dc86fd8d78cde83fa47ecd19044f2fd5bb4c83152e92158dd8272740085"
+  },
+  "native_mining_profile": {
+    "command": [
+      "work/wo08/native-mining/wo07c_native_tests",
+      "--run_test=mining_tests*",
+      "--log_level=test_suite",
+      "--report_level=detailed",
+      "--color_output=no",
+      "--",
+      "-testdatadir=/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-native-mining-final"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 130.10879197400027,
+    "cpu_user_seconds": 92.993228,
+    "cpu_system_seconds": 5.401448,
+    "max_rss_kib": 455732,
+    "minor_page_faults": 4047546,
+    "major_page_faults": 0,
+    "binary_sha256": "5f939fe7d4953e20f5a547ed761b00a57b28f28a004cce5e852fb39a3609afbd"
+  },
+  "new_bounded_mutations_per_mode": 1024,
+  "unexpected_acceptances": 0,
+  "final_timeouts": 0,
+  "final_crashes": 0,
+  "final_sanitizer_findings": 0,
+  "lsan_verdict": "NOT TESTED",
+  "lsan_reason": "fatal ptrace incompatibility; positive control never reports leak",
+  "failures_preserved": true,
+  "private_wallets_or_binaries_copied": false,
+  "debug_wallet_global_allocation_injection": "NOT TESTED: inherited DEBUG_LOCKORDER environment terminates at point 25; locks remain enabled; actual Debug signing/concurrency and PSBT allocation tests run"
+}

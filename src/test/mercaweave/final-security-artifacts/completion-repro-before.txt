@@ -1,0 +1,121 @@
+Running 1 test case...
+Entering test module "Bitcoin Core Test Suite"
+./test/mercaweave/production_path/native_tests.cpp(11): Test suite "pqgroup_chainstate" is skipped because disabled
+./test/mercaweave/production_path/wallet_tests.cpp(29): Test suite "pqgroup_cwallet" is skipped because disabled
+./test/mercaweave/production_path/security_tests.cpp(37): Test suite "pqgroup_security" is skipped because disabled
+./test/mercaweave/security_audit/native_tests.cpp(13): Entering test suite "pqgroup_final_security"
+./test/mercaweave/security_audit/native_tests.cpp(14): Test case "pqgroup_final_security/no_allocation_after_sqlite_issuance_commit" is skipped because disabled
+./test/mercaweave/security_audit/native_tests.cpp(43): Test case "pqgroup_final_security/owned_context_allocation_and_parallel_jobs" is skipped because disabled
+./test/mercaweave/security_audit/native_tests.cpp(83): Entering test case "wallet_psbt_allocation_and_concurrent_publication"
+Test directory (will not be deleted): "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/completion-repro-before/test_common bitcoin/pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication/datadir"
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+./test/mercaweave/security_audit/native_tests.cpp(101): error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": check !complete has failed
+WO08_JSON {"scenario":"actual-wallet-psbt-allocation","points_per_operation":512,"fill_faults":350,"fill_complete":252,"finalizer_faults":92,"combine_faults":263,"parallel_wallet_rounds":32}
+./test/mercaweave/security_audit/native_tests.cpp(83): Leaving test case "wallet_psbt_allocation_and_concurrent_publication"; testing time: 2005280us
+./test/mercaweave/security_audit/native_tests.cpp(134): Test case "pqgroup_final_security/independent_vectors_and_bounded_mutations" is skipped because disabled
+./test/mercaweave/security_audit/native_tests.cpp(13): Leaving test suite "pqgroup_final_security"; testing time: 2005315us
+Leaving test module "Bitcoin Core Test Suite"; testing time: 2005332us
+
+Test module "Bitcoin Core Test Suite" has failed with:
+  1 test case out of 10 failed
+  9 test cases out of 10 skipped
+  981 assertions out of 1071 passed
+  90 assertions out of 1071 failed
+
+  Test suite "pqgroup_final_security" has failed with:
+    1 test case out of 4 failed
+    3 test cases out of 4 skipped
+    981 assertions out of 1071 passed
+    90 assertions out of 1071 failed
+
+    Test case "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication" has failed with:
+      981 assertions out of 1071 passed
+      90 assertions out of 1071 failed

@@ -1,0 +1,98 @@
+[
+  {
+    "name": "control-thread-safe",
+    "compile_command": [
+      "g++",
+      "-O1",
+      "-g",
+      "-pthread",
+      "-fsanitize=thread",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/tool_probe.cpp",
+      "-o",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/control-thread-safe"
+    ],
+    "compile_exit": 0,
+    "command": [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/control-thread-safe",
+      "safe"
+    ],
+    "exit_code": 0,
+    "race_diagnostic": false,
+    "leak_diagnostic": false,
+    "ptrace_incompatible": false,
+    "runtime_fatal": false,
+    "log": "work/wo08/control-thread-safe.log"
+  },
+  {
+    "name": "control-thread-race",
+    "compile_command": [
+      "g++",
+      "-O1",
+      "-g",
+      "-pthread",
+      "-fsanitize=thread",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/tool_probe.cpp",
+      "-o",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/control-thread-race"
+    ],
+    "compile_exit": 0,
+    "command": [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/control-thread-race",
+      "race"
+    ],
+    "exit_code": 66,
+    "race_diagnostic": true,
+    "leak_diagnostic": false,
+    "ptrace_incompatible": false,
+    "runtime_fatal": false,
+    "log": "work/wo08/control-thread-race.log"
+  },
+  {
+    "name": "control-leak-leak",
+    "compile_command": [
+      "g++",
+      "-O1",
+      "-g",
+      "-pthread",
+      "-fsanitize=leak",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/tool_probe.cpp",
+      "-o",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/control-leak-leak"
+    ],
+    "compile_exit": 0,
+    "command": [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/control-leak-leak",
+      "leak"
+    ],
+    "exit_code": 23,
+    "race_diagnostic": false,
+    "leak_diagnostic": false,
+    "ptrace_incompatible": true,
+    "runtime_fatal": true,
+    "log": "work/wo08/control-leak-leak.log"
+  },
+  {
+    "name": "control-address-leak",
+    "compile_command": [
+      "g++",
+      "-O1",
+      "-g",
+      "-pthread",
+      "-fsanitize=address",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/tool_probe.cpp",
+      "-o",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/control-address-leak"
+    ],
+    "compile_exit": 0,
+    "command": [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/control-address-leak",
+      "leak"
+    ],
+    "exit_code": 23,
+    "race_diagnostic": false,
+    "leak_diagnostic": false,
+    "ptrace_incompatible": true,
+    "runtime_fatal": true,
+    "log": "work/wo08/control-address-leak.log"
+  }
+]

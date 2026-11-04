@@ -1,0 +1,58 @@
+{
+  "passed": true,
+  "binary_sha256": "4a37ff00bfc0aaa6ecf24562975d394ae146cae59827ca0c8cc358599ab00bfb",
+  "profiles": [
+    {
+      "command": [
+        "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_qualification_bench",
+        "100",
+        "1"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.05799287199988612,
+      "user_seconds": 0.05742,
+      "system_seconds": 0.0,
+      "max_rss_kib": 10368
+    },
+    {
+      "command": [
+        "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_qualification_bench",
+        "256",
+        "256"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 1.874877539001318,
+      "user_seconds": 1.841361,
+      "system_seconds": 0.032802,
+      "max_rss_kib": 16648
+    },
+    {
+      "command": [
+        "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_qualification_bench",
+        "4096",
+        "4"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 1.7356756840017624,
+      "user_seconds": 1.721975,
+      "system_seconds": 0.011904,
+      "max_rss_kib": 10368
+    },
+    {
+      "command": [
+        "/workspace/Mercatura-MercaWeave-v0.1/work/build-release/mercaweave_qualification_bench",
+        "1",
+        "1",
+        "--large-output"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.20478252000066277,
+      "user_seconds": 0.20002,
+      "system_seconds": 0.0041659999999999996,
+      "max_rss_kib": 10368
+    }
+  ],
+  "scope": "shared-engine stage timings; actual Chainstate timings/profiles are separate",
+  "samples": "three warmups then eleven measured, median and worst; fixture/signing outside timings",
+  "allocation_scope": "untimed ordinary C++ new/new[] requested volume; excludes C malloc/realloc and stack"
+}

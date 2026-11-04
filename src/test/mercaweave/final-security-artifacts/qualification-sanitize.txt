@@ -1,0 +1,235 @@
+Running 14 test cases...
+Entering test module "Bitcoin Core Test Suite"
+./test/mercaweave/production_path/native_tests.cpp(11): Entering test suite "pqgroup_chainstate"
+./test/mercaweave/production_path/native_tests.cpp(12): Entering test case "real_connect_disconnect_undo_rollback_and_reload"
+Test directory (will not be deleted): "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-qualification-sanitize/test_common bitcoin/pqgroup_chainstate/real_connect_disconnect_undo_rollback_and_reload/datadir"
+WO07C_JSON {"scenario":"actual-connect-disconnect","inputs":1,"groups":1,"connect_us":3951291,"bytes":5397,"weight":5679,"persistent_undo":true,"exact_utxo_restore":true}
+WO07C_JSON {"scenario":"actual-connect-disconnect","inputs":10,"groups":1,"connect_us":4538153,"bytes":6117,"weight":7506,"persistent_undo":true,"exact_utxo_restore":true}
+WO07C_JSON {"scenario":"actual-connect-disconnect","inputs":53,"groups":1,"connect_us":5353832,"bytes":9557,"weight":16235,"persistent_undo":true,"exact_utxo_restore":true}
+WO07C_JSON {"scenario":"actual-connect-disconnect","inputs":100,"groups":1,"connect_us":8590803,"bytes":13317,"weight":25776,"persistent_undo":true,"exact_utxo_restore":true}
+WO07C_JSON {"scenario":"actual-connect-disconnect","inputs":100,"groups":10,"connect_us":8439680,"bytes":60675,"weight":73134,"persistent_undo":true,"exact_utxo_restore":true}
+WO07C_JSON {"scenario":"actual-connect-disconnect","inputs":100,"groups":100,"connect_us":9098453,"bytes":534255,"weight":546714,"persistent_undo":true,"exact_utxo_restore":true}
+WO07C_JSON {"scenario":"actual-connect-disconnect","inputs":1000,"groups":1,"connect_us":7483863,"bytes":85319,"weight":208484,"persistent_undo":true,"exact_utxo_restore":true}
+WO07C_JSON {"scenario":"actual-connect-disconnect","inputs":1024,"groups":1,"connect_us":7005618,"bytes":87239,"weight":213356,"persistent_undo":true,"exact_utxo_restore":true}
+WO07C_JSON {"scenario":"actual-connect-disconnect","inputs":256,"groups":256,"connect_us":8047123,"bytes":1367609,"weight":1399262,"persistent_undo":true,"exact_utxo_restore":true}
+WO07C_JSON {"scenario":"actual-connect-disconnect","inputs":4096,"groups":4,"connect_us":9407325,"bytes":348785,"weight":852758,"persistent_undo":true,"exact_utxo_restore":true}
+WO07C_JSON {"scenario":"actual-chainstate-recovery","late_invalid_atomic":true,"competing_spends":true,"coins_database_reopened":true,"real_network_v3":false}
+./test/mercaweave/production_path/native_tests.cpp(12): Leaving test case "real_connect_disconnect_undo_rollback_and_reload"; testing time: 243832365us
+./test/mercaweave/production_path/native_tests.cpp(11): Leaving test suite "pqgroup_chainstate"; testing time: 243832518us
+./test/mercaweave/production_path/wallet_tests.cpp(29): Entering test suite "pqgroup_cwallet"
+./test/mercaweave/production_path/wallet_tests.cpp(30): Entering test case "ownership_funding_raw_signing_and_multiple_signer_psbt"
+Test directory (will not be deleted): "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-qualification-sanitize/test_common bitcoin/pqgroup_cwallet/ownership_funding_raw_signing_and_multiple_signer_psbt/datadir"
+WO07C_JSON {"scenario":"actual-cwallet-multisigner","groups":2,"native_signatures":2,"fee_units":100,"alice_balance":5900,"bob_balance":0,"actual_create_transaction":true}
+./test/mercaweave/production_path/wallet_tests.cpp(30): Leaving test case "ownership_funding_raw_signing_and_multiple_signer_psbt"; testing time: 29057597us
+./test/mercaweave/production_path/wallet_tests.cpp(212): Entering test case "native_sqlite_encryption_backup_restore_rotation_and_failed_issuance"
+Test directory (will not be deleted): "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-qualification-sanitize/test_common bitcoin/pqgroup_cwallet/native_sqlite_encryption_backup_restore_rotation_and_failed_issuance/datadir"
+WO07C_JSON {"scenario":"actual-cwallet-sqlite","issued":65,"rotation":64,"encrypted_seed_only":true,"locked_signing_rejected":true,"restart":true,"backup_restore":true,"failed_write_no_issued_index":true,"ordinary_v3_issue":false}
+./test/mercaweave/production_path/wallet_tests.cpp(212): Leaving test case "native_sqlite_encryption_backup_restore_rotation_and_failed_issuance"; testing time: 32123532us
+./test/mercaweave/production_path/wallet_tests.cpp(29): Leaving test suite "pqgroup_cwallet"; testing time: 61181320us
+./test/mercaweave/production_path/security_tests.cpp(37): Entering test suite "pqgroup_security"
+./test/mercaweave/production_path/security_tests.cpp(38): Entering test case "real_cache_and_negative_authorization_matrix"
+Test directory (will not be deleted): "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-qualification-sanitize/test_common bitcoin/pqgroup_security/real_cache_and_negative_authorization_matrix/datadir"
+WO07C_JSON {"scenario":"negative-production-entry","case":"wrong-public-key","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"altered-signature","rejected":true,"group_verifications":1}
+WO07C_JSON {"scenario":"negative-production-entry","case":"signature-length","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"public-key-length","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"nonce-length","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"self-reference","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"follower-reference","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"outside-reference","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"duplicate-anchor","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"missing-anchor","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"extra-anchor","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"missing-follower","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"duplicate-outpoint","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"wrong-commitment","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"wrong-genesis","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"changed-prevout","rejected":true,"group_verifications":1}
+WO07C_JSON {"scenario":"negative-production-entry","case":"changed-amount","rejected":true,"group_verifications":1}
+WO07C_JSON {"scenario":"negative-production-entry","case":"changed-script","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"changed-sequence","rejected":true,"group_verifications":1}
+WO07C_JSON {"scenario":"negative-production-entry","case":"changed-version","rejected":true,"group_verifications":1}
+WO07C_JSON {"scenario":"negative-production-entry","case":"changed-locktime","rejected":true,"group_verifications":1}
+WO07C_JSON {"scenario":"negative-production-entry","case":"changed-output-value","rejected":true,"group_verifications":1}
+WO07C_JSON {"scenario":"negative-production-entry","case":"changed-output-script","rejected":true,"group_verifications":1}
+WO07C_JSON {"scenario":"negative-production-entry","case":"reordered-inputs","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"added-member","rejected":true,"group_verifications":1}
+WO07C_JSON {"scenario":"negative-production-entry","case":"removed-member","rejected":true,"group_verifications":1}
+WO07C_JSON {"scenario":"negative-production-entry","case":"moved-group","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"mixed-independent-keys","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"scriptSig","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"oversized-witness","rejected":true,"group_verifications":0}
+WO07C_JSON {"scenario":"negative-production-entry","case":"late-invalid","rejected":true,"group_verifications":2}
+WO07C_JSON {"scenario":"negative-production-entry","case":"reordered-outputs","rejected":true,"group_verifications":1}
+./test/mercaweave/production_path/security_tests.cpp(38): Leaving test case "real_cache_and_negative_authorization_matrix"; testing time: 11876106us
+./test/mercaweave/production_path/security_tests.cpp(130): Entering test case "actual_wallet_metadata_and_atomic_entropy_failures"
+Test directory (will not be deleted): "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-qualification-sanitize/test_common bitcoin/pqgroup_security/actual_wallet_metadata_and_atomic_entropy_failures/datadir"
+WO07C_JSON {"scenario":"actual-wallet-negative","metadata_rejections":7,"ordinary_grouped_load_rejected":true,"entropy_failure_atomic":true,"prevout_mismatch_atomic":true}
+./test/mercaweave/production_path/security_tests.cpp(130): Leaving test case "actual_wallet_metadata_and_atomic_entropy_failures"; testing time: 8427899us
+./test/mercaweave/production_path/security_tests.cpp(222): Entering test case "ordinary_unknown_witness_boundary_and_group_limits"
+Test directory (will not be deleted): "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-qualification-sanitize/test_common bitcoin/pqgroup_security/ordinary_unknown_witness_boundary_and_group_limits/datadir"
+WO07C_JSON {"scenario":"ordinary-and-limits","mandatory_unknown_v3_permissive":true,"standard_unknown_v3_rejected":true,"excess_members_groups_inputs_rejected":true,"psbt_mutations":250,"seed":"574f303743505342"}
+./test/mercaweave/production_path/security_tests.cpp(222): Leaving test case "ordinary_unknown_witness_boundary_and_group_limits"; testing time: 9688469us
+./test/mercaweave/production_path/security_tests.cpp(37): Leaving test suite "pqgroup_security"; testing time: 29992766us
+./test/mercaweave/security_audit/native_tests.cpp(13): Entering test suite "pqgroup_final_security"
+./test/mercaweave/security_audit/native_tests.cpp(14): Entering test case "no_allocation_after_sqlite_issuance_commit"
+Test directory (will not be deleted): "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-qualification-sanitize/test_common bitcoin/pqgroup_final_security/no_allocation_after_sqlite_issuance_commit/datadir"
+WO08_JSON {"scenario":"allocation-after-sqlite-commit","threw":0,"records":1,"ownership_entries":1}
+./test/mercaweave/security_audit/native_tests.cpp(14): Leaving test case "no_allocation_after_sqlite_issuance_commit"; testing time: 8275793us
+./test/mercaweave/security_audit/native_tests.cpp(43): Entering test case "owned_context_allocation_and_parallel_jobs"
+Test directory (will not be deleted): "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-qualification-sanitize/test_common bitcoin/pqgroup_final_security/owned_context_allocation_and_parallel_jobs/datadir"
+WO08_JSON {"scenario":"context-allocation-and-concurrency","allocation_points":256,"faults":189,"successes":67,"parallel_jobs":2400}
+./test/mercaweave/security_audit/native_tests.cpp(43): Leaving test case "owned_context_allocation_and_parallel_jobs"; testing time: 8889580us
+./test/mercaweave/security_audit/native_tests.cpp(83): Entering test case "wallet_psbt_allocation_and_concurrent_publication"
+Test directory (will not be deleted): "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-qualification-sanitize/test_common bitcoin/pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication/datadir"
+=================================================================
+==21144==ERROR: AddressSanitizer: stack-use-after-scope on address 0x7f8d4fdf4c60 at pc 0x5568d6bc2f31 bp 0x7fff4c292020 sp 0x7fff4c292018
+READ of size 8 at 0x7f8d4fdf4c60 thread T0 (b-test)
+    #0 0x5568d6bc2f30 in std::vector<unsigned char, std::allocator<unsigned char> >::~vector() (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xc25af30) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #1 0x5568d9e1289e in mercaweave::psbt::Inspect(PartiallySignedTransaction const&, std::span<CTxOut const, 18446744073709551615ul>, mercaweave::IsolatedExecution const&) (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xf4aa89e) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #2 0x5568d9e16a34 in mercaweave::psbt::Create(CMutableTransaction const&, std::span<CTxOut const, 18446744073709551615ul>, std::span<mercaweave::psbt::InputRecord const, 18446744073709551615ul>, mercaweave::IsolatedExecution const&) (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xf4aea34) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #3 0x5568d908f1a7 in wallet::CWallet::FillPQGroupPSBT(PartiallySignedTransaction&, bool&, std::optional<int>, bool, unsigned long*, bool, std::map<COutPoint, Coin, std::less<COutPoint>, std::allocator<std::pair<COutPoint const, Coin> > > const*) const (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xe7271a7) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #4 0x5568d90a7a83 in wallet::CWallet::FillPSBT(PartiallySignedTransaction&, bool&, std::optional<int>, bool, bool, unsigned long*, bool) const (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xe73fa83) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #5 0x5568d6eb5cc2 in pqgroup_final_security::wallet_psbt_allocation_and_concurrent_publication::test_method() (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xc54dcc2) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #6 0x5568d6ebe4fa in pqgroup_final_security::wallet_psbt_allocation_and_concurrent_publication_invoker() (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xc5564fa) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #7 0x5568d6c088ac in boost::detail::function::void_function_invoker0<void (*)(), void>::invoke(boost::detail::function::function_buffer&) (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xc2a08ac) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #8 0x5568d6a14611 in boost::detail::function::function_obj_invoker0<boost::detail::forward, int>::invoke(boost::detail::function::function_buffer&) (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xc0ac611) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #9 0x5568d68a55f2 in boost::execution_monitor::catch_signals(boost::function<int ()> const&) (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xbf3d5f2) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #10 0x5568d68a5c13 in boost::execution_monitor::execute(boost::function<int ()> const&) (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xbf3dc13) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #11 0x5568d68afb01 in boost::execution_monitor::vexecute(boost::function<void ()> const&) (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xbf47b01) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #12 0x5568d691cea8 in boost::unit_test::unit_test_monitor_t::execute_and_translate(boost::function<void ()> const&, unsigned long) (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xbfb4ea8) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #13 0x5568d6b4d21e in boost::unit_test::framework::state::execute_test_tree(unsigned long, unsigned long, boost::unit_test::framework::state::random_generator_helper const*) (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xc1e521e) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #14 0x5568d6b4e758 in boost::unit_test::framework::state::execute_test_tree(unsigned long, unsigned long, boost::unit_test::framework::state::random_generator_helper const*) (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xc1e6758) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #15 0x5568d6b4e758 in boost::unit_test::framework::state::execute_test_tree(unsigned long, unsigned long, boost::unit_test::framework::state::random_generator_helper const*) (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xc1e6758) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #16 0x5568d6942b23 in boost::unit_test::framework::run(unsigned long, bool) (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xbfdab23) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #17 0x5568d697e439 in boost::unit_test::unit_test_main(boost::unit_test::test_suite* (*)(int, char**), int, char**) (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xc016439) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #18 0x5568d697fb25 in main (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xc017b25) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+    #19 0x7f8d51843ca7  (/lib/x86_64-linux-gnu/libc.so.6+0x29ca7) (BuildId: c495b62edadd6c356265942ec1282d98058a7b41)
+    #20 0x7f8d51843d64 in __libc_start_main (/lib/x86_64-linux-gnu/libc.so.6+0x29d64) (BuildId: c495b62edadd6c356265942ec1282d98058a7b41)
+    #21 0x5568d686e560 in _start (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xbf06560) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+
+Address 0x7f8d4fdf4c60 is located in stack of thread T0 (b-test) at offset 3168 in frame
+    #0 0x5568d9e06e19 in mercaweave::psbt::Inspect(PartiallySignedTransaction const&, std::span<CTxOut const, 18446744073709551615ul>, mercaweave::IsolatedExecution const&) (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xf49ee19) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4)
+
+  This frame has 86 object(s):
+    [48, 49) '<unknown>'
+    [64, 65) '<unknown>'
+    [80, 81) '<unknown>'
+    [96, 97) '<unknown>'
+    [112, 113) '<unknown>'
+    [128, 129) '<unknown>'
+    [144, 145) '<unknown>'
+    [160, 161) '<unknown>'
+    [176, 177) '<unknown>'
+    [192, 193) '<unknown>'
+    [208, 209) '<unknown>'
+    [224, 228) 'version' (line 118)
+    [240, 248) '__for_begin' (line 99)
+    [272, 280) '__for_end' (line 99)
+    [304, 312) '__for_begin' (line 141)
+    [336, 344) '__for_end' (line 141)
+    [368, 376) '__for_begin' (line 144)
+    [400, 408) '__for_end' (line 144)
+    [432, 440) '<unknown>'
+    [464, 472) '<unknown>'
+    [496, 504) '<unknown>'
+    [528, 536) '__it'
+    [560, 568) '<unknown>'
+    [592, 600) '<unknown>'
+    [624, 632) '<unknown>'
+    [656, 664) '<unknown>'
+    [688, 696) '<unknown>'
+    [720, 728) '<unknown>'
+    [752, 760) '<unknown>'
+    [784, 792) '<unknown>'
+    [816, 824) '<unknown>'
+    [848, 856) '<unknown>'
+    [880, 888) '<unknown>'
+    [912, 920) '<unknown>'
+    [944, 952) '<unknown>'
+    [976, 984) '<unknown>'
+    [1008, 1016) '<unknown>'
+    [1040, 1048) '<unknown>'
+    [1072, 1080) '<unknown>'
+    [1104, 1112) '<unknown>'
+    [1136, 1144) '<unknown>'
+    [1168, 1184) '<unknown>'
+    [1200, 1216) '<unknown>'
+    [1232, 1248) '<unknown>'
+    [1264, 1280) '<unknown>'
+    [1296, 1312) '<unknown>'
+    [1328, 1344) '<unknown>'
+    [1360, 1376) '__start'
+    [1392, 1408) '<unknown>'
+    [1424, 1440) '__tmp'
+    [1456, 1472) '__l' (line 91)
+    [1488, 1504) '__l' (line 91)
+    [1520, 1536) '<unknown>'
+    [1552, 1568) '<unknown>'
+    [1584, 1600) '<unknown>'
+    [1616, 1632) '<unknown>'
+    [1648, 1664) '__tmp'
+    [1680, 1696) '<unknown>'
+    [1712, 1728) '<unknown>'
+    [1744, 1760) '<unknown>'
+    [1776, 1792) '<unknown>'
+    [1808, 1824) '__tmp'
+    [1840, 1856) '<unknown>'
+    [1872, 1888) '<unknown>'
+    [1904, 1920) '<unknown>'
+    [1936, 1952) '<unknown>'
+    [1968, 1984) '__tmp'
+    [2000, 2016) 'spent' (line 91)
+    [2032, 2056) 'program' (line 118)
+    [2096, 2120) '<unknown>'
+    [2160, 2184) 'outputs' (line 146)
+    [2224, 2248) '__tmp'
+    [2288, 2312) '__tmp'
+    [2352, 2376) '__tmp'
+    [2416, 2440) '__tmp'
+    [2480, 2504) '__tmp'
+    [2544, 2568) '__tmp'
+    [2608, 2640) '<unknown>'
+    [2672, 2736) 'work' (line 139)
+    [2768, 2800) 'commitment' (line 130)
+    [2832, 2868) 'point' (line 114)
+    [2912, 2960) '<unknown>'
+    [2992, 3040) '<unknown>'
+    [3072, 3120) '<unknown>'
+    [3152, 3224) '<unknown>' <== Memory access at offset 3168 is inside this variable
+    [3264, 3800) 'native' (line 146)
+HINT: this may be a false positive if your program uses some custom stack unwind mechanism, swapcontext or vfork
+      (longjmp and C++ exceptions *are* supported)
+SUMMARY: AddressSanitizer: stack-use-after-scope (/workspace/Mercatura-MercaWeave-v0.1/work/wo08/native-sanitize/wo08_native_tests+0xc25af30) (BuildId: 5d010bf71cd0a76deebc088a552ee6a2d38000e4) in std::vector<unsigned char, std::allocator<unsigned char> >::~vector()
+Shadow bytes around the buggy address:
+  0x7f8d4fdf4980: 00 f2 f2 f2 f2 f2 00 00 00 f2 f2 f2 f2 f2 00 00
+  0x7f8d4fdf4a00: 00 f2 f2 f2 f2 f2 00 00 00 00 f2 f2 f2 f2 00 00
+  0x7f8d4fdf4a80: 00 00 00 00 00 00 f2 f2 f2 f2 00 00 00 00 f2 f2
+  0x7f8d4fdf4b00: f2 f2 00 00 00 00 04 f2 f2 f2 f2 f2 00 00 00 00
+  0x7f8d4fdf4b80: 00 00 f2 f2 f2 f2 00 00 00 00 00 00 f2 f2 f2 f2
+=>0x7f8d4fdf4c00: 00 00 00 00 00 00 f2 f2 f2 f2 f8 f8[f8]f8 f8 f8
+  0x7f8d4fdf4c80: f8 f8 f8 f2 f2 f2 f2 f2 00 00 00 00 00 00 00 00
+  0x7f8d4fdf4d00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7f8d4fdf4d80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7f8d4fdf4e00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+  0x7f8d4fdf4e80: 00 00 00 00 00 00 00 00 00 00 00 f3 f3 f3 f3 f3
+Shadow byte legend (one shadow byte represents 8 application bytes):
+  Addressable:           00
+  Partially addressable: 01 02 03 04 05 06 07
+  Heap left redzone:       fa
+  Freed heap region:       fd
+  Stack left redzone:      f1
+  Stack mid redzone:       f2
+  Stack right redzone:     f3
+  Stack after return:      f5
+  Stack use after scope:   f8
+  Global redzone:          f9
+  Global init order:       f6
+  Poisoned by user:        f7
+  Container overflow:      fc
+  Array cookie:            ac
+  Intra object redzone:    bb
+  ASan internal:           fe
+  Left alloca redzone:     ca
+  Right alloca redzone:    cb
+==21144==ABORTING

@@ -15,7 +15,15 @@ MACRO = "MERCATURA_MERCAWEAVE_QT_RESEARCH_TEST_ONLY"
 def main():
     build = pathlib.Path(sys.argv[1]).resolve(strict=True)
     git = lambda *args: subprocess.check_output(["git", "-C", str(ROOT), *args], text=True)
-    if git("diff", BASE, "--name-only", "--", "src/mining", "src/crypto", "src/kernel/chainparams.cpp", "src/wallet/mining.cpp", "src/qt/miningsession.cpp", "src/qt/forms", "src/qt/qrimagewidget.cpp", "src/qt/guiutil.cpp", "src/psbt.cpp", "src/psbt.h").strip():
+    protected = git("diff", BASE, "--name-only", "--", "src/mining", "src/crypto", "src/kernel/chainparams.cpp", "src/wallet/mining.cpp", "src/qt/miningsession.cpp", "src/qt/forms", "src/qt/qrimagewidget.cpp", "src/qt/guiutil.cpp", "src/psbt.cpp", "src/psbt.h").splitlines()
+    # Exact reviewed WO08 secret-temporary cleanup; all other protected source
+    # remains identical. This exception does not change the original UI base.
+    hygiene = "src/crypto/hkdf_sha3_384.cpp"
+    if hygiene in protected:
+        if (ROOT / hygiene).read_text() != git("show", "700929e22ef913a6868a7cbd1d379e72caf89c62:" + hygiene):
+            raise RuntimeError("HKDF change exceeds reviewed temporary cleanup")
+        protected.remove(hygiene)
+    if protected:
         raise RuntimeError("native mining/crypto/network/PSBT/QR path changed")
     erased = {}
     for file in ("receivecoinsdialog", "sendcoinsdialog", "miningpage"):

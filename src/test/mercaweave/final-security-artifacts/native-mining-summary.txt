@@ -1,0 +1,40 @@
+Test module "Bitcoin Core Test Suite" has passed with:
+  8 test cases out of 14 passed
+  6 test cases out of 14 skipped
+  979 assertions out of 979 passed
+
+  Test suite "mining_tests_wallet" has passed with:
+    1 test case out of 1 passed
+    20 assertions out of 20 passed
+
+    Test case "mining_tests_wallet/pq_destination_persistence_and_locked_reuse" has passed with:
+      20 assertions out of 20 passed
+
+  Test suite "mining_tests_solo" has passed with:
+    6 test cases out of 6 passed
+    938 assertions out of 938 passed
+
+    Test case "mining_tests_solo/native_controller_submits_valid_pq_regtest_block" has passed with:
+      16 assertions out of 16 passed
+
+    Test case "mining_tests_solo/gpu_controller_accepts_native_pq_block_with_cpu_reference_test_double" has passed with:
+      13 assertions out of 13 passed
+
+    Test case "mining_tests_solo/solo_template_binding_wrong_work_hash_and_duplicate" has passed with:
+      15 assertions out of 15 passed
+
+    Test case "mining_tests_solo/native_rewards_maturity_fees_and_pq_spend" has passed with:
+      859 assertions out of 859 passed
+
+    Test case "mining_tests_solo/public_readiness_cooldown_and_interrupt" has passed with:
+      18 assertions out of 18 passed
+
+    Test case "mining_tests_solo/real_competing_tip_reorg_and_new_template" has passed with:
+      17 assertions out of 17 passed
+
+  Test suite "mining_tests_v2" has passed with:
+    1 test case out of 1 passed
+    21 assertions out of 21 passed
+
+    Test case "mining_tests_v2/gpu_worker_and_combined_mode_submit_genuine_v2_blocks_with_cpu_reference_device" has passed with:
+      21 assertions out of 21 passed

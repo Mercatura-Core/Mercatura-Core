@@ -1,0 +1,65 @@
+Test module "Bitcoin Core Test Suite" has passed with:
+  14 test cases out of 14 passed
+  23945 assertions out of 23945 passed
+
+  Test suite "pqgroup_chainstate" has passed with:
+    1 test case out of 1 passed
+    20849 assertions out of 20849 passed
+
+    Test case "pqgroup_chainstate/real_connect_disconnect_undo_rollback_and_reload" has passed with:
+      20849 assertions out of 20849 passed
+
+  Test suite "pqgroup_cwallet" has passed with:
+    2 test cases out of 2 passed
+    248 assertions out of 248 passed
+
+    Test case "pqgroup_cwallet/ownership_funding_raw_signing_and_multiple_signer_psbt" has passed with:
+      110 assertions out of 110 passed
+
+    Test case "pqgroup_cwallet/native_sqlite_encryption_backup_restore_rotation_and_failed_issuance" has passed with:
+      138 assertions out of 138 passed
+
+  Test suite "pqgroup_security" has passed with:
+    3 test cases out of 3 passed
+    400 assertions out of 400 passed
+
+    Test case "pqgroup_security/real_cache_and_negative_authorization_matrix" has passed with:
+      79 assertions out of 79 passed
+
+    Test case "pqgroup_security/actual_wallet_metadata_and_atomic_entropy_failures" has passed with:
+      54 assertions out of 54 passed
+
+    Test case "pqgroup_security/ordinary_unknown_witness_boundary_and_group_limits" has passed with:
+      267 assertions out of 267 passed
+
+  Test suite "pqgroup_final_security" has passed with:
+    5 test cases out of 5 passed
+    2398 assertions out of 2398 passed
+
+    Test case "pqgroup_final_security/no_allocation_after_sqlite_issuance_commit" has passed with:
+      16 assertions out of 16 passed
+
+    Test case "pqgroup_final_security/owned_context_allocation_and_parallel_jobs" has passed with:
+      265 assertions out of 265 passed
+
+    Test case "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication" has passed with:
+      1035 assertions out of 1035 passed
+
+    Test case "pqgroup_final_security/independent_vectors_and_bounded_mutations" has passed with:
+      1028 assertions out of 1028 passed
+
+    Test case "pqgroup_final_security/multiblock_reorg_during_actual_wallet_signing" has passed with:
+      54 assertions out of 54 passed
+
+  Test suite "mercahash_v2_tests" has passed with:
+    3 test cases out of 3 passed
+    50 assertions out of 50 passed
+
+    Test case "mercahash_v2_tests/permanent_vectors_reuse_and_independent_allocations" has passed with:
+      35 assertions out of 35 passed
+
+    Test case "mercahash_v2_tests/buffer_sizes_are_checked_in_release_builds" has passed with:
+      6 assertions out of 6 passed
+
+    Test case "mercahash_v2_tests/v1_nonce_vectors_and_buffer_reuse_remain_frozen" has passed with:
+      9 assertions out of 9 passed

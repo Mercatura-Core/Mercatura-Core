@@ -9,7 +9,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 MACRO = "MERCATURA_MERCAWEAVE_WALLET_RESEARCH_TEST_ONLY"
-BASE = "9d7d0e4d008f5524231a3a3257258aea57cde757"  # Reviewed dormant CWallet/PSBT integration.
+BASE = "671c17158949499329132fa86e1655013d8f209c"  # WO08 allocation-atomic publication checkpoint.
 
 
 def project(text):

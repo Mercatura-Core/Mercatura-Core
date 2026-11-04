@@ -1,0 +1,13 @@
+terminate called after throwing an instance of 'std::bad_alloc'
+  what():  std::bad_alloc
+unknown location(0): fatal error: in "pqgroup_final_security/no_allocation_after_sqlite_issuance_commit": signal: SIGABRT (application abort requested)
+./test/mercaweave/production_path/native_fixture.h(129): last checkpoint
+wo08_native_tests: ./common/args.cpp:603: void ArgsManager::AddArg(const std::string&, const std::string&, unsigned int, const OptionsCategory&): Assertion `ret.second' failed.
+unknown location(0): fatal error: in "pqgroup_final_security/owned_context_allocation_and_parallel_jobs": signal: SIGABRT (application abort requested)
+./test/mercaweave/security_audit/native_tests.cpp(43): last checkpoint: "owned_context_allocation_and_parallel_jobs" fixture ctor
+wo08_native_tests: ./common/args.cpp:603: void ArgsManager::AddArg(const std::string&, const std::string&, unsigned int, const OptionsCategory&): Assertion `ret.second' failed.
+unknown location(0): fatal error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": signal: SIGABRT (application abort requested)
+./test/mercaweave/security_audit/native_tests.cpp(83): last checkpoint: "wallet_psbt_allocation_and_concurrent_publication" fixture ctor
+wo08_native_tests: ./common/args.cpp:603: void ArgsManager::AddArg(const std::string&, const std::string&, unsigned int, const OptionsCategory&): Assertion `ret.second' failed.
+unknown location(0): fatal error: in "pqgroup_final_security/independent_vectors_and_bounded_mutations": signal: SIGABRT (application abort requested)
+./test/mercaweave/security_audit/native_tests.cpp(134): last checkpoint: "independent_vectors_and_bounded_mutations" fixture ctor

@@ -1,0 +1,31 @@
+Running 1 test case...
+Entering test module "Bitcoin Core Test Suite"
+./test/mercaweave/production_path/native_tests.cpp(11): Test suite "pqgroup_chainstate" is skipped because disabled
+./test/mercaweave/production_path/wallet_tests.cpp(29): Test suite "pqgroup_cwallet" is skipped because disabled
+./test/mercaweave/production_path/security_tests.cpp(37): Test suite "pqgroup_security" is skipped because disabled
+./test/mercaweave/security_audit/native_tests.cpp(10): Entering test suite "pqgroup_final_security"
+./test/mercaweave/security_audit/native_tests.cpp(11): Entering test case "no_allocation_after_sqlite_issuance_commit"
+Test directory (will not be deleted): "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/allocation-repro-before/test_common bitcoin/pqgroup_final_security/no_allocation_after_sqlite_issuance_commit/datadir"
+WO08_JSON {"scenario":"allocation-after-sqlite-commit","threw":1,"records":1,"ownership_entries":0}
+./test/mercaweave/security_audit/native_tests.cpp(30): error: in "pqgroup_final_security/no_allocation_after_sqlite_issuance_commit": check !threw has failed
+./test/mercaweave/security_audit/native_tests.cpp(31): fatal error: in "pqgroup_final_security/no_allocation_after_sqlite_issuance_commit": critical check issued has failed
+./test/mercaweave/security_audit/native_tests.cpp(11): Leaving test case "no_allocation_after_sqlite_issuance_commit"; testing time: 858645us
+./test/mercaweave/security_audit/native_tests.cpp(10): Leaving test suite "pqgroup_final_security"; testing time: 858660us
+Leaving test module "Bitcoin Core Test Suite"; testing time: 858675us
+
+Test module "Bitcoin Core Test Suite" has failed with:
+  1 test case out of 7 failed
+  6 test cases out of 7 skipped
+  1 test case out of 7 aborted
+  9 assertions out of 11 passed
+  2 assertions out of 11 failed
+
+  Test suite "pqgroup_final_security" has failed with:
+    1 test case out of 1 failed
+    1 test case out of 1 aborted
+    9 assertions out of 11 passed
+    2 assertions out of 11 failed
+
+    Test case "pqgroup_final_security/no_allocation_after_sqlite_issuance_commit" was aborted with:
+      9 assertions out of 11 passed
+      2 assertions out of 11 failed

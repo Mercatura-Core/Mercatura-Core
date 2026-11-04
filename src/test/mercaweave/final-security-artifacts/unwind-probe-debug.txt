@@ -1,0 +1,64 @@
+Running 1 test case...
+Entering test module "Bitcoin Core Test Suite"
+./test/mercaweave/production_path/native_tests.cpp(11): Test suite "pqgroup_chainstate" is skipped because disabled
+./test/mercaweave/production_path/wallet_tests.cpp(29): Test suite "pqgroup_cwallet" is skipped because disabled
+./test/mercaweave/production_path/security_tests.cpp(37): Test suite "pqgroup_security" is skipped because disabled
+./test/mercaweave/security_audit/native_tests.cpp(13): Entering test suite "pqgroup_final_security"
+./test/mercaweave/security_audit/native_tests.cpp(14): Test case "pqgroup_final_security/no_allocation_after_sqlite_issuance_commit" is skipped because disabled
+./test/mercaweave/security_audit/native_tests.cpp(43): Test case "pqgroup_final_security/owned_context_allocation_and_parallel_jobs" is skipped because disabled
+./test/mercaweave/security_audit/native_tests.cpp(83): Entering test case "wallet_psbt_allocation_and_concurrent_publication"
+Test directory (will not be deleted): "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/runtime-unwind-probe-debug/test_common bitcoin/pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication/datadir"
+WO08_ALLOC_POINT fill 0
+WO08_ALLOC_POINT fill 1
+WO08_ALLOC_POINT fill 2
+WO08_ALLOC_POINT fill 3
+WO08_ALLOC_POINT fill 4
+WO08_ALLOC_POINT fill 5
+WO08_ALLOC_POINT fill 6
+WO08_ALLOC_POINT fill 7
+WO08_ALLOC_POINT fill 8
+WO08_ALLOC_POINT fill 9
+WO08_ALLOC_POINT fill 10
+WO08_ALLOC_POINT fill 11
+WO08_ALLOC_POINT fill 12
+WO08_ALLOC_POINT fill 13
+WO08_ALLOC_POINT fill 14
+WO08_ALLOC_POINT fill 15
+WO08_ALLOC_POINT fill 16
+WO08_ALLOC_POINT fill 17
+WO08_ALLOC_POINT fill 18
+WO08_ALLOC_POINT fill 19
+WO08_ALLOC_POINT fill 20
+WO08_ALLOC_POINT fill 21
+WO08_ALLOC_POINT fill 22
+WO08_ALLOC_POINT fill 23
+WO08_ALLOC_POINT fill 24
+WO08_ALLOC_POINT fill 25
+terminate called after throwing an instance of 'std::bad_alloc'
+  what():  std::bad_alloc
+unknown location(0): fatal error: in "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication": signal: SIGABRT (application abort requested)
+./test/mercaweave/security_audit/native_tests.cpp(102): last checkpoint
+./test/mercaweave/security_audit/native_tests.cpp(83): Leaving test case "wallet_psbt_allocation_and_concurrent_publication"; testing time: 12417633us
+./test/mercaweave/security_audit/native_tests.cpp(135): Test case "pqgroup_final_security/independent_vectors_and_bounded_mutations" is skipped because disabled
+./test/mercaweave/security_audit/native_tests.cpp(179): Test case "pqgroup_final_security/multiblock_reorg_during_actual_wallet_signing" is skipped because disabled
+./test/mercaweave/security_audit/native_tests.cpp(13): Leaving test suite "pqgroup_final_security"; testing time: 12417664us
+./test/mercahash_v2_tests.cpp(11): Test suite "mercahash_v2_tests" is skipped because disabled
+Leaving test module "Bitcoin Core Test Suite"; testing time: 12417696us
+
+Test module "Bitcoin Core Test Suite" has failed with:
+  1 test case out of 14 failed
+  13 test cases out of 14 skipped
+  1 test case out of 14 aborted
+  60 assertions out of 61 passed
+  1 assertion out of 61 failed
+
+  Test suite "pqgroup_final_security" has failed with:
+    1 test case out of 5 failed
+    4 test cases out of 5 skipped
+    1 test case out of 5 aborted
+    60 assertions out of 61 passed
+    1 assertion out of 61 failed
+
+    Test case "pqgroup_final_security/wallet_psbt_allocation_and_concurrent_publication" was aborted with:
+      60 assertions out of 61 passed
+      1 assertion out of 61 failed

@@ -1,0 +1,70 @@
+[
+  {
+    "mode": "debug",
+    "safe": false,
+    "build_command": [
+      "g++",
+      "-std=c++20",
+      "-O0",
+      "-g",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/conditional_unwind_probe.cpp",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/allocation.cpp",
+      "-o",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/conditional-unwind-debug-original"
+    ],
+    "exit_code": 0,
+    "log": "conditional-unwind-debug-original.log"
+  },
+  {
+    "mode": "debug",
+    "safe": true,
+    "build_command": [
+      "g++",
+      "-std=c++20",
+      "-O0",
+      "-g",
+      "-DWO08_SAFE_WITNESS_CONTROL=1",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/conditional_unwind_probe.cpp",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/allocation.cpp",
+      "-o",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/conditional-unwind-debug-safe"
+    ],
+    "exit_code": 0,
+    "log": "conditional-unwind-debug-safe.log"
+  },
+  {
+    "mode": "sanitize",
+    "safe": false,
+    "build_command": [
+      "g++",
+      "-std=c++20",
+      "-O1",
+      "-g",
+      "-fsanitize=address,undefined",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/conditional_unwind_probe.cpp",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/allocation.cpp",
+      "-o",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/conditional-unwind-sanitize-original"
+    ],
+    "exit_code": 0,
+    "log": "conditional-unwind-sanitize-original.log"
+  },
+  {
+    "mode": "sanitize",
+    "safe": true,
+    "build_command": [
+      "g++",
+      "-std=c++20",
+      "-O1",
+      "-g",
+      "-fsanitize=address,undefined",
+      "-DWO08_SAFE_WITNESS_CONTROL=1",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/conditional_unwind_probe.cpp",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/security_audit/allocation.cpp",
+      "-o",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo08/conditional-unwind-sanitize-safe"
+    ],
+    "exit_code": 0,
+    "log": "conditional-unwind-sanitize-safe.log"
+  }
+]

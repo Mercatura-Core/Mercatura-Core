@@ -1,0 +1,9 @@
+test,status,duration(seconds)
+mercatura_fee_policy.py,Passed,53
+mercatura_pq_invalid_auth.py,Passed,49
+mercatura_pq_mempool_persistence.py,Passed,88
+mercatura_pq_psbt.py,Passed,107
+mercatura_pq_reorg.py,Passed,70
+mercatura_pq_rescan.py,Passed,337
+mercatura_wallet_encryption_persistence.py,Passed,186
+ALL,Passed,894

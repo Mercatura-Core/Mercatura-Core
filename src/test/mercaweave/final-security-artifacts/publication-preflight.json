@@ -1,0 +1,2441 @@
+{
+  "passed": true,
+  "head": "0e4a9c78e0cacb076aa69200d002ee218b2b8b74",
+  "remotes": {
+    "origin": "https://github.com/Mercatura-Core/Mercatura-Core.git",
+    "project": "https://github.com/Mercatura-Core/Mercatura-Core.git"
+  },
+  "original_head": "4b88b619fb1b08c7f30112a38eb471880b2a6af4",
+  "original_branch": "work",
+  "original_clean": true,
+  "historical_files_verified": 89,
+  "research_commits": 61,
+  "history_blobs": [
+    {
+      "path": ".gitignore",
+      "object": "cbb73a7e2bc70294492f5c7d29eaf60322d1c7d1",
+      "bytes": 628,
+      "sha256": "1abe465cc3f6601a9aacd68f8ea5d82b7f77cc68ef750db25094c45290dd4ab2"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-automated-simulation.md",
+      "object": "8ddcf246530636040a9e6f8ace7abad3feb807fb",
+      "bytes": 32378,
+      "sha256": "ee1d9af0fc04d91fbbbad0ecd59e393bbfed6c35081aba731cbcfa536d990ad3"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-consensus-readiness.md",
+      "object": "553d6267433ad17ef395b082fb075e1c8a0267b8",
+      "bytes": 28842,
+      "sha256": "37a688a8b96455b38b5fe2720bbdac3b7a9f6b9ec61879b04c50664c53cc4b30"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-full-integration-qualification.md",
+      "object": "70036ee6c8aa5f073c0cf68d9a44670315d21e44",
+      "bytes": 29696,
+      "sha256": "53d785a33712b1727a1f935fb03ebca0d053015eee3f0f73342ea8b818dfa683"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-isolated-consensus-integration.md",
+      "object": "e89fb7a78ac5398cfb16b2c0df73f1c9b8432be9",
+      "bytes": 30425,
+      "sha256": "c767d4e72a4f39458a8c21336e80bb54c7f662cff3931789938f693e933f65c0"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-production-path-integration.md",
+      "object": "87129b4f09523c1d89f0d652bda7c8538812fd83",
+      "bytes": 41570,
+      "sha256": "6ced35a73262e0ac56c51bd1ee5c0a30f65323c0f7a2baa566f77748a532942c"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-qt-mining-integration.md",
+      "object": "c63f039b85e89c93f7ab9c1f924024c807021239",
+      "bytes": 28426,
+      "sha256": "d5888de5186196acc5521e58a9627a646d46c19202a440d6847a1296608cc7d4"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-security-qualification.md",
+      "object": "aeaa9e57b90b6b0c49fee1b925a335f810755db2",
+      "bytes": 17333,
+      "sha256": "67e91434f979074701c78af0e94a57f2df96ee281373d7dd82f840a7d1e4c216"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-source-audit.md",
+      "object": "8643971cf318ad60d3170ed4408adb734bf58fcf",
+      "bytes": 6890,
+      "sha256": "5c9bd05d274a6b4dab82f6adbc60ca599d3fd9af3e239b2be12dae1cee4d1f9b"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-standalone-validation.md",
+      "object": "4fa18544f94311b3414d9ec8f8437f35847fdd56",
+      "bytes": 11576,
+      "sha256": "6b8a443f281cd877272068978286bbdbbb46f67cbf08055d99f33cca8415583e"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-wallet-psbt-integration.md",
+      "object": "b315a0444e8bfa44f87027c567fa12eb37119bb3",
+      "bytes": 28313,
+      "sha256": "561415c53943c06af31cc5ff64acdde8a5e5690f73938e07104fdf49c500045a"
+    },
+    {
+      "path": "src/CMakeLists.txt",
+      "object": "4c61bfe11e8c514747471b3495eac26bbbc91374",
+      "bytes": 11235,
+      "sha256": "90a1777b7a127760fc74bffc6688bad2f203a2935618f518cc05eaf68e1e4027"
+    },
+    {
+      "path": "src/crypto/hkdf_sha3_384.cpp",
+      "object": "06a961057e6977580940b25eef30a0440773f44a",
+      "bytes": 1059,
+      "sha256": "84c20b8781cb401afc39d6c478b69ed0b664baf9d90e6488169654c7f13763c1"
+    },
+    {
+      "path": "src/qt/CMakeLists.txt",
+      "object": "1d8c75d415d06451a68a22a2cae294f59c480986",
+      "bytes": 9477,
+      "sha256": "a93b58fa463cf2d2c5fd311912bfd01c9f7f55697908ec37de8f671ff227fd87"
+    },
+    {
+      "path": "src/qt/mercaweavemodel.cpp",
+      "object": "220dd5aa6da73f18a56dd7cd9c1dc530c51c54c1",
+      "bytes": 7587,
+      "sha256": "f317d7ad24a5c903980b106ccdc52f917837847f3649bd266dbc06ee39378e86"
+    },
+    {
+      "path": "src/qt/mercaweavemodel.h",
+      "object": "d8098c0fda97875e6cf84421f86875b0df4f1051",
+      "bytes": 3238,
+      "sha256": "0246c3e5871c60b8db3edc526c3e77530664a2665374ebfb4ab042daff58c0fc"
+    },
+    {
+      "path": "src/qt/mercaweavepanel.cpp",
+      "object": "909a57d0b2def3de5a9c30a3794e463859ca76cc",
+      "bytes": 9571,
+      "sha256": "219c4f46d7a7670d379e1edb1f419fb2b3e15f49dd85d6a0a80d3bb818c4635f"
+    },
+    {
+      "path": "src/qt/mercaweavepanel.h",
+      "object": "1eba2fe2ec2364929178cf8e6de5da74b6617b36",
+      "bytes": 934,
+      "sha256": "ed95f44d23f0a867aba42ea2ab1724d89d50c281c9734aef42f3e171358dcf99"
+    },
+    {
+      "path": "src/qt/miningpage.cpp",
+      "object": "d0bc0c82228bc036912b9ef5ea8ee994ece5b320",
+      "bytes": 27771,
+      "sha256": "3f1093ed73b9b9f6f51e70e485d3dd5d42786abb7cbc35890a0c51b046b38192"
+    },
+    {
+      "path": "src/qt/receivecoinsdialog.cpp",
+      "object": "533efebdb0e2d4197c404575c0356733f0cdcbc5",
+      "bytes": 11445,
+      "sha256": "7f758bd5b062d4fd37b0829adf457e19c30fcf30d467065d4d2f832ab84d30e9"
+    },
+    {
+      "path": "src/qt/sendcoinsdialog.cpp",
+      "object": "536256aa60bc3090ca537a785fcc32025e72ad33",
+      "bytes": 45016,
+      "sha256": "7270a378d383a78f8173a22c2c0002d216ee005d01f1e1d86d3e5c99d396f1dd"
+    },
+    {
+      "path": "src/qt/walletmodel.cpp",
+      "object": "93f25abfeacfce6d96fce99333266c1f7af8151c",
+      "bytes": 24038,
+      "sha256": "621a81759705b736346f4794dcd387a127cb153076cabbf32bf0ddbde9ed132d"
+    },
+    {
+      "path": "src/qt/walletmodel.h",
+      "object": "bee7b4a9c942671b642085e536e81f033b719476",
+      "bytes": 7816,
+      "sha256": "dbf06fab306838787f36fb54aa56207ce5b29501b337fc2dd37eea611be4c313"
+    },
+    {
+      "path": "src/script/interpreter.cpp",
+      "object": "bbd8eb52274c532d719a9235df67bbf8098fe621",
+      "bytes": 93284,
+      "sha256": "3782322b0762567c313e15c69de4b44f2b8c2720d7d972b5491492c244d63680"
+    },
+    {
+      "path": "src/script/interpreter.h",
+      "object": "badb24184aa916acffb482bfeb84547a2519b753",
+      "bytes": 19911,
+      "sha256": "943766112422519f0de2d556f583d45709a98f502c078d52f734ebf8b406af26"
+    },
+    {
+      "path": "src/script/pqgroup.cpp",
+      "object": "6c412d7650abc7ca29c2c9a1e37fe2c683bd2e01",
+      "bytes": 17287,
+      "sha256": "32a92ea9971983e89df4047d438d93639a3950531043ab975f76ee3ba3644037"
+    },
+    {
+      "path": "src/script/pqgroup.h",
+      "object": "cd49c1716abbef630506698d7df38c9cc82c2bc7",
+      "bytes": 7573,
+      "sha256": "6e3879c51960e74c9c5f92c467e3c07f73261478513ed4c7ca918083bed7a376"
+    },
+    {
+      "path": "src/script/pqgroup_context.cpp",
+      "object": "b0d397dba634fc7579903dec28c24a4d4b4ae38f",
+      "bytes": 3469,
+      "sha256": "030b498a94e5b5e730501ef49b527793307e8e0682060c35da97269ff2b845f1"
+    },
+    {
+      "path": "src/script/pqgroup_context.h",
+      "object": "efb5d56dadbb704a194c00ef83361249f4d611c1",
+      "bytes": 2515,
+      "sha256": "ae340c91cf365cbceeb30019619372330842c8ae6b4c0be9c5bb5d62657bfb4e"
+    },
+    {
+      "path": "src/script/pqgroup_psbt.cpp",
+      "object": "662ff401e2d26fe5175e04e48272ebedefc3620b",
+      "bytes": 14201,
+      "sha256": "a60d5dc86fd8d78cde83fa47ecd19044f2fd5bb4c83152e92158dd8272740085"
+    },
+    {
+      "path": "src/script/pqgroup_psbt.h",
+      "object": "cc2a45c2ff8163646418db459528459a27902cb0",
+      "bytes": 1984,
+      "sha256": "02f7feade9ea17119b13b088edb81fb40371526ba4c626bfaa26b1aa9c2c594f"
+    },
+    {
+      "path": "src/script/sigcache.h",
+      "object": "85d46eabda8a4276b749ac61f5c596492b877f49",
+      "bytes": 3302,
+      "sha256": "9826185c2c6b79a402e25dce1aa76d34ce099beab5c74947001307c7918bcd82"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "48de0122f6447630170ebd6755533999b4b0fd78",
+      "bytes": 23733,
+      "sha256": "3a01df89378dd95613dcaf2d6458b911e5482b8a092f336a798ad488fd918118"
+    },
+    {
+      "path": "src/test/mercaweave/README.md",
+      "object": "77365ba6be5320123f3edec0dbaf91afbcea89f4",
+      "bytes": 18074,
+      "sha256": "3a5122b71194f54865a7c5989dcb1dcf8abbaa6ade6b6eeb4dd5d6142234c6ac"
+    },
+    {
+      "path": "src/test/mercaweave/allocation_probe.cpp",
+      "object": "eeed02828c2d643faad4bbcb4b5b7a5a712efc89",
+      "bytes": 914,
+      "sha256": "38337b26eb97cb888d0e0100e5df1133bdb9613cb82a5a7ef2db6554e6b38f3d"
+    },
+    {
+      "path": "src/test/mercaweave/allocation_probe.h",
+      "object": "64c1a30be2a2a229c9ff47abff3dda679e68529e",
+      "bytes": 498,
+      "sha256": "42c173b2ed5779ce67e6225644408a5dccc7ccbcdf07a82856efc59e221030e9"
+    },
+    {
+      "path": "src/test/mercaweave/attack_tests.cpp",
+      "object": "e4d0f21dc157595dab72a7f88519d9d7f1876caf",
+      "bytes": 7744,
+      "sha256": "61a4a0d1d2fca7efeb38406d3944851a50ce8f0ef862fc5353ea70581d13d4e7"
+    },
+    {
+      "path": "src/test/mercaweave/auth_context.cpp",
+      "object": "7ea8b800bfc1b4cf348efa0fdc009fcb1faa236d",
+      "bytes": 5190,
+      "sha256": "70a7650fdb2a7e8bb83678f849c53dd0b7ec2c033115aa7ab35e94b4a8f5d2db"
+    },
+    {
+      "path": "src/test/mercaweave/auth_context.h",
+      "object": "cb7466afaea26d4e6460979a30a8a65f12f56db6",
+      "bytes": 3730,
+      "sha256": "f6f9dcb5fbbe2bb77d01ae6dcebcca002567fc07132c007cee771cf268f906bc"
+    },
+    {
+      "path": "src/test/mercaweave/bench.cpp",
+      "object": "4933f114f3f7d53d03058db513745ea49d44df1d",
+      "bytes": 4537,
+      "sha256": "4f789afde8eda6f58d6799c0eb761418a505c2a61216f770730f6413010169dc"
+    },
+    {
+      "path": "src/test/mercaweave/benchmark-environment.json",
+      "object": "9e161fa324ac234d8ad65a2e26080ce3a4caf46a",
+      "bytes": 1968,
+      "sha256": "117a545ca3f6f16afba7920a71e5fc49fc24078d48728ec0dd760fcc16c4c0cc"
+    },
+    {
+      "path": "src/test/mercaweave/benchmarks.csv",
+      "object": "92abd1a2c0d25fd377181a41ef0c98ae4bbee671",
+      "bytes": 2166,
+      "sha256": "0896a259684d85b4df92299d535c7f292ab237fefbb0a3114c4c8cd7fe83ac28"
+    },
+    {
+      "path": "src/test/mercaweave/block_tests.cpp",
+      "object": "0737930aac7dc4fe0ba0fdf7c8eef0410da10dc2",
+      "bytes": 6072,
+      "sha256": "ef28f415ed8880b13ab150c03f4a5f8bef790c4f8535d2e980c5c2b551517c1d"
+    },
+    {
+      "path": "src/test/mercaweave/block_work.cpp",
+      "object": "f28deab81c81a700744d84b566576875c90a8fe8",
+      "bytes": 9184,
+      "sha256": "0834bdb4b79ab96408f52e7286e8fed440e646d0a489759cfcfc39910184b080"
+    },
+    {
+      "path": "src/test/mercaweave/block_work.h",
+      "object": "cb3f1a7a37a200ac12a7e1b30c28a148eb918a50",
+      "bytes": 3011,
+      "sha256": "40dba0f2cf659c905d8479b0920453ca1558cc8ca75e947b310238cd9a60e12a"
+    },
+    {
+      "path": "src/test/mercaweave/build_native_probe.py",
+      "object": "deeff75f0f57c91f49cfb4eb51ae523d53aa411a",
+      "bytes": 2350,
+      "sha256": "ccd4c4b58128152f99ae33d5b5b1482f36d107ed8264caff66eee503b3342ba2"
+    },
+    {
+      "path": "src/test/mercaweave/check_isolation.py",
+      "object": "6e968383f25c6e4f9998f7cd9a8361482ccb6b1f",
+      "bytes": 5587,
+      "sha256": "049dcb0a5741d8558c42e29c08a18649265e96c18889320414d124e48e2be93d"
+    },
+    {
+      "path": "src/test/mercaweave/check_node_isolation.py",
+      "object": "de5e775a76f395e5db5f3d48bd842889a665be4f",
+      "bytes": 3874,
+      "sha256": "2201bcaf40c7b505af3dd56cc2d9df0636e9b43e9f9ad2c60e774b537bc320eb"
+    },
+    {
+      "path": "src/test/mercaweave/check_qt_isolation.py",
+      "object": "7e98fc6783465966c1be9b2f7b9f309c5688ed8e",
+      "bytes": 5059,
+      "sha256": "64fc983cf6999dde415b3f669434c2b4695c7166c548acae2d05bee1682942bd"
+    },
+    {
+      "path": "src/test/mercaweave/check_readiness_determinism.py",
+      "object": "8108f2c2ee8a964fb01e3e0b44e740e84535a884",
+      "bytes": 3616,
+      "sha256": "40205c72ed6fcf5a9caa42971099b3a4968841f5c7d59410b1de8e457f8dad2b"
+    },
+    {
+      "path": "src/test/mercaweave/check_wallet_isolation.py",
+      "object": "4fd84383280db5c425b63f32da5228820eff48d3",
+      "bytes": 3285,
+      "sha256": "4c93bbd85b782bc8a506d011d14d1f71bc990a2ab836e77a18f0fa0e860273c6"
+    },
+    {
+      "path": "src/test/mercaweave/coin_view_probe.cpp",
+      "object": "aaac3f06b8806e579e23d87b0c9711d5ee422958",
+      "bytes": 929,
+      "sha256": "31f57fd50a49fb1e947db46c110a8e5b818026620be5341d334647f967a95e78"
+    },
+    {
+      "path": "src/test/mercaweave/context_fixtures.h",
+      "object": "c3ddd1bc761f867c0882c8342201ad2cff09e438",
+      "bytes": 1252,
+      "sha256": "596aec2a96b7df191b0729db111745de930dd0ffad9a6f710fb5aa294bdcfb40"
+    },
+    {
+      "path": "src/test/mercaweave/context_tests.cpp",
+      "object": "850555214ca9846c44abf18fc8c1da8b3215815f",
+      "bytes": 7896,
+      "sha256": "82386d40ac59b59e62839301c3b3b4d115b5ae8506864f859a14c4ed8f7841fd"
+    },
+    {
+      "path": "src/test/mercaweave/crosscheck.py",
+      "object": "6e40edd56d9befc673f98f6d65cdccee5539ffbc",
+      "bytes": 6796,
+      "sha256": "ce05c65ce5c02f366107555b9042a74165045570a93a1a96b75873817ef359cd"
+    },
+    {
+      "path": "src/test/mercaweave/durable_tests.cpp",
+      "object": "f0a25e7c405a09b1f1f74633aa1d61f0f99766e8",
+      "bytes": 10571,
+      "sha256": "7aa246efcf8bd643216591e5830ed424c81bba4024bcdd10244c37a8f4a64948"
+    },
+    {
+      "path": "src/test/mercaweave/durable_wallet.cpp",
+      "object": "5d0c0ffd82178078c4d53c0c1391072c384b58b6",
+      "bytes": 12007,
+      "sha256": "4d544f3a383a89723de8adf918ee265b13c427654807005ec9dcf6f6d039452f"
+    },
+    {
+      "path": "src/test/mercaweave/durable_wallet.h",
+      "object": "349cca2292188b985971da58a1ca8372f33ca63c",
+      "bytes": 2420,
+      "sha256": "b64fbb3c61bc2af166b78608c6ef1f25d9c7b220e6b67896b3a58b9956b8fa74"
+    },
+    {
+      "path": "src/test/mercaweave/fixtures.cpp",
+      "object": "1e7f692c5874891c4592f14431bb0c6b7b784171",
+      "bytes": 5963,
+      "sha256": "10b919b35cb5ba1dcb272b2d7a1a1be3ce449e99287447f87e927d3c7eae13e6"
+    },
+    {
+      "path": "src/test/mercaweave/fixtures.h",
+      "object": "3916896528c985db58a0057c470bc263c7cd0c71",
+      "bytes": 1262,
+      "sha256": "f6f070611f7b4c3831874338a7a05e849a89844e8bc6be8d1cf6bcc8a6fd07fb"
+    },
+    {
+      "path": "src/test/mercaweave/full-integration-artifacts/active-native-parameters.json",
+      "object": "b3e3a0eb5ddb715429b9ddc82d84e8f8b9266d00",
+      "bytes": 7670,
+      "sha256": "e8ebb23d9ab0956dcc880ec642caba9174d9307d850fbf56a74d85c38a6f9d0d"
+    },
+    {
+      "path": "src/test/mercaweave/full-integration-artifacts/debug-workloads.csv",
+      "object": "a201348d9a14d90fd8be35538aa0182869e30165",
+      "bytes": 1498,
+      "sha256": "59c1049ceacd8715e2dfd4094382e897f0d4d85f6fb3756bab4b3367c8616760"
+    },
+    {
+      "path": "src/test/mercaweave/full-integration-artifacts/qualification.json",
+      "object": "f94a76fd290a7ebc7f1909eb578745421f959f28",
+      "bytes": 20035,
+      "sha256": "5828d932974a86e6cbc62b9d8377dc2a2d3ea36302b12fd26c10ccca9bffed9e"
+    },
+    {
+      "path": "src/test/mercaweave/full-integration-artifacts/release-workloads.csv",
+      "object": "28711411a3efa9b938d66304ee400a449061a6f2",
+      "bytes": 1471,
+      "sha256": "f1594ab1ef5d9e898e3921adb2844855cc13fc6eab34fde7c0364f64a32d5ec3"
+    },
+    {
+      "path": "src/test/mercaweave/full-integration-artifacts/sanitize-workloads.csv",
+      "object": "8f105e9e7044b4898b4f013141e29f1a3bbf4b5e",
+      "bytes": 1483,
+      "sha256": "00793babd274b69d2e689f67140d28bc0a46462cec053c595e72538f3d925699"
+    },
+    {
+      "path": "src/test/mercaweave/inactive_control.cpp",
+      "object": "1048596de83ab0ebdf3e9e447483b4403ac13f04",
+      "bytes": 1838,
+      "sha256": "73e87ec1638cf8d8b654709bbb5f73520db44d990ebc04b4e4bbd094d0b839d2"
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/debug-benchmarks.csv",
+      "object": "d15f03992e367e87c389cc5d7cac01f08718e08f",
+      "bytes": 4180,
+      "sha256": "ff0f87da523a9ae618ea6020e2385bd2f09b30750eb06997978b3bece03479e9"
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/debug-isolation.json",
+      "object": "6da614bd63e7c3d5223ee2401d1a982d84ab9b82",
+      "bytes": 900,
+      "sha256": "9ddcc353470fa57e71fcab0817b9c4ad22aaf43e0e618e78af70e94472c0770e"
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/leak-sanitizer.txt",
+      "object": "e757d5c8fd1be1b015c7c91d4246371837d10bee",
+      "bytes": 231,
+      "sha256": "46da19cffef18e9d70fa371e0b1e38bdff1a6f89006d0071e472a9af6a366bff"
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/mercaweave_integration_tests.jsonl",
+      "object": "864310809099bba1a8b8caf8c3fbc471d695eda8",
+      "bytes": 560,
+      "sha256": "10e22b561f37dba524211184e315c03a807e0456dc090e28c47c65343d8013c8"
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/mercaweave_isolated_control.json",
+      "object": "726eca3f17fd67fb95357897436089c38d2774a4",
+      "bytes": 124,
+      "sha256": "5c824d5cb5ba55210868128de4ff33ce47c6ddb2c5cd7c1e3ca37b2356885053"
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/mercaweave_normal_control.json",
+      "object": "68426cf87aeae15dc8f7edb82355ba8078a28e66",
+      "bytes": 124,
+      "sha256": "9a072b2e822ddef3561b651badea85a0e1c3eb5b5bb2c47bcb039c8fd7b57a63"
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/mercaweave_tests.json",
+      "object": "3bc9f4f285b179e6d7ae3d361ba11c0652721aff",
+      "bytes": 400672,
+      "sha256": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7"
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/qualification.json",
+      "object": "1b1c1cb8648f40c6b1c98a6cc933a7710832d962",
+      "bytes": 103464,
+      "sha256": "7fa8cc1eb8d14aa2776b46c84f37df2b49270d2097d01601a881761a4fe8f98c"
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/release-benchmarks.csv",
+      "object": "59571c17b2222a5b2dc6c0592e558ee93e5bbcd3",
+      "bytes": 7543,
+      "sha256": "47d7a1242477909aa1e26043b7e01bf13c50463ca6aea47874d0a61f8a850633"
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/sanitize-benchmarks.csv",
+      "object": "70898cb908cf9c09b4db0070c5a02e089879e4e6",
+      "bytes": 4154,
+      "sha256": "d46e503a3ac4a76fd9ca4b9d9dda42c53d89d2a1277860b54eae3f02aad4455e"
+    },
+    {
+      "path": "src/test/mercaweave/integration_bench.cpp",
+      "object": "bd1a4c503eca313b77f9049c3d063100e83d51aa",
+      "bytes": 8138,
+      "sha256": "33cc3338880af70c5f8fdfce8df8ec515ebb9bc43d7a5f705d8ad65280b4db7b"
+    },
+    {
+      "path": "src/test/mercaweave/integration_fixtures.h",
+      "object": "eae8e98f0b3e840b1c0e0862c674be119f98daba",
+      "bytes": 1510,
+      "sha256": "0336b0e71f52fcafa9a8d0e2f63d345631cccee81c44d742aca6ad001dedd2f8"
+    },
+    {
+      "path": "src/test/mercaweave/integration_tests.cpp",
+      "object": "c533a6d2d3ed35df6ea63d18ac03e3f4e99b3816",
+      "bytes": 21016,
+      "sha256": "b116f21aa0b660709f89051ba6ebf789a56619b4831d10639425e558be483221"
+    },
+    {
+      "path": "src/test/mercaweave/isolated_validation.cpp",
+      "object": "154489a7adae3eb414b2208dfa535bc01f7486d7",
+      "bytes": 16117,
+      "sha256": "be9f529304ee631d993a9ccbaeda322881c9a76317978a80983b2dc6615d476a"
+    },
+    {
+      "path": "src/test/mercaweave/isolated_validation.h",
+      "object": "a8ad33932c17e22cb1c393d59279120d347c37bd",
+      "bytes": 5634,
+      "sha256": "8dc86a07550dbd32e30ea33faba3f75bfb747f15cde167f01b2766c6383e7ba9"
+    },
+    {
+      "path": "src/test/mercaweave/malleability_tests.cpp",
+      "object": "aa0922c5056e114ffd5ac160b81380b25a8d0d76",
+      "bytes": 8237,
+      "sha256": "60bf6fa38335fc6d00f5fdfcd059858fc056575fb625676318b3f2c23e091195"
+    },
+    {
+      "path": "src/test/mercaweave/measure_readiness.py",
+      "object": "10f3016bbaf67fb575edfa01491ade10819a4969",
+      "bytes": 4651,
+      "sha256": "c001ba5dbc98645bf379889b5d26ac1deb198dd450ac115cb4d034a1ad5ad20f"
+    },
+    {
+      "path": "src/test/mercaweave/mercaweave.cpp",
+      "object": "073c781c7de5f34f0dca1f6a57f2caff6b8b696f",
+      "bytes": 186,
+      "sha256": "80669bd057abe9eceecbd6e6ef9b5bf3181bd29c1fb64cafb54fa81ddd1915d7"
+    },
+    {
+      "path": "src/test/mercaweave/mercaweave.h",
+      "object": "6f894701eabe1ba3a8cb1f29be2ea4b2c38470dd",
+      "bytes": 169,
+      "sha256": "b3ffd8be9e9d2f62aa362506cc7297a7e633a2360a30d02a609124d72ddac9b6"
+    },
+    {
+      "path": "src/test/mercaweave/mutation_seeds.h",
+      "object": "4068008e5da682bf2173f3a41e31a22f27b5f848",
+      "bytes": 432,
+      "sha256": "9c59d56b3f0ba24d2bcdb691a4b90d25864d745f23c6459702fff800e194d1cf"
+    },
+    {
+      "path": "src/test/mercaweave/native_lifecycle.py",
+      "object": "75fda97e6f789bcf65b16fcfc83c09226fa8b240",
+      "bytes": 4905,
+      "sha256": "2454e4f94cb8e575bd26c0ff174ff76899165ec4c12a0ad7889a405f1f378dca"
+    },
+    {
+      "path": "src/test/mercaweave/native_tests.cpp",
+      "object": "df064e5781ae10acd5dba28dfff06fb29d49e0fc",
+      "bytes": 10982,
+      "sha256": "66684deb1129be16c47ae04f6fe84bd7788344232fe8cca47be0833ce67f8b3b"
+    },
+    {
+      "path": "src/test/mercaweave/native_v2.cpp",
+      "object": "4cda3a3a8e340e491d328e9638ba83b8a32bc313",
+      "bytes": 3070,
+      "sha256": "7713ec976d2665f9b940fe0775a3faa939b5c0437cb29358276f07ed59c1083e"
+    },
+    {
+      "path": "src/test/mercaweave/native_v2.h",
+      "object": "a29203a7ad634c7d1471a64b08deb16bfb3ef053",
+      "bytes": 1332,
+      "sha256": "9c49f54786e8fe448d784c89dcdffc0453d9effcba6488ed31a18329873cbbaa"
+    },
+    {
+      "path": "src/test/mercaweave/node_bench.cpp",
+      "object": "755312fdb2158b42cb75f5adc118b31d15b12da2",
+      "bytes": 4502,
+      "sha256": "6ab3fdd208119e57fe4f381dad28fa71f1ce9a4df4cac11bd5b71d2b76f86a7e"
+    },
+    {
+      "path": "src/test/mercaweave/node_tests.cpp",
+      "object": "3d03d5fc9da532aa7c65f75ddafc145ef2d26686",
+      "bytes": 15251,
+      "sha256": "660a5272c3a375c30d060dc35e8b4717abaa08520b6c35bbc40048d2c9fd00fe"
+    },
+    {
+      "path": "src/test/mercaweave/node_validation.cpp",
+      "object": "c172eab02cfa482cd0bf4db1ca0cdcc75d4507ba",
+      "bytes": 2863,
+      "sha256": "a5332a8abc5e92117ca5f26c66a3e8da0fe20cf36a8be428e8a50ec83d20e8ff"
+    },
+    {
+      "path": "src/test/mercaweave/node_validation.h",
+      "object": "3d65ab2a669036ad82100fa2d2b2db267706cd54",
+      "bytes": 2153,
+      "sha256": "cd0edabdf0a1565c00e77cb077515adf5b501a0a1b665ebb882f64f1540a6474"
+    },
+    {
+      "path": "src/test/mercaweave/parameter_probe.cpp",
+      "object": "a8748c2c9fb8c90df6f5cdc857d5ef8898da031d",
+      "bytes": 1100,
+      "sha256": "e6b74060cf0b4182b13779453cd378b158beb73511a9178735e6cb7ad01f28fd"
+    },
+    {
+      "path": "src/test/mercaweave/parser_tests.cpp",
+      "object": "fbad7b14000be7c51c5b4e44fb9abea9ddfb68d6",
+      "bytes": 5222,
+      "sha256": "09ab6f3c08787d561e81116b4c927e04c658e35db4f0953f3810b11eb8cc41bc"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/boundary-audit.json",
+      "object": "a06659504fe5f59fb3c404e7d3444fcb2848927d",
+      "bytes": 16369,
+      "sha256": "468b73416822142900337d2b8cde61e4a2432120a014a7870fd39f51bdb39545"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/build-provenance.csv",
+      "object": "f0077af11ea76a72bd16d0aac2360a642d86660d",
+      "bytes": 6490,
+      "sha256": "1ca71992bc85f222a317199aaa340c4b594650d66d86308a146270144f0eede7"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/context-scenarios.jsonl",
+      "object": "aaf9a90147dc0340234c62a7784912a099a07fbd",
+      "bytes": 5498,
+      "sha256": "953f2a56f5a8131ec0f82101661307a2fec933e001ae3db76b05f4e177a12c76"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/environment.json",
+      "object": "e7cb14170a7951f7bbe8e35026a329f220acaeb6",
+      "bytes": 635,
+      "sha256": "89ed135525a1bee49e4ffeb4f84852c4c74971eb8bb8a5607f0915f9c3856390"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/failed-attempts.csv",
+      "object": "75ca55a4a1c5bd2b07e81a73738ef2c1af5250f0",
+      "bytes": 4314,
+      "sha256": "3a0f08f9484d5afc2ea752aa1839f32c5c46d99d19a4c83181a5357074138be0"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/native-build-commands.json",
+      "object": "fb960d5636eb726fe7b748220d060d3f47449b84",
+      "bytes": 46037,
+      "sha256": "8a9522bd01287abaece30184280da69516b8616158d724535aea737eac261405"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/native-debug-final-execution.json",
+      "object": "106e06c12e7f90030607c6f873a8fd65e7069942",
+      "bytes": 467,
+      "sha256": "489588064d5396ae65d0da4e39e131e0be986e874b2bc0f1ebf8e1c303583d44"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/native-debug-initial-execution.json",
+      "object": "773e8dfbcc4d9c70955db78ea7afa1ad12640a8b",
+      "bytes": 2838,
+      "sha256": "dc539bde2db0730d80171053b4133a0e9ebd68eb2ab09467c217e53d2cb34f48"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/native-debug-mining-budget.json",
+      "object": "b475d178e78acc52a71017120dc0cfa86d419e1c",
+      "bytes": 409,
+      "sha256": "8a563205d1e7da59e528dd787726556df699f11bbc5a82648a0dd969c5f8ad8c"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/native-release-mining-budget.json",
+      "object": "a370974ea77820b915577e91d0298710bdae2e6b",
+      "bytes": 408,
+      "sha256": "48da46d974544c36d9f82bb39450ae0c5301b95d34fcb414341d910a81631a44"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/native-sanitize-final-execution.json",
+      "object": "4e4ce50203b3518dda2e951942fad7f892d2f2ce",
+      "bytes": 476,
+      "sha256": "28a89c63892660f6e32807dda41b47c30d76c262fc26e38b584d43b542c73b49"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/native-sanitize-initial-execution.json",
+      "object": "d6449a5a6a08674fc5f09449fa0d4fdf861d2a25",
+      "bytes": 3025,
+      "sha256": "b99b0fe2b3967a0e03c2e7d634fa3b89a4a6be77d86a92edb752d73d20234ed1"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/native-scenarios.jsonl",
+      "object": "4b31c04c85fc6a1abc81a529cd6750a5ff80f270",
+      "bytes": 23028,
+      "sha256": "1b639a2aebfcffe37c3ae5482a726319cffe7dbb5a025b7b79ce85f994e2c76c"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/profile-scenarios.jsonl",
+      "object": "c50f0fb2604f9a5f3d5f83fa975c671ae3eaf7c6",
+      "bytes": 6369,
+      "sha256": "b6c655e7e51afab89d962b5644cec0f19e2cf9f8b473c003a3d48f9b8ff4d6ed"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/qualification.json",
+      "object": "5962dd5656f44dc9a958e0029ab9cb5e3a28bc7f",
+      "bytes": 3608,
+      "sha256": "39cde0a7056ddb115f5fc78c07952e298c3acbb98742a93802ea63133c226d64"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/sanitizer-failure.txt",
+      "object": "806cfcecbe81df9826f54127744822e26849418a",
+      "bytes": 2286,
+      "sha256": "1e3f14c1b1638c5e2f5aab6eb6447d3bca212a42f4c6a9dc36943e1b91439af8"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/security-matrix.csv",
+      "object": "a01494845cbb701d264f51a3b12c1412039dfbcd",
+      "bytes": 7223,
+      "sha256": "ab59c85e3218a0e9c0115c0ae3cce31a5f52d5648e3380599b0ec9c91e33ddbb"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/access.h",
+      "object": "05f928229f8d860bbb9cd624d19e5fd5fbc58cad",
+      "bytes": 1216,
+      "sha256": "bc029f200c79550e430498cbf65e7f7c01eecd71562decd687add8f2b908735b"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/audit.py",
+      "object": "c5b37e4c37aa72ca2ae234661c351c848ff1ac2b",
+      "bytes": 4884,
+      "sha256": "89f805ab8c2cf8c60249de95bac46939b27228f4942820e3fb40afb6ffa52fad"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/build_native.py",
+      "object": "94983420da9801df6a39a96cf7411492c626cd7b",
+      "bytes": 5284,
+      "sha256": "907c6421b4af4cc256a1303ce432a6cd4d499896ca2f9889173b1058483c8dc0"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/collect.py",
+      "object": "46f6a71069535252837db1248a4f4eff11b392a4",
+      "bytes": 9856,
+      "sha256": "f3d78c926d795feb1f6853920a37fd6673e9c8b2500a1e56c3251f81859513f4"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/context_tests.cpp",
+      "object": "19a8cc64d377400e414ef3874d125918e52567c0",
+      "bytes": 5806,
+      "sha256": "91acbb27dd633725744ef84d8aac68cebcbd23f1d92f2cc239a6bfbd19f22179"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/measure.py",
+      "object": "44d27627e258332531b48ad1c8e1fbace542f491",
+      "bytes": 1079,
+      "sha256": "1084eb40e9c0ad1c0c44751a2fc0147c94999bc3445fcbe5a00a29c708234cb7"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/native_fixture.h",
+      "object": "835f7026917d3c3c59a79c499b1fdff9ec93e5e6",
+      "bytes": 7001,
+      "sha256": "fb261a54fc3a89d7acdd3ac0a17342a01f2dc6f436d50cf98624ed93072582a9"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/native_tests.cpp",
+      "object": "0bd7dc0f859024ca76f8c4e9e86eaf4470681709",
+      "bytes": 5354,
+      "sha256": "b130c2ce47d04a4784684d80b649da2eb579de45ecedbe4b53457b18f0fdd2f7"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/run_native.py",
+      "object": "9fe2ba50d4f923e334a34082a8c1c1d5844d141b",
+      "bytes": 3327,
+      "sha256": "97b16448ddc0eacfe7d4dfea150169b9b96fcb0c0c0659f513fb0ed75b0f3de5"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/security_tests.cpp",
+      "object": "9e7527fe96be1b0eb15c667f372ef0cf8bab4c2f",
+      "bytes": 17494,
+      "sha256": "4d9527f9e0e0edaa786601ac1923b3e76581032b83e840772c0d29a7f014b575"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/wallet_access.h",
+      "object": "332bb7cbae205c942c0cc0331967b8ae6435e53a",
+      "bytes": 1015,
+      "sha256": "79021d1d2b8bde5cd2ba10e61f87feced344dab2edf2f8d339596d8cebdb9a6b"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/wallet_tests.cpp",
+      "object": "b430eea6c93826ea2f85ef7b505456f5daf4506d",
+      "bytes": 19863,
+      "sha256": "fb3f68f5a46d02331cec10900e1c6052a39ff10cd8ab895fb4e1a8a1bf9700bf"
+    },
+    {
+      "path": "src/test/mercaweave/psbt_tests.cpp",
+      "object": "5158c625ed3dcc16c536a73c3b69f88e489ff858",
+      "bytes": 10723,
+      "sha256": "9201be43aaa9bc814dd4a647f8c932f1629bca9be73095cf7c381325233ba070"
+    },
+    {
+      "path": "src/test/mercaweave/qt_integration_tests.cpp",
+      "object": "393cd21b2e2c85b2ed1d525b4d9c3f3561b1fe02",
+      "bytes": 10526,
+      "sha256": "fb7eac40b8684d0027f7b9f1dd7cff8a6b79759d389e9a1a2ed22121db2377b4"
+    },
+    {
+      "path": "src/test/mercaweave/qt_model_tests.cpp",
+      "object": "dc8cf7c414f81246cc6c070173bc1878c2751e59",
+      "bytes": 6044,
+      "sha256": "335b4d65c72194b937207a91e3182598dd1eef14c35278f16ac6f2beeef9b5f7"
+    },
+    {
+      "path": "src/test/mercaweave/qt_qr_tests.cpp",
+      "object": "20fb62f3a8ccf7a76c540527fea0471bd1e09c64",
+      "bytes": 1338,
+      "sha256": "e46b227a0f4dcc86717e226ace8fc93134b117722ebd93b041fae75856bee3c7"
+    },
+    {
+      "path": "src/test/mercaweave/qt_wallet_bridge.cpp",
+      "object": "96bbc2296659500bb0a8852cddb0aa6972cd1764",
+      "bytes": 13171,
+      "sha256": "f82f454ed2c24c97bf2dda98be815ffd7e8775fa7d8074454d1ce00cfad8a503"
+    },
+    {
+      "path": "src/test/mercaweave/qt_wallet_bridge.h",
+      "object": "854791906bb0a15b2ec0bf7f7db41b96eada573a",
+      "bytes": 2070,
+      "sha256": "1c66b2de38f250cef2a645f159ffc20f09a2134d6af780ca08dd463134f4e7be"
+    },
+    {
+      "path": "src/test/mercaweave/qualification_bench.cpp",
+      "object": "b878f18aa381b44eff23ef4fcaf0152b14ae91a1",
+      "bytes": 8138,
+      "sha256": "b868d7f508d8b9d65db34b42051767ab4eefcbfbd2164dd2400018e410d01b18"
+    },
+    {
+      "path": "src/test/mercaweave/qualify_full_integration.py",
+      "object": "1b69da5c09633f5ba1a2dd0ede0d191344c15238",
+      "bytes": 9495,
+      "sha256": "f6882d7125214b67831fdc498085a3cf63278789f62a685ca870f88311f88a3b"
+    },
+    {
+      "path": "src/test/mercaweave/qualify_integration.py",
+      "object": "453e3c4a8dd238e0474ae7f18966a9555cb42f2e",
+      "bytes": 9538,
+      "sha256": "563d3f1f36dda787b1b2c6e5b3324695e184c14f9a8be6f2a9f90e371b1322fe"
+    },
+    {
+      "path": "src/test/mercaweave/qualify_qt_mining.py",
+      "object": "c44c9f8989462bf24c19048586504365c19b5f17",
+      "bytes": 6880,
+      "sha256": "35dd44e3e18c167710367bcf47f22d571d1280587ad21ca6efff26cbe19ecb18"
+    },
+    {
+      "path": "src/test/mercaweave/qualify_wallet.py",
+      "object": "990a8bd353c084062c4bc80b9181573d33f32aa1",
+      "bytes": 7827,
+      "sha256": "c42dafcf691cf1970bb2302d62741b564316da4d26811c8238c6da4008aa9197"
+    },
+    {
+      "path": "src/test/mercaweave/readiness-artifacts/block-benchmarks.csv",
+      "object": "1d80d7e85e351d9769ce94f2d9f5c9d1454b4845",
+      "bytes": 2287,
+      "sha256": "c8c67e28fa1363a9ad8d08dc15ffb69e97ca9cda0cf14581df0cba72ab7340ca"
+    },
+    {
+      "path": "src/test/mercaweave/readiness-artifacts/consensus-readiness-benchmarks.json",
+      "object": "a0fd66bdd4db35c5093e08158f474aed0737002e",
+      "bytes": 42016,
+      "sha256": "b73de8e5f6b813e57fb796263064253987f5c72af78838482f2bd35f769a04ca"
+    },
+    {
+      "path": "src/test/mercaweave/readiness-artifacts/determinism-checks.json",
+      "object": "60fbbef58567bee79f84fa50419055775c973fac",
+      "bytes": 9469,
+      "sha256": "b9205483dd367c9201430d7b577ca7ffb576e826078e4439bbd8f9098d1c465e"
+    },
+    {
+      "path": "src/test/mercaweave/readiness-artifacts/invalid-workloads.csv",
+      "object": "d3474bc0962d817352271b7c4a464db00c52762a",
+      "bytes": 2175,
+      "sha256": "c5ae8b1202d12d62f75c4acbfbb8d1f4c20ba67c9b7af49654aa72cd9d84770d"
+    },
+    {
+      "path": "src/test/mercaweave/readiness-artifacts/malleability-proof.jsonl",
+      "object": "0a10429f18a6c7d00f30c5cae2450b432aa69fbb",
+      "bytes": 1083,
+      "sha256": "d8658e03b6424addac83e692526c9176cb325075d8eb70ce3c419fa5a1bfbc09"
+    },
+    {
+      "path": "src/test/mercaweave/readiness-artifacts/transaction-benchmarks.csv",
+      "object": "f7416f150fdce4b5ec1dcd1fd8c734ce1a4a7619",
+      "bytes": 1714,
+      "sha256": "1f07a4555ddaa0cedbcd116e6b8707c9a087fa96204488b18ed2f7fb94906276"
+    },
+    {
+      "path": "src/test/mercaweave/readiness_bench.cpp",
+      "object": "aaf381dab194ae54a6d1781074a8f940283a7639",
+      "bytes": 11458,
+      "sha256": "d8250d49a50d7fbcfe6d8ef88bbf0da6d3ae3c74467a71d2e97f497ea193e809"
+    },
+    {
+      "path": "src/test/mercaweave/reference.py",
+      "object": "7e84d7140e293ca3df950616f515ed1fe237a2ab",
+      "bytes": 4304,
+      "sha256": "e40393313eb1879d84edc75a353da04e25b22abc92f553f89e7aec2a90ab8067"
+    },
+    {
+      "path": "src/test/mercaweave/research_wallet.cpp",
+      "object": "81eac2682d311ef600808bce91a7040c56803c53",
+      "bytes": 16303,
+      "sha256": "9781b91f222a77c04adbd9e48d527f5dc3165e6947e75f78268c8b5504e95c99"
+    },
+    {
+      "path": "src/test/mercaweave/research_wallet.h",
+      "object": "f850ec9141192e0dc74add26e29a14c849c58207",
+      "bytes": 4067,
+      "sha256": "89803305de2165665828c908b9a3a0a1506e3254e398ac33163146171736800b"
+    },
+    {
+      "path": "src/test/mercaweave/resource_qualification.py",
+      "object": "2455b6590df46db76a41cbb7baefba23afe9b002",
+      "bytes": 3001,
+      "sha256": "1ebba3ef029cd294ad614c9456d274a685fc287982dfefce8346970c602d67d8"
+    },
+    {
+      "path": "src/test/mercaweave/reward_planner.cpp",
+      "object": "f9416a4253f37c0372ec6de65f795984c36e2385",
+      "bytes": 6680,
+      "sha256": "d215a6d13a2dc84671896d77e68e63cf836ba8810f0ecbc7152f5148ca0f64a3"
+    },
+    {
+      "path": "src/test/mercaweave/reward_planner.h",
+      "object": "6433c355b3c24fe4719bd8403a14ed52ac4c2916",
+      "bytes": 2326,
+      "sha256": "b6db87aa8ca75c724def4ca891e170ffeb1c3e8b32aa0e2cfa1275f8588b9861"
+    },
+    {
+      "path": "src/test/mercaweave/reward_tests.cpp",
+      "object": "ac7f5d05a613f312801300c0bcae9bc0998b807f",
+      "bytes": 9283,
+      "sha256": "fc06d9d638c6a2fb50721026ab67f93453c111136c91577e95ddc3d0dea37c62"
+    },
+    {
+      "path": "src/test/mercaweave/security-benchmarks.csv",
+      "object": "3c665c7fd5db26e0902381a10af0d1a2b51376af",
+      "bytes": 3128,
+      "sha256": "5bcdce4ef3a1625e2dfd1f2d6442daf79bb28b668dafd8234fd51bfc3569fdc6"
+    },
+    {
+      "path": "src/test/mercaweave/security-benchmarks.json",
+      "object": "5b504d9d0a9c90f0ede21b6b4e47b75d0b3e7cbc",
+      "bytes": 2050,
+      "sha256": "a2b9c3f49c19776edadef19ba4f7c73ca61dcb72bd12fca15e70148a15844cab"
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/build-provenance.json",
+      "object": "d3abf2f511a7f9f4f5cd3f4a5bd9a7a39a436c39",
+      "bytes": 2679,
+      "sha256": "27ad076b982ca9d1bca428655a127cd8fe0b3634e7a22ca4b2acf4474d9e72d4"
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/failed-attempts.json",
+      "object": "768162eefcd6a0a7e26bba9c7b3325e78a836989",
+      "bytes": 4564,
+      "sha256": "5d82e3d910d34d28c752a3d1ef4b22f010da31f2680b521db77d8534887981f4"
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/native-campaigns.json",
+      "object": "6cb49d6fbef76cdff4357bdfd1a5e0759a082419",
+      "bytes": 56123,
+      "sha256": "ecb493e84b1059dbd8b20c283f2dceb9dee9affc0ee216fd2cc0cef5d883bf94"
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/native-summary.csv",
+      "object": "bf69d0007c760db22033fbd45d5703f505d1f02c",
+      "bytes": 930,
+      "sha256": "39cbe29db606b5ba0e556012bc06605219a2a67787a9c6611b8544d3bd4980fe"
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/preserved-evidence.json",
+      "object": "be8581c5de76c4006a5c65d7ddfb338bb22d1a1f",
+      "bytes": 8459,
+      "sha256": "9f34c35da2bd52e0357c296a7eab6d321fcb5836220e3b4353223a0c5afcddd3"
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/regression.json",
+      "object": "b3b3511061ebdbfac54ebf8383cdcb84e8961ffe",
+      "bytes": 2409,
+      "sha256": "fb56cfdd675909973f56f9d47fb1e4254d1146eb61c757990ea5a19bb0a5e504"
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/research-campaigns.json",
+      "object": "f389837ae4ef2030d565a7424b54fbace2c75d08",
+      "bytes": 20640,
+      "sha256": "3ca1abd2cacbc7bdd4d681ed231a8f9fb4ba41ade1e6866d4fe351083a28e812"
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/research-debug.csv",
+      "object": "347b754f901263fb3eb6f1840bc04b9f57fa50f4",
+      "bytes": 1809,
+      "sha256": "642e29348daf48d01c7ffc9ef953c7ec6be6406237aab682c4fe0401d9c9e8df"
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/research-release-repeat.csv",
+      "object": "8a397d57fbb5260978bc9d06396588843ccd4b62",
+      "bytes": 1773,
+      "sha256": "4c6be6c9c0eed82759a76b7acd097be8d09966333d1c265ffd36056a92dec473"
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/research-release.csv",
+      "object": "470e492c09528436a648c543c687c0c2a39cbb6e",
+      "bytes": 1778,
+      "sha256": "1dacd8486b1380a94b7b388b51b50106a90d2a95af600cda6472e8707a4d4af3"
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/research-sanitize.csv",
+      "object": "0e305dd41e574943e91c4accd7f3fd80ce938db9",
+      "bytes": 1793,
+      "sha256": "e63e51c813fc904522774b6c2f52194e2a30fd697ba8b77b9bbbc25688db7c24"
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/research-seed11.csv",
+      "object": "e1bbdb492ba8f426405641a70f06548cb4ed4c88",
+      "bytes": 1779,
+      "sha256": "f6c0a82ca42c02f461493ebefc639367b4b4dbc4f25d9f063483db571ec8291a"
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/runner-controls.json",
+      "object": "7f3aaa8b67b076128e0c52054a808eaa9738442b",
+      "bytes": 860,
+      "sha256": "16ab475cc8968347ae9c4f4c3ec3e57b31e56ebdf04d5febafd73397d79b4fa1"
+    },
+    {
+      "path": "src/test/mercaweave/simulation/__init__.py",
+      "object": "b82b2e0d1ffa211414603d0b476e6b8b5307d472",
+      "bytes": 85,
+      "sha256": "e3193188f24be2cee29ab008e26c5e985bcd40e6bbf9331ae722bff7da0315e0"
+    },
+    {
+      "path": "src/test/mercaweave/simulation/core.py",
+      "object": "e547738997539566bf242fffe1765bc5f888ed9c",
+      "bytes": 6491,
+      "sha256": "db62bd7cd2f5401e3c5e59f79c722f70739ab1b816b1df97e18f7b4af4dd8839"
+    },
+    {
+      "path": "src/test/mercaweave/simulation/lifecycle.py",
+      "object": "f2f17c85569a5556334f4a9f658966bf7858dbec",
+      "bytes": 8288,
+      "sha256": "72f2460c48e26ee22b5e67486a5ec10c11524c0180cd4aaf4fd5de9e7477d3d1"
+    },
+    {
+      "path": "src/test/mercaweave/simulation/native.py",
+      "object": "1b8454ddd875293790d4848efd0b0190c33c13cc",
+      "bytes": 15061,
+      "sha256": "e36d08b23606f9e45797887e935a879ada8fa937c4dfb03280d04cb45aacc772"
+    },
+    {
+      "path": "src/test/mercaweave/simulation/research.cpp",
+      "object": "54757f82eaa8724612bacd4a2bb874285a7ddb25",
+      "bytes": 3166,
+      "sha256": "63b438d895548732246ad967635e5ae8c90f512bc0f7d8681c0dadbc550d65be"
+    },
+    {
+      "path": "src/test/mercaweave/simulation/run.py",
+      "object": "f8ea6fb87011436d3231be97a7ba84d49e0883f8",
+      "bytes": 4095,
+      "sha256": "d51cc2750298825476951a15b30b349b5267f5edab4a051713bda8fa69b3f6f4"
+    },
+    {
+      "path": "src/test/mercaweave/simulation/summarize.py",
+      "object": "f9337168d2ad530dc938b004bc4b748b65a0b0f7",
+      "bytes": 6369,
+      "sha256": "3de765cd031bf52d5a97df476d8ab2a6bf3c2ae6b1df9c94c8181d08e65f9cc6"
+    },
+    {
+      "path": "src/test/mercaweave/simulation/test_core.py",
+      "object": "3c09a32f84565b3bc0ae1578529c91484a277d64",
+      "bytes": 1827,
+      "sha256": "af5c7204cf8c2926ebd661665a6d4d4b8523dd0262f5bcedb8e5f9bf19c1fe2b"
+    },
+    {
+      "path": "src/test/mercaweave/tests.cpp",
+      "object": "474969ca579263be64bbcb316d7b3462cf4ca582",
+      "bytes": 27308,
+      "sha256": "ffb2a48aea07860bc99c9d9fc4e3feb0d2e4b72f07296d086c58fe377b452f2f"
+    },
+    {
+      "path": "src/test/mercaweave/vectors.json",
+      "object": "510c0e155d59e2469283476e12ec04093461e23f",
+      "bytes": 402634,
+      "sha256": "ea4978206307ac21d4f544b05e6da3543e094c9a1c4bd97c44f90fad4420c49c"
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/debug-check_isolation.json",
+      "object": "bfb36a9fbceed3d204bc333c29465f6af320cf53",
+      "bytes": 900,
+      "sha256": "3ab3d5d4780a71878711db5863f09e2c5cbd05b95a69142979ae16eff5b60997"
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/debug-check_wallet_isolation.json",
+      "object": "c859f5d145f76c2ab43faad6d5ac1a0bd3a23a13",
+      "bytes": 226,
+      "sha256": "09a83216c95479ead3c250b3735bc3e4c0393417b4c0fa5a167d8807ce139351"
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/debug-ctest.txt",
+      "object": "a8c14d5b5efae8a06455fb480e4ba2cef6469c7e",
+      "bytes": 23339,
+      "sha256": "268dd85d6ed4f185a97432555fe83736da9e03348978d462243c8ed9bffbeeda"
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/debug-workloads.csv",
+      "object": "741efbfbe23126a3179912dec578282799213eec",
+      "bytes": 5653,
+      "sha256": "dbf58f68023e240a11afaf7c67b2c5ef8087bb178d0fdf4621ab3305fa3ba0c0"
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/mercaweave_psbt_tests.json",
+      "object": "4cf1e72dd75503e11aaf9ce23570a7181a9c215c",
+      "bytes": 93,
+      "sha256": "804fb0bdf3d607b2d033dd31b3622933a1a2c153b51f49ae99ba1ebc145e9a5c"
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/mercaweave_wallet_tests.json",
+      "object": "7db4b66b8565722d782a11d92a81b052217755e2",
+      "bytes": 52,
+      "sha256": "996c3f99ac58b3b194c4e4c87b1dc381ef62b3b643483321a1d43f9261874b91"
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/qualification.json",
+      "object": "2cad825173205b406f7d6f247f59a8eb9bdf4776",
+      "bytes": 31034,
+      "sha256": "6000c56a58605c99278c467c1f82fb0f115838aeac29998148dbfdc42aed4f74"
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/release-ctest.txt",
+      "object": "c3c46a3112fbbb05ba123cde88b193593a3f8083",
+      "bytes": 23420,
+      "sha256": "ff31bc28bb54df80909d21ed5f0b00159645a507950eb3733b65f1e0ba6821f6"
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/release-workloads.csv",
+      "object": "9b6d54198d2b836cf109c797d3f0f32a828c7834",
+      "bytes": 5602,
+      "sha256": "0c5eb9f7ef6ac3975bb4b418a1e38b8c63e227560d9f8021441808b85e61e520"
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/sanitize-ctest.txt",
+      "object": "54e2eb19339f2c7c3c73ca55b9ee36b2d549e0b4",
+      "bytes": 23468,
+      "sha256": "495e470861df8aac9b9b4bf9fd3eb6301c481b70351edba152848e651876db55"
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/sanitize-workloads.csv",
+      "object": "9d163b75939fe452db8987380ffb691d15d186f4",
+      "bytes": 5640,
+      "sha256": "a14b5208c1b753726d8bad2bb360c5364c15d0fa2b04cf84e1ca37b050f470e7"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_bench.cpp",
+      "object": "46d167f1740a67f8686fb9a1399979d200054a73",
+      "bytes": 5719,
+      "sha256": "47e45f4f4ab60363738a985d5991b9d50ccb29599cd6ace45b11beb13e21ac4b"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_fixtures.h",
+      "object": "a85de0a65218a83b5841c47719c5c16330bf57fc",
+      "bytes": 1258,
+      "sha256": "7333310129e672b63697a0c601972fd3de15259456e093be8d9d7d9f0dd2fd52"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_funding.cpp",
+      "object": "4823355ddbdb37830d98219c34e276119d68fd3e",
+      "bytes": 12072,
+      "sha256": "89118c89fe567080b907c4f193746fd0ee2dd6858342d41def4e87fed20e7899"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_funding.h",
+      "object": "23168e3be8932ce6dedee943638d5a73eb45bf23",
+      "bytes": 1818,
+      "sha256": "ade2649200c1c21ecd1046ee69b5805ca356a198c7beb108dd0f2a6e7db41956"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_primitive_probe.cpp",
+      "object": "f345e47574f41b65e6e9a032c4e9dfbc34ec1907",
+      "bytes": 1459,
+      "sha256": "fd8a2a883baa0a049e9954b7724743d9629c03aa75d20775739585d277d5dd0b"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_psbt.cpp",
+      "object": "5f52e88f02b46bea3e7ce16dfb3905a4ad15f41e",
+      "bytes": 14490,
+      "sha256": "db7848d86bf02090120945235ba90ba7a782ebc4bce08ad271f4f112ebbe06e9"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_psbt.h",
+      "object": "c0aae590a45404d21366b3d803d7cb4bfcfb7d66",
+      "bytes": 2217,
+      "sha256": "298e5e28e5beb9754b561d402bb10351e75c7024271f305de52263dee711a336"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_seed_bridge.h",
+      "object": "b500eff61e4b81f2710fc1f5c91c0ab8124bd969",
+      "bytes": 660,
+      "sha256": "d4c1928f544a2a604ea19f1768bfc6dd709a7afdce6a4b3643e2a9d462ae6ce3"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_tests.cpp",
+      "object": "2b37ff84ecaea9e2bd9f638d566ac88eb45c7fba",
+      "bytes": 13223,
+      "sha256": "24693bcc3c79eb15566214fd46835d47d1803c315aed5e9608e0cd36b71f0af3"
+    },
+    {
+      "path": "src/test/mercaweave/work-order-02-baseline.csv",
+      "object": "4da0b96cb0f1f65b3f0687b3fdf14dbbbf414932",
+      "bytes": 2166,
+      "sha256": "b81d187a98415bc1be0fab7ad8ba922aa2ef44ceed4b16320ecdd19d98caa012"
+    },
+    {
+      "path": "src/validation.cpp",
+      "object": "fd565f4e49198e0dff3e60a3c1a81c65bfb38368",
+      "bytes": 340712,
+      "sha256": "6d26022802f8a286da3ce64965d5d196dcaa7461027d927d71a761ed3bd0b26c"
+    },
+    {
+      "path": "src/validation.h",
+      "object": "261852e17e04e01c174adca598e778802a394bca",
+      "bytes": 68726,
+      "sha256": "8122e453397bce198016cbbcf44c186d284ec030f4189c27c35be24f38352867"
+    },
+    {
+      "path": "src/wallet/CMakeLists.txt",
+      "object": "f34a7547b894a3d4bb747d39af1f821c6c230955",
+      "bytes": 996,
+      "sha256": "ac38c505518e4fdb5b6e4b328a34a6dfe37c25a1b1e71be1589075c252393157"
+    },
+    {
+      "path": "src/wallet/pqgroup.cpp",
+      "object": "ba12ebb81f7592e34120abcfb49005303819d74e",
+      "bytes": 8285,
+      "sha256": "b5b23d69105465647b2de68f1ad47a44cbaec0be7cd0f5c50f8675474f0a6cc4"
+    },
+    {
+      "path": "src/wallet/pqgroup.h",
+      "object": "e81dedee1c7d76c5a9e32d15f8c5b9ac05093a93",
+      "bytes": 1907,
+      "sha256": "84de1c6951deb30618b41d1ef35c070f84d18b661de83de92fcbc74a60bfe27a"
+    },
+    {
+      "path": "src/wallet/spend.cpp",
+      "object": "7c4ec1e3d6a49053c18a989a28aa8fa536276019",
+      "bytes": 87246,
+      "sha256": "19aef2871b4534cd09fae09a4875c8a2c84af149457ffc17875bff8e005da2a1"
+    },
+    {
+      "path": "src/wallet/sqlite.cpp",
+      "object": "426e5ae9990b360125ea8c58ef93271844d76df2",
+      "bytes": 26741,
+      "sha256": "b399d8354cdfe0546a11645ff3e3815d902e3a1129a90efc26ce7e39630e834f"
+    },
+    {
+      "path": "src/wallet/wallet.cpp",
+      "object": "1fd9884b4aa7295a6cd292d50433e3bd1a351a71",
+      "bytes": 238300,
+      "sha256": "34c129598fb299408d570533c2e458227e660b726b8e7bf3d240a49601659906"
+    },
+    {
+      "path": "src/wallet/wallet.h",
+      "object": "b0e18a6d3ac886f15ac13d9fd2af1b183451a605",
+      "bytes": 59841,
+      "sha256": "fed88125b3d492d960fc1155e198da680af134c1dc4456dd2f47440a0cef64fc"
+    },
+    {
+      "path": "src/wallet/walletdb.cpp",
+      "object": "8e350be40c98e489fd8b06a7f57993bd25888c1e",
+      "bytes": 63180,
+      "sha256": "1d121c3bb47b8e0c9793e4fed105e01207b6dcc8e54bbd773e3ef6a813fab484"
+    },
+    {
+      "path": "src/wallet/walletdb.h",
+      "object": "cf39e0f85efccea72cb2711dbde6f4d6776676af",
+      "bytes": 12230,
+      "sha256": "2aa7ec812d140cfb8fb7ca8ce4cb6ebf369c3075221432663df942ee7f4ab005"
+    },
+    {
+      "path": "src/script/pqgroup_psbt.cpp",
+      "object": "9ebe57b5ed4ecf699a1109e2818aef30638e42fd",
+      "bytes": 13558,
+      "sha256": "61eb91bf0f794d6f4bb735ba83dd2e7dc276cdbf25ab75dda71a81531b5aac17"
+    },
+    {
+      "path": "src/wallet/pqgroup.cpp",
+      "object": "9a94ab7f8fe00515bd0975b6cdf79556449f24af",
+      "bytes": 7952,
+      "sha256": "71157c8c914ed1d40a9dabbe38b9fb0bf5de86bf7e56765d3c581122490c371a"
+    },
+    {
+      "path": "src/wallet/wallet.cpp",
+      "object": "120a99e102e0eb1a8eec38b6c9cbaa13f38ea864",
+      "bytes": 238093,
+      "sha256": "df60464e0391e78f5d0fb483f5f8a621c7850ad0b159e0a917b347704528d07b"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-production-path-integration.md",
+      "object": "1545292b93b92c90866c91d69b5a45ceb199f95f",
+      "bytes": 5352,
+      "sha256": "ce2ad598f317f7a2506db59a62f483fdf928af439affa2175085750fc2b70e42"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/collect.py",
+      "object": "f0de798614c2f4dc634f34fb777acbc2fdc9ece0",
+      "bytes": 9611,
+      "sha256": "afe576999f0548c620235af2ed17c02bb197ea8e098a5ff4d66e1c38dfd7e111"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/run_native.py",
+      "object": "c9bf7c2fa0b4356085bf69eddc582f5ec50c53e7",
+      "bytes": 3174,
+      "sha256": "4c5898c13af0aa2b268b7d13157b62974f3ac7f104b410ed43522455153edbef"
+    },
+    {
+      "path": "src/test/mercaweave/check_wallet_isolation.py",
+      "object": "954d3e37939c750e5ac1d9ed17ecb060406046c1",
+      "bytes": 3285,
+      "sha256": "54584df81012ee0212329ef223d7308e445b69b0b719109afc7d82c80883a3eb"
+    },
+    {
+      "path": "src/test/mercaweave/production-path-artifacts/failed-attempts.csv",
+      "object": "11ac895a9baf78afade0181beafa157b83c7cd68",
+      "bytes": 3592,
+      "sha256": "83ad2f0e6438c9995a3a9a7ac9b3e33f99477be63e73d27a909d2534c1229a29"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/audit.py",
+      "object": "f939f89f6740fb7617af6287f983681d114617aa",
+      "bytes": 4793,
+      "sha256": "796e301384d818c9609e61370401bbbbb207ef60a76794cbca4d62d33d005daa"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/build_native.py",
+      "object": "2b877389e43ddf41dff4299065052cecb4da1222",
+      "bytes": 3687,
+      "sha256": "f927634e1a47435ec212c11c7d4c5c581c10358891d815a8d9f0047fa369f3eb"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/collect.py",
+      "object": "6e6a1b1b995d910b108e5480b9be0d5ae4b8087f",
+      "bytes": 8986,
+      "sha256": "4bdd24c9d0f395e87736d1bc7546987419f850e10f66480b739d58f4bb2cf9e6"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/run_native.py",
+      "object": "61e35b768cc6e005cc45f45cbc26dd9e9b8cf3c2",
+      "bytes": 3130,
+      "sha256": "1910eab569a72d63e6de2feb0786679d095cac85c99e2997daaf16fa1ee3d025"
+    },
+    {
+      "path": "src/wallet/wallet.cpp",
+      "object": "39b5ef3bc058235e554fe90142aa5c507e74f818",
+      "bytes": 237999,
+      "sha256": "d5bd27245f96d0198e9c4c4dbfb59f624ef363fa729395bee857d28c287eac12"
+    },
+    {
+      "path": "src/test/mercaweave/check_isolation.py",
+      "object": "f1bce15e402b09fb0f5b0bc8dda282c88e7d2246",
+      "bytes": 5413,
+      "sha256": "b91d372f4f7c872bbdcd6590846c53a58643d77cf4a3285acef55de7bd498775"
+    },
+    {
+      "path": "src/test/mercaweave/check_node_isolation.py",
+      "object": "e381b45af8a814be849ecd48c9786c0ebc7f2f24",
+      "bytes": 3799,
+      "sha256": "528fc1958138fae71b53fa68e5082fb4aead0483208ba7e03a3477a3ce4bf674"
+    },
+    {
+      "path": "src/test/mercaweave/check_wallet_isolation.py",
+      "object": "e434513a9530085f951086f6535919c79d92449e",
+      "bytes": 3041,
+      "sha256": "610a77b4f6716dd7d0fe69d9c9ae95483af8f89cc38f0cbaf01486f660b58e80"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/access.h",
+      "object": "ae0158a5cbadb361251a89b52a1c79e2bb6874fd",
+      "bytes": 811,
+      "sha256": "9087e82957acf33ca0a496b54b4acd0058d53be2bc8c9f6b7907f5fbb69f146d"
+    },
+    {
+      "path": "src/test/mercaweave/production_path/context_tests.cpp",
+      "object": "01fced13d392aabba412c5289e68df1c7f007913",
+      "bytes": 5555,
+      "sha256": "8f05d88a63bf2f7b56db4f33471f807df763e7aa8797fc404fc2a2242afa94dd"
+    },
+    {
+      "path": "src/wallet/wallet.cpp",
+      "object": "3b93f2d6114c9115e68393b6347769832b936637",
+      "bytes": 237108,
+      "sha256": "d568e52e7a184c8c5505746ccd117032d229beefd4fbfaede9d15a694c54dea0"
+    },
+    {
+      "path": "src/wallet/walletdb.cpp",
+      "object": "9f93fecc8bee538f46d47e6ffa11ef9a1b019234",
+      "bytes": 62091,
+      "sha256": "dbbbd47a00826fa6f0b231f3d645d48232dfbf24d642c2b66508fa0b63d7e26d"
+    },
+    {
+      "path": "src/wallet/walletdb.h",
+      "object": "e229131927e02363ef1efee3d86a650fead18af0",
+      "bytes": 12187,
+      "sha256": "21aca49cade7371ffd84791d8ec3c5be690a7e44ca271417fde541b03470721d"
+    },
+    {
+      "path": "src/CMakeLists.txt",
+      "object": "8007ef4901bfd2bfb7e66f9ddaf0bea798dca86e",
+      "bytes": 11209,
+      "sha256": "2834f9a381a2ba890cf5abbf131edb527de9f97463f889af97d10a9fc10bc688"
+    },
+    {
+      "path": "src/wallet/wallet.cpp",
+      "object": "8ffd409a63ab4cd817b74d4b5faefd76c9d8c4cf",
+      "bytes": 226220,
+      "sha256": "aa1914bdda91fec127274436b54c555c24fa500c6a1c9c89bb5480f694e157c7"
+    },
+    {
+      "path": "src/script/interpreter.cpp",
+      "object": "dc610be35b0d386d1b5e40075dc0ab7255fcc574",
+      "bytes": 93029,
+      "sha256": "f6c5cc8aef60bc5227c0bbe49772eeda6dd7f3253e03f1c6e0329ec2f17d7eb2"
+    },
+    {
+      "path": "src/script/interpreter.h",
+      "object": "e2adc62cce290ece825ff3d9edebaab700cb0def",
+      "bytes": 19561,
+      "sha256": "95e0c1b5bd634cb2bcb2ded295aeed654bb76849887cf7a2b7f9635b043efd89"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "bea5c8c3bcf24102d76d201216828e0b31761358",
+      "bytes": 23277,
+      "sha256": "7ed1d2948c33cf507864d356bcac83f721d6d3f6ed6201bb328cc0dfd1db7021"
+    },
+    {
+      "path": "src/test/mercaweave/mercaweave.cpp",
+      "object": "36e44440c7d5be9bfd337c41f502a8a1bc03ab66",
+      "bytes": 17283,
+      "sha256": "8948feef7969c3a4d43eb499fa14d0c847d1a78680729d07c84462c94caca766"
+    },
+    {
+      "path": "src/test/mercaweave/mercaweave.h",
+      "object": "e14a3890ec145f67517a39ac50e98db245c6c354",
+      "bytes": 7575,
+      "sha256": "1375b61160180387355e87512ec378a24fa485dd48e4a1e4e629df7ac675d7db"
+    },
+    {
+      "path": "src/validation.cpp",
+      "object": "e3df23432896a19949f71d98d17328d5095a8e74",
+      "bytes": 335539,
+      "sha256": "a507f633f9b8774cd20068a9a0fa7ec3fe0acd3fc9b26d53d52f6666d6092adb"
+    },
+    {
+      "path": "src/validation.h",
+      "object": "55334c500f7785344679147bf40e3ff5c5665299",
+      "bytes": 67662,
+      "sha256": "882503d5873136fd24747e7cbc3337059c69d19ea46ad55ffadb4f07fd72e16b"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-automated-simulation.md",
+      "object": "a2162e4981bc252c0f3811fe5245b3e822ce7729",
+      "bytes": 3852,
+      "sha256": "31107541abdf63fdbfbeab5a44a7c27d424c83e5dca8952e1b4a58838aaa1764"
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/native-summary.csv",
+      "object": "45c55940509aae44de74d73e0432877235ec79a6",
+      "bytes": 938,
+      "sha256": "239a441b48d233eeda33beff62efcc0dcb86d110c4c8f6f879b53dfcab63cfa5"
+    },
+    {
+      "path": "src/test/mercaweave/simulation/summarize.py",
+      "object": "7e037cd440e2638047fc1aa01374738d617d935f",
+      "bytes": 6349,
+      "sha256": "2f2e877456b2966049d2107df3f4e9fe01640b2bf66488ae56e8422206543b7e"
+    },
+    {
+      "path": "src/test/mercaweave/simulation/core.py",
+      "object": "43c8cbdee579a6d8dace0034ab237d6047344280",
+      "bytes": 6046,
+      "sha256": "6f1052a4ba1a048ff76ba4db74cc06464020687a59b21840ddad612f0bfbfeb1"
+    },
+    {
+      "path": "src/test/mercaweave/simulation/native.py",
+      "object": "f429bedf0e6aa4ea110eccfd39ff1a6a37ab0e99",
+      "bytes": 13341,
+      "sha256": "09b314b66d4b497b87eb1b56edd80a86ffed42f3eb641b7076dc01de1bff9b9b"
+    },
+    {
+      "path": "src/test/mercaweave/simulation/run.py",
+      "object": "9ba6229e3de9e1452347732276c0de4ad36db6d9",
+      "bytes": 3012,
+      "sha256": "c608ae631c44678e8acf68f38ee2fb5d283516e6ebda682fd6e1ae999ea712af"
+    },
+    {
+      "path": "src/test/mercaweave/simulation/test_core.py",
+      "object": "023c472097ae8dc09c11ba66e46b7e9bccc7f7fb",
+      "bytes": 1770,
+      "sha256": "3c318f22f107926ee6fef4c2594b30fe4f3b293665b072c3e74de763e4109d3a"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "098edf5fcc79baf72b8d7c8ec67283e2329e19d8",
+      "bytes": 22636,
+      "sha256": "36281f6538320955f4bffd2d63444ab61a5d9b60107891baf18dda90db0abd2d"
+    },
+    {
+      "path": "src/test/mercaweave/check_isolation.py",
+      "object": "2d84e11574e5751ec4489c74bafa372de550baf6",
+      "bytes": 5379,
+      "sha256": "3f015e9c9afb21c1f9181dc98dc7380da06658bfb3be7711693a17189f49810e"
+    },
+    {
+      "path": "src/test/mercaweave/durable_tests.cpp",
+      "object": "60cb2c1a5b41229859198d3b7ecfed87c386ad70",
+      "bytes": 10347,
+      "sha256": "6696d67cc0c7baa69c3e54d9227f26b4b8b9fddfc966f07dde2d8c803d49f71f"
+    },
+    {
+      "path": "src/test/mercaweave/durable_wallet.cpp",
+      "object": "55abc231497001d6ed64b667c4cfc0e0ff2815d0",
+      "bytes": 11945,
+      "sha256": "902ba1e3548813af924fe65ee85cd63953b36e89d1f49aebdc613c52e14ec3f0"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "012f48006b3248baf22cb3328bda86c040e5174a",
+      "bytes": 18919,
+      "sha256": "9db747899d422828860b0d4b0e43234269eb6e0a9e2128b2ff723219e2b11a32"
+    },
+    {
+      "path": "src/test/mercaweave/check_isolation.py",
+      "object": "de390545ec24210400e2e508f7c8c6c778af2f88",
+      "bytes": 5176,
+      "sha256": "de82caf406146da781845e62172dce7705fbdfdf3e09686628c6ec5e396f75e0"
+    },
+    {
+      "path": "src/test/mercaweave/check_qt_isolation.py",
+      "object": "e5693c1d8749ee05cabf132d38b251dbf360908b",
+      "bytes": 5002,
+      "sha256": "9eb46e4482384c151b6334ca7e3f73869568841db7ea09de31a480e31f956218"
+    },
+    {
+      "path": "src/test/mercaweave/check_wallet_isolation.py",
+      "object": "49206a36d5216a20ff93a8fbf02e885f584ea218",
+      "bytes": 2926,
+      "sha256": "7a84b10028af0632c4059df3a90df29cad2556e77f8527d9b61d3d86e51cf82c"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-qt-mining-integration.md",
+      "object": "fe5dce543c3307d8406fbbe0352bf73e42a6a531",
+      "bytes": 3720,
+      "sha256": "39e26ff2209394e38056b7390a5dde90f6fdf2f31bc004389ceb5f947a734c42"
+    },
+    {
+      "path": "src/test/mercaweave/README.md",
+      "object": "8c760840a5808058abd276d878383c4c6b346409",
+      "bytes": 16608,
+      "sha256": "4e6cfe75295bb046ab69b173d6a9a7e494cc8d81211c8c8011f8a929e9869761"
+    },
+    {
+      "path": "src/test/mercaweave/qt_integration_tests.cpp",
+      "object": "7b6ae2fbfd6b2f485c4e6f504a3ba40d18646092",
+      "bytes": 10269,
+      "sha256": "4374899fd2bd102f8865f7e629034f0d467dfd980063ed78724e881da6def45f"
+    },
+    {
+      "path": "src/test/mercaweave/qt_wallet_bridge.cpp",
+      "object": "ed402f53b20787000dd2985181c548097e7d28dc",
+      "bytes": 12794,
+      "sha256": "63bfb5e5614778f2e3b674c5b3778b39ccaaf0865b981c855040f4a788b0573c"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "56408337e9da75e4633be25d654064915d8c8684",
+      "bytes": 17295,
+      "sha256": "bf7d56b4e25ca0be1ba1e8963a6d75ccb22128e2797351588ff84760f5b81506"
+    },
+    {
+      "path": "src/qt/mercaweavemodel.h",
+      "object": "dd878ac5a6784760f2643b8015f2bcb40e220521",
+      "bytes": 3197,
+      "sha256": "1b7af4ea79d2859110681653116a2feef026bef721742bd4473b4f093993d2b5"
+    },
+    {
+      "path": "src/qt/mercaweavepanel.cpp",
+      "object": "16497a8a77ecca19e0f8dbc2df331885108af70e",
+      "bytes": 9373,
+      "sha256": "4703c3f3dee5bfdca6162d33de423615bd87eba7b702b28a2a18f89755e17ca0"
+    },
+    {
+      "path": "src/test/mercaweave/qt_integration_tests.cpp",
+      "object": "08ba7d797bdc9c89b61740058cd87cc2dea83f87",
+      "bytes": 9656,
+      "sha256": "52931f31381277af208576cdfe9af78cd8ac5fefbdeca3b6f1939207c13b6729"
+    },
+    {
+      "path": "src/test/mercaweave/qt_wallet_bridge.cpp",
+      "object": "c19eb5a192585fee3e5edffb6c9cae02048b0c85",
+      "bytes": 11646,
+      "sha256": "95a641ae01cb304d033e0881afc70a4e02c53ed01a8c2bda29db98909fda16b9"
+    },
+    {
+      "path": "src/test/mercaweave/qt_wallet_bridge.h",
+      "object": "5e0596aabbf702ff9f0e230edcaaa6cf8f61dd47",
+      "bytes": 1915,
+      "sha256": "c36eefecfa7fa517500f55064f74b2fcc757de73f1c3fb20fa5b7ded96ab1355"
+    },
+    {
+      "path": "src/qt/mercaweavepanel.cpp",
+      "object": "7a906a9038bf203b37889219521f6464bc512751",
+      "bytes": 9081,
+      "sha256": "eb562800847c21e47c1e7e94500671b506e43e1785ce91fd3dfa8d565e313d4e"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "db97c201a250ff5df29cd4e9d9d66ef95dd6b22d",
+      "bytes": 15607,
+      "sha256": "d4f5cf774058c1615360c578a38166a0aeb1f6a41c62dde3b2e6a9d5fd83b0a8"
+    },
+    {
+      "path": "src/test/mercaweave/reward_planner.cpp",
+      "object": "bc896464e168a5c2da4cc623296a252d6aef9e46",
+      "bytes": 6342,
+      "sha256": "5c6d026f6cf40f367dfc94bd6fe2ef37dc6766079dea4d6a908646842af3544c"
+    },
+    {
+      "path": "src/test/mercaweave/reward_planner.h",
+      "object": "096e0f9b49c83b163ddfb3ee032903be61a980b7",
+      "bytes": 2304,
+      "sha256": "f1dfa08ec6d122ce0578de56cee13b06505339d97272f43ce98a4a79304d78c4"
+    },
+    {
+      "path": "src/test/mercaweave/reward_tests.cpp",
+      "object": "eae3a3b01efa439c3150bdd93214e9c4cc9094ae",
+      "bytes": 8683,
+      "sha256": "13506778f0ce18f0bf157e56dc71323f36201e6d04291308615e62b12a1aae56"
+    },
+    {
+      "path": "src/qt/mercaweavemodel.cpp",
+      "object": "ef322268534784603e97c3d4657ecbb0e81a50aa",
+      "bytes": 7517,
+      "sha256": "fe551e7a3b56e14437e2a637959bbc604ac235937021479868d00177066e7c7e"
+    },
+    {
+      "path": "src/test/mercaweave/qt_model_tests.cpp",
+      "object": "53d41bd8f136e612a37aa4e066b48b1e8ab46898",
+      "bytes": 5696,
+      "sha256": "d9de8f31efc97324b55bf14e64bb1fb94c9c3224ae82b907e9385b53c75262a0"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "29b7b1a34072d37e3a4fba283c177e0a281e9514",
+      "bytes": 15097,
+      "sha256": "b1a18e1f1e6df81b3fd0458431d52e59b32d7a71c1fed89ef89a75fad8773335"
+    },
+    {
+      "path": "src/test/mercaweave/check_isolation.py",
+      "object": "30a9571b52cbc0d40ba45461d0619a327205044f",
+      "bytes": 5061,
+      "sha256": "51d9f6808f8dcb8d007e1bb56502fae459147d6fce4b406002b6e448668e74db"
+    },
+    {
+      "path": "src/test/mercaweave/check_wallet_isolation.py",
+      "object": "45e9aa79ce9f852f2c3df0de4243c9ad589e4921",
+      "bytes": 2811,
+      "sha256": "77c249f41c0e2d2d49f1a401c17f0aa0058c108358ef800c6cb51d797dc43659"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_funding.cpp",
+      "object": "fcc60ea6c65755f9db061a4e1fc95d8ef3a7a553",
+      "bytes": 11850,
+      "sha256": "e098b55db89652b075bfcfa1e70f6c2e2aecf5a184ebb3d12b897463c526a65b"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_funding.h",
+      "object": "87ed94fe2fa5ca7bf53ade457e5965ae018f3d73",
+      "bytes": 1755,
+      "sha256": "4b65815d2f8aa4b97963e46180dc6e3f9dd22c08cccf57c5eaf83b9a88ca0ca8"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_psbt.cpp",
+      "object": "5eea3f48157f088990c79fde119dd6ffd99c7aa6",
+      "bytes": 14372,
+      "sha256": "404128b40f2b33242e5fdb83d76dbbc76aff96d47af632e29e8edf507d091a8d"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_psbt.h",
+      "object": "4806f8e4398370deb127e40d2a7d92108cc31574",
+      "bytes": 2112,
+      "sha256": "cdf54909acb6ba98958edae17fab14c0f25b793fd9b0516330ba69fd577e1beb"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_funding.cpp",
+      "object": "ac6028d4d5ba019643d2ea7cff7b1bcd64fcbf85",
+      "bytes": 11620,
+      "sha256": "6ed3b2b8f529f73c4fb5d07d6375d1acee20c1712fce5abd73407cfda3f49317"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_tests.cpp",
+      "object": "07e11fad936a5abe112322c648d23735b56ee161",
+      "bytes": 12795,
+      "sha256": "8d794eb7c95bc5029b5aa2b639f434d8ce6a21ad559080ffe2537f51bcdf14ae"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "893309677e11b07a0e927c64e5ba9689f4e062f6",
+      "bytes": 13454,
+      "sha256": "6f3334540cbee9371ae8640a28d45e45bc96706f338e1d27ffacf9c035ed92fe"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-wallet-psbt-integration.md",
+      "object": "72f8ae8c11e4e0a9738bea8f98738c0297929450",
+      "bytes": 1715,
+      "sha256": "b3d15452f7729d289be637a0646a3ef21b2a4f18c4a52a0830f2615c9b3fcf49"
+    },
+    {
+      "path": "src/test/mercaweave/README.md",
+      "object": "675cd81cf416542c681a23d690c09ca9c7527a5b",
+      "bytes": 14933,
+      "sha256": "1ac31641545791c7410a3d7e2e7a081292340b0e0cb7c20da5ab7b01b2236954"
+    },
+    {
+      "path": "src/test/mercaweave/research_wallet.cpp",
+      "object": "ababfd2b4800dbe9f0e50c07718d095970bac9c5",
+      "bytes": 16142,
+      "sha256": "72245d426af09f776350b86525ca65c93c77bc1e1233f80a8812c02115930342"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_tests.cpp",
+      "object": "6ed0ef45368f939febbdb72f6f24487a370f2e0a",
+      "bytes": 12047,
+      "sha256": "a96633c9f27a35356568a704970468ac6436aa699b7d2218351839fef33f3fc9"
+    },
+    {
+      "path": "src/test/mercaweave/research_wallet.cpp",
+      "object": "5c49ffab0e3c7bdf6aa69105ada7a73b7eb83280",
+      "bytes": 15857,
+      "sha256": "a5b50f10cbbbc530c781260df05f608ce58bd2fc34d058eba69ca77c8617a24f"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_tests.cpp",
+      "object": "30d1eeb698e5dbe3d5ac833e0998d48a5ef65558",
+      "bytes": 11438,
+      "sha256": "5fda0ce2b3bdf99cdd43ff802fd4cab61989edfd4730c632d4ffb5096e30ba44"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "633dc25f93a3762bf97975be11bdf4fce6cc9f5a",
+      "bytes": 13234,
+      "sha256": "ed3296c407aa1c1ff0abefb2d511873f6530d70a973e2c0bc9e3b19d45422d86"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_bench.cpp",
+      "object": "fac4ae0a70bd52a22534074f9db2c4fa16ee2bd9",
+      "bytes": 5543,
+      "sha256": "4000d24fa578b2526d3adb42ff69387a3823ac97413b6b6553155e5f92faae10"
+    },
+    {
+      "path": "src/test/mercaweave/psbt_tests.cpp",
+      "object": "2821ea6d682f6445b3f6c44e22ab5eeb976855b2",
+      "bytes": 9869,
+      "sha256": "a8e34d019d7e91ed62c2aaf4ebbd23ad8f58c110afb29243d1d01d2a5e9101a5"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_psbt.cpp",
+      "object": "ba58772eb49c7ccfd6669785431511dca839e4b6",
+      "bytes": 14268,
+      "sha256": "46c2b34dc5beba38cefe3f1c603c2743f2b010a556117058e1c10174e9b36bce"
+    },
+    {
+      "path": "src/test/mercaweave/isolated_validation.cpp",
+      "object": "cb2e2430e4074d91232533d0938ffcf70cd797b6",
+      "bytes": 16104,
+      "sha256": "12cd2a8d3740223ec4f795d73635e7b245e861f25d2d5bba8db085b246cacaed"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_tests.cpp",
+      "object": "aa45f701dbd0fbede89d8c004e3fc523cc641460",
+      "bytes": 11290,
+      "sha256": "2a864f4b0e5ef4f0deb0373a0af265e3296112c91d05c0e02f3316df73b69fd9"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "ab21d9d7283243e42ac09fbb1603e7f16f904730",
+      "bytes": 13015,
+      "sha256": "6a99845f8570726ebdfcbb3a868de9310c9c5ac9c0992a4a9192b62f2b5fdbbf"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "353a3937616ac059dcf444e0cbfbc2680ec93020",
+      "bytes": 12996,
+      "sha256": "e8de8e1d5ea7828353b33910a179e60d15cd26e9be1e560381cebbcf19d796fd"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_tests.cpp",
+      "object": "ee067beafa465384bfcb5486b36ab0e6fe7ffa3b",
+      "bytes": 6638,
+      "sha256": "5a15ddf3cccfac746bfb4214c2ccf4941f7458a8b97f56de34cc0030f43c0e7f"
+    },
+    {
+      "path": "src/test/mercaweave/wallet_tests.cpp",
+      "object": "eeb8023797a95a1e4ab81bf0d3f661a6b1d772ca",
+      "bytes": 5820,
+      "sha256": "57cd04fca73fb06c6d08973a3d5c3620f9e1af49fd4446cdd699eb60a7f40b60"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "e08c7b8a03d611e6659912b63c660425efbbe32f",
+      "bytes": 12778,
+      "sha256": "cf5beee6e8446d90fc757b2f0283df5187dfaebb6ad302a1c8fd274aca8264da"
+    },
+    {
+      "path": "src/test/mercaweave/isolated_validation.cpp",
+      "object": "8f9c4a6180f538f5a7deac6e45fb81b79e498a1c",
+      "bytes": 15675,
+      "sha256": "2939e4bd68cd5c7522b6156e3b5ed1b4004581400196ac6b7fd13d096533c99e"
+    },
+    {
+      "path": "src/test/mercaweave/isolated_validation.h",
+      "object": "40d8b56d05f5f7eca0bdb9e5b76423ad55be924a",
+      "bytes": 5237,
+      "sha256": "0f9eff7550eede6e85c1373763415cb60b05c6ae63c9b144a6bf70fe9da8cacc"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "2b5645b793b6321a327ef97b67e03c69af5cc51e",
+      "bytes": 11126,
+      "sha256": "ebc958807776e004d3dbfeaf97007083f8eeaf2dad7f0da1d7bcafca971ebf06"
+    },
+    {
+      "path": "src/test/mercaweave/check_isolation.py",
+      "object": "3d407e7ea6dfbad195c6c3c53e1fe8d123140d06",
+      "bytes": 4876,
+      "sha256": "d1cba9053fc1ba06a3674900606a826c6b026c8718af6293b0e75d1d3d680669"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-isolated-consensus-integration.md",
+      "object": "1c9c9587d623f977ce0843f9d8f6e67b6560ce4c",
+      "bytes": 2619,
+      "sha256": "033a898f305c7cd9b4850e27663ece93f66c895644a36868a3346a7d91976329"
+    },
+    {
+      "path": "src/test/mercaweave/README.md",
+      "object": "c89f761d761c8dfa43e65fcd8875c8bf44380e24",
+      "bytes": 11660,
+      "sha256": "9564652a36c897f20b4f3ed9dceae19879a8dfc246c242f87d7dafe99a3f1de6"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "48060f463b7dc8b82d8fb4163bf1ff716151c9a7",
+      "bytes": 10838,
+      "sha256": "dba8b1537190154367a7fedd0202c02c1e054d3c3ed24f95e90a5056f72d3c6c"
+    },
+    {
+      "path": "src/test/mercaweave/check_isolation.py",
+      "object": "5cb0790112e0f64ead5c1e19d918f610af615a39",
+      "bytes": 4741,
+      "sha256": "eac2acba97347aa1a1b9644689d49782053e4bff155340f819c23a892fece582"
+    },
+    {
+      "path": "src/test/mercaweave/integration_tests.cpp",
+      "object": "7e2440e71ff1d6decc83615186f7f7c27568b732",
+      "bytes": 20774,
+      "sha256": "f6a79759e65965fad62bda1aba2613dd6a778dd6e4d2b230f1b60acf26cda24d"
+    },
+    {
+      "path": "src/test/mercaweave/isolated_validation.cpp",
+      "object": "62469ecf4347afbb3039c662deaaf47eb9824ff0",
+      "bytes": 15238,
+      "sha256": "743987813582a0b74b46ead4c9acea14d3782ad0cfee6f2dafc73b99a57e127a"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "379de5e1635f944605b75da0698c38a58c86c232",
+      "bytes": 7604,
+      "sha256": "f8d08fe9ffa65ac8fffc1723b1d7bccc7bbb82a958db586977a463ae68e51c84"
+    },
+    {
+      "path": "src/test/mercaweave/README.md",
+      "object": "c2cbdd06b6ae20a47fe7f8bea89163f62ed9611f",
+      "bytes": 7959,
+      "sha256": "21082d4db652521e939cc9ee2fa7c969f615059c770973b0a6b7e249512afd5e"
+    },
+    {
+      "path": "src/test/mercaweave/measure_readiness.py",
+      "object": "6cf366ec7d7294998c3eddc5316816bf88d79220",
+      "bytes": 4630,
+      "sha256": "f1c7741ac2dfe37b9406c67eb833ee192452e2cd89787d7fe7c7aff2f32983c9"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "a2f987bfb31d17e390c6ad4d1c221a86b2b29e98",
+      "bytes": 5921,
+      "sha256": "543f44887e97fbacfa4a335845c945ffe8dfc15dbc9d54f31f7df05493ffbae1"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "a63f28b20b5e5c613b76b10edff3bde6224d8481",
+      "bytes": 4977,
+      "sha256": "09aa9883867269c8cccb34f1221720290cb5be65d20a118c635240bc44255f75"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "9ff22d5e8afe43b60cd88c33655bba3bef4d3abb",
+      "bytes": 4640,
+      "sha256": "010d0710bfb8a3be6dc67e60b8df1f10ef4fe5fe66b0cc1079480082741cbb86"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "693bff47f3fcc9dcade0d46fd55704c8308dc314",
+      "bytes": 4285,
+      "sha256": "3bc9da0959845771a656ff1569dc64e9f416adf88659e7cc7bfc9b2ef8d3de9d"
+    },
+    {
+      "path": "src/test/mercaweave/mercaweave.cpp",
+      "object": "92fa5679291948793ecef1e6e82d7a63777bd257",
+      "bytes": 16888,
+      "sha256": "87c7eb99cd04bce3b2d0180274e622f334f50f8435917dd0412da5f8bb082cee"
+    },
+    {
+      "path": "src/test/mercaweave/mercaweave.h",
+      "object": "9c66856e56fd134231d83974c9e4fd40fc28cae2",
+      "bytes": 6912,
+      "sha256": "0ea2eab360df7e9a2442d3027a490de56310421fa6b4a0195af4acf5b2b77cdd"
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-standalone-validation.md",
+      "object": "1ee01a8736b39e626310708cf21657e952884001",
+      "bytes": 11163,
+      "sha256": "2439e85cd4a909006adda39d68f0f06d6ab8222f99c29ba663d002280d4d8db6"
+    },
+    {
+      "path": "src/test/mercaweave/README.md",
+      "object": "e17fc285e0088d294c5dcf7818bd73132101fe0d",
+      "bytes": 5430,
+      "sha256": "b01ab59d9e5bd66dda9aa711e95ce024f3c941d3f2cc997121888c13e2439a15"
+    },
+    {
+      "path": "src/test/mercaweave/resource_qualification.py",
+      "object": "5d03dea6f5d0d68d497449f9db8b9f6dfcbb2872",
+      "bytes": 2980,
+      "sha256": "c0a2f6b054dcb871c169c32d5eda4f3e62d5b1c715b909ca877b87c62d2315a1"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "e58f414d65ebd29f67aa9ca5e611494a5aaef1c7",
+      "bytes": 4040,
+      "sha256": "2bae4db3c67315a6cdbb1b08eaa3d4ff6db1c61689de096d508135543cbea7e7"
+    },
+    {
+      "path": "src/test/mercaweave/mercaweave.cpp",
+      "object": "51dd3dd5b6437e3ac5cd8e651189d1afc86922a2",
+      "bytes": 16722,
+      "sha256": "e406b52ddb7f780ae87bdfed566c55c1acd65892c2767f732142e87ba656f136"
+    },
+    {
+      "path": "src/test/mercaweave/mercaweave.h",
+      "object": "f0040ea55f29484ec1549a3f5376f23f0bdee884",
+      "bytes": 6651,
+      "sha256": "c78fd0db55d70907d981e923957f71a7129bf3b4fc51e3860d8aa9d208739b63"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "513e38f3751d77e863ec5fcd0d2ae70d55073f7c",
+      "bytes": 3779,
+      "sha256": "d0bea1491e85be699abaeb6c6fb61e3875609a8025080415d166d4928b013e1f"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "a4c2b8b1e0aa80ae6964e12ea3c857bb0678f402",
+      "bytes": 3580,
+      "sha256": "35e32f8fd721039e533aaf490a6f5c3bc4d3b8a8a1ce5ebc61a6a19e9cd6f931"
+    },
+    {
+      "path": "src/test/mercaweave/mercaweave.cpp",
+      "object": "c5dbc58cf32a3bd38e976981eda6ada9a35a67a0",
+      "bytes": 14609,
+      "sha256": "75e81a59569b62415ae5f2e6aadcce53c0b39bb95017d91ab4c8ee2db6bc8493"
+    },
+    {
+      "path": "src/test/mercaweave/mercaweave.h",
+      "object": "2a0909cff992d8c825dd95255f9dc22695dfbd1f",
+      "bytes": 6373,
+      "sha256": "c88697e82a0f4e05fb987d938cf88f75d0553bf4c0f5107940c5a7c4ddc96ee0"
+    },
+    {
+      "path": "src/test/mercaweave/CMakeLists.txt",
+      "object": "e152e183b9df006aa274ca7b6a945e243e86354d",
+      "bytes": 2285,
+      "sha256": "9eddadadfd9262d29e91311d6b5c52e4533590705f459ba0d938842158b95b6b"
+    }
+  ],
+  "current_files": [
+    {
+      "path": "doc/design/mercaweave-v0.1-final-security-qualification.md",
+      "object": null,
+      "bytes": 50660,
+      "sha256": "dda15e3da1dc4e713d05d653813b2752812edeea8f88d5390c7b159f4b524738"
+    },
+    {
+      "path": "src/crypto/hkdf_sha3_384.cpp",
+      "object": null,
+      "bytes": 1059,
+      "sha256": "84c20b8781cb401afc39d6c478b69ed0b664baf9d90e6488169654c7f13763c1"
+    },
+    {
+      "path": "src/script/pqgroup_psbt.cpp",
+      "object": null,
+      "bytes": 14201,
+      "sha256": "a60d5dc86fd8d78cde83fa47ecd19044f2fd5bb4c83152e92158dd8272740085"
+    },
+    {
+      "path": "src/test/mercaweave/check_qt_isolation.py",
+      "object": null,
+      "bytes": 5547,
+      "sha256": "56a778a4302cb2bc574da288b8a773e24a7046ee2dbe065b838cb29fb2780619"
+    },
+    {
+      "path": "src/test/mercaweave/check_wallet_isolation.py",
+      "object": null,
+      "bytes": 3289,
+      "sha256": "f74220446085d8b81f1b8105440a4fa2b7ccc8a103bd7dbe5d5b89af6f4d4f7f"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/additional-commands.json",
+      "object": null,
+      "bytes": 979,
+      "sha256": "984e775785f8d6124c285ee1f8e3d5d5b93fe088acb2ed0a48d3ac2f4c0b6724"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/allocation-repro-before.txt",
+      "object": null,
+      "bytes": 2180,
+      "sha256": "9d8b9fce40c68ad324d63de6af1f485ed5764c327313e572c54bf84cd61ac11c"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/baseline-debug-ctest.txt",
+      "object": null,
+      "bytes": 4807,
+      "sha256": "2a1b7dd7ee88e1726f7e67a955e43874582ac0a24c97da214b3189d429551703"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/baseline-release-ctest.txt",
+      "object": null,
+      "bytes": 4809,
+      "sha256": "cad8204193ad0ab340000c1abe83255edfd12f4276ce7141f1b0dd9afe40ab74"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/baseline-sanitize-ctest.txt",
+      "object": null,
+      "bytes": 4810,
+      "sha256": "2d745d69c9a91ced0147c6ac5d5910c8935d7fefbdaccf8a4da9630861945c41"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/boundary-audit.json",
+      "object": null,
+      "bytes": 18070,
+      "sha256": "4a49f462a85ba923aadc7ea702561ba4e4562541215195c3b7a30b46f140c8e6"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/completion-repro-before.txt",
+      "object": null,
+      "bytes": 17656,
+      "sha256": "801cb7229fdfe0f1a925b0b0c304a4407d27e3f8b1ac95f57fc50a225645e309"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/conditional-unwind-controls.json",
+      "object": null,
+      "bytes": 2217,
+      "sha256": "5b25f4c5300d745d6fe40c22843e1810ae1dc5f1fd11e8b8dce70c3e6ff5cd75"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/conditional-unwind-debug-original.txt",
+      "object": null,
+      "bytes": 155,
+      "sha256": "23d71ba8fa6b4f6e5692a1eef1baee63ccd5b9d021c81e0f57595faa9a1b89ea"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/conditional-unwind-debug-safe.txt",
+      "object": null,
+      "bytes": 156,
+      "sha256": "bda4bf2a27d7bb42c85401425e33aa472011ae5788613132153f6a4ab1d6c6cc"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/conditional-unwind-sanitize-original.txt",
+      "object": null,
+      "bytes": 155,
+      "sha256": "23d71ba8fa6b4f6e5692a1eef1baee63ccd5b9d021c81e0f57595faa9a1b89ea"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/conditional-unwind-sanitize-safe.txt",
+      "object": null,
+      "bytes": 156,
+      "sha256": "bda4bf2a27d7bb42c85401425e33aa472011ae5788613132153f6a4ab1d6c6cc"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/control-address-leak.txt",
+      "object": null,
+      "bytes": 231,
+      "sha256": "f4ea77ea05dc64644a23c822f48ecac55b8e6bd75a5fdae3a4e92bfdf50714e7"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/control-leak-leak.txt",
+      "object": null,
+      "bytes": 231,
+      "sha256": "4a5a8a45f3a065023072d04cedab1e5855a4346c72459972370ccd61fe7fdcfd"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/control-thread-race.txt",
+      "object": null,
+      "bytes": 3255,
+      "sha256": "d6e4790c3ecabcf7367af5eabfb65d46ef6c91381209779eea0e59d53b28aa96"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/final-debug-ctest.txt",
+      "object": null,
+      "bytes": 4807,
+      "sha256": "2490495498e7fa57388971625758d1aaf7f8919969ef46f90684ca7877ca9948"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/final-release-ctest.txt",
+      "object": null,
+      "bytes": 4809,
+      "sha256": "314f5bc6483da0a671ac187d62116c140a7f93d7fdb9655e66b40a46c8951fe7"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/final-sanitize-ctest.txt",
+      "object": null,
+      "bytes": 4810,
+      "sha256": "9fd50fa4d121820a3d7b649feb4da8c2f3a233264e9b5738f1a37d116991e8f2"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/github-identity.json",
+      "object": null,
+      "bytes": 290,
+      "sha256": "fa9575c7c5c8b46004ad4a51c864f59fe0f7bcb1dfd2abaa912ec93a8abd7cdd"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/hostile-stage-measurements.csv",
+      "object": null,
+      "bytes": 1357,
+      "sha256": "654d160d3d73fdb245aed7243f04dccf1b8ac400066864c5eec00c8982051f28"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/hostile-stage-profiles.json",
+      "object": null,
+      "bytes": 1757,
+      "sha256": "bf9b38f7bf398d4648536eb4ffa0eb5c33f24468e5420dbf929985dda94d881f"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/inactive-wallet-safety.json",
+      "object": null,
+      "bytes": 1306,
+      "sha256": "89a4f9035c86ce2cb4ff1d7b4c05404c3e19d5887f1590ecb31b28b725dcb454"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/independent-vectors.json",
+      "object": null,
+      "bytes": 888,
+      "sha256": "02a2904233e104990a60db706d10f78233bd1aa5fa3193063986f07f7c2e04fa"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/independent-vectors.jsonl",
+      "object": null,
+      "bytes": 259765,
+      "sha256": "fe2662594401ee195169302580e466aa3b997eabeed12d2be53b11c9a936655c"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/native-debug-build-commands.json",
+      "object": null,
+      "bytes": 18968,
+      "sha256": "c5d81d73b27f08b79a50155384863c93acf47a2d21fa249e3fd9f6af3bbb5814"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/native-debug-summary.txt",
+      "object": null,
+      "bytes": 2710,
+      "sha256": "8168583583317e862e8cbe8be7875136e84ccd5ec2b96c2a7487464be7855028"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/native-functional-final-results.csv",
+      "object": null,
+      "bytes": 316,
+      "sha256": "734319877ad2be977336d4c259b75b6a38f36fcc6488b501feeb50e5682b9785"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/native-mining-budget.json",
+      "object": null,
+      "bytes": 408,
+      "sha256": "48da46d974544c36d9f82bb39450ae0c5301b95d34fcb414341d910a81631a44"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/native-mining-build-commands.json",
+      "object": null,
+      "bytes": 13826,
+      "sha256": "e613438ddec166dc260ad4ab98957565f1df52d3d84fb80c9510550b141b1b67"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/native-mining-profile.json",
+      "object": null,
+      "bytes": 588,
+      "sha256": "7610d8ffb98f8ec089fde3f734ff96cc79036f89ff6b6cb2cea0598785a00214"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/native-mining-summary.txt",
+      "object": null,
+      "bytes": 1645,
+      "sha256": "93328d6857537d1bfd959f449980c8b3e09693cab2be9bdbe19b4cdfa9b5cfb4"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/native-release-build-commands.json",
+      "object": null,
+      "bytes": 17667,
+      "sha256": "1cc29e3be326b445db9e367f504e79be76a578fbb2cc391e6f86ddf539e3ce85"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/native-release-summary.txt",
+      "object": null,
+      "bytes": 2712,
+      "sha256": "2e6e570053083e964fc46300b8118663bb9bfcb90d251d100956021bfad1f5db"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/native-sanitize-build-commands.json",
+      "object": null,
+      "bytes": 18719,
+      "sha256": "5f661ea8882ba4cd7186c4ba00af4204ebe3f5b15ee232ccab9a84f86a9eb140"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/native-sanitize-summary.txt",
+      "object": null,
+      "bytes": 2712,
+      "sha256": "2e6e570053083e964fc46300b8118663bb9bfcb90d251d100956021bfad1f5db"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/native-tsan-build-commands.json",
+      "object": null,
+      "bytes": 18356,
+      "sha256": "2004f99bf61acd9d639625e3b9071339a7bb57da967284f26ffbf8e989b962f9"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/native-tsan-summary.txt",
+      "object": null,
+      "bytes": 989,
+      "sha256": "729e0984bf109c967070b2fa8dd9d7849e185aa3276742cf7e37284ce0a92124"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/qualification-sanitize.txt",
+      "object": null,
+      "bytes": 22741,
+      "sha256": "2121a020145362477598d689b1c9a0483f19fc927f9a9628923a07ac53f2bcc4"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/qualification.json",
+      "object": null,
+      "bytes": 14437,
+      "sha256": "4fddeec154cd5f26f42bd6dd16d0cf30e2cb8c8a5bb3b75287763b2198905347"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/sanitizer-controls.json",
+      "object": null,
+      "bytes": 2664,
+      "sha256": "4fb36f0a10ddcf9ca7a4af42d69ea73df0eade97c05ae9cf8b27471bfd2098e7"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/sqlite-close-repro.txt",
+      "object": null,
+      "bytes": 1705,
+      "sha256": "b9ed1e3d431b228f8f5c938eab153311c98b261fc1cd2111ee6ef77cd897257e"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/starting-state.json",
+      "object": null,
+      "bytes": 17979,
+      "sha256": "a2b7e493275c8f3b246806325872c6a1a0ada2c83c8f55300a62f957f5913eed"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/text-normalization.json",
+      "object": null,
+      "bytes": 3467,
+      "sha256": "9b6f7d6621d6d8524c4a0b578536d009b3984159aa38e4b69944782af15dc922"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/tsan-build.json",
+      "object": null,
+      "bytes": 1565,
+      "sha256": "9bc9d348ff46429d9155f445a0a9d6e58d49e6162b63c78ef2475c9c25f7d122"
+    },
+    {
+      "path": "src/test/mercaweave/final-security-artifacts/unwind-probe-debug.txt",
+      "object": null,
+      "bytes": 3528,
+      "sha256": "befbc5022792adaf2cfac11f4df7329ee6c797e73ebeec5d57be8f0c87bd279d"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/README.md",
+      "object": null,
+      "bytes": 3191,
+      "sha256": "59a58a61698d513cd3bfbbca4f5ca97f529ec535598a54449cdc9b95e98f8f8b"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/allocation.cpp",
+      "object": null,
+      "bytes": 2707,
+      "sha256": "71e2d9a4a930a1d029ba130c1e4961950866640e560919fe718c83f35f0a5692"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/allocation.h",
+      "object": null,
+      "bytes": 332,
+      "sha256": "ff52d9f80dd47a3a2c86d9d45fac2c4ac43a0cfe1c44c0780b99c16252a510b6"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/boundary_audit.py",
+      "object": null,
+      "bytes": 1684,
+      "sha256": "c95d85ddb897f1c930ee538e1c7dc5e4e8d96f191b1042fc6156acb775216c07"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/build_native.py",
+      "object": null,
+      "bytes": 3394,
+      "sha256": "9d048f9dbc8e6b1ba429b6e00b7e982ab391c408400b856a6d11787a8da38979"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/build_tsan.py",
+      "object": null,
+      "bytes": 2052,
+      "sha256": "ce1c2cd28c6f1b31f915b6b52c1eb740f6c914a3114760a4eced26afcecfbb1a"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/collect.py",
+      "object": null,
+      "bytes": 7817,
+      "sha256": "e5acb7c9d77c79db0e7a6d957679477df674bd6abffe545931ef06daac7fc68e"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/conditional_unwind_probe.cpp",
+      "object": null,
+      "bytes": 1290,
+      "sha256": "0c7eff71d6b7dc9d6e160c0ff1b5caf5cc3c91fe195e9dad94adc2bf86b89561"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/conditional_unwind_probe.py",
+      "object": null,
+      "bytes": 1308,
+      "sha256": "cd1aa36e0b7ec76e7ed0a96a6f164ce82d77d07f0c184e18c35ba93dea171e64"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/finalize_report.py",
+      "object": null,
+      "bytes": 4718,
+      "sha256": "55342a65b4676e8d900fd2ac238ed8f633a9942d220f214bc23629a49cec1409"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/inactive_wallet_safety.py",
+      "object": null,
+      "bytes": 3338,
+      "sha256": "5bac0bb66e455f0a06ab4b8cf6288cda3451a37ca67dd224d75f2f4535a45d82"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/independent_vectors.py",
+      "object": null,
+      "bytes": 6507,
+      "sha256": "1f2942f14df67ea8045760e56ee684a59d175419cce27cf70dc3c42889e821aa"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/inventory.py",
+      "object": null,
+      "bytes": 2122,
+      "sha256": "987bc5ff0e5ac3325e3c9780083811707746ca3f8b79a658786fd70d86c0b52f"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/measure_hostile.py",
+      "object": null,
+      "bytes": 2058,
+      "sha256": "770915e7ae26433c704bf77e5a9479d3c6bbf0dc9b93c5bb871809818a16118b"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/native_tests.cpp",
+      "object": null,
+      "bytes": 14264,
+      "sha256": "0fc6c489a1ba35fb775e92753dec2b5be7dbd4488964e393b8e1f55def306aed"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/publication_audit.py",
+      "object": null,
+      "bytes": 6299,
+      "sha256": "65bc1691e8cc452864a0f53423671795a31b251d4d9c1cdea6fbbb1fa4f834e4"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/run_native.py",
+      "object": null,
+      "bytes": 3171,
+      "sha256": "fca605e1f5b09940d8e23bfb47bc43c964500eba595e2fb1e989971e860f3aad"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/tool_probe.cpp",
+      "object": null,
+      "bytes": 741,
+      "sha256": "b2f01bd1c17c32ba1a609a5c246dbfa5b872b449703fe3cf3c88c824f1ece261"
+    },
+    {
+      "path": "src/test/mercaweave/security_audit/tool_probes.py",
+      "object": null,
+      "bytes": 1928,
+      "sha256": "7cb37cdc1c388ebb3d9f6a897594b27e77b50fd6e380c9957428f7cc2a1a21d7"
+    },
+    {
+      "path": "src/wallet/pqgroup.cpp",
+      "object": null,
+      "bytes": 8285,
+      "sha256": "b5b23d69105465647b2de68f1ad47a44cbaec0be7cd0f5c50f8675474f0a6cc4"
+    },
+    {
+      "path": "src/wallet/sqlite.cpp",
+      "object": null,
+      "bytes": 26741,
+      "sha256": "b399d8354cdfe0546a11645ff3e3815d902e3a1129a90efc26ce7e39630e834f"
+    },
+    {
+      "path": "src/wallet/wallet.cpp",
+      "object": null,
+      "bytes": 238300,
+      "sha256": "34c129598fb299408d570533c2e458227e660b726b8e7bf3d240a49601659906"
+    }
+  ],
+  "candidates": [],
+  "workflows": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "dee5e341af8d29a8b493bc7b440bfccd647c2fa3f9738e10df9382519996150a"
+    },
+    {
+      "path": ".github/workflows/macos-release.yml",
+      "sha256": "d75c5b20e1d603c5a77f3ddaeada606d4e19f7c5ed8e15f1ba2e3f07a397d827"
+    },
+    {
+      "path": ".github/workflows/mercatura-gpu.yml",
+      "sha256": "10f969c0899252eaabd6565f4f4b4d4cb8711bcf9a59b4d77ba843ce4052309a"
+    },
+    {
+      "path": ".github/workflows/mercatura-native-mining.yml",
+      "sha256": "f6c61e9231e2f2dfb3e2c09669fe973209ce50ab92a41e2f2b9144f83cb80795"
+    },
+    {
+      "path": ".github/workflows/pq-integration.yml",
+      "sha256": "a162eb15e7c9b63dee20804635887699dd57e3cb45b8ccc2118189a98088cb69"
+    }
+  ],
+  "locked_engine_unchanged": true,
+  "current_inventory_excludes_own_preflight_hash": true,
+  "production_files_changed": [
+    "src/crypto/hkdf_sha3_384.cpp",
+    "src/script/pqgroup_psbt.cpp",
+    "src/wallet/pqgroup.cpp",
+    "src/wallet/sqlite.cpp",
+    "src/wallet/wallet.cpp"
+  ],
+  "mercaweave_activation_added": false,
+  "mercahash_v2_sources_changed": false,
+  "workflow_review": "ci.yml all-branch push runs build/test/lint; no release/deploy; other push allowlists exclude research; macOS manual only",
+  "scan_limit": "Pattern scan and reviewed research inventory; no universal secret absence proof"
+}

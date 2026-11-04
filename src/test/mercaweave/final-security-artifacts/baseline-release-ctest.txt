@@ -1,0 +1,75 @@
+Test project /workspace/Mercatura-MercaWeave-v0.1/work/build-release
+      Start  1: locked_python_vectors
+ 1/35 Test  #1: locked_python_vectors ...........................   Passed    0.04 sec
+      Start  2: mercaweave_tests
+ 2/35 Test  #2: mercaweave_tests ................................   Passed    1.67 sec
+      Start  3: cross_language_vectors
+ 3/35 Test  #3: cross_language_vectors ..........................   Passed    0.28 sec
+      Start  4: native_v2_interoperability
+ 4/35 Test  #4: native_v2_interoperability ......................   Passed    0.20 sec
+      Start  5: bounded_parsers
+ 5/35 Test  #5: bounded_parsers .................................   Passed    5.25 sec
+      Start  6: hostile_followers_and_context
+ 6/35 Test  #6: hostile_followers_and_context ...................   Passed    0.26 sec
+      Start  7: resource_qualification_smoke
+ 7/35 Test  #7: resource_qualification_smoke ....................   Passed    0.04 sec
+      Start  8: fail_closed_context
+ 8/35 Test  #8: fail_closed_context .............................   Passed    1.07 sec
+      Start  9: checked_block_work
+ 9/35 Test  #9: checked_block_work ..............................   Passed    0.02 sec
+      Start 10: block_measurement_smoke
+10/35 Test #10: block_measurement_smoke .........................   Passed    0.01 sec
+      Start 11: malleability_children_and_policy
+11/35 Test #11: malleability_children_and_policy ................   Passed    0.06 sec
+      Start 12: normal_inactive_control
+12/35 Test #12: normal_inactive_control .........................   Passed    0.04 sec
+      Start 13: isolated_missing_context_control
+13/35 Test #13: isolated_missing_context_control ................   Passed    0.08 sec
+      Start 14: authoritative_coin_view_probe
+14/35 Test #14: authoritative_coin_view_probe ...................   Passed    0.01 sec
+      Start 15: isolated_validation_integration
+15/35 Test #15: isolated_validation_integration .................   Passed    7.41 sec
+      Start 16: research_compile_and_cache_isolation
+16/35 Test #16: research_compile_and_cache_isolation ............   Passed    4.45 sec
+      Start 17: integrated_resource_measurement_smoke
+17/35 Test #17: integrated_resource_measurement_smoke ...........   Passed    0.04 sec
+      Start 18: native_wallet_primitives
+18/35 Test #18: native_wallet_primitives ........................   Passed    0.05 sec
+      Start 19: grouped_wallet_keys_and_storage
+19/35 Test #19: grouped_wallet_keys_and_storage .................   Passed    5.90 sec
+      Start 20: research_wallet_compile_isolation
+20/35 Test #20: research_wallet_compile_isolation ...............   Passed    4.80 sec
+      Start 21: grouped_partial_psbt_and_signing
+21/35 Test #21: grouped_partial_psbt_and_signing ................   Passed    1.76 sec
+      Start 22: wallet_workload_measurement_smoke
+22/35 Test #22: wallet_workload_measurement_smoke ...............   Passed    1.14 sec
+      Start 23: qt_production_capability_closed
+23/35 Test #23: qt_production_capability_closed .................   Passed    0.25 sec
+      Start 24: qt_capability_lifetime_and_previews
+24/35 Test #24: qt_capability_lifetime_and_previews .............   Passed    0.46 sec
+      Start 25: grouped_reward_policy_and_scheduler
+25/35 Test #25: grouped_reward_policy_and_scheduler .............   Passed   35.11 sec
+      Start 26: qt_wo05_wallet_and_mining_bridge
+26/35 Test #26: qt_wo05_wallet_and_mining_bridge ................   Passed    0.50 sec
+      Start 27: qt_native_v2_qr_and_copy_regression
+27/35 Test #27: qt_native_v2_qr_and_copy_regression .............   Passed    0.11 sec
+      Start 28: qt_wallet_and_mining_compile_isolation
+28/35 Test #28: qt_wallet_and_mining_compile_isolation ..........   Passed    6.18 sec
+      Start 29: actual_script_queue_cache_and_undo
+29/35 Test #29: actual_script_queue_cache_and_undo ..............   Passed    5.09 sec
+      Start 30: native_sqlite_wallet_and_durable_reservations
+30/35 Test #30: native_sqlite_wallet_and_durable_reservations ...   Passed    1.59 sec
+      Start 31: actual_script_resource_measurement_smoke
+31/35 Test #31: actual_script_resource_measurement_smoke ........   Passed    0.11 sec
+      Start 32: node_validation_compile_isolation
+32/35 Test #32: node_validation_compile_isolation ...............   Passed    1.10 sec
+      Start 33: simulation_accounting_oracle
+33/35 Test #33: simulation_accounting_oracle ....................   Passed    0.25 sec
+      Start 34: research_signed_simulation
+34/35 Test #34: research_signed_simulation ......................   Passed    2.46 sec
+      Start 35: dormant_production_group_context
+35/35 Test #35: dormant_production_group_context ................   Passed    2.38 sec
+
+100% tests passed out of 35
+
+Total Test time (real) =  90.20 sec
