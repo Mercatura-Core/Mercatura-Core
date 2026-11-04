@@ -1,0 +1,81 @@
+[
+  {
+    "command": [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/tools/cmake/data/bin/cmake",
+      "-S",
+      "/workspace/Mercatura-MercaWeave-v0.1",
+      "-B",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo07c/native-debug-build",
+      "-DBUILD_GUI=OFF",
+      "-DENABLE_IPC=OFF",
+      "-DBUILD_TESTS=ON",
+      "-DBUILD_BENCH=OFF",
+      "-DBUILD_KERNEL_LIB=OFF",
+      "-DWITH_USDT=OFF",
+      "-DWITH_ZMQ=OFF",
+      "-DWITH_CCACHE=OFF",
+      "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+      "-DCMAKE_PREFIX_PATH=/workspace/Mercatura-MercaWeave-v0.1/work/wo06-tools/qt-sdk/usr",
+      "-DCMAKE_BUILD_TYPE=Debug",
+      "-DCMAKE_CXX_FLAGS_DEBUG=-O0 -ftrapv -g0 -D_GLIBCXX_ASSERTIONS=1",
+      "-DCMAKE_C_FLAGS_DEBUG=-O0 -g0"
+    ],
+    "exit_code": 0,
+    "seconds": 15.355242079998789,
+    "cpu_seconds": 10.708494,
+    "max_rss_kib": 148572,
+    "log": "work/wo07c/native-debug-step0.log",
+    "rss_scope": "cumulative maximum child RSS including earlier build steps; not isolated test RSS"
+  },
+  {
+    "command": [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/tools/cmake/data/bin/cmake",
+      "--build",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo07c/native-debug-build",
+      "--target",
+      "bitcoind",
+      "bitcoin-cli",
+      "test_util",
+      "-j1"
+    ],
+    "exit_code": 0,
+    "seconds": 2469.2978697979997,
+    "cpu_seconds": 1089.9439770000001,
+    "max_rss_kib": 2153204,
+    "log": "work/wo07c/native-debug-step1.log",
+    "rss_scope": "cumulative maximum child RSS including earlier build steps; not isolated test RSS"
+  },
+  {
+    "command": [
+      "python3",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/production_path/build_native.py",
+      "--build",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo07c/native-debug-build",
+      "--output",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo07c/native-debug"
+    ],
+    "exit_code": 0,
+    "seconds": 661.7618750479996,
+    "cpu_seconds": 293.44082200000014,
+    "max_rss_kib": 2153204,
+    "log": "work/wo07c/native-debug-step2.log",
+    "rss_scope": "cumulative maximum child RSS including earlier build steps; not isolated test RSS"
+  },
+  {
+    "command": [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo07c/native-debug/wo07c_native_tests",
+      "--log_level=test_suite",
+      "--report_level=detailed",
+      "--color_output=no",
+      "--",
+      "-testdatadir=/workspace/Mercatura-MercaWeave-v0.1/work/wo07c/native-runtime-debug"
+    ],
+    "exit_code": 201,
+    "seconds": 801.3293478129999,
+    "cpu_seconds": 677.8242469999999,
+    "max_rss_kib": 2153204,
+    "log": "work/wo07c/native-debug-step3.log",
+    "rss_scope": "cumulative maximum child RSS including earlier build steps; not isolated test RSS",
+    "preserved_failure_log": "work/wo07c/native-debug-step3-attempt1.log"
+  }
+]

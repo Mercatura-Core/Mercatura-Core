@@ -1,0 +1,17 @@
+{
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "machine": "x86_64",
+  "compiler": "c++ (Debian 14.2.0-19) 14.2.0",
+  "cmake": "cmake version 4.4.4",
+  "affinity_cpus": 3,
+  "cpu_max": "200000 100000",
+  "memory_max_bytes": "8589934592",
+  "clang_available": false,
+  "afl_available": false,
+  "native_functional_jobs": 1,
+  "positive_v3_network_process_tests": false,
+  "external_system_sdk_libraries_instrumented": false,
+  "standalone_sanitizer_flags": "-O1 -g0 -fsanitize=address,undefined -fno-omit-frame-pointer",
+  "compact_symbols_reason": "bounded disk; instrumentation retained",
+  "leak_detection_enabled": false
+}

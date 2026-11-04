@@ -1,0 +1,17 @@
+{
+  "command": [
+    "work/wo07c/native-sanitize/wo07c_native_tests",
+    "--log_level=test_suite",
+    "--report_level=detailed",
+    "--color_output=no",
+    "--",
+    "-testdatadir=/workspace/Mercatura-MercaWeave-v0.1/work/wo07c/native-runtime-sanitize-final"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 622.8489384260001,
+  "cpu_user_seconds": 824.229271,
+  "cpu_system_seconds": 7.986468,
+  "max_rss_kib": 1356832,
+  "minor_page_faults": 5866489,
+  "major_page_faults": 0
+}

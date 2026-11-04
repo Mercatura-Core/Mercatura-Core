@@ -1,0 +1,141 @@
+{"bytes": 5397, "configuration": "release", "connect_us": 304065, "exact_utxo_restore": true, "groups": 1, "inputs": 1, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 5679}
+{"bytes": 6117, "configuration": "release", "connect_us": 364875, "exact_utxo_restore": true, "groups": 1, "inputs": 10, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 7506}
+{"bytes": 9557, "configuration": "release", "connect_us": 370020, "exact_utxo_restore": true, "groups": 1, "inputs": 53, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 16235}
+{"bytes": 13317, "configuration": "release", "connect_us": 374751, "exact_utxo_restore": true, "groups": 1, "inputs": 100, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 25776}
+{"bytes": 60675, "configuration": "release", "connect_us": 358291, "exact_utxo_restore": true, "groups": 10, "inputs": 100, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 73134}
+{"bytes": 534255, "configuration": "release", "connect_us": 403329, "exact_utxo_restore": true, "groups": 100, "inputs": 100, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 546714}
+{"bytes": 85319, "configuration": "release", "connect_us": 359778, "exact_utxo_restore": true, "groups": 1, "inputs": 1000, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 208484}
+{"bytes": 87239, "configuration": "release", "connect_us": 342166, "exact_utxo_restore": true, "groups": 1, "inputs": 1024, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 213356}
+{"bytes": 1367609, "configuration": "release", "connect_us": 422554, "exact_utxo_restore": true, "groups": 256, "inputs": 256, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 1399262}
+{"bytes": 348785, "configuration": "release", "connect_us": 366771, "exact_utxo_restore": true, "groups": 4, "inputs": 4096, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 852758}
+{"coins_database_reopened": true, "competing_spends": true, "configuration": "release", "late_invalid_atomic": true, "real_network_v3": false, "scenario": "actual-chainstate-recovery"}
+{"actual_create_transaction": true, "alice_balance": 5900, "bob_balance": 0, "configuration": "release", "fee_units": 100, "groups": 2, "native_signatures": 2, "scenario": "actual-cwallet-multisigner"}
+{"backup_restore": true, "configuration": "release", "encrypted_seed_only": true, "failed_write_no_issued_index": true, "issued": 65, "locked_signing_rejected": true, "ordinary_v3_issue": false, "restart": true, "rotation": 64, "scenario": "actual-cwallet-sqlite"}
+{"case": "wrong-public-key", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "altered-signature", "configuration": "release", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "signature-length", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "public-key-length", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "nonce-length", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "self-reference", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "follower-reference", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "outside-reference", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "duplicate-anchor", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "missing-anchor", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "extra-anchor", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "missing-follower", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "duplicate-outpoint", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "wrong-commitment", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "wrong-genesis", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-prevout", "configuration": "release", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-amount", "configuration": "release", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-script", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-sequence", "configuration": "release", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-version", "configuration": "release", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-locktime", "configuration": "release", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-output-value", "configuration": "release", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-output-script", "configuration": "release", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "reordered-inputs", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "added-member", "configuration": "release", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "removed-member", "configuration": "release", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "moved-group", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "mixed-independent-keys", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "scriptSig", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "oversized-witness", "configuration": "release", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "late-invalid", "configuration": "release", "group_verifications": 2, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "reordered-outputs", "configuration": "release", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"configuration": "release", "entropy_failure_atomic": true, "metadata_rejections": 7, "ordinary_grouped_load_rejected": true, "prevout_mismatch_atomic": true, "scenario": "actual-wallet-negative"}
+{"configuration": "release", "excess_members_groups_inputs_rejected": true, "mandatory_unknown_v3_permissive": true, "psbt_mutations": 250, "scenario": "ordinary-and-limits", "seed": "574f303743505342", "standard_unknown_v3_rejected": true}
+{"bytes": 5397, "configuration": "debug", "connect_us": 4684571, "exact_utxo_restore": true, "groups": 1, "inputs": 1, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 5679}
+{"bytes": 6117, "configuration": "debug", "connect_us": 5950395, "exact_utxo_restore": true, "groups": 1, "inputs": 10, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 7506}
+{"bytes": 9557, "configuration": "debug", "connect_us": 5279114, "exact_utxo_restore": true, "groups": 1, "inputs": 53, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 16235}
+{"bytes": 13317, "configuration": "debug", "connect_us": 6452059, "exact_utxo_restore": true, "groups": 1, "inputs": 100, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 25776}
+{"bytes": 60675, "configuration": "debug", "connect_us": 5442995, "exact_utxo_restore": true, "groups": 10, "inputs": 100, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 73134}
+{"bytes": 534255, "configuration": "debug", "connect_us": 4966537, "exact_utxo_restore": true, "groups": 100, "inputs": 100, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 546714}
+{"bytes": 85319, "configuration": "debug", "connect_us": 5082649, "exact_utxo_restore": true, "groups": 1, "inputs": 1000, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 208484}
+{"bytes": 87239, "configuration": "debug", "connect_us": 4639147, "exact_utxo_restore": true, "groups": 1, "inputs": 1024, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 213356}
+{"bytes": 1367609, "configuration": "debug", "connect_us": 6042269, "exact_utxo_restore": true, "groups": 256, "inputs": 256, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 1399262}
+{"bytes": 348785, "configuration": "debug", "connect_us": 8077111, "exact_utxo_restore": true, "groups": 4, "inputs": 4096, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 852758}
+{"coins_database_reopened": true, "competing_spends": true, "configuration": "debug", "late_invalid_atomic": true, "real_network_v3": false, "scenario": "actual-chainstate-recovery"}
+{"actual_create_transaction": true, "alice_balance": 5900, "bob_balance": 0, "configuration": "debug", "fee_units": 100, "groups": 2, "native_signatures": 2, "scenario": "actual-cwallet-multisigner"}
+{"backup_restore": true, "configuration": "debug", "encrypted_seed_only": true, "failed_write_no_issued_index": true, "issued": 65, "locked_signing_rejected": true, "ordinary_v3_issue": false, "restart": true, "rotation": 64, "scenario": "actual-cwallet-sqlite"}
+{"case": "wrong-public-key", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "altered-signature", "configuration": "debug", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "signature-length", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "public-key-length", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "nonce-length", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "self-reference", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "follower-reference", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "outside-reference", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "duplicate-anchor", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "missing-anchor", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "extra-anchor", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "missing-follower", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "duplicate-outpoint", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "wrong-commitment", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "wrong-genesis", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-prevout", "configuration": "debug", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-amount", "configuration": "debug", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-script", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-sequence", "configuration": "debug", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-version", "configuration": "debug", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-locktime", "configuration": "debug", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-output-value", "configuration": "debug", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-output-script", "configuration": "debug", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "reordered-inputs", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "added-member", "configuration": "debug", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "removed-member", "configuration": "debug", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "moved-group", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "mixed-independent-keys", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "scriptSig", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "oversized-witness", "configuration": "debug", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "late-invalid", "configuration": "debug", "group_verifications": 2, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "reordered-outputs", "configuration": "debug", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"configuration": "debug", "entropy_failure_atomic": true, "metadata_rejections": 7, "ordinary_grouped_load_rejected": true, "prevout_mismatch_atomic": true, "scenario": "actual-wallet-negative"}
+{"configuration": "debug", "excess_members_groups_inputs_rejected": true, "mandatory_unknown_v3_permissive": true, "psbt_mutations": 250, "scenario": "ordinary-and-limits", "seed": "574f303743505342", "standard_unknown_v3_rejected": true}
+{"bytes": 5397, "configuration": "sanitize", "connect_us": 2631167, "exact_utxo_restore": true, "groups": 1, "inputs": 1, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 5679}
+{"bytes": 6117, "configuration": "sanitize", "connect_us": 2381004, "exact_utxo_restore": true, "groups": 1, "inputs": 10, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 7506}
+{"bytes": 9557, "configuration": "sanitize", "connect_us": 2090292, "exact_utxo_restore": true, "groups": 1, "inputs": 53, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 16235}
+{"bytes": 13317, "configuration": "sanitize", "connect_us": 2124953, "exact_utxo_restore": true, "groups": 1, "inputs": 100, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 25776}
+{"bytes": 60675, "configuration": "sanitize", "connect_us": 2129208, "exact_utxo_restore": true, "groups": 10, "inputs": 100, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 73134}
+{"bytes": 534255, "configuration": "sanitize", "connect_us": 2189854, "exact_utxo_restore": true, "groups": 100, "inputs": 100, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 546714}
+{"bytes": 85319, "configuration": "sanitize", "connect_us": 2178939, "exact_utxo_restore": true, "groups": 1, "inputs": 1000, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 208484}
+{"bytes": 87239, "configuration": "sanitize", "connect_us": 2187511, "exact_utxo_restore": true, "groups": 1, "inputs": 1024, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 213356}
+{"bytes": 1367609, "configuration": "sanitize", "connect_us": 2190535, "exact_utxo_restore": true, "groups": 256, "inputs": 256, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 1399262}
+{"bytes": 348785, "configuration": "sanitize", "connect_us": 2305864, "exact_utxo_restore": true, "groups": 4, "inputs": 4096, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 852758}
+{"coins_database_reopened": true, "competing_spends": true, "configuration": "sanitize", "late_invalid_atomic": true, "real_network_v3": false, "scenario": "actual-chainstate-recovery"}
+{"actual_create_transaction": true, "alice_balance": 5900, "bob_balance": 0, "configuration": "sanitize", "fee_units": 100, "groups": 2, "native_signatures": 2, "scenario": "actual-cwallet-multisigner"}
+{"backup_restore": true, "configuration": "sanitize", "encrypted_seed_only": true, "failed_write_no_issued_index": true, "issued": 65, "locked_signing_rejected": true, "ordinary_v3_issue": false, "restart": true, "rotation": 64, "scenario": "actual-cwallet-sqlite"}
+{"case": "wrong-public-key", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "altered-signature", "configuration": "sanitize", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "signature-length", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "public-key-length", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "nonce-length", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "self-reference", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "follower-reference", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "outside-reference", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "duplicate-anchor", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "missing-anchor", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "extra-anchor", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "missing-follower", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "duplicate-outpoint", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "wrong-commitment", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "wrong-genesis", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-prevout", "configuration": "sanitize", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-amount", "configuration": "sanitize", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-script", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-sequence", "configuration": "sanitize", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-version", "configuration": "sanitize", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-locktime", "configuration": "sanitize", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-output-value", "configuration": "sanitize", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-output-script", "configuration": "sanitize", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "reordered-inputs", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "added-member", "configuration": "sanitize", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "removed-member", "configuration": "sanitize", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "moved-group", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "mixed-independent-keys", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "scriptSig", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "oversized-witness", "configuration": "sanitize", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "late-invalid", "configuration": "sanitize", "group_verifications": 2, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "reordered-outputs", "configuration": "sanitize", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"configuration": "sanitize", "entropy_failure_atomic": true, "metadata_rejections": 7, "ordinary_grouped_load_rejected": true, "prevout_mismatch_atomic": true, "scenario": "actual-wallet-negative"}
+{"configuration": "sanitize", "excess_members_groups_inputs_rejected": true, "mandatory_unknown_v3_permissive": true, "psbt_mutations": 250, "scenario": "ordinary-and-limits", "seed": "574f303743505342", "standard_unknown_v3_rejected": true}

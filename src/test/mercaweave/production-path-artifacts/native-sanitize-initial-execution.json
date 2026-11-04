@@ -1,0 +1,82 @@
+[
+  {
+    "command": [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/tools/cmake/data/bin/cmake",
+      "-S",
+      "/workspace/Mercatura-MercaWeave-v0.1",
+      "-B",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo07c/native-sanitize-build",
+      "-DBUILD_GUI=OFF",
+      "-DENABLE_IPC=OFF",
+      "-DBUILD_TESTS=ON",
+      "-DBUILD_BENCH=OFF",
+      "-DBUILD_KERNEL_LIB=OFF",
+      "-DWITH_USDT=OFF",
+      "-DWITH_ZMQ=OFF",
+      "-DWITH_CCACHE=OFF",
+      "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+      "-DCMAKE_PREFIX_PATH=/workspace/Mercatura-MercaWeave-v0.1/work/wo06-tools/qt-sdk/usr",
+      "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+      "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=-O1 -g0 -fsanitize=address,undefined -fno-omit-frame-pointer",
+      "-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O1 -g0 -fsanitize=address,undefined -fno-omit-frame-pointer",
+      "-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined"
+    ],
+    "exit_code": 0,
+    "seconds": 17.49623828699987,
+    "cpu_seconds": 13.122896999999998,
+    "max_rss_kib": 153924,
+    "log": "work/wo07c/native-sanitize-step0.log",
+    "rss_scope": "cumulative maximum child RSS including earlier build steps; not isolated test RSS"
+  },
+  {
+    "command": [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/tools/cmake/data/bin/cmake",
+      "--build",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo07c/native-sanitize-build",
+      "--target",
+      "bitcoind",
+      "bitcoin-cli",
+      "test_util",
+      "-j1"
+    ],
+    "exit_code": 0,
+    "seconds": 4032.756722962,
+    "cpu_seconds": 2080.875976,
+    "max_rss_kib": 2287368,
+    "log": "work/wo07c/native-sanitize-step1.log",
+    "rss_scope": "cumulative maximum child RSS including earlier build steps; not isolated test RSS"
+  },
+  {
+    "command": [
+      "python3",
+      "/workspace/Mercatura-MercaWeave-v0.1/src/test/mercaweave/production_path/build_native.py",
+      "--build",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo07c/native-sanitize-build",
+      "--output",
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo07c/native-sanitize"
+    ],
+    "exit_code": 0,
+    "seconds": 461.55172111499996,
+    "cpu_seconds": 461.36060799999996,
+    "max_rss_kib": 2287368,
+    "log": "work/wo07c/native-sanitize-step2.log",
+    "rss_scope": "cumulative maximum child RSS including earlier build steps; not isolated test RSS"
+  },
+  {
+    "command": [
+      "/workspace/Mercatura-MercaWeave-v0.1/work/wo07c/native-sanitize/wo07c_native_tests",
+      "--log_level=test_suite",
+      "--report_level=detailed",
+      "--color_output=no",
+      "--",
+      "-testdatadir=/workspace/Mercatura-MercaWeave-v0.1/work/wo07c/native-runtime-sanitize"
+    ],
+    "exit_code": 1,
+    "seconds": 103.44379337800274,
+    "cpu_seconds": 103.022689,
+    "max_rss_kib": 2287368,
+    "log": "work/wo07c/native-sanitize-step3.log",
+    "rss_scope": "cumulative maximum child RSS including earlier build steps; not isolated test RSS",
+    "preserved_failure_log": "work/wo07c/native-sanitize-step3-attempt1.log"
+  }
+]

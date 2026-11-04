@@ -1,0 +1,429 @@
+{
+  "passed": true,
+  "initial_head": "0de90cccbb33c033edd5c3578a02d53967791682",
+  "original_head": "4b88b619fb1b08c7f30112a38eb471880b2a6af4",
+  "original_clean": true,
+  "source_head": "d6de958557ffc62229099696cad4822cd5de2ecd",
+  "prior_evidence": [
+    {
+      "path": "doc/design/mercaweave-v0.1-automated-simulation.md",
+      "sha256": "ee1d9af0fc04d91fbbbad0ecd59e393bbfed6c35081aba731cbcfa536d990ad3",
+      "bytes": 32378
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-consensus-readiness.md",
+      "sha256": "37a688a8b96455b38b5fe2720bbdac3b7a9f6b9ec61879b04c50664c53cc4b30",
+      "bytes": 28842
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-full-integration-qualification.md",
+      "sha256": "53d785a33712b1727a1f935fb03ebca0d053015eee3f0f73342ea8b818dfa683",
+      "bytes": 29696
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-isolated-consensus-integration.md",
+      "sha256": "c767d4e72a4f39458a8c21336e80bb54c7f662cff3931789938f693e933f65c0",
+      "bytes": 30425
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-qt-mining-integration.md",
+      "sha256": "d5888de5186196acc5521e58a9627a646d46c19202a440d6847a1296608cc7d4",
+      "bytes": 28426
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-security-qualification.md",
+      "sha256": "67e91434f979074701c78af0e94a57f2df96ee281373d7dd82f840a7d1e4c216",
+      "bytes": 17333
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-source-audit.md",
+      "sha256": "5c9bd05d274a6b4dab82f6adbc60ca599d3fd9af3e239b2be12dae1cee4d1f9b",
+      "bytes": 6890
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-standalone-validation.md",
+      "sha256": "6b8a443f281cd877272068978286bbdbbb46f67cbf08055d99f33cca8415583e",
+      "bytes": 11576
+    },
+    {
+      "path": "doc/design/mercaweave-v0.1-wallet-psbt-integration.md",
+      "sha256": "561415c53943c06af31cc5ff64acdde8a5e5690f73938e07104fdf49c500045a",
+      "bytes": 28313
+    },
+    {
+      "path": "src/test/mercaweave/benchmark-environment.json",
+      "sha256": "117a545ca3f6f16afba7920a71e5fc49fc24078d48728ec0dd760fcc16c4c0cc",
+      "bytes": 1968
+    },
+    {
+      "path": "src/test/mercaweave/benchmarks.csv",
+      "sha256": "0896a259684d85b4df92299d535c7f292ab237fefbb0a3114c4c8cd7fe83ac28",
+      "bytes": 2166
+    },
+    {
+      "path": "src/test/mercaweave/full-integration-artifacts/active-native-parameters.json",
+      "sha256": "e8ebb23d9ab0956dcc880ec642caba9174d9307d850fbf56a74d85c38a6f9d0d",
+      "bytes": 7670
+    },
+    {
+      "path": "src/test/mercaweave/full-integration-artifacts/debug-workloads.csv",
+      "sha256": "59c1049ceacd8715e2dfd4094382e897f0d4d85f6fb3756bab4b3367c8616760",
+      "bytes": 1498
+    },
+    {
+      "path": "src/test/mercaweave/full-integration-artifacts/qualification.json",
+      "sha256": "5828d932974a86e6cbc62b9d8377dc2a2d3ea36302b12fd26c10ccca9bffed9e",
+      "bytes": 20035
+    },
+    {
+      "path": "src/test/mercaweave/full-integration-artifacts/release-workloads.csv",
+      "sha256": "f1594ab1ef5d9e898e3921adb2844855cc13fc6eab34fde7c0364f64a32d5ec3",
+      "bytes": 1471
+    },
+    {
+      "path": "src/test/mercaweave/full-integration-artifacts/sanitize-workloads.csv",
+      "sha256": "00793babd274b69d2e689f67140d28bc0a46462cec053c595e72538f3d925699",
+      "bytes": 1483
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/debug-benchmarks.csv",
+      "sha256": "ff0f87da523a9ae618ea6020e2385bd2f09b30750eb06997978b3bece03479e9",
+      "bytes": 4180
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/debug-isolation.json",
+      "sha256": "9ddcc353470fa57e71fcab0817b9c4ad22aaf43e0e618e78af70e94472c0770e",
+      "bytes": 900
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/leak-sanitizer.txt",
+      "sha256": "46da19cffef18e9d70fa371e0b1e38bdff1a6f89006d0071e472a9af6a366bff",
+      "bytes": 231
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/mercaweave_integration_tests.jsonl",
+      "sha256": "10e22b561f37dba524211184e315c03a807e0456dc090e28c47c65343d8013c8",
+      "bytes": 560
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/mercaweave_isolated_control.json",
+      "sha256": "5c824d5cb5ba55210868128de4ff33ce47c6ddb2c5cd7c1e3ca37b2356885053",
+      "bytes": 124
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/mercaweave_normal_control.json",
+      "sha256": "9a072b2e822ddef3561b651badea85a0e1c3eb5b5bb2c47bcb039c8fd7b57a63",
+      "bytes": 124
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/mercaweave_tests.json",
+      "sha256": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7",
+      "bytes": 400672
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/qualification.json",
+      "sha256": "7fa8cc1eb8d14aa2776b46c84f37df2b49270d2097d01601a881761a4fe8f98c",
+      "bytes": 103464
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/release-benchmarks.csv",
+      "sha256": "47d7a1242477909aa1e26043b7e01bf13c50463ca6aea47874d0a61f8a850633",
+      "bytes": 7543
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/release-isolation.json",
+      "sha256": "9ddcc353470fa57e71fcab0817b9c4ad22aaf43e0e618e78af70e94472c0770e",
+      "bytes": 900
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/sanitize-benchmarks.csv",
+      "sha256": "d46e503a3ac4a76fd9ca4b9d9dda42c53d89d2a1277860b54eae3f02aad4455e",
+      "bytes": 4154
+    },
+    {
+      "path": "src/test/mercaweave/integration-artifacts/sanitize-isolation.json",
+      "sha256": "9ddcc353470fa57e71fcab0817b9c4ad22aaf43e0e618e78af70e94472c0770e",
+      "bytes": 900
+    },
+    {
+      "path": "src/test/mercaweave/readiness-artifacts/block-benchmarks.csv",
+      "sha256": "c8c67e28fa1363a9ad8d08dc15ffb69e97ca9cda0cf14581df0cba72ab7340ca",
+      "bytes": 2287
+    },
+    {
+      "path": "src/test/mercaweave/readiness-artifacts/consensus-readiness-benchmarks.json",
+      "sha256": "b73de8e5f6b813e57fb796263064253987f5c72af78838482f2bd35f769a04ca",
+      "bytes": 42016
+    },
+    {
+      "path": "src/test/mercaweave/readiness-artifacts/determinism-checks.json",
+      "sha256": "b9205483dd367c9201430d7b577ca7ffb576e826078e4439bbd8f9098d1c465e",
+      "bytes": 9469
+    },
+    {
+      "path": "src/test/mercaweave/readiness-artifacts/invalid-workloads.csv",
+      "sha256": "c5ae8b1202d12d62f75c4acbfbb8d1f4c20ba67c9b7af49654aa72cd9d84770d",
+      "bytes": 2175
+    },
+    {
+      "path": "src/test/mercaweave/readiness-artifacts/malleability-proof.jsonl",
+      "sha256": "d8658e03b6424addac83e692526c9176cb325075d8eb70ce3c419fa5a1bfbc09",
+      "bytes": 1083
+    },
+    {
+      "path": "src/test/mercaweave/readiness-artifacts/transaction-benchmarks.csv",
+      "sha256": "1f07a4555ddaa0cedbcd116e6b8707c9a087fa96204488b18ed2f7fb94906276",
+      "bytes": 1714
+    },
+    {
+      "path": "src/test/mercaweave/security-benchmarks.csv",
+      "sha256": "5bcdce4ef3a1625e2dfd1f2d6442daf79bb28b668dafd8234fd51bfc3569fdc6",
+      "bytes": 3128
+    },
+    {
+      "path": "src/test/mercaweave/security-benchmarks.json",
+      "sha256": "a2b9c3f49c19776edadef19ba4f7c73ca61dcb72bd12fca15e70148a15844cab",
+      "bytes": 2050
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/build-provenance.json",
+      "sha256": "27ad076b982ca9d1bca428655a127cd8fe0b3634e7a22ca4b2acf4474d9e72d4",
+      "bytes": 2679
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/failed-attempts.json",
+      "sha256": "5d82e3d910d34d28c752a3d1ef4b22f010da31f2680b521db77d8534887981f4",
+      "bytes": 4564
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/native-campaigns.json",
+      "sha256": "ecb493e84b1059dbd8b20c283f2dceb9dee9affc0ee216fd2cc0cef5d883bf94",
+      "bytes": 56123
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/native-summary.csv",
+      "sha256": "39cbe29db606b5ba0e556012bc06605219a2a67787a9c6611b8544d3bd4980fe",
+      "bytes": 930
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/preserved-evidence.json",
+      "sha256": "9f34c35da2bd52e0357c296a7eab6d321fcb5836220e3b4353223a0c5afcddd3",
+      "bytes": 8459
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/regression.json",
+      "sha256": "fb56cfdd675909973f56f9d47fb1e4254d1146eb61c757990ea5a19bb0a5e504",
+      "bytes": 2409
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/research-campaigns.json",
+      "sha256": "3ca1abd2cacbc7bdd4d681ed231a8f9fb4ba41ade1e6866d4fe351083a28e812",
+      "bytes": 20640
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/research-debug.csv",
+      "sha256": "642e29348daf48d01c7ffc9ef953c7ec6be6406237aab682c4fe0401d9c9e8df",
+      "bytes": 1809
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/research-release-repeat.csv",
+      "sha256": "4c6be6c9c0eed82759a76b7acd097be8d09966333d1c265ffd36056a92dec473",
+      "bytes": 1773
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/research-release.csv",
+      "sha256": "1dacd8486b1380a94b7b388b51b50106a90d2a95af600cda6472e8707a4d4af3",
+      "bytes": 1778
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/research-sanitize.csv",
+      "sha256": "e63e51c813fc904522774b6c2f52194e2a30fd697ba8b77b9bbbc25688db7c24",
+      "bytes": 1793
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/research-seed11.csv",
+      "sha256": "f6c0a82ca42c02f461493ebefc639367b4b4dbc4f25d9f063483db571ec8291a",
+      "bytes": 1779
+    },
+    {
+      "path": "src/test/mercaweave/simulation-artifacts/runner-controls.json",
+      "sha256": "16ab475cc8968347ae9c4f4c3ec3e57b31e56ebdf04d5febafd73397d79b4fa1",
+      "bytes": 860
+    },
+    {
+      "path": "src/test/mercaweave/vectors.json",
+      "sha256": "ea4978206307ac21d4f544b05e6da3543e094c9a1c4bd97c44f90fad4420c49c",
+      "bytes": 402634
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/debug-check_isolation.json",
+      "sha256": "3ab3d5d4780a71878711db5863f09e2c5cbd05b95a69142979ae16eff5b60997",
+      "bytes": 900
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/debug-check_wallet_isolation.json",
+      "sha256": "09a83216c95479ead3c250b3735bc3e4c0393417b4c0fa5a167d8807ce139351",
+      "bytes": 226
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/debug-ctest.txt",
+      "sha256": "268dd85d6ed4f185a97432555fe83736da9e03348978d462243c8ed9bffbeeda",
+      "bytes": 23339
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/debug-workloads.csv",
+      "sha256": "dbf58f68023e240a11afaf7c67b2c5ef8087bb178d0fdf4621ab3305fa3ba0c0",
+      "bytes": 5653
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/mercaweave_integration_tests.jsonl",
+      "sha256": "10e22b561f37dba524211184e315c03a807e0456dc090e28c47c65343d8013c8",
+      "bytes": 560
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/mercaweave_isolated_control.json",
+      "sha256": "5c824d5cb5ba55210868128de4ff33ce47c6ddb2c5cd7c1e3ca37b2356885053",
+      "bytes": 124
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/mercaweave_normal_control.json",
+      "sha256": "9a072b2e822ddef3561b651badea85a0e1c3eb5b5bb2c47bcb039c8fd7b57a63",
+      "bytes": 124
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/mercaweave_psbt_tests.json",
+      "sha256": "804fb0bdf3d607b2d033dd31b3622933a1a2c153b51f49ae99ba1ebc145e9a5c",
+      "bytes": 93
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/mercaweave_tests.json",
+      "sha256": "17306fd48a53acda5a6425f909904e35da8beac37f25b709919ee68df5e5a6f7",
+      "bytes": 400672
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/mercaweave_wallet_tests.json",
+      "sha256": "996c3f99ac58b3b194c4e4c87b1dc381ef62b3b643483321a1d43f9261874b91",
+      "bytes": 52
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/qualification.json",
+      "sha256": "6000c56a58605c99278c467c1f82fb0f115838aeac29998148dbfdc42aed4f74",
+      "bytes": 31034
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/release-check_isolation.json",
+      "sha256": "3ab3d5d4780a71878711db5863f09e2c5cbd05b95a69142979ae16eff5b60997",
+      "bytes": 900
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/release-check_wallet_isolation.json",
+      "sha256": "09a83216c95479ead3c250b3735bc3e4c0393417b4c0fa5a167d8807ce139351",
+      "bytes": 226
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/release-ctest.txt",
+      "sha256": "ff31bc28bb54df80909d21ed5f0b00159645a507950eb3733b65f1e0ba6821f6",
+      "bytes": 23420
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/release-workloads.csv",
+      "sha256": "0c5eb9f7ef6ac3975bb4b418a1e38b8c63e227560d9f8021441808b85e61e520",
+      "bytes": 5602
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/sanitize-check_isolation.json",
+      "sha256": "3ab3d5d4780a71878711db5863f09e2c5cbd05b95a69142979ae16eff5b60997",
+      "bytes": 900
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/sanitize-check_wallet_isolation.json",
+      "sha256": "09a83216c95479ead3c250b3735bc3e4c0393417b4c0fa5a167d8807ce139351",
+      "bytes": 226
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/sanitize-ctest.txt",
+      "sha256": "495e470861df8aac9b9b4bf9fd3eb6301c481b70351edba152848e651876db55",
+      "bytes": 23468
+    },
+    {
+      "path": "src/test/mercaweave/wallet-artifacts/sanitize-workloads.csv",
+      "sha256": "a14b5208c1b753726d8bad2bb360c5364c15d0fa2b04cf84e1ca37b050f470e7",
+      "bytes": 5640
+    },
+    {
+      "path": "src/test/mercaweave/work-order-02-baseline.csv",
+      "sha256": "b81d187a98415bc1be0fab7ad8ba922aa2ef44ceed4b16320ecdd19d98caa012",
+      "bytes": 2166
+    }
+  ],
+  "locked_engine_identical": true,
+  "ordinary_definitions_absent": true,
+  "production_fixture_factory_symbols_absent": true,
+  "boundary": [
+    {
+      "case": "guarded-test-access",
+      "rejected": true,
+      "exit_code": 1
+    },
+    {
+      "case": "private-capability",
+      "rejected": true,
+      "exit_code": 1
+    },
+    {
+      "case": "private-wallet-issuance",
+      "rejected": true,
+      "exit_code": 1
+    },
+    {
+      "case": "private-chainstate-context",
+      "rejected": true,
+      "exit_code": 1
+    }
+  ],
+  "changed_files": [
+    "doc/design/mercaweave-v0.1-production-path-integration.md",
+    "src/CMakeLists.txt",
+    "src/script/interpreter.cpp",
+    "src/script/interpreter.h",
+    "src/script/pqgroup.cpp",
+    "src/script/pqgroup.h",
+    "src/script/pqgroup_context.cpp",
+    "src/script/pqgroup_context.h",
+    "src/script/pqgroup_psbt.cpp",
+    "src/script/pqgroup_psbt.h",
+    "src/script/sigcache.h",
+    "src/test/mercaweave/CMakeLists.txt",
+    "src/test/mercaweave/check_isolation.py",
+    "src/test/mercaweave/check_node_isolation.py",
+    "src/test/mercaweave/check_wallet_isolation.py",
+    "src/test/mercaweave/mercaweave.cpp",
+    "src/test/mercaweave/mercaweave.h",
+    "src/test/mercaweave/production-path-artifacts/failed-attempts.csv",
+    "src/test/mercaweave/production-path-artifacts/security-matrix.csv",
+    "src/test/mercaweave/production_path/access.h",
+    "src/test/mercaweave/production_path/audit.py",
+    "src/test/mercaweave/production_path/build_native.py",
+    "src/test/mercaweave/production_path/collect.py",
+    "src/test/mercaweave/production_path/context_tests.cpp",
+    "src/test/mercaweave/production_path/measure.py",
+    "src/test/mercaweave/production_path/native_fixture.h",
+    "src/test/mercaweave/production_path/native_tests.cpp",
+    "src/test/mercaweave/production_path/run_native.py",
+    "src/test/mercaweave/production_path/security_tests.cpp",
+    "src/test/mercaweave/production_path/wallet_access.h",
+    "src/test/mercaweave/production_path/wallet_tests.cpp",
+    "src/validation.cpp",
+    "src/validation.h",
+    "src/wallet/CMakeLists.txt",
+    "src/wallet/pqgroup.cpp",
+    "src/wallet/pqgroup.h",
+    "src/wallet/spend.cpp",
+    "src/wallet/wallet.cpp",
+    "src/wallet/wallet.h",
+    "src/wallet/walletdb.cpp",
+    "src/wallet/walletdb.h"
+  ],
+  "network_activation_added": false,
+  "ordinary_unknown_v3_is_group_authorization": false
+}

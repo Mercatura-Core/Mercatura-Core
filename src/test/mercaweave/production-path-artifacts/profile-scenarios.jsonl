@@ -1,0 +1,47 @@
+{"bytes": 5397, "connect_us": 304065, "exact_utxo_restore": true, "groups": 1, "inputs": 1, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 5679}
+{"bytes": 6117, "connect_us": 364875, "exact_utxo_restore": true, "groups": 1, "inputs": 10, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 7506}
+{"bytes": 9557, "connect_us": 370020, "exact_utxo_restore": true, "groups": 1, "inputs": 53, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 16235}
+{"bytes": 13317, "connect_us": 374751, "exact_utxo_restore": true, "groups": 1, "inputs": 100, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 25776}
+{"bytes": 60675, "connect_us": 358291, "exact_utxo_restore": true, "groups": 10, "inputs": 100, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 73134}
+{"bytes": 534255, "connect_us": 403329, "exact_utxo_restore": true, "groups": 100, "inputs": 100, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 546714}
+{"bytes": 85319, "connect_us": 359778, "exact_utxo_restore": true, "groups": 1, "inputs": 1000, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 208484}
+{"bytes": 87239, "connect_us": 342166, "exact_utxo_restore": true, "groups": 1, "inputs": 1024, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 213356}
+{"bytes": 1367609, "connect_us": 422554, "exact_utxo_restore": true, "groups": 256, "inputs": 256, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 1399262}
+{"bytes": 348785, "connect_us": 366771, "exact_utxo_restore": true, "groups": 4, "inputs": 4096, "persistent_undo": true, "scenario": "actual-connect-disconnect", "weight": 852758}
+{"coins_database_reopened": true, "competing_spends": true, "late_invalid_atomic": true, "real_network_v3": false, "scenario": "actual-chainstate-recovery"}
+{"actual_create_transaction": true, "alice_balance": 5900, "bob_balance": 0, "fee_units": 100, "groups": 2, "native_signatures": 2, "scenario": "actual-cwallet-multisigner"}
+{"backup_restore": true, "encrypted_seed_only": true, "failed_write_no_issued_index": true, "issued": 65, "locked_signing_rejected": true, "ordinary_v3_issue": false, "restart": true, "rotation": 64, "scenario": "actual-cwallet-sqlite"}
+{"case": "wrong-public-key", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "altered-signature", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "signature-length", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "public-key-length", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "nonce-length", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "self-reference", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "follower-reference", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "outside-reference", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "duplicate-anchor", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "missing-anchor", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "extra-anchor", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "missing-follower", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "duplicate-outpoint", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "wrong-commitment", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "wrong-genesis", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-prevout", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-amount", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-script", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-sequence", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-version", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-locktime", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-output-value", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "changed-output-script", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "reordered-inputs", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "added-member", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "removed-member", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "moved-group", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "mixed-independent-keys", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "scriptSig", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "oversized-witness", "group_verifications": 0, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "late-invalid", "group_verifications": 2, "rejected": true, "scenario": "negative-production-entry"}
+{"case": "reordered-outputs", "group_verifications": 1, "rejected": true, "scenario": "negative-production-entry"}
+{"entropy_failure_atomic": true, "metadata_rejections": 7, "ordinary_grouped_load_rejected": true, "prevout_mismatch_atomic": true, "scenario": "actual-wallet-negative"}
+{"excess_members_groups_inputs_rejected": true, "mandatory_unknown_v3_permissive": true, "psbt_mutations": 250, "scenario": "ordinary-and-limits", "seed": "574f303743505342", "standard_unknown_v3_rejected": true}

@@ -1,0 +1,17 @@
+{
+  "command": [
+    "work/wo07c/native-debug/wo07c_native_tests",
+    "--log_level=test_suite",
+    "--report_level=detailed",
+    "--color_output=no",
+    "--",
+    "-testdatadir=/workspace/Mercatura-MercaWeave-v0.1/work/wo07c/native-runtime-debug-final"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 1215.864521719,
+  "cpu_user_seconds": 1617.635097,
+  "cpu_system_seconds": 6.036973,
+  "max_rss_kib": 468060,
+  "minor_page_faults": 4449262,
+  "major_page_faults": 0
+}

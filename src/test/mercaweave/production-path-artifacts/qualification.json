@@ -1,0 +1,122 @@
+{
+  "initial_head": "0de90cccbb33c033edd5c3578a02d53967791682",
+  "source_head": "d6de958557ffc62229099696cad4822cd5de2ecd",
+  "configurations": {
+    "release": {
+      "standalone_ctests": 35,
+      "existing_standalone": 34,
+      "new_context": 1,
+      "context_assertions": 1070,
+      "native": {
+        "cases": 14,
+        "assertions": 22476,
+        "log": "work/wo07c/native-release-latest.log",
+        "mining_fixture_timeout_seconds": 180
+      },
+      "new_native_cases": 6,
+      "existing_native_cases": 8,
+      "combined_asan_ubsan": false,
+      "leak_detection": "not applicable"
+    },
+    "debug": {
+      "standalone_ctests": 35,
+      "existing_standalone": 34,
+      "new_context": 1,
+      "context_assertions": 1070,
+      "native": {
+        "cases": 14,
+        "assertions": 22476,
+        "log": "work/wo07c/native-debug-step3.log",
+        "mining_fixture_timeout_seconds": 1800
+      },
+      "new_native_cases": 6,
+      "existing_native_cases": 8,
+      "combined_asan_ubsan": false,
+      "leak_detection": "not applicable"
+    },
+    "sanitize": {
+      "standalone_ctests": 35,
+      "existing_standalone": 34,
+      "new_context": 1,
+      "context_assertions": 1070,
+      "native": {
+        "cases": 14,
+        "assertions": 22476,
+        "log": "work/wo07c/native-sanitize-step3.log",
+        "mining_fixture_timeout_seconds": 1800
+      },
+      "new_native_cases": 6,
+      "existing_native_cases": 8,
+      "combined_asan_ubsan": true,
+      "leak_detection": "NOT TESTED"
+    }
+  },
+  "native_functionals": [
+    {
+      "test": "mercatura_fee_policy.py",
+      "status": "Passed",
+      "duration(seconds)": "106"
+    },
+    {
+      "test": "mercatura_pq_invalid_auth.py",
+      "status": "Passed",
+      "duration(seconds)": "165"
+    },
+    {
+      "test": "mercatura_pq_mempool_persistence.py",
+      "status": "Passed",
+      "duration(seconds)": "189"
+    },
+    {
+      "test": "mercatura_pq_psbt.py",
+      "status": "Passed",
+      "duration(seconds)": "108"
+    },
+    {
+      "test": "mercatura_pq_reorg.py",
+      "status": "Passed",
+      "duration(seconds)": "168"
+    },
+    {
+      "test": "mercatura_pq_rescan.py",
+      "status": "Passed",
+      "duration(seconds)": "887"
+    },
+    {
+      "test": "mercatura_wallet_encryption_persistence.py",
+      "status": "Passed",
+      "duration(seconds)": "163"
+    }
+  ],
+  "final_storage_followup": "mercatura_wallet_encryption_persistence.py",
+  "distinct_standalone_tests": 35,
+  "distinct_native_boost_cases": 14,
+  "distinct_native_functional_scripts": 7,
+  "baseline_runs_not_added_to_final_totals": true,
+  "profile": {
+    "command": [
+      "work/wo07c/native-release/wo07c_native_tests",
+      "--log_level=test_suite",
+      "--report_level=detailed",
+      "--color_output=no",
+      "--",
+      "-testdatadir=/workspace/Mercatura-MercaWeave-v0.1/work/wo07c/native-runtime-release-after-cleanup"
+    ],
+    "exit_code": 0,
+    "wall_seconds": 103.42294143399977,
+    "cpu_user_seconds": 113.859721,
+    "cpu_system_seconds": 5.088372,
+    "max_rss_kib": 457212,
+    "minor_page_faults": 4449655,
+    "major_page_faults": 0
+  },
+  "real_node_grouped_v3": "NOT TESTED",
+  "network_activation_added": false,
+  "gap1": "CLOSED WITH RESTRICTIONS: isolated genuine chainstate components",
+  "gap2": "CLOSED WITH RESTRICTIONS: isolated genuine CWallet components",
+  "leak_sanitizer": "NOT TESTED: ptrace limitation; detect_leaks=0",
+  "production_allocation_failure_injection": "NOT TESTED",
+  "thread_sanitizer": "NOT TESTED",
+  "original_worktree_unchanged": true,
+  "pushed": false
+}
