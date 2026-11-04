@@ -104,11 +104,16 @@ std::optional<PQGroupRecord> CWallet::IssuePQGroupAddress(uint32_t account, uint
     auto record = DeriveRecord(m_mercatura_pq_master_seed,staged.genesis,account,purpose,sequence / 64,sequence % 64);
     staged.issued.push_back(record);
     staged.mac = staged.Authenticate(m_mercatura_pq_master_seed);
+    // Allocate the complete public index before committing durable metadata.
+    // A failed allocation must not leave a committed issued record without its
+    // in-memory ownership entry, or consume an address while returning failure.
+    auto staged_index = m_pq_group_index;
+    if (!staged_index.emplace(record.Script(staged.genesis),staged.issued.size()-1).second) return {};
     WalletBatch batch(GetDatabase());
     if (!batch.TxnBegin()) return {};
     if (!batch.WritePQGroupRecords(staged) || !batch.TxnCommit()) { batch.TxnAbort(); return {}; }
     m_pq_group_records = std::move(staged);
-    m_pq_group_index.emplace(record.Script(Network()),m_pq_group_records->issued.size()-1);
+    m_pq_group_index.swap(staged_index);
     m_pq_group_verified = true;
     MaybeUpdateBirthTime(GetTime());
     return record;

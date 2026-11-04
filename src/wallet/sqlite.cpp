@@ -19,6 +19,7 @@
 #include <sqlite3.h>
 
 #include <cstdint>
+#include <array>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -420,13 +421,15 @@ void SQLiteBatch::Close()
     }
 
     // Free all of the prepared statements
-    const std::vector<std::pair<sqlite3_stmt**, const char*>> statements{
+    // Closing a batch is also called by its noexcept destructor, including
+    // after a successful durable commit. This fixed list must not allocate.
+    const std::array<std::pair<sqlite3_stmt**, const char*>, 5> statements{{
         {&m_read_stmt, "read"},
         {&m_insert_stmt, "insert"},
         {&m_overwrite_stmt, "overwrite"},
         {&m_delete_stmt, "delete"},
         {&m_delete_prefix_stmt, "delete prefix"},
-    };
+    }};
 
     for (const auto& [stmt_prepared, stmt_description] : statements) {
         int res = sqlite3_finalize(*stmt_prepared);

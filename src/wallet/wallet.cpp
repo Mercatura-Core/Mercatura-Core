@@ -2739,9 +2739,12 @@ std::optional<PSBTError> CWallet::FillPQGroupPSBT(PartiallySignedTransaction& so
                     return PSBTError::MISSING_INPUTS;
             }
         }
-        complete = std::all_of(info.complete.begin(),info.complete.end(),[](bool value) { return value; });
+        const bool staged_complete = std::all_of(info.complete.begin(),info.complete.end(),[](bool value) { return value; });
         if (finalize) FinalizePSBT(staged,*m_group_execution,spent);
         source = std::move(staged);
+        // Publish completion only after finalization's allocations and the
+        // staged PSBT publication succeed. Exceptions leave complete false.
+        complete = staged_complete;
         if (signed_inputs) *signed_inputs = count;
         return {};
     } catch (const mercaweave::Failure&) { return PSBTError::INCOMPLETE; }
