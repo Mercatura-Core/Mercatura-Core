@@ -121,8 +121,20 @@ Inspection Inspect(const PartiallySignedTransaction& source, std::span<const CTx
         if (version == 3) {
             Require(nonce && ((key && !reference) || (!key && reference && !signature)));
             Require(!GetMercaturaPQPSBTPublicKey(input) && !GetMercaturaPQPSBTSignature(input));
-            out.tx.vin[i].scriptWitness.stack = key ? std::vector<Bytes>{signature ? *signature : Bytes(3309),*key,*nonce} :
-                std::vector<Bytes>{*nonce,*reference};
+            // Construct directly into the owned witness. Nested conditional
+            // initializer-list temporaries made allocation-failure unwinding
+            // unsafe on the qualified toolchain (WO08 sanitizer regression).
+            auto& witness = out.tx.vin[i].scriptWitness.stack;
+            witness.reserve(key ? 3 : 2);
+            if (key) {
+                if (signature) witness.push_back(*signature);
+                else witness.emplace_back(3309);
+                witness.push_back(*key);
+                witness.push_back(*nonce);
+            } else {
+                witness.push_back(*nonce);
+                witness.push_back(*reference);
+            }
         } else {
             Require(!nonce && !reference && !key && !signature);
             const auto native_key = GetMercaturaPQPSBTPublicKey(input);
@@ -132,7 +144,11 @@ Inspection Inspect(const PartiallySignedTransaction& source, std::span<const CTx
                 std::equal(commitment.begin(),commitment.end(),program.begin()));
             const auto native_signature = GetMercaturaPQPSBTSignature(input);
             Require(!native_signature || native_signature->size() == 3309);
-            out.tx.vin[i].scriptWitness.stack = {native_signature ? *native_signature : Bytes(3309),*native_key};
+            auto& witness = out.tx.vin[i].scriptWitness.stack;
+            witness.reserve(2);
+            if (native_signature) witness.push_back(*native_signature);
+            else witness.emplace_back(3309);
+            witness.push_back(*native_key);
         }
     }
     out.mapping = Reconstruct(out.tx,out.spent);
