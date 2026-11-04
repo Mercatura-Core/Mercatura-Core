@@ -125,6 +125,9 @@ def main():
             execution = json.loads((WORK/f'native-{mode}-execution.json').read_text())
             for row in execution:
                 row['rss_scope'] = 'cumulative maximum child RSS including earlier build steps; not isolated test RSS'
+                if row['exit_code'] and row['log'].endswith('step3.log'):
+                    row['preserved_failure_log'] = f'work/wo07c/native-{mode}-step3-attempt1.log'
+                    assert (ROOT/row['preserved_failure_log']).is_file()
             (ARTIFACTS/f'native-{mode}-initial-execution.json').write_text(json.dumps(execution,indent=2)+'\n')
             final_profile = json.loads((WORK/f'native-{mode}-profile-final.json').read_text())
             assert final_profile['exit_code'] == 0
