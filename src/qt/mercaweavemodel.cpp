@@ -74,26 +74,31 @@ Model::~Model()
 }
 void Model::observeNativeWallet(bool locked,bool watch)
 {
-    if(QThread::currentThread()!=thread())return;++m_generation;m_busy=false;
+    if(QThread::currentThread()!=thread())return;
+    ++m_generation;m_busy=false;
     m_state.capability.locked=locked;m_state.capability.watchOnly=watch;
     m_state.reason=Availability(m_state.capability,Action::Inspect);Q_EMIT changed();
 }
 void Model::nativePreview(Preview preview)
 {
-    if(QThread::currentThread()!=thread())return;++m_generation;m_busy=false;m_state.preview=std::move(preview);m_state.reason=Availability(m_state.capability,Action::Inspect);Q_EMIT changed();
+    if(QThread::currentThread()!=thread())return;
+    ++m_generation;m_busy=false;m_state.preview=std::move(preview);m_state.reason=Availability(m_state.capability,Action::Inspect);Q_EMIT changed();
 }
 void Model::invalidate(Reason reason)
 {
-    if(QThread::currentThread()!=thread())return;++m_generation;m_busy=false;m_busy=false;
+    if(QThread::currentThread()!=thread())return;
+    ++m_generation;m_busy=false;m_busy=false;
 #ifdef MERCATURA_MERCAWEAVE_QT_RESEARCH_TEST_ONLY
     if(m_backend)m_backend->Invalidate(reason);
 #endif
     m_state.preview={};m_state.syntheticAddress.clear();m_state.proposal.clear();m_state.reason=reason;
-    if(reason==Reason::Unloaded)m_state.capability.loaded=false;Q_EMIT changed();
+    if(reason==Reason::Unloaded)m_state.capability.loaded=false;
+    Q_EMIT changed();
 }
 void Model::setOptIn(bool enabled)
 {
-    if(QThread::currentThread()!=thread())return;++m_generation;m_busy=false;m_state.capability.optedIn=enabled;
+    if(QThread::currentThread()!=thread())return;
+    ++m_generation;m_busy=false;m_state.capability.optedIn=enabled;
 #ifdef MERCATURA_MERCAWEAVE_QT_RESEARCH_TEST_ONLY
     if(!enabled&&m_backend)m_backend->Invalidate(Reason::Cancelled);
 #endif
@@ -128,7 +133,8 @@ bool Model::request(Request request)
 #ifdef MERCATURA_MERCAWEAVE_QT_RESEARCH_TEST_ONLY
 void Model::attachIsolated(std::shared_ptr<Backend> backend,Snapshot state)
 {
-    if(QThread::currentThread()!=thread())return;++m_generation;m_busy=false;m_busy=false;
+    if(QThread::currentThread()!=thread())return;
+    ++m_generation;m_busy=false;m_busy=false;
     if(!state.capability.isolated){m_state={};m_backend.reset();m_state.reason=Reason::Network;}
     else{m_backend=std::move(backend);m_state=std::move(state);}Q_EMIT changed();
 }

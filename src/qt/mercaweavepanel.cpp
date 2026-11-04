@@ -45,12 +45,14 @@ Panel::Panel(View view,QWidget* parent):QGroupBox(tr("Optional grouped PQ — un
 }
 void Panel::setModel(Model* model)
 {
-    if(m_model)disconnect(m_model,nullptr,this,nullptr);m_model=model;
+    if(m_model)disconnect(m_model,nullptr,this,nullptr);
+    m_model=model;
     if(model){connect(model,&Model::changed,this,&Panel::refresh);connect(model,&QObject::destroyed,this,[this]{m_model=nullptr;refresh();});}refresh();
 }
 void Panel::dispatch(Action action)
 {
-    if(!m_model)return;Request request;request.action=action;request.account=static_cast<quint32>(m_account->value());request.purpose=m_view==View::Mining?2:0;
+    if(!m_model)return;
+    Request request;request.action=action;request.account=static_cast<quint32>(m_account->value());request.purpose=m_view==View::Mining?2:0;
     request.mode=m_mode->currentIndex();request.group=m_group->currentData().toString();request.sweepEnabled=m_sweep->isChecked();request.threshold=m_trigger->value();request.destination=m_destination->text();m_model->request(request);
 }
 void Panel::refresh()
@@ -71,7 +73,9 @@ void Panel::refresh()
     QString details;
     if(m_view==View::Mining)details=tr("Mature rewards: %1 · immature: %2 · eligible: %3\nProposal: %4\n").arg(s.mature).arg(s.immature).arg(s.eligible).arg(s.proposal.isEmpty()?tr("None"):s.proposal);
     const auto& p=s.preview;if(p.available){details+=tr("%1 inputs / %2 outputs · v2 inputs %3 · v3 group authorizations %4 (%5 anchors, %6 followers) · %7 ML-DSA signatures\n%8 full serialized bytes · %9 total WU · fee %10 · rate %11 per 1,000 full bytes\nChange: %12 · %13").arg(p.inputs).arg(p.outputs).arg(p.nativeInputs).arg(p.groups).arg(p.anchors).arg(p.followers).arg(p.signatures).arg(p.bytes).arg(p.weight).arg(Money(p.fee)).arg(Money(p.perK)).arg(p.changeType,p.complete?tr("Authorization complete; grouped broadcasting is unavailable"):tr("Incomplete PSBT; not ready for broadcast"));}
-    else details+=tr("No current transaction-aware estimate is available.");if(p.available)details+=tr("\nTransactions: %1 · largest transaction: %2 WU. Totals include every split transaction.").arg(p.transactions).arg(p.maxWeight?p.maxWeight:p.weight);m_detail->setText(details);
+    else details+=tr("No current transaction-aware estimate is available.");
+    if(p.available)details+=tr("\nTransactions: %1 · largest transaction: %2 WU. Totals include every split transaction.").arg(p.transactions).arg(p.maxWeight?p.maxWeight:p.weight);
+    m_detail->setText(details);
     m_recovery->setText(tr("Public inventory: %1 · metadata backup: %2\nDiscovery hints: %3 address candidates / %4 successive unused groups. Seed-only recovery is not guaranteed.\n%5").arg(s.inventory).arg(s.metadataBackup?tr("available"):tr("unavailable")).arg(s.recoveryAddresses).arg(s.recoveryGroups).arg(s.recoveryStatus.isEmpty()?tr("Live and resumable rescanning are unavailable."):s.recoveryStatus));
 }
 }
