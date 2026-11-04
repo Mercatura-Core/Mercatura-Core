@@ -37,7 +37,9 @@ def main():
         [cmake,'--build',str(build),'--target','bitcoind','bitcoin-cli','test_util','-j1'],
         ['python3',str(pathlib.Path(__file__).with_name('build_native.py')),'--build',str(build),'--output',str(output),
          '--mining-timeout-seconds','1800'],
-        [str(output/'wo07c_native_tests'),'--log_level=test_suite','--report_level=detailed','--color_output=no','--',
+        ['python3',str(pathlib.Path(__file__).with_name('measure.py')),'--output',
+         str(evidence/f'native-{args.mode}-profile-final.json'),'--',str(output/'wo07c_native_tests'),
+         '--log_level=test_suite','--report_level=detailed','--color_output=no','--',
          '-testdatadir='+str(evidence/f'native-runtime-{args.mode}')],
     ]
     rows = []
