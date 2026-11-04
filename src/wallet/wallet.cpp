@@ -4784,9 +4784,11 @@ bool CWallet::Unlock(
         }
 
         if (!AuthenticatePQGroups(pq_master_seed)) {
-            memory_cleanse(m_mercatura_pq_master_seed.data(),m_mercatura_pq_master_seed.size());
+            if (!m_mercatura_pq_master_seed.empty())
+                memory_cleanse(m_mercatura_pq_master_seed.data(),m_mercatura_pq_master_seed.size());
             m_mercatura_pq_master_seed.clear();
-            memory_cleanse(vMasterKey.data(),vMasterKey.size()); vMasterKey.clear();
+            if (!vMasterKey.empty()) memory_cleanse(vMasterKey.data(),vMasterKey.size());
+            vMasterKey.clear();
             return false;
         }
         vMasterKey = vMasterKeyIn;
