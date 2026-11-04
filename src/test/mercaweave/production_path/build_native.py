@@ -5,6 +5,7 @@ No legacy research ABI definitions. Dependencies must first be rebuilt normally
 in the selected native configuration. This never builds or launches a miner.
 """
 import argparse
+import hashlib
 import json
 import pathlib
 import re
@@ -18,7 +19,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build',type=pathlib.Path,required=True)
     parser.add_argument('--output',type=pathlib.Path,required=True)
+    parser.add_argument('--mining-timeout-seconds',type=int,default=180,
+                        help='Wall-clock budget for the existing native mining fixture; no assertion changes')
     args = parser.parse_args()
+    if not 180 <= args.mining_timeout_seconds <= 1800:
+        parser.error('mining fixture budget must be between 180 and 1800 seconds')
     build = args.build.resolve(strict=True)
     out = args.output.resolve(); out.mkdir(parents=True,exist_ok=True)
     # Recheck dependencies after any ongoing configuration build: source edits
@@ -41,11 +46,28 @@ def main():
                'src/test/mercaweave/production_path/security_tests.cpp',
                'src/wallet/test/mining_tests.cpp']
     for index,source in enumerate(sources):
+        compile_source = ROOT/source
+        if source == 'src/wallet/test/mining_tests.cpp':
+            original = compile_source.read_text()
+            needle = 'std::chrono::seconds{180}'
+            if original.count(needle) != 1:
+                raise RuntimeError('native mining fixture timeout changed; review required')
+            transformed = original.replace(needle,'std::chrono::seconds{'+str(args.mining_timeout_seconds)+'}')
+            budget = dict(original_source=source,original_sha256=hashlib.sha256(original.encode()).hexdigest(),
+                          timeout_seconds=args.mining_timeout_seconds,
+                          original_timeout_seconds=180,only_change='wall-clock fixture deadline',
+                          assertions_and_mining_implementation_unchanged=True,
+                          transformed_sha256=hashlib.sha256(transformed.encode()).hexdigest())
+            if args.mining_timeout_seconds != 180:
+                compile_source = out/'mining-tests-with-host-budget.cpp'
+                if not compile_source.exists() or compile_source.read_text() != transformed:
+                    compile_source.write_text(transformed)
+            (out/'mining-budget.json').write_text(json.dumps(budget,indent=2)+'\n')
         obj = out/f'{index}-{pathlib.Path(source).stem}.o'
         dependencies = obj.with_suffix('.d')
         recorded = obj.with_suffix('.command.json')
         command = ['/usr/bin/c++',*options,'-DMERCATURA_MERCAWEAVE_PRODUCTION_PATH_TEST_ONLY=1',
-                   '-MMD','-MF',str(dependencies),'-c',str(ROOT/source),'-o',str(obj)]
+                   '-MMD','-MF',str(dependencies),'-c',str(compile_source),'-o',str(obj)]
         fresh = False
         if obj.exists() and dependencies.exists() and recorded.exists() and json.loads(recorded.read_text()) == command:
             names = shlex.split(dependencies.read_text().replace('\\\n',' ').split(':',1)[1])

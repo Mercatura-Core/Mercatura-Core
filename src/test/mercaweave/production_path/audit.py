@@ -28,7 +28,8 @@ def main():
     assert not subprocess.check_output(['git','-C',str(original),'status','--porcelain'])
     changed = git('diff','--name-only',INITIAL).decode().splitlines()
     forbidden = ['src/chainparams.cpp','src/consensus/params.h','src/pow.cpp','src/crypto/',
-                 'src/kernel/chainparams.cpp','src/qt/','src/rpc/','src/policy/','src/node/miner.cpp']
+                 'src/kernel/chainparams.cpp','src/qt/','src/rpc/','src/policy/','src/node/miner.cpp',
+                 'src/mining/','src/wallet/mining.cpp','src/wallet/test/mining_tests.cpp']
     assert not [name for name in changed if any(name == item or name.startswith(item) for item in forbidden)]
     preserved = []
     for name in git('ls-tree','-r','--name-only',INITIAL).decode().splitlines():

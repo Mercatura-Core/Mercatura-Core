@@ -62,6 +62,8 @@ def main():
         contexts.extend(timings)
         native = WORK/('native-release-latest.log' if mode == 'release' else f'native-{mode}-step3.log')
         native_result,rows = boost(native,14)
+        budget = json.loads((WORK/f'native-{mode}'/'mining-budget.json').read_text())
+        native_result['mining_fixture_timeout_seconds'] = budget['timeout_seconds']
         native_rows.extend(dict(configuration=mode,**row) for row in rows)
         results[mode] = dict(standalone_ctests=35,existing_standalone=34,new_context=1,
                              context_assertions=1070,native=native_result,
@@ -123,7 +125,12 @@ def main():
             execution = json.loads((WORK/f'native-{mode}-execution.json').read_text())
             for row in execution:
                 row['rss_scope'] = 'cumulative maximum child RSS including earlier build steps; not isolated test RSS'
-            (ARTIFACTS/f'native-{mode}-execution.json').write_text(json.dumps(execution,indent=2)+'\n')
+            (ARTIFACTS/f'native-{mode}-initial-execution.json').write_text(json.dumps(execution,indent=2)+'\n')
+            final_profile = json.loads((WORK/f'native-{mode}-profile-final.json').read_text())
+            assert final_profile['exit_code'] == 0
+            (ARTIFACTS/f'native-{mode}-final-execution.json').write_text(json.dumps(final_profile,indent=2)+'\n')
+        budget = json.loads((WORK/f'native-{mode}'/'mining-budget.json').read_text())
+        (ARTIFACTS/f'native-{mode}-mining-budget.json').write_text(json.dumps(budget,indent=2)+'\n')
     (ARTIFACTS/'native-build-commands.json').write_text(json.dumps(build_commands,indent=2)+'\n')
     environment = dict(platform=platform.platform(),machine=platform.machine(),
         compiler=subprocess.check_output(['c++','--version'],text=True).splitlines()[0],
