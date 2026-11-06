@@ -210,7 +210,8 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
             // this type of NONSTANDARD transaction earlier in transaction
             // validation.
             return false;
-        } else if (whichType == TxoutType::WITNESS_V2_MERCATURA_PQ) {
+        } else if (whichType == TxoutType::WITNESS_V2_MERCATURA_PQ ||
+                   whichType == TxoutType::WITNESS_V3_MERCAWEAVE) {
             // Mercatura PQ Authorization v1 is native witness-v2 only.
             // Consensus also requires this, but reject cheaply at policy.
             if (!tx.vin[i].scriptSig.empty()) {
@@ -272,6 +273,15 @@ bool IsWitnessStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
         // Non-witness program must not be associated with any witness
         if (!prevScript.IsWitnessProgram(witnessversion, witnessprogram))
             return false;
+
+        if (witnessversion == 3) {
+            if (p2sh || witnessprogram.size() != 32 || !tx.vin[i].scriptSig.empty()) return false;
+            const auto& stack = tx.vin[i].scriptWitness.stack;
+            const bool anchor = stack.size() == 3 && stack[0].size() == 3309 &&
+                                stack[1].size() == 1952 && stack[2].size() == 32;
+            const bool follower = stack.size() == 2 && stack[0].size() == 32 && stack[1].size() == 4;
+            if (!anchor && !follower) return false;
+        }
 
         // Mercatura PQ Authorization v1 has one exact native witness form:
         //   witness[0] = raw 3309-byte ML-DSA-65 signature

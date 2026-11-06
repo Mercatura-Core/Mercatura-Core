@@ -152,6 +152,8 @@ public:
         std::unordered_map<Consensus::BuriedDeployment, int> activation_heights{};
         /** Unset: V1 only; zero: isolated V2 genesis; positive: V1-to-V2 transition. */
         std::optional<int> mercahash_v2_height{};
+        /** Isolated grouped-authorization tests only; no public deployment. */
+        std::optional<int> mercaweave_height{};
         /** Isolated fixed-target mining qualification chain with its own genesis. */
         bool mining_stress{false};
         bool fastprune{false};

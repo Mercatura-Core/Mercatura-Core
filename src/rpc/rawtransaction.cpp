@@ -30,6 +30,7 @@
 #include <rpc/util.h>
 #include <script/script.h>
 #include <script/sign.h>
+#include <script/pqgroup_psbt.h>
 #include <script/signingprovider.h>
 #include <script/solver.h>
 #include <uint256.h>
@@ -509,6 +510,7 @@ static RPCHelpMan decodescript()
         case TxoutType::SCRIPTHASH:
         case TxoutType::WITNESS_UNKNOWN:
         case TxoutType::WITNESS_V2_MERCATURA_PQ:
+        case TxoutType::WITNESS_V3_MERCAWEAVE:
         case TxoutType::WITNESS_V1_TAPROOT:
         case TxoutType::ANCHOR:
             // Should not be wrapped
@@ -552,7 +554,8 @@ static RPCHelpMan decodescript()
             case TxoutType::WITNESS_UNKNOWN:
             case TxoutType::WITNESS_V0_KEYHASH:
             case TxoutType::WITNESS_V0_SCRIPTHASH:
-        case TxoutType::WITNESS_V2_MERCATURA_PQ:
+            case TxoutType::WITNESS_V2_MERCATURA_PQ:
+            case TxoutType::WITNESS_V3_MERCAWEAVE:
             case TxoutType::WITNESS_V1_TAPROOT:
             case TxoutType::ANCHOR:
                 // Should not be wrapped
@@ -1516,6 +1519,29 @@ static RPCHelpMan decodepsbt()
     };
 }
 
+struct MercaWeavePSBTContext {
+    std::shared_ptr<const mercaweave::IsolatedExecution> execution;
+    std::vector<CTxOut> spent;
+};
+
+static MercaWeavePSBTContext MercaWeaveRPCContext(const JSONRPCRequest& request, const PartiallySignedTransaction& psbt)
+{
+    if (!mercaweave::psbt::Supported(psbt)) throw JSONRPCError(RPC_INVALID_PARAMETER, "MercaWeave PSBT exceeds supported coordinator limits");
+    auto& chainman = EnsureChainman(EnsureAnyNodeContext(request.context));
+    MercaWeavePSBTContext result;
+    {
+        LOCK(cs_main);
+        result.execution = mercaweave::IsolatedExecution::ForConsensus(chainman.GetConsensus(), chainman.ActiveChain().Height());
+    }
+    if (!result.execution) throw JSONRPCError(RPC_INVALID_PARAMETER, "MercaWeave is not active on this network");
+    for (size_t i = 0; i < psbt.inputs.size(); ++i) {
+        CTxOut output;
+        if (!psbt.GetInputUTXO(output, i)) throw JSONRPCError(RPC_INVALID_PARAMETER, "MercaWeave PSBT requires complete prevout data");
+        result.spent.push_back(output);
+    }
+    return result;
+}
+
 static RPCHelpMan combinepsbt()
 {
     return RPCHelpMan{
@@ -1553,7 +1579,12 @@ static RPCHelpMan combinepsbt()
     }
 
     PartiallySignedTransaction merged_psbt;
-    if (!CombinePSBTs(merged_psbt, psbtxs)) {
+    bool merged;
+    if (std::any_of(psbtxs.begin(), psbtxs.end(), mercaweave::psbt::HasGroupInputs)) {
+        const auto context = MercaWeaveRPCContext(request, psbtxs.front());
+        merged = CombinePSBTs(merged_psbt, psbtxs, *context.execution, context.spent);
+    } else merged = CombinePSBTs(merged_psbt, psbtxs);
+    if (!merged) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "PSBTs not compatible (different transactions)");
     }
 
@@ -1599,7 +1630,11 @@ static RPCHelpMan finalizepsbt()
     bool extract = request.params[1].isNull() || (!request.params[1].isNull() && request.params[1].get_bool());
 
     CMutableTransaction mtx;
-    bool complete = FinalizeAndExtractPSBT(psbtx, mtx);
+    bool complete;
+    if (mercaweave::psbt::HasGroupInputs(psbtx)) {
+        const auto context = MercaWeaveRPCContext(request, psbtx);
+        complete = FinalizeAndExtractPSBT(psbtx, mtx, *context.execution, context.spent);
+    } else complete = FinalizeAndExtractPSBT(psbtx, mtx);
 
     UniValue result(UniValue::VOBJ);
     DataStream ssTx{};

@@ -2034,6 +2034,11 @@ static bool VerifyWitnessProgram(const CScriptWitness& witness, int witversion, 
         if (const auto grouped = checker.CheckPQGroupAuthorization(witness, program, flags, is_p2sh)) {
             return *grouped ? set_success(serror) : set_error(serror, SCRIPT_ERR_WITNESS_PROGRAM_MISMATCH);
         }
+        // After activation an absent transaction-wide context must never fall
+        // through to permissive unknown-witness semantics.
+        if (flags & SCRIPT_VERIFY_MERCAWEAVE) {
+            return set_error(serror, SCRIPT_ERR_WITNESS_PROGRAM_MISMATCH);
+        }
     }
     CScript exec_script; //!< Actually executed script (last stack item in P2WSH; implied P2PKH script in P2WPKH; leaf script in P2TR)
     std::span stack{witness.stack};
@@ -2151,6 +2156,10 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const C
     bool hadWitness = false;
 
     set_error(serror, SCRIPT_ERR_UNKNOWN_ERROR);
+
+    if ((flags & SCRIPT_VERIFY_MERCAWEAVE) && !(flags & SCRIPT_VERIFY_WITNESS)) {
+        return set_error(serror, SCRIPT_ERR_WITNESS_PROGRAM_MISMATCH);
+    }
 
     if ((flags & SCRIPT_VERIFY_SIGPUSHONLY) != 0 && !scriptSig.IsPushOnly()) {
         return set_error(serror, SCRIPT_ERR_SIG_PUSHONLY);
@@ -2340,6 +2349,7 @@ const std::map<std::string, script_verify_flag_name>& ScriptFlagNamesToEnum()
         FLAG_NAME(WITNESS_PUBKEYTYPE),
         FLAG_NAME(CONST_SCRIPTCODE),
         FLAG_NAME(TAPROOT),
+        FLAG_NAME(MERCAWEAVE),
         FLAG_NAME(DISCOURAGE_UPGRADABLE_PUBKEYTYPE),
         FLAG_NAME(DISCOURAGE_OP_SUCCESS),
         FLAG_NAME(DISCOURAGE_UPGRADABLE_TAPROOT_VERSION),

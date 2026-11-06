@@ -1,8 +1,33 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
 #include <script/pqgroup_context.h>
+#include <consensus/mercaweave.h>
 
 namespace mercaweave {
+std::shared_ptr<const IsolatedExecution> IsolatedExecution::ForConsensus(
+    const Consensus::Params& params, int height)
+{
+    if (!Consensus::MercaWeaveActive(params, height)) return {};
+    B32 genesis;
+    std::copy(params.hashGenesisBlock.begin(), params.hashGenesisBlock.end(), genesis.begin());
+    return std::shared_ptr<const IsolatedExecution>(new IsolatedExecution(genesis));
+}
+
+std::shared_ptr<const GroupContext> GroupContext::PrepareActivated(
+    const CTransaction& tx, std::vector<CTxOut> spent, script_verify_flags flags,
+    const uint256& genesis, std::optional<Error>& error, Statistics* work)
+{
+    if (!(flags & SCRIPT_VERIFY_MERCAWEAVE)) {
+        error = Error::Context;
+        if (work) *work = {};
+        return {};
+    }
+    B32 network;
+    std::copy(genesis.begin(), genesis.end(), network.begin());
+    const IsolatedExecution execution(network);
+    return Prepare(execution, tx, std::move(spent), flags, genesis, error, work);
+}
+
 namespace {
 std::vector<bool> Authorized(const Result& result, size_t count)
 {

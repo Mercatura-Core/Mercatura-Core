@@ -139,6 +139,8 @@ struct Params {
     bool fPowNoRetargeting;
     /** Unset retains V1 forever. Only isolated regtest currently configures this. */
     std::optional<int> nMercaHashV2Height{};
+    /** Unset on every public network. Regtest may schedule isolated v3 tests. */
+    std::optional<int> nMercaWeaveHeight{};
     int64_t nPowTargetSpacing;
     /**
      * Periodic boundary used by Bitcoin Core's retained BIP94 timewarp

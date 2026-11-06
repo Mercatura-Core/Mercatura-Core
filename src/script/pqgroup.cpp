@@ -5,6 +5,7 @@
 #include <crypto/hkdf_sha3_384.h>
 #include <crypto/sha256.h>
 #include <support/cleanse.h>
+#include <streams.h>
 
 #include <cstring>
 #include <map>
@@ -36,7 +37,9 @@ void Basic(const CMutableTransaction& tx, const std::vector<CTxOut>& spent)
     Require(spent.size() == tx.vin.size(), Error::Context);
     Require(!tx.vin.empty() && !tx.vout.empty(), Error::Format);
     Require(tx.vin.size() <= UINT32_MAX, Error::Format);
-    Require(GetSerializeSize(TX_WITH_WITNESS(tx)) <= MAX_SIZE, Error::Format);
+    // The offline decoder bounds its own wire buffer. Normal validation uses
+    // the chain's existing transaction, byte, witness and sigop budgets; a
+    // standalone harness buffer ceiling must not become a consensus rule.
     std::set<COutPoint> seen;
     CAmount in{0}, out{0};
     for (size_t i = 0; i < tx.vin.size(); ++i) {
@@ -76,7 +79,11 @@ void Reader::skip(size_t n)
 }
 Bytes Wire(const CMutableTransaction& tx, bool witness)
 {
-    return witness ? SerializeBytes(TX_WITH_WITNESS(tx)) : SerializeBytes(TX_NO_WITNESS(tx));
+    Bytes bytes;
+    VectorWriter writer{bytes, 0};
+    if (witness) writer << TX_WITH_WITNESS(tx);
+    else writer << TX_NO_WITNESS(tx);
+    return bytes;
 }
 CScriptWitness DecodeWitness(std::span<const unsigned char> bytes)
 {

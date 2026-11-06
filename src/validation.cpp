@@ -8,6 +8,7 @@
 #endif // MERCATURA_MERCAWEAVE_VALIDATION_COMPONENTS_TEST_ONLY config
 
 #include <validation.h>
+#include <consensus/mercaweave.h>
 #include <consensus/validation.h>
 #include <random.h>
 #include <script/sigcache.h>
@@ -357,6 +358,22 @@ void Chainstate::MaybeUpdateMempoolForReorg(
         AssertLockHeld(m_mempool->cs);
         AssertLockHeld(::cs_main);
         const CTransaction& tx = it->GetTx();
+
+        if (!Consensus::MercaWeaveActive(m_chainman.GetConsensus(), m_chain.Height() + 1)) {
+            const auto grouped = [](const CScript& script) {
+                int version;
+                std::vector<unsigned char> program;
+                return script.IsWitnessProgram(version, program) && version == 3;
+            };
+            for (const auto& output : tx.vout) {
+                if (grouped(output.scriptPubKey)) return true;
+            }
+            const CCoinsViewMemPool view{&CoinsTip(), *m_mempool};
+            for (const auto& input : tx.vin) {
+                const auto coin = view.GetCoin(input.prevout);
+                if (coin && grouped(coin->out.scriptPubKey)) return true;
+            }
+        }
 
         // The transaction must be final.
         if (!CheckFinalTxAtTip(*Assert(m_chain.Tip()), tx)) return true;
@@ -927,6 +944,23 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
         return false; // state filled in by CheckTxInputs
     }
 
+    // Relay must not present unactivated v3 as protected custody. Historical
+    // block consensus remains permissive until its explicit activation gate.
+    if (!Consensus::MercaWeaveActive(args.m_chainparams.GetConsensus(), m_active_chainstate.m_chain.Height() + 1)) {
+        const auto grouped = [](const CScript& script) {
+            int version;
+            std::vector<unsigned char> program;
+            return script.IsWitnessProgram(version, program) && version == 3;
+        };
+        for (const auto& output : tx.vout) {
+            if (grouped(output.scriptPubKey)) return state.Invalid(TxValidationResult::TX_NOT_STANDARD, "mercaweave-inactive");
+        }
+        for (const auto& input : tx.vin) {
+            if (grouped(m_view.AccessCoin(input.prevout).out.scriptPubKey))
+                return state.Invalid(TxValidationResult::TX_NOT_STANDARD, "mercaweave-inactive");
+        }
+    }
+
     if (m_pool.m_opts.require_standard && !AreInputsStandard(tx, m_view)) {
         return state.Invalid(TxValidationResult::TX_INPUTS_NOT_STANDARD, "bad-txns-nonstandard-inputs");
     }
@@ -1220,6 +1254,10 @@ bool MemPoolAccept::ConsensusScriptChecks(const ATMPArgs& args, Workspace& ws)
     // invalid blocks (using TestBlockValidity), however allowing such
     // transactions into the mempool can be exploited as a DoS attack.
     script_verify_flags currentBlockScriptVerifyFlags{GetBlockScriptFlags(*m_active_chainstate.m_chain.Tip(), m_active_chainstate.m_chainman)};
+    currentBlockScriptVerifyFlags &= ~SCRIPT_VERIFY_MERCAWEAVE;
+    if (Consensus::MercaWeaveActive(args.m_chainparams.GetConsensus(), m_active_chainstate.m_chain.Height() + 1)) {
+        currentBlockScriptVerifyFlags |= SCRIPT_VERIFY_MERCAWEAVE;
+    }
     if (!CheckInputsFromMempoolAndCache(
             tx,
             state,
@@ -2199,6 +2237,22 @@ bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
         pvChecks->reserve(tx.vin.size());
     }
 
+    // Active grouped transactions authenticate current coins and prepare all
+    // group signatures before consulting any legacy full-script cache entry.
+    if (flags & SCRIPT_VERIFY_MERCAWEAVE) {
+        for (const auto& input : tx.vin) {
+            const auto& coin = inputs.AccessCoin(input.prevout);
+            if (coin.IsSpent()) return state.Invalid(TxValidationResult::TX_CONSENSUS, "pqgroup-input-missing");
+            int version;
+            std::vector<unsigned char> program;
+            if (coin.out.scriptPubKey.IsWitnessProgram(version, program) && version == 3) {
+                if (!pq_genesis_hash) return state.Invalid(TxValidationResult::TX_CONSENSUS, "pqgroup-genesis-missing");
+                return CheckInputScriptsWithPQGroups(tx, state, inputs, flags, validation_cache,
+                                                    pvChecks, {}, *pq_genesis_hash);
+            }
+        }
+    }
+
     // First check if script executions have been cached with the same
     // flags. Note that this assumes that the inputs provided are
     // correct (ie that the transaction hash which is in tx's prevouts
@@ -2291,7 +2345,8 @@ bool CheckInputScriptsWithPQGroups(
 {
     AssertLockHeld(cs_main);
     if (work) *work = {};
-    if (!execution) return state.Invalid(TxValidationResult::TX_CONSENSUS, "pqgroup-context-unavailable");
+    if (!execution && !(flags & SCRIPT_VERIFY_MERCAWEAVE))
+        return state.Invalid(TxValidationResult::TX_CONSENSUS, "pqgroup-context-unavailable");
     if (tx.IsCoinBase()) return true;
     std::vector<CTxOut> spent;
     spent.reserve(tx.vin.size());
@@ -2301,8 +2356,9 @@ bool CheckInputScriptsWithPQGroups(
         spent.push_back(coin.out);
     }
     std::optional<mercaweave::Error> error;
-    const auto context = mercaweave::GroupContext::Prepare(*execution, tx, std::move(spent),
-                                                        flags, genesis, error, work);
+    const auto context = execution
+        ? mercaweave::GroupContext::Prepare(*execution, tx, std::move(spent), flags, genesis, error, work)
+        : mercaweave::GroupContext::PrepareActivated(tx, std::move(spent), flags, genesis, error, work);
     if (!context) return state.Invalid(TxValidationResult::TX_CONSENSUS,
         "pqgroup-authorization-" + strprintf("%d", static_cast<int>(error.value_or(mercaweave::Error::Context))));
     // Never consult OR populate the legacy whole-script cache. A cache key based
@@ -2472,6 +2528,10 @@ script_verify_flags GetBlockScriptFlags(const CBlockIndex& block_index, const Ch
     // Enforce BIP147 NULLDUMMY (activated simultaneously with segwit)
     if (DeploymentActiveAt(block_index, chainman, Consensus::DEPLOYMENT_SEGWIT)) {
         flags |= SCRIPT_VERIFY_NULLDUMMY;
+    }
+
+    if (Consensus::MercaWeaveActive(consensusparams, block_index.nHeight)) {
+        flags |= SCRIPT_VERIFY_MERCAWEAVE;
     }
 
     return flags;
@@ -2734,7 +2794,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
              Ticks<SecondsDouble>(m_chainman.time_forks),
              Ticks<MillisecondsDouble>(m_chainman.time_forks) / m_chainman.num_blocks_total);
 
-    const bool fScriptChecks{!!script_check_reason || bool(m_group_execution)};
+    const bool fScriptChecks{!!script_check_reason || bool(m_group_execution) || bool(flags & SCRIPT_VERIFY_MERCAWEAVE)};
     const kernel::ChainstateRole role{GetRole()};
     if (script_check_reason != m_last_script_check_reason_logged && role.validated && !role.historical) {
         if (fScriptChecks) {
@@ -2808,7 +2868,7 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
         // * p2sh (when P2SH enabled in flags and excludes coinbase)
         // * witness (when witness enabled in flags and excludes coinbase)
         nSigOpsCost += GetTransactionSigOpCost(tx, view, flags);
-        if (m_group_execution && !tx.IsCoinBase()) {
+        if (m_group_execution && !(flags & SCRIPT_VERIFY_MERCAWEAVE) && !tx.IsCoinBase()) {
             // Structural work is bounded and charged before ML-DSA verification.
             // Ordinary blocks never enter this dormant fixture-only route.
             std::vector<CTxOut> spent;

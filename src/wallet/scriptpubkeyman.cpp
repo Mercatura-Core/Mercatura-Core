@@ -94,6 +94,7 @@ IsMineResult LegacyWalletIsMineInnerDONOTUSE(const LegacyDataSPKM& keystore, con
     case TxoutType::NULL_DATA:
     case TxoutType::WITNESS_UNKNOWN:
     case TxoutType::WITNESS_V2_MERCATURA_PQ:
+    case TxoutType::WITNESS_V3_MERCAWEAVE:
     case TxoutType::WITNESS_V1_TAPROOT:
     case TxoutType::ANCHOR:
         break;

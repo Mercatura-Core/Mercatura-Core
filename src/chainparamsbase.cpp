@@ -13,6 +13,7 @@
 
 void SetupChainParamsBaseOptions(ArgsManager& argsman)
 {
+    argsman.AddArg("-mercaweaveheight=<height>", "Schedule MercaWeave only for isolated regtest (-1 disables; 0 immediate; nonnegative height below INT_MAX). Rejected on all public networks. Use a separate test datadir.", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::CHAINPARAMS);
     argsman.AddArg("-chain=<chain>", "Use the chain <chain> (default: main). Allowed values: " LIST_CHAIN_NAMES, ArgsManager::ALLOW_ANY, OptionsCategory::CHAINPARAMS);
     argsman.AddArg("-regtest", "Enter regression test mode, which uses a special chain in which blocks can be solved instantly. "
                  "This is intended for regression testing tools and app development. Equivalent to -chain=regtest.", ArgsManager::ALLOW_ANY | ArgsManager::DEBUG_ONLY, OptionsCategory::CHAINPARAMS);

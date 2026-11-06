@@ -4,6 +4,43 @@
 #include <crypto/mercatura_pqkey.h>
 
 namespace mercaweave::psbt {
+bool HasGroupInputs(const PartiallySignedTransaction& source)
+{
+    static constexpr std::string_view identifier{"MercaWeave"};
+    for (size_t i = 0; i < source.inputs.size(); ++i) {
+        for (const auto& field : source.inputs[i].m_proprietary) {
+            if (field.identifier.size() == identifier.size() &&
+                std::equal(field.identifier.begin(), field.identifier.end(), identifier.begin())) return true;
+        }
+        CTxOut output;
+        int version;
+        std::vector<unsigned char> program;
+        if (source.GetInputUTXO(output, i) && output.scriptPubKey.IsWitnessProgram(version, program) && version == 3) return true;
+    }
+    return false;
+}
+
+bool Supported(const PartiallySignedTransaction& source)
+{
+    if (!source.tx || source.inputs.size() > MAX_INPUTS || source.outputs.size() > MAX_INPUTS ||
+        GetSerializeSize(source) > 16U * 1024 * 1024) return false;
+    size_t fields{0};
+    const auto bounded = [&](const auto& proprietary, const auto& unknown) {
+        if (proprietary.size() + unknown.size() > 256) return false;
+        fields += proprietary.size() + unknown.size();
+        if (fields > 32768) return false;
+        for (const auto& field : proprietary)
+            if (field.key.size() > 4096 || field.value.size() > 4U * 1024 * 1024) return false;
+        for (const auto& [key, value] : unknown)
+            if (key.size() > 4096 || value.size() > 4U * 1024 * 1024) return false;
+        return true;
+    };
+    if (!bounded(source.m_proprietary, source.unknown)) return false;
+    for (const auto& input : source.inputs) if (!bounded(input.m_proprietary, input.unknown)) return false;
+    for (const auto& output : source.outputs) if (!bounded(output.m_proprietary, output.unknown)) return false;
+    return true;
+}
+
 namespace {
 const Bytes ID{'M','e','r','c','a','W','e','a','v','e'};
 void Require(bool value) { if (!value) throw Failure(Error::Context); }
@@ -91,6 +128,7 @@ bool VerifyNative(const CMutableTransaction& tx, const std::vector<CTxOut>& spen
 Inspection Inspect(const PartiallySignedTransaction& source, std::span<const CTxOut> spent,
                    const IsolatedExecution& execution)
 {
+    Require(Supported(source));
     Require(source.tx && source.GetVersion() == 0 && source.m_xpubs.empty() &&
         !source.inputs.empty() && source.inputs.size() <= MAX_INPUTS &&
         source.inputs.size() == source.tx->vin.size() && source.outputs.size() == source.tx->vout.size() &&

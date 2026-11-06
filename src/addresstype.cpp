@@ -93,6 +93,10 @@ bool ExtractDestination(const CScript& scriptPubKey, CTxDestination& addressRet)
         addressRet = pq;
         return true;
     }
+    case TxoutType::WITNESS_V3_MERCAWEAVE: {
+        addressRet = WitnessUnknown{3, vSolutions[0]};
+        return true;
+    }
     case TxoutType::ANCHOR: {
         addressRet = PayToAnchor();
         return true;
@@ -174,7 +178,10 @@ public:
     bool operator()(const WitnessV0ScriptHash& dest) const { return true; }
     bool operator()(const WitnessV1Taproot& dest) const { return true; }
     bool operator()(const WitnessV2MercaturaPQ& dest) const { return true; }
-    bool operator()(const WitnessUnknown& dest) const { return dest.GetWitnessVersion() != 2; }
+    bool operator()(const WitnessUnknown& dest) const {
+        return dest.GetWitnessVersion() != 2 &&
+               (dest.GetWitnessVersion() != 3 || dest.GetWitnessProgram().size() == 32);
+    }
 };
 } // namespace
 

@@ -146,6 +146,10 @@ enum class script_verify_flag_name : uint8_t {
     // Making unknown public key versions (in BIP 342 scripts) non-standard
     SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_PUBKEYTYPE,
 
+    // Enforce the locked MercaWeave witness-v3 authorization rules. Selected
+    // from network consensus parameters, never a public runtime override.
+    SCRIPT_VERIFY_MERCAWEAVE,
+
     // Constants to point to the highest flag in use. Add new flags above this line.
     //
     SCRIPT_VERIFY_END_MARKER

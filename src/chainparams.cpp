@@ -43,6 +43,13 @@ void ReadSigNetArgs(const ArgsManager& args, CChainParams::SigNetOptions& option
 
 void ReadRegTestArgs(const ArgsManager& args, CChainParams::RegTestOptions& options)
 {
+    if (args.IsArgSet("-mercaweaveheight")) {
+        const auto height{ToIntegral<int>(args.GetArg("-mercaweaveheight", ""))};
+        if (!height || *height < -1 || *height == std::numeric_limits<int>::max()) {
+            throw std::runtime_error{"Invalid -mercaweaveheight: use -1 or a nonnegative height below INT_MAX"};
+        }
+        if (*height >= 0) options.mercaweave_height = *height;
+    }
     options.mining_stress = args.GetBoolArg("-regtestminingstress", false);
     if (args.IsArgSet("-mercahashv2height")) {
         const auto height{ToIntegral<int>(args.GetArg("-mercahashv2height", ""))};
@@ -124,6 +131,9 @@ const CChainParams &Params() {
 
 std::unique_ptr<const CChainParams> CreateChainParams(const ArgsManager& args, const ChainType chain)
 {
+    if (chain != ChainType::REGTEST && args.IsArgSet("-mercaweaveheight")) {
+        throw std::runtime_error{"-mercaweaveheight is restricted to isolated regtest"};
+    }
     if (chain != ChainType::REGTEST && args.IsArgSet("-mercahashv2height")) {
         throw std::runtime_error{"-mercahashv2height is restricted to regtest"};
     }

@@ -6,6 +6,9 @@
 #include <script/pqgroup_context.h>
 
 namespace mercaweave::psbt {
+bool HasGroupInputs(const PartiallySignedTransaction&);
+/** Local coordinator policy, not an additional consensus transaction limit. */
+bool Supported(const PartiallySignedTransaction&);
 struct InputRecord { PublicKey pk; B32 nonce; uint8_t witness_version{3}; };
 struct Inspection {
     CMutableTransaction tx;
@@ -27,8 +30,8 @@ bool VerifyNative(const CMutableTransaction&, const std::vector<CTxOut>&,
                   const B32&, uint32_t, const PrecomputedTransactionData&);
 }
 
-// Explicit capability overloads. Ordinary PSBT functions and RPCs do not call
-// these, and no PSBT field can carry or reconstruct the capability.
+// Explicit execution-domain overloads. RPC callers must obtain their domain
+// from authoritative activated chain parameters; no PSBT field activates it.
 bool FinalizePSBT(PartiallySignedTransaction&, const mercaweave::IsolatedExecution&,
                   std::span<const CTxOut>);
 bool FinalizeAndExtractPSBT(PartiallySignedTransaction&, CMutableTransaction&,

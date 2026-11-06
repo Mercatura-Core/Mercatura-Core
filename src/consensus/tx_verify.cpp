@@ -11,6 +11,7 @@
 #include <consensus/validation.h>
 #include <primitives/transaction.h>
 #include <script/interpreter.h>
+#include <script/pqgroup.h>
 #include <util/check.h>
 #include <util/moneystr.h>
 
@@ -157,6 +158,27 @@ int64_t GetTransactionSigOpCost(const CTransaction& tx, const CCoinsViewCache& i
         assert(!coin.IsSpent());
         const CTxOut &prevout = coin.out;
         nSigOps += CountWitnessSigOps(tx.vin[i].scriptSig, prevout.scriptPubKey, tx.vin[i].scriptWitness, flags);
+    }
+    if (flags & SCRIPT_VERIFY_MERCAWEAVE) {
+        std::vector<CTxOut> spent;
+        bool grouped{false};
+        spent.reserve(tx.vin.size());
+        for (const auto& input : tx.vin) {
+            const auto& output = inputs.AccessCoin(input.prevout).out;
+            spent.push_back(output);
+            int version;
+            std::vector<unsigned char> program;
+            grouped |= output.scriptPubKey.IsWitnessProgram(version, program) && version == 3;
+        }
+        if (grouped) {
+            try {
+                const auto mapping = mercaweave::Reconstruct(CMutableTransaction(tx), spent);
+                nSigOps += 4 * mapping.groups.size() + mapping.inputs;
+            } catch (const mercaweave::Failure&) {
+                // Invalid structure cannot be mined or admitted for zero work.
+                return MAX_BLOCK_SIGOPS_COST + 1;
+            }
+        }
     }
     return nSigOps;
 }

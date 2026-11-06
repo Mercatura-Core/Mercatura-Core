@@ -545,6 +545,7 @@ public:
         if (opts.mercahash_v2_height && (*opts.mercahash_v2_height < 0 || *opts.mercahash_v2_height == std::numeric_limits<int>::max()))
             throw std::invalid_argument{"Invalid regtest MercaHash V2 activation height"};
         consensus.nMercaHashV2Height = opts.mercahash_v2_height;
+        consensus.nMercaWeaveHeight = opts.mercaweave_height;
         if (opts.mining_stress && opts.mercahash_v2_height != 0)
             throw std::runtime_error{"-regtestminingstress requires -mercahashv2height=0 and a separate datadir"};
         m_chain_type = ChainType::REGTEST;

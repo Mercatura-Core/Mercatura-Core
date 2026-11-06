@@ -32,6 +32,7 @@ enum class TxoutType {
     WITNESS_V0_KEYHASH,
     WITNESS_V1_TAPROOT,
     WITNESS_V2_MERCATURA_PQ,
+    WITNESS_V3_MERCAWEAVE,
     WITNESS_UNKNOWN, //!< Only for Witness versions not already defined above
 };
 

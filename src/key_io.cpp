@@ -79,6 +79,7 @@ public:
         if (id.GetWitnessVersion() < 1 ||
             id.GetWitnessVersion() > 16 ||
             id.GetWitnessVersion() == 2 ||
+            (id.GetWitnessVersion() == 3 && program.size() != 32) ||
             program.size() < 2 ||
             program.size() > 40) {
             return {};
@@ -207,6 +208,11 @@ CTxDestination DecodeDestination(const std::string& str, const CChainParams& par
                 WitnessV2MercaturaPQ pq;
                 std::copy(data.begin(), data.end(), pq.begin());
                 return pq;
+            }
+
+            if (version == 3 && data.size() != 32) {
+                error_str = "Invalid MercaWeave witness-v3 program size";
+                return CNoDestination();
             }
 
             if (CScript::IsPayToAnchor(version, data)) {

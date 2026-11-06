@@ -392,8 +392,18 @@ static_assert(std::is_nothrow_move_assignable_v<CScriptCheck>);
 static_assert(std::is_nothrow_move_constructible_v<CScriptCheck>);
 static_assert(std::is_nothrow_destructible_v<CScriptCheck>);
 
-// Dormant internal path: ordinary node entry points have no fixture capability.
-// The capability is not a validation result; complete group checks are mandatory.
+/** Native Script entrypoint. Caller authenticates coins and selects the
+ * candidate-height consensus flags before calling; no diagnostic is a proof. */
+bool CheckInputScripts(const CTransaction&, TxValidationState&, const CCoinsViewCache&,
+    script_verify_flags, bool, bool, PrecomputedTransactionData&, ValidationCache&,
+    std::vector<CScriptCheck>*, std::optional<uint256>
+#ifdef MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY
+    , std::shared_ptr<const mercaweave::node_research::Context>
+#endif
+    ) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
+
+// Active consensus uses network-selected flags; guarded fixtures may supply
+// their explicit execution domain. Both paths require complete group checks.
 bool CheckInputScriptsWithPQGroups(
     const CTransaction&, TxValidationState&, const CCoinsViewCache&,
     script_verify_flags, ValidationCache&, std::vector<CScriptCheck>*,

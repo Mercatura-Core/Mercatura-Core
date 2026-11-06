@@ -6,18 +6,22 @@
 #include <script/interpreter.h>
 #include <script/pqgroup.h>
 
+namespace Consensus { struct Params; }
 namespace mercaweave {
 class ProductionPathTestAccess;
 
-/** Nonserializable fixture capability. No production constructor, setting, RPC,
- * deployment or wire field creates one. Only the separately guarded test helper
- * can install it on disposable Chainstate/CWallet instances. */
+/** Genesis-bound execution domain. The historical name remains for fixture ABI
+ * compatibility. Normal wallets obtain it only from an active consensus height;
+ * Script preparation requires the network-selected activation flag. No wire
+ * field, wallet record or public-network option enables activation. */
 class IsolatedExecution final {
     const B32 m_genesis;
     explicit IsolatedExecution(B32 genesis) : m_genesis(genesis) {}
     friend class ProductionPathTestAccess;
+    friend class GroupContext;
 public:
     const B32& Genesis() const { return m_genesis; }
+    static std::shared_ptr<const IsolatedExecution> ForConsensus(const Consensus::Params&, int height);
 };
 
 /** Group-only authorization. Non-v3 inputs MUST still execute ordinary Script.
@@ -40,6 +44,10 @@ public:
         const IsolatedExecution&, const CTransaction&, std::vector<CTxOut>,
         script_verify_flags, const uint256& genesis, std::optional<Error>& error,
         Statistics* work = nullptr);
+    /** Caller selects flags from the authoritative candidate-height rules. */
+    static std::shared_ptr<const GroupContext> PrepareActivated(
+        const CTransaction&, std::vector<CTxOut>, script_verify_flags,
+        const uint256& genesis, std::optional<Error>& error, Statistics* work = nullptr);
 
     const CTransaction& Transaction() const { return *m_tx; }
     const std::vector<CTxOut>& Spent() const { return m_spent; }
