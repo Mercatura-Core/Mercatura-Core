@@ -58,7 +58,9 @@ jobs:
     name: ${{ matrix.name }}
     needs: runners
     runs-on: ${{ needs.runners.outputs.provider == 'warp' && matrix.warp-runner || matrix.fallback-runner }}
-    if: ${{ vars.SKIP_BRANCH_PUSH != 'true' || github.event_name == 'pull_request' }}
+    # The staged MercaWeave work order forbids installers. Its dedicated native
+    # workflow runs GUI, unit and functional gates without the cross deploy goal.
+    if: ${{ (vars.SKIP_BRANCH_PUSH != 'true' || github.event_name == 'pull_request') && (github.head_ref || github.ref_name) != 'integration/mercaweave-v0.1-upgrade' }}
     timeout-minutes: ${{ matrix.timeout-minutes }}
 
     env:

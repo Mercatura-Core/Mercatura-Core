@@ -1,0 +1,104 @@
+# Copyright (c) 2026 The Mercatura Core developers
+# Distributed under the MIT software license, see the accompanying file COPYING.
+name: MercaWeave upgrade qualification (tests only)
+on:
+  push:
+    branches: [integration/mercaweave-v0.1-upgrade]
+  pull_request:
+    paths: ['src/**', 'test/**', 'cmake/**', 'CMakeLists.txt', 'vcpkg*.json',
+            'CMakePresets.json', 'contrib/vcpkg-ports/**', '.github/workflows/mercaweave-upgrade.yml']
+permissions:
+  contents: read
+concurrency:
+  group: mercaweave-upgrade-${{ github.ref }}
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+jobs:
+  native:
+    name: MercaWeave native ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, platform: linux-x86_64}
+          - {runner: macos-15, platform: macos-arm64}
+          - {runner: windows-2025-vs2026, platform: windows-msvc}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential cmake ninja-build python3 \
+            libboost-dev libevent-dev libsqlite3-dev libqrencode-dev \
+            qt6-base-dev qt6-tools-dev qt6-tools-dev-tools
+      - name: macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install cmake ninja boost libevent qt@6 qrencode
+      - name: Windows dependency cache location
+        if: runner.os == 'Windows'
+        id: windows-cache
+        shell: pwsh
+        run: |
+          'path=' + (Join-Path $env:LOCALAPPDATA 'vcpkg/archives') >> $env:GITHUB_OUTPUT
+          'image=' + $env:ImageVersion >> $env:GITHUB_OUTPUT
+      - name: Restore Windows dependencies
+        if: runner.os == 'Windows'
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.windows-cache.outputs.path }}
+          key: mercaweave-qt-${{ steps.windows-cache.outputs.image }}-${{ hashFiles('vcpkg*.json', 'CMakePresets.json', 'contrib/vcpkg-ports/**') }}-${{ github.run_id }}
+          restore-keys: |
+            mercaweave-qt-${{ steps.windows-cache.outputs.image }}-${{ hashFiles('vcpkg*.json', 'CMakePresets.json', 'contrib/vcpkg-ports/**') }}-
+      - name: Configure Unix
+        if: runner.os != 'Windows'
+        run: |
+          prefix=()
+          if [[ "$RUNNER_OS" == macOS ]]; then prefix=(-DCMAKE_PREFIX_PATH="$(brew --prefix qt@6)"); fi
+          cmake -S . -B work/build -G Ninja -DCMAKE_BUILD_TYPE=Release "${prefix[@]}" \
+            -DBUILD_GUI=ON -DBUILD_GUI_TESTS=ON -DBUILD_TESTS=ON -DENABLE_IPC=OFF \
+            -DWITH_ZMQ=OFF -DWITH_USDT=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=ON \
+            -DWITH_OPENCL_MINING=OFF -DWITH_CUDA_MINING=OFF -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
+      - name: Configure Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:VCPKG_ROOT = $env:VCPKG_INSTALLATION_ROOT
+          cmake -B work/build --preset vs2026 `
+            -DVCPKG_INSTALL_OPTIONS=--clean-after-build `
+            -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON '-DVCPKG_MANIFEST_FEATURES=qt;wallet;tests' `
+            -DBUILD_GUI=ON -DBUILD_GUI_TESTS=ON -DBUILD_TESTS=ON -DENABLE_IPC=OFF `
+            -DWITH_ZMQ=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=ON `
+            -DWITH_OPENCL_MINING=OFF -DWITH_CUDA_MINING=OFF -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Build tests and native applications without packaging
+        run: cmake --build work/build --config Release --parallel 4
+      - name: Unit and Qt tests
+        env:
+          QT_QPA_PLATFORM: ${{ runner.os == 'Windows' && 'windows' || 'offscreen' }}
+        run: |
+          mkdir -p work/qualification
+          ctest --test-dir work/build -C Release --output-on-failure -j 4 | tee work/qualification/unit.log
+      - name: Mercatura-native functional suite
+        run: |
+          python_bin=python3
+          if [[ "$RUNNER_OS" == Windows ]]; then python_bin=python; fi
+          "$python_bin" work/build/test/functional/test_runner.py --jobs=4 | tee work/qualification/functional.log
+      - name: Save Windows dependencies
+        if: always() && runner.os == 'Windows'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ steps.windows-cache.outputs.path }}
+          key: mercaweave-qt-${{ steps.windows-cache.outputs.image }}-${{ hashFiles('vcpkg*.json', 'CMakePresets.json', 'contrib/vcpkg-ports/**') }}-${{ github.run_id }}
+      - name: Retain qualification logs only
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: mercaweave-qualification-${{ matrix.platform }}
+          path: |
+            work/qualification/*.log
+            work/build/Testing/Temporary/LastTest.log
