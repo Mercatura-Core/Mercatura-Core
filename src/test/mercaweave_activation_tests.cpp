@@ -15,6 +15,8 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <limits>
+
 namespace {
 struct MercaWeaveSetup : BasicTestingSetup {
     MercaWeaveSetup() : BasicTestingSetup(ChainType::REGTEST) {}
@@ -70,6 +72,10 @@ BOOST_AUTO_TEST_CASE(public_schedules_unset_and_regtest_boundaries)
     const auto immediate = CChainParams::RegTest(options);
     BOOST_CHECK(Consensus::MercaWeaveActive(immediate->GetConsensus(), 0));
     BOOST_CHECK(!Consensus::MercaWeaveActive(immediate->GetConsensus(), -1));
+    options.mercaweave_height = -1;
+    BOOST_CHECK_THROW(CChainParams::RegTest(options), std::invalid_argument);
+    options.mercaweave_height = std::numeric_limits<int>::max();
+    BOOST_CHECK_THROW(CChainParams::RegTest(options), std::invalid_argument);
 
     ArgsManager forbidden;
     forbidden.ForceSetArg("-mercaweaveheight", "0");
