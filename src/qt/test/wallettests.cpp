@@ -38,6 +38,7 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QClipboard>
+#include <QComboBox>
 #include <QObject>
 #include <QPushButton>
 #include <QTimer>
@@ -45,6 +46,7 @@
 #include <QTextEdit>
 #include <QListView>
 #include <QDialogButtonBox>
+#include <QStandardItemModel>
 
 using wallet::AddWallet;
 using wallet::CWallet;
@@ -504,4 +506,93 @@ void WalletTests::walletTests()
     }
 #endif
     TestGUI(m_node);
+}
+
+void WalletTests::mercaweaveReceiveTests()
+{
+    TestChain100Setup test{ChainType::REGTEST, {.extra_args={"-mercaweaveheight=101"}}};
+    auto loader = interfaces::MakeWalletLoader(*test.m_node.chain, *Assert(test.m_node.args));
+    test.m_node.wallet_loader = loader.get();
+    m_node.setContext(&test.m_node);
+    const auto wallet = SetupDescriptorsWallet(m_node, test);
+    const std::unique_ptr<const PlatformStyle> style{PlatformStyle::instantiate("other")};
+    MiniGUI gui(m_node, style.get());
+    gui.initModelForWallet(m_node, wallet, style.get());
+    ReceiveCoinsDialog dialog(style.get());
+    dialog.setModel(gui.walletModel.get());
+    auto* selector = dialog.findChild<QComboBox*>("receiveAddressType");
+    auto* button = dialog.findChild<QPushButton*>("receiveButton");
+    QVERIFY(selector && button);
+    QCOMPARE(selector->count(), 2);
+    QCOMPARE(selector->currentIndex(), 0);
+    QCOMPARE(selector->itemText(0), QString{"Standard PQ — Witness v2"});
+    QCOMPARE(selector->itemText(1), QString{"MercaWeave Grouped PQ — Witness v3"});
+    auto* items = qobject_cast<QStandardItemModel*>(selector->model());
+    QVERIFY(items && !items->item(1)->isEnabled());
+    QVERIFY(button->isEnabled());
+    selector->setCurrentIndex(1);
+    QVERIFY(!button->isEnabled());
+    QVERIFY(!gui.walletModel->wallet().getNewMercaWeaveDestination("premature"));
+
+    test.CreateAndProcessBlock({}, CScript{} << OP_TRUE);
+    wallet->SetLastBlockProcessed(101, test.m_node.chainman->ActiveChain().Tip()->GetBlockHash());
+    SyncUpWallet(wallet, m_node);
+    QVERIFY(QMetaObject::invokeMethod(&dialog, "updateAddressTypes"));
+    QVERIFY(items->item(1)->isEnabled());
+    QVERIFY(button->isEnabled());
+    dialog.findChild<QLineEdit*>("reqLabel")->setText("Grouped request");
+    dialog.findChild<QLineEdit*>("reqMessage")->setText("Native receive workflow");
+    const auto capture = qEnvironmentVariable("MERCAWEAVE_QT_CAPTURE");
+    if (!capture.isEmpty()) {
+        dialog.resize(800, 500);
+        dialog.show();
+        qApp->processEvents();
+        QVERIFY(dialog.grab().save(capture));
+    }
+    const int before = gui.walletModel->getRecentRequestsTableModel()->rowCount({});
+    button->click();
+    QCOMPARE(gui.walletModel->getRecentRequestsTableModel()->rowCount({}), before + 1);
+    const auto requests = gui.walletModel->wallet().getAddressReceiveRequests();
+    QCOMPARE(requests.size(), size_t{1});
+    RecentRequestEntry request;
+    SpanReader{MakeByteSpan(requests[0])} >> request;
+    QCOMPARE(request.recipient.label, QString{"Grouped request"});
+    const auto destination = DecodeDestination(request.recipient.address.toStdString());
+    int version;
+    std::vector<unsigned char> program;
+    QVERIFY(GetScriptForDestination(destination).IsWitnessProgram(version, program));
+    QCOMPARE(version, 3);
+    QCOMPARE(program.size(), size_t{32});
+    QVERIFY(wallet->GetPQGroupRecord(GetScriptForDestination(destination)));
+    for (auto* widget : QApplication::topLevelWidgets()) {
+        if (auto* request_dialog = qobject_cast<ReceiveRequestDialog*>(widget)) {
+            QCOMPARE(request_dialog->findChild<QLabel*>("address_content")->text(), request.recipient.address);
+            QVERIFY(QMetaObject::invokeMethod(request_dialog, "on_btnCopyAddress_clicked"));
+            QCOMPARE(QApplication::clipboard()->text(), request.recipient.address);
+            request_dialog->close();
+        }
+    }
+    auto& chainstate = test.m_node.chainman->ActiveChainstate();
+    auto* activated_tip = WITH_LOCK(cs_main, return test.m_node.chainman->ActiveChain().Tip());
+    BlockValidationState state;
+    QVERIFY(chainstate.InvalidateBlock(state, activated_tip));
+    QVERIFY(chainstate.ActivateBestChain(state));
+    QCOMPARE(WITH_LOCK(cs_main, return test.m_node.chainman->ActiveChain().Height()), 100);
+    QTRY_VERIFY_WITH_TIMEOUT(!button->isEnabled(), 3000);
+    QCOMPARE(selector->currentIndex(), 1);
+    QVERIFY(!items->item(1)->isEnabled());
+    {
+        LOCK(cs_main);
+        chainstate.ResetBlockFailureFlags(activated_tip);
+    }
+    BlockValidationState restored;
+    QVERIFY(chainstate.ActivateBestChain(restored));
+    QTRY_VERIFY_WITH_TIMEOUT(button->isEnabled(), 3000);
+
+    // Losing a wallet while the grouped option is selected must disable it
+    // without silently issuing a different address type.
+    dialog.setModel(nullptr);
+    QCOMPARE(selector->currentIndex(), 1);
+    QVERIFY(!button->isEnabled());
+    QVERIFY(!items->item(1)->isEnabled());
 }

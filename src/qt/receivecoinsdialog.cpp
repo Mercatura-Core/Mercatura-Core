@@ -5,7 +5,6 @@
 #include <wallet/wallet.h>
 
 #include <qt/receivecoinsdialog.h>
-#include <qt/mercaweavepanel.h>
 #include <qt/forms/ui_receivecoinsdialog.h>
 
 #include <qt/addresstablemodel.h>
@@ -17,6 +16,10 @@
 #include <qt/walletmodel.h>
 
 #include <QAction>
+#include <QComboBox>
+#include <QLabel>
+#include <QStandardItemModel>
+#include <QTimer>
 #include <QCursor>
 #include <QMessageBox>
 #include <QScrollBar>
@@ -29,7 +32,25 @@ ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, QWid
     platformStyle(_platformStyle)
 {
     ui->setupUi(this);
-    ui->verticalLayout->addWidget(new MercaWeaveQt::Panel(MercaWeaveQt::Panel::View::Receive,this));
+    m_address_type = new QComboBox(this);
+    m_address_type->setObjectName(QStringLiteral("receiveAddressType"));
+    m_address_type->addItems({tr("Standard PQ — Witness v2"), tr("MercaWeave Grouped PQ — Witness v3")});
+    auto* type_label = new QLabel(tr("Address type:"), this);
+    type_label->setBuddy(m_address_type);
+    type_label->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    // Row 3 is the existing gap between the explanation and request fields.
+    ui->gridLayout->addWidget(type_label, 3, 0);
+    ui->gridLayout->addWidget(m_address_type, 3, 2);
+    m_group_note = new QLabel(this);
+    m_group_note->setObjectName(QStringLiteral("receiveMercaWeaveAvailability"));
+    m_group_note->setWordWrap(true);
+    m_group_note->setTextFormat(Qt::PlainText);
+    ui->gridLayout->addWidget(m_group_note, ui->gridLayout->rowCount(), 2);
+    connect(m_address_type, &QComboBox::currentIndexChanged, this, &ReceiveCoinsDialog::updateAddressTypes);
+    auto* activation_timer = new QTimer(this);
+    connect(activation_timer, &QTimer::timeout, this, &ReceiveCoinsDialog::updateAddressTypes);
+    activation_timer->start(1000);
+    updateAddressTypes();
 
     if (!_platformStyle->getImagesOnButtons()) {
         ui->clearButton->setIcon(QIcon());
@@ -73,7 +94,12 @@ ReceiveCoinsDialog::ReceiveCoinsDialog(const PlatformStyle *_platformStyle, QWid
 void ReceiveCoinsDialog::setModel(WalletModel *_model)
 {
     this->model = _model;
-    findChild<MercaWeaveQt::Panel*>()->setModel(_model?_model->getMercaWeaveModel():nullptr);
+    updateAddressTypes();
+    if (_model) {
+        connect(_model, &QObject::destroyed, this, [this, _model] {
+            if (model == _model) { model = nullptr; updateAddressTypes(); }
+        });
+    }
 
     if(_model && _model->getOptionsModel())
     {
@@ -90,11 +116,11 @@ void ReceiveCoinsDialog::setModel(WalletModel *_model)
             &ReceiveCoinsDialog::recentRequestsView_selectionChanged);
 
         // Set the button to be enabled or disabled based on whether the wallet can give out new addresses.
-        ui->receiveButton->setEnabled(model->wallet().canGetAddresses());
+        updateAddressTypes();
 
         // Enable/disable the receive button if the wallet is now able/unable to give out new addresses.
-        connect(model, &WalletModel::canGetAddressesChanged, [this] {
-            ui->receiveButton->setEnabled(model->wallet().canGetAddresses());
+        connect(model, &WalletModel::canGetAddressesChanged, this, [this] {
+            updateAddressTypes();
         });
     }
 }
@@ -132,6 +158,21 @@ void ReceiveCoinsDialog::updateDisplayUnit()
     }
 }
 
+void ReceiveCoinsDialog::updateAddressTypes()
+{
+    const bool available = model && model->wallet().mercaweaveAvailable();
+    if (auto* items = qobject_cast<QStandardItemModel*>(m_address_type->model())) {
+        items->item(1)->setEnabled(available);
+    }
+    m_group_note->setText(available
+        ? tr("Spending can link addresses in the same group. A compromised group key puts all coins in that group at risk. Back up your wallet after creating addresses.")
+        : tr("MercaWeave requires network activation and a wallet with grouped PQ keys. Standard PQ remains the default."));
+    // Do not silently switch an explicitly selected grouped request to v2 if
+    // activation or wallet support is lost during a reorg or wallet unload.
+    ui->receiveButton->setEnabled(model && model->wallet().canGetAddresses() &&
+                                  (m_address_type->currentIndex() == 0 || available));
+}
+
 void ReceiveCoinsDialog::on_receiveButton_clicked()
 {
     if(!model || !model->getOptionsModel() || !model->getAddressTableModel() || !model->getRecentRequestsTableModel())
@@ -139,12 +180,16 @@ void ReceiveCoinsDialog::on_receiveButton_clicked()
 
     QString address;
     QString label = ui->reqLabel->text();
+    const bool grouped = m_address_type->currentIndex() == 1;
+    if (grouped && !model->wallet().mercaweaveAvailable()) {
+        QMessageBox::critical(this, windowTitle(), tr("MercaWeave is unavailable on the current network or wallet."));
+        return;
+    }
     /* Generate new receiving address */
-    // Mercatura PQ Authorization v1 is the sole normal receive path.
-    // BECH32M is retained internally as the wallet compatibility bucket
-    // for native witness-v2 Mercatura PQ destinations.
+    // BECH32M remains the existing native-v2 compatibility bucket; the
+    // optional grouped selection uses the explicit wallet interface.
     const OutputType address_type{OutputType::BECH32M};
-    address = model->getAddressTableModel()->addRow(AddressTableModel::Receive, label, "", address_type);
+    address = model->getAddressTableModel()->addRow(AddressTableModel::Receive, label, "", address_type, grouped);
 
     switch(model->getAddressTableModel()->getEditStatus())
     {

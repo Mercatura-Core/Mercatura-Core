@@ -24,6 +24,8 @@ namespace Ui {
 
 QT_BEGIN_NAMESPACE
 class QModelIndex;
+class QComboBox;
+class QLabel;
 QT_END_NAMESPACE
 
 /** Dialog for requesting payment of bitcoins */
@@ -52,6 +54,8 @@ public Q_SLOTS:
 private:
     Ui::ReceiveCoinsDialog *ui;
     WalletModel* model{nullptr};
+    QComboBox* m_address_type{nullptr};
+    QLabel* m_group_note{nullptr};
     QMenu *contextMenu;
     QAction* copyLabelAction;
     QAction* copyMessageAction;
@@ -68,6 +72,7 @@ private Q_SLOTS:
     void on_recentRequestsView_doubleClicked(const QModelIndex &index);
     void recentRequestsView_selectionChanged(const QItemSelection &selected, const QItemSelection &deselected);
     void updateDisplayUnit();
+    void updateAddressTypes();
     void showMenu(const QPoint &point);
     void copyURI();
     void copyAddress();

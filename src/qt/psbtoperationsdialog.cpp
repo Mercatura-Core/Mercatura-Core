@@ -11,6 +11,7 @@
 #include <node/psbt.h>
 #include <node/types.h>
 #include <policy/policy.h>
+#include <script/pqgroup_psbt.h>
 #include <qt/bitcoinunits.h>
 #include <qt/forms/ui_psbtoperationsdialog.h>
 #include <qt/guiutil.h>
@@ -56,7 +57,7 @@ void PSBTOperationsDialog::openWithPSBT(PartiallySignedTransaction psbtx)
 {
     m_transaction_data = psbtx;
 
-    bool complete = FinalizePSBT(psbtx); // Make sure all existing signatures are fully combined before checking for completeness.
+    bool complete = m_wallet_model ? m_wallet_model->wallet().finalizePSBT(psbtx) : FinalizePSBT(psbtx);
     if (m_wallet_model) {
         size_t n_could_sign;
         const auto err{m_wallet_model->wallet().fillPSBT(std::nullopt, /*sign=*/false, /*bip32derivs=*/true, &n_could_sign, m_transaction_data, complete)};
@@ -110,7 +111,8 @@ void PSBTOperationsDialog::signTransaction()
 void PSBTOperationsDialog::broadcastTransaction()
 {
     CMutableTransaction mtx;
-    if (!FinalizeAndExtractPSBT(m_transaction_data, mtx)) {
+    if (!(m_wallet_model ? m_wallet_model->wallet().finalizePSBT(m_transaction_data, &mtx)
+                        : FinalizeAndExtractPSBT(m_transaction_data, mtx))) {
         // This is never expected to fail unless we were given a malformed PSBT
         // (e.g. with an invalid signature.)
         showStatus(tr("Unknown error processing transaction."), StatusLevel::ERR);
@@ -194,7 +196,7 @@ QString PSBTOperationsDialog::renderTransaction(const PartiallySignedTransaction
 
     PSBTAnalysis analysis = AnalyzePSBT(psbtx);
     tx_description.append(bullet_point);
-    if (!*analysis.fee) {
+    if (!analysis.fee) {
         // This happens if the transaction is missing input UTXO information.
         tx_description.append(tr("Unable to calculate transaction fee or total transaction amount."));
     } else {
@@ -262,6 +264,11 @@ size_t PSBTOperationsDialog::couldSignInputs(const PartiallySignedTransaction &p
 void PSBTOperationsDialog::showTransactionStatus(const PartiallySignedTransaction &psbtx) {
     PSBTAnalysis analysis = AnalyzePSBT(psbtx);
     size_t n_could_sign = couldSignInputs(psbtx);
+    if (mercaweave::psbt::HasGroupInputs(psbtx)) {
+        auto staged = psbtx;
+        analysis.next = m_wallet_model && m_wallet_model->wallet().finalizePSBT(staged)
+            ? PSBTRole::EXTRACTOR : PSBTRole::SIGNER;
+    }
 
     switch (analysis.next) {
         case PSBTRole::UPDATER: {
