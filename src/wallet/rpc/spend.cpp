@@ -121,7 +121,7 @@ static UniValue FinishTransaction(const std::shared_ptr<CWallet> pwallet, const 
     }
 
     CMutableTransaction mtx;
-    complete = FinalizeAndExtractPSBT(psbtx, mtx);
+    complete = pwallet->FinalizeWalletPSBT(psbtx, &mtx);
 
     UniValue result(UniValue::VOBJ);
 
@@ -1643,7 +1643,9 @@ RPCHelpMan walletprocesspsbt()
     if (complete) {
         CMutableTransaction mtx;
         // Returns true if complete, which we already think it is.
-        CHECK_NONFATAL(FinalizeAndExtractPSBT(psbtx, mtx));
+        if (!wallet.FinalizeWalletPSBT(psbtx, &mtx)) {
+            throw JSONRPCError(RPC_WALLET_ERROR, "Transaction finalization failed or activation changed");
+        }
         DataStream ssTx_final;
         ssTx_final << TX_WITH_WITNESS(mtx);
         result.pushKV("hex", HexStr(ssTx_final));

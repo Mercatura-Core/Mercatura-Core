@@ -11,6 +11,7 @@
 #include <coins.h>
 #include <common/args.h>
 #include <consensus/amount.h>
+#include <consensus/mercaweave.h>
 #include <consensus/consensus.h>
 #include <consensus/merkle.h>
 #include <consensus/tx_verify.h>
@@ -176,6 +177,12 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     CBlockIndex* pindexPrev = m_chainstate.m_chain.Tip();
     assert(pindexPrev != nullptr);
     nHeight = pindexPrev->nHeight + 1;
+    int reward_version;
+    std::vector<unsigned char> reward_program;
+    if (m_options.coinbase_output_script.IsWitnessProgram(reward_version, reward_program) && reward_version == 3 &&
+        (reward_program.size() != 32 || !Consensus::MercaWeaveActive(chainparams.GetConsensus(), nHeight))) {
+        throw std::runtime_error("MercaWeave mining reward destination is not protected at the candidate height");
+    }
 
     nBlockMaxCapacityBytes =
         GetBlockTemplateMaxCapacityBytes(

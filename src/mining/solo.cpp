@@ -5,6 +5,7 @@
 
 #include <chainparams.h>
 #include <consensus/merkle.h>
+#include <consensus/mercaweave.h>
 #include <crypto/common.h>
 #include <interfaces/handler.h>
 #include <node/context.h>
@@ -28,8 +29,17 @@ SoloWorkProvider::SoloWorkProvider(std::unique_ptr<interfaces::Mining> mining, C
 {
     std::vector<std::vector<unsigned char>> solutions;
     if (!m_mining) throw std::runtime_error{"Native mining interface is unavailable"};
-    if (Solver(m_payout, solutions) != TxoutType::WITNESS_V2_MERCATURA_PQ) {
+    const auto payout_type = Solver(m_payout, solutions);
+    if (payout_type != TxoutType::WITNESS_V2_MERCATURA_PQ && payout_type != TxoutType::WITNESS_V3_MERCAWEAVE) {
         throw std::runtime_error{"Mining requires a native Mercatura PQ payout script"};
+    }
+    if (payout_type == TxoutType::WITNESS_V3_MERCAWEAVE) {
+        const auto* context = m_mining->context();
+        if (!context || !context->chainman) throw std::runtime_error{"Grouped payout requires an activated full node"};
+        LOCK(cs_main);
+        if (!Consensus::MercaWeaveActive(context->chainman->GetConsensus(), context->chainman->ActiveChain().Height() + 1)) {
+            throw std::runtime_error{"MercaWeave mining rewards are not active on this network"};
+        }
     }
 }
 SoloWorkProvider::~SoloWorkProvider() = default;

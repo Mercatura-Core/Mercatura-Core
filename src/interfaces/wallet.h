@@ -97,6 +97,8 @@ public:
 
     // Get a new address.
     virtual util::Result<CTxDestination> getNewDestination(OutputType type, const std::string& label) = 0;
+    virtual bool mercaweaveAvailable() { return false; }
+    virtual util::Result<CTxDestination> getNewMercaWeaveDestination(const std::string&) { return util::Error{Untranslated("MercaWeave is unsupported by this wallet interface")}; }
 
     //! Get public key.
     virtual bool getPubKey(const CScript& script, const CKeyID& address, CPubKey& pub_key) = 0;
@@ -211,6 +213,9 @@ public:
         size_t* n_signed,
         PartiallySignedTransaction& psbtx,
         bool& complete) = 0;
+
+    //! Finalize using current wallet/network capabilities.
+    virtual bool finalizePSBT(PartiallySignedTransaction&, CMutableTransaction* result = nullptr) { return false; }
 
     //! Get balances.
     virtual WalletBalances getBalances() = 0;

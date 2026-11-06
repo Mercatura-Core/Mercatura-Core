@@ -646,6 +646,7 @@ CoinsResult AvailableCoins(const CWallet& wallet,
         int input_bytes = CalculateMaximumSignedInputSize(output, COutPoint(), provider.get(), can_grind_r, coinControl);
         int input_weight = CalculateMaximumSignedInputWeight(output, COutPoint(), provider.get(), can_grind_r, coinControl);
         if (wallet.GetPQGroupRecord(output.scriptPubKey)) {
+            if (!wallet.MercaWeaveAvailable()) continue;
             input_bytes = 41 + 5301; // conservative independent anchor during selection
             input_weight = 41 * WITNESS_SCALE_FACTOR + 5301;
         }
@@ -1684,6 +1685,15 @@ util::Result<CreatedTransactionResult> CreateTransaction(
 
     if (std::any_of(vecSend.cbegin(), vecSend.cend(), [](const auto& recipient){ return recipient.nAmount < 0; })) {
         return util::Error{_("Transaction amounts must not be negative")};
+    }
+
+    for (const auto& recipient : vecSend) {
+        int version;
+        std::vector<unsigned char> program;
+        if (GetScriptForDestination(recipient.dest).IsWitnessProgram(version, program) && version == 3 &&
+            (program.size() != 32 || !wallet.MercaWeaveActive())) {
+            return util::Error{Untranslated("MercaWeave recipient is unsupported or not active on this network")};
+        }
     }
 
     LOCK(wallet.cs_wallet);

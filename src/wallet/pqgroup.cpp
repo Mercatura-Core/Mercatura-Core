@@ -5,11 +5,50 @@
 #include <wallet/walletdb.h>
 #include <chainparams.h>
 #include <crypto/hmac_sha3_384.h>
+#include <consensus/mercaweave.h>
+#include <interfaces/chain.h>
 #include <script/pqgroup_psbt.h>
 #include <support/cleanse.h>
 #include <util/strencodings.h>
 
 namespace wallet {
+std::shared_ptr<const mercaweave::IsolatedExecution> CWallet::PQGroupExecution() const
+{
+    AssertLockHeld(cs_wallet);
+    if (m_group_execution) return m_group_execution; // Guarded in-process fixtures only.
+    if (!Params().GetConsensus().nMercaWeaveHeight || !m_chain) return {};
+    const auto height = m_chain->getHeight();
+    return height ? mercaweave::IsolatedExecution::ForConsensus(Params().GetConsensus(), *height) : nullptr;
+}
+
+bool CWallet::MercaWeaveAvailable() const
+{
+    LOCK(cs_wallet);
+    return HasMercaturaPQState() && !IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS) && bool(PQGroupExecution());
+}
+
+bool CWallet::MercaWeaveActive() const
+{
+    LOCK(cs_wallet);
+    return bool(PQGroupExecution());
+}
+
+util::Result<CTxDestination> CWallet::GetNewPQGroupDestination(
+    const std::string& label, uint32_t account, uint8_t purpose)
+{
+    LOCK(cs_wallet);
+    if (!MercaWeaveAvailable()) return util::Error{Untranslated("MercaWeave is unavailable: activation and authenticated wallet support are required")};
+    if (IsLocked()) return util::Error{Untranslated("Unlock the wallet before deriving a grouped PQ address")};
+    const auto record = IssuePQGroupAddress(account, purpose);
+    if (!record) return util::Error{Untranslated("Unable to issue grouped PQ address: invalid purpose, exhausted range, or database failure")};
+    CTxDestination destination;
+    if (!ExtractDestination(record->Script(m_pq_group_records->genesis), destination)) {
+        return util::Error{Untranslated("Invalid grouped PQ destination")};
+    }
+    if (purpose != 1) SetAddressBook(destination, label, AddressPurpose::RECEIVE);
+    return destination;
+}
+
 namespace {
 using namespace mercaweave;
 struct Wipe { void* data; size_t size; ~Wipe() { memory_cleanse(data,size); } };
@@ -60,7 +99,7 @@ bool CWallet::AuthenticatePQGroups(const CKeyingMaterial& seed)
     if (!m_pq_group_records) return true;
     m_pq_group_verified = false; m_pq_group_index.clear();
     const auto& records = *m_pq_group_records;
-    if (!m_group_execution || records.genesis != m_group_execution->Genesis() ||
+    if ((m_group_execution && records.genesis != m_group_execution->Genesis()) ||
         records.genesis != Network() || !records.StructurallyValid() || seed.size() != 32 ||
         !TimingResistantEqual(records.Authenticate(seed),records.mac)) return false;
     try {
@@ -78,8 +117,8 @@ bool CWallet::AuthenticatePQGroups(const CKeyingMaterial& seed)
 bool CWallet::LoadPQGroupRecords(const PQGroupRecords& records)
 {
     AssertLockHeld(cs_wallet);
-    if (!m_group_execution || m_pq_group_records || !records.StructurallyValid() ||
-        records.genesis != m_group_execution->Genesis() || records.genesis != Network() ||
+    if ((!m_group_execution && !IsWalletFlagSet(WALLET_FLAG_MERCAWEAVE)) || m_pq_group_records || !records.StructurallyValid() ||
+        (m_group_execution && records.genesis != m_group_execution->Genesis()) || records.genesis != Network() ||
         !HasMercaturaPQState()) return false;
     m_pq_group_records = records;
     // The record contains issued ranges, not a trustworthy creation timestamp.
@@ -93,7 +132,8 @@ bool CWallet::LoadPQGroupRecords(const PQGroupRecords& records)
 std::optional<PQGroupRecord> CWallet::IssuePQGroupAddress(uint32_t account, uint8_t purpose)
 {
     LOCK(cs_wallet);
-    if (!m_group_execution || m_group_execution->Genesis() != Network() || purpose > 2 ||
+    const auto execution = PQGroupExecution();
+    if (!execution || execution->Genesis() != Network() || purpose > 2 ||
         IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS) || m_mercatura_pq_master_seed.size() != 32) return {};
     if (m_pq_group_records && !m_pq_group_verified) return {};
     PQGroupRecords staged = m_pq_group_records.value_or(PQGroupRecords{});
@@ -111,7 +151,9 @@ std::optional<PQGroupRecord> CWallet::IssuePQGroupAddress(uint32_t account, uint
     if (!staged_index.emplace(record.Script(staged.genesis),staged.issued.size()-1).second) return {};
     WalletBatch batch(GetDatabase());
     if (!batch.TxnBegin()) return {};
-    if (!batch.WritePQGroupRecords(staged) || !batch.TxnCommit()) { batch.TxnAbort(); return {}; }
+    const auto flags = GetWalletFlags() | WALLET_FLAG_MERCAWEAVE;
+    if (!batch.WriteWalletFlags(flags) || !batch.WritePQGroupRecords(staged) || !batch.TxnCommit()) { batch.TxnAbort(); return {}; }
+    m_wallet_flags = flags;
     m_pq_group_records = std::move(staged);
     m_pq_group_index.swap(staged_index);
     m_pq_group_verified = true;
@@ -121,8 +163,8 @@ std::optional<PQGroupRecord> CWallet::IssuePQGroupAddress(uint32_t account, uint
 std::optional<PQGroupRecord> CWallet::GetPQGroupRecord(const CScript& script) const
 {
     LOCK(cs_wallet);
-    if (!m_group_execution || !m_pq_group_verified || !m_pq_group_records ||
-        m_group_execution->Genesis() != m_pq_group_records->genesis) return {};
+    if (!m_pq_group_verified || !m_pq_group_records || m_pq_group_records->genesis != Network() ||
+        (m_group_execution && m_group_execution->Genesis() != m_pq_group_records->genesis)) return {};
     const auto found = m_pq_group_index.find(script);
     return found == m_pq_group_index.end() ? std::nullopt : std::optional{m_pq_group_records->issued[found->second]};
 }
@@ -130,8 +172,8 @@ std::vector<CScript> CWallet::GetPQGroupScripts() const
 {
     LOCK(cs_wallet);
     std::vector<CScript> result;
-    if (m_group_execution && m_pq_group_verified && m_pq_group_records &&
-        m_group_execution->Genesis() == m_pq_group_records->genesis)
+    if (m_pq_group_verified && m_pq_group_records && m_pq_group_records->genesis == Network() &&
+        (!m_group_execution || m_group_execution->Genesis() == m_pq_group_records->genesis))
         for (const auto& [script,index] : m_pq_group_index) result.push_back(script);
     return result;
 }
@@ -139,7 +181,7 @@ std::optional<mercaweave::Sizes> CWallet::EstimatePQGroupTransaction(
     const CTransaction& tx, const std::vector<CTxOut>& spent) const
 {
     LOCK(cs_wallet);
-    if (!m_group_execution || tx.vin.size() != spent.size()) return {};
+    if (!PQGroupExecution() || tx.vin.size() != spent.size()) return {};
     CMutableTransaction model(tx);
     std::map<mercaweave::PublicKey,uint32_t> anchors;
     bool grouped{false};

@@ -5,6 +5,9 @@
 #include <bitcoin-build-config.h> // IWYU pragma: keep
 
 #include <core_io.h>
+#include <chainparams.h>
+#include <consensus/mercaweave.h>
+#include <interfaces/chain.h>
 #include <key_io.h>
 #include <rpc/util.h>
 #include <script/script.h>
@@ -18,6 +21,35 @@
 #include <univalue.h>
 
 namespace wallet {
+RPCHelpMan getnewmercaweaveaddress()
+{
+    return RPCHelpMan{
+        "getnewmercaweaveaddress",
+        "Issue an optional grouped witness-v3 address only on an activated network.\n"
+        "Group keys rotate automatically after 64 addresses. Retain issued-range backups.\n",
+        {
+            {"label", RPCArg::Type::STR, RPCArg::Default{""}, "Address book label."},
+            {"account", RPCArg::Type::NUM, RPCArg::Default{0}, "Unsigned 32-bit account."},
+            {"purpose", RPCArg::Type::STR, RPCArg::Default{"receive"}, "receive, change, or mining; each uses a separate derivation domain."},
+        },
+        RPCResult{RPCResult::Type::STR, "address", "Grouped PQ address; never an activation override."},
+        RPCExamples{HelpExampleCli("getnewmercaweaveaddress", "\"grouped\" 0 \"receive\"")},
+        [&](const RPCHelpMan&, const JSONRPCRequest& request) -> UniValue {
+            const auto wallet = GetWalletForJSONRPCRequest(request);
+            if (!wallet) return UniValue::VNULL;
+            const auto label = LabelFromValue(request.params[0]);
+            const auto account = request.params[1].isNull() ? 0 : request.params[1].getInt<int64_t>();
+            if (account < 0 || account > int64_t{UINT32_MAX}) throw JSONRPCError(RPC_INVALID_PARAMETER, "Account must fit uint32");
+            const auto purpose = request.params[2].isNull() ? "receive" : request.params[2].get_str();
+            if (purpose != "receive" && purpose != "change" && purpose != "mining") throw JSONRPCError(RPC_INVALID_PARAMETER, "Unsupported group derivation purpose");
+            if (!wallet->MercaWeaveAvailable()) throw JSONRPCError(RPC_WALLET_ERROR, "MercaWeave is not active on this network or unavailable in this wallet");
+            EnsureWalletIsUnlocked(*wallet);
+            const auto destination = wallet->GetNewPQGroupDestination(label, static_cast<uint32_t>(account), purpose == "receive" ? 0 : purpose == "change" ? 1 : 2);
+            if (!destination) throw JSONRPCError(RPC_WALLET_ERROR, util::ErrorString(destination).original);
+            return EncodeDestination(*destination);
+        }};
+}
+
 RPCHelpMan getnewaddress()
 {
     return RPCHelpMan{
@@ -27,7 +59,7 @@ RPCHelpMan getnewaddress()
                 "so payments received with the address will be associated with 'label'.\n",
                 {
                     {"label", RPCArg::Type::STR, RPCArg::Default{""}, "The label name for the address to be linked to. It can also be set to the empty string \"\" to represent the default label. The label does not need to exist, it will be created if there is no label by the given name."},
-                    {"address_type", RPCArg::Type::STR, RPCArg::DefaultHint{"set by -addresstype"}, "The address type to use. Options are " + FormatAllOutputTypes() + "."},
+                    {"address_type", RPCArg::Type::STR, RPCArg::DefaultHint{"set by -addresstype"}, "The address type to use. Options are " + FormatAllOutputTypes() + " or mercaweave (only after consensus activation; v2 remains the default)."},
                 },
                 RPCResult{
                     RPCResult::Type::STR, "address", "The new Mercatura address"
@@ -49,6 +81,14 @@ RPCHelpMan getnewaddress()
 
     // Parse the label first so we don't generate a key if there's an error
     const std::string label{LabelFromValue(request.params[0])};
+
+    if (!request.params[1].isNull() && request.params[1].get_str() == "mercaweave") {
+        if (!pwallet->MercaWeaveAvailable()) throw JSONRPCError(RPC_WALLET_ERROR, "MercaWeave is not active on this network or unavailable in this wallet");
+        EnsureWalletIsUnlocked(*pwallet);
+        const auto destination = pwallet->GetNewPQGroupDestination(label);
+        if (!destination) throw JSONRPCError(RPC_WALLET_ERROR, util::ErrorString(destination).original);
+        return EncodeDestination(*destination);
+    }
 
     OutputType output_type = pwallet->m_default_address_type;
     if (!request.params[1].isNull()) {
@@ -76,7 +116,7 @@ RPCHelpMan getrawchangeaddress()
         "Returns a new Mercatura address, for receiving change.\n"
                 "This is for use with raw transactions, NOT normal use.\n",
                 {
-                    {"address_type", RPCArg::Type::STR, RPCArg::DefaultHint{"set by -changetype"}, "The address type to use. Options are " + FormatAllOutputTypes() + "."},
+                    {"address_type", RPCArg::Type::STR, RPCArg::DefaultHint{"set by -changetype"}, "The address type to use. Options are " + FormatAllOutputTypes() + " or mercaweave (only after consensus activation; v2 remains the default)."},
                 },
                 RPCResult{
                     RPCResult::Type::STR, "address", "The address"
@@ -94,6 +134,14 @@ RPCHelpMan getrawchangeaddress()
 
     if (!pwallet->CanGetAddresses(true)) {
         throw JSONRPCError(RPC_WALLET_ERROR, "Error: This wallet has no available keys");
+    }
+
+    if (!request.params[0].isNull() && request.params[0].get_str() == "mercaweave") {
+        if (!pwallet->MercaWeaveAvailable()) throw JSONRPCError(RPC_WALLET_ERROR, "MercaWeave is not active on this network or unavailable in this wallet");
+        EnsureWalletIsUnlocked(*pwallet);
+        const auto destination = pwallet->GetNewPQGroupDestination("", 0, 1);
+        if (!destination) throw JSONRPCError(RPC_WALLET_ERROR, util::ErrorString(destination).original);
+        return EncodeDestination(*destination);
     }
 
     OutputType output_type = pwallet->m_default_change_type.value_or(pwallet->m_default_address_type);
@@ -383,6 +431,15 @@ RPCHelpMan getaddressinfo()
                         {RPCResult::Type::BOOL, "ismine", "If the address is yours."},
                         {RPCResult::Type::BOOL, "iswatchonly", "(DEPRECATED) Always false."},
                         {RPCResult::Type::BOOL, "solvable", "If we know how to spend coins sent to this address, ignoring the possible lack of private keys."},
+                        {RPCResult::Type::BOOL, "mercaweave", /*optional=*/true, "The script is the MercaWeave witness-v3 form; not itself activation or ownership proof."},
+                        {RPCResult::Type::BOOL, "mercaweave_active", /*optional=*/true, "Whether consensus currently protects v3 on this network."},
+                        {RPCResult::Type::BOOL, "pq_group_authenticated", /*optional=*/true, "Whether native PQ seed authentication established this wallet's group record."},
+                        {RPCResult::Type::NUM, "pq_group_account", /*optional=*/true, "Group account."},
+                        {RPCResult::Type::NUM, "pq_group_purpose", /*optional=*/true, "Receive/change/mining purpose 0/1/2."},
+                        {RPCResult::Type::NUM, "pq_group_index", /*optional=*/true, "Group key index."},
+                        {RPCResult::Type::NUM, "pq_address_index", /*optional=*/true, "Address nonce index within its group."},
+                        {RPCResult::Type::STR_HEX, "pq_group_public_key", /*optional=*/true, "Public group key, for explicit PSBT coordination."},
+                        {RPCResult::Type::STR_HEX, "pq_address_nonce", /*optional=*/true, "Public address nonce, for explicit PSBT coordination."},
                         {RPCResult::Type::STR, "desc", /*optional=*/true, "A descriptor for spending coins sent to this address (only when solvable)."},
                         {RPCResult::Type::STR, "parent_desc", /*optional=*/true, "The descriptor used to derive this address if this is a descriptor wallet"},
                         {RPCResult::Type::BOOL, "isscript", /*optional=*/true, "If the key is a script."},
@@ -448,11 +505,27 @@ RPCHelpMan getaddressinfo()
     ret.pushKV("scriptPubKey", HexStr(scriptPubKey));
 
     std::unique_ptr<SigningProvider> provider = pwallet->GetSolvingProvider(scriptPubKey);
+    int witness_version;
+    std::vector<unsigned char> witness_program;
+    if (scriptPubKey.IsWitnessProgram(witness_version, witness_program) && witness_version == 3) {
+        const auto height = pwallet->chain().getHeight();
+        ret.pushKV("mercaweave", true);
+        ret.pushKV("mercaweave_active", height && Consensus::MercaWeaveActive(Params().GetConsensus(), *height));
+        ret.pushKV("pq_group_authenticated", pwallet->GetPQGroupRecord(scriptPubKey).has_value());
+    }
 
     bool mine = pwallet->IsMine(dest);
     ret.pushKV("ismine", mine);
 
-    if (provider) {
+    if (const auto group = pwallet->GetPQGroupRecord(scriptPubKey)) {
+        ret.pushKV("solvable", true);
+        ret.pushKV("pq_group_account", uint64_t{group->account});
+        ret.pushKV("pq_group_purpose", uint64_t{group->purpose});
+        ret.pushKV("pq_group_index", uint64_t{group->group});
+        ret.pushKV("pq_address_index", uint64_t{group->address});
+        ret.pushKV("pq_group_public_key", HexStr(group->pk));
+        ret.pushKV("pq_address_nonce", HexStr(group->nonce));
+    } else if (provider) {
         auto inferred = InferDescriptor(scriptPubKey, *provider);
         bool solvable = inferred->IsSolvable();
         ret.pushKV("solvable", solvable);

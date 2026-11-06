@@ -1443,7 +1443,8 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
                 }
                 group_records_loaded = true; return DBErrors::LOAD_OK;
             }).m_result,result);
-        if (group_records_loaded != group_records_required) result = DBErrors::CORRUPT;
+        if (group_records_loaded != group_records_required ||
+            group_records_loaded != pwallet->IsWalletFlagSet(WALLET_FLAG_MERCAWEAVE)) result = DBErrors::CORRUPT;
 
         // Load tx records after authenticated/provisional ownership metadata.
         result = std::max(LoadTxRecords(pwallet, *m_batch, any_unordered), result);

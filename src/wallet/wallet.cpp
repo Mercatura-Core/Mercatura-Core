@@ -2610,10 +2610,12 @@ std::optional<PSBTError> CWallet::FillPQGroupPSBT(PartiallySignedTransaction& so
     const std::map<COutPoint,Coin>* authenticated_coins) const
 {
     AssertLockHeld(cs_wallet);
+    const auto execution = PQGroupExecution();
     complete = false;
     if (signed_inputs) *signed_inputs = 0;
-    if (!m_group_execution || !source.tx || (sighash && *sighash != SIGHASH_DEFAULT))
+    if (!execution || !source.tx || (sighash && *sighash != SIGHASH_DEFAULT))
         return PSBTError::SIGHASH_MISMATCH;
+    if (!mercaweave::psbt::Supported(source)) return PSBTError::UNSUPPORTED;
     try {
         using namespace mercaweave;
         struct Clean { void* data; size_t size; ~Clean() { memory_cleanse(data,size); } };
@@ -2637,7 +2639,7 @@ std::optional<PSBTError> CWallet::FillPQGroupPSBT(PartiallySignedTransaction& so
         const bool unlocked = m_mercatura_pq_master_seed.size() == master.size();
         if (unlocked) std::copy(m_mercatura_pq_master_seed.begin(),m_mercatura_pq_master_seed.end(),master.begin());
         const auto genesis = Params().GetConsensus().hashGenesisBlock;
-        if (!std::equal(genesis.begin(),genesis.end(),m_group_execution->Genesis().begin())) return PSBTError::UNSUPPORTED;
+        if (!std::equal(genesis.begin(),genesis.end(),execution->Genesis().begin())) return PSBTError::UNSUPPORTED;
         std::vector<psbt::InputRecord> records;
         for (uint32_t i = 0; i < spent.size(); ++i) {
             int version; Bytes program;
@@ -2673,7 +2675,7 @@ std::optional<PSBTError> CWallet::FillPQGroupPSBT(PartiallySignedTransaction& so
             } else return PSBTError::UNSUPPORTED;
             records.push_back(record);
         }
-        const auto canonical = psbt::Create(*staged.tx,spent,records,*m_group_execution);
+        const auto canonical = psbt::Create(*staged.tx,spent,records,*execution);
         for (size_t i = 0; i < staged.inputs.size(); ++i) {
             // Existing UTXO descriptions are never overwritten on disagreement.
             if (!staged.inputs[i].witness_utxo.IsNull() && staged.inputs[i].witness_utxo != spent[i])
@@ -2685,8 +2687,27 @@ std::optional<PSBTError> CWallet::FillPQGroupPSBT(PartiallySignedTransaction& so
                 staged.inputs[i].m_proprietary.insert(field);
             }
         }
-        auto info = psbt::Inspect(staged,spent,*m_group_execution);
+        auto info = psbt::Inspect(staged,spent,*execution);
         size_t count{0};
+        if (!sign) {
+            for (const auto& group : info.mapping.groups) {
+                if (info.complete[group.anchor]) continue;
+                bool owned{true};
+                for (const auto& member : group.members) {
+                    const auto record = GetPQGroupRecord(spent[member.index].scriptPubKey);
+                    owned &= record && record->pk == group.pk && record->nonce == member.nonce;
+                }
+                if (owned) count += group.members.size();
+            }
+            for (size_t i = 0; i < spent.size(); ++i) {
+                int version;
+                Bytes program;
+                if (info.complete[i] || !spent[i].scriptPubKey.IsWitnessProgram(version, program) || version != 2) continue;
+                MercaturaPQKeyCommitment commitment{};
+                std::copy(program.begin(), program.end(), commitment.begin());
+                if (GetMercaturaPQKeyLocator(commitment)) ++count;
+            }
+        }
         if (sign) {
             for (const auto& group : info.mapping.groups) {
                 if (info.complete[group.anchor]) continue;
@@ -2699,14 +2720,14 @@ std::optional<PSBTError> CWallet::FillPQGroupPSBT(PartiallySignedTransaction& so
                 }
                 if (!owned) return PSBTError::INCOMPLETE;
                 if (!unlocked) return PSBTError::INCOMPLETE;
-                auto child = Derive(master,m_group_execution->Genesis(),anchor->account,anchor->purpose,anchor->group);
+                auto child = Derive(master,execution->Genesis(),anchor->account,anchor->purpose,anchor->group);
                 Clean clean_child{child.data(),child.size()}; mercaweave::KeyPair key(child);
                 if (key.pk != group.pk) return PSBTError::INCOMPLETE;
                 B32 randomness{}; Clean clean_randomness{randomness.data(),randomness.size()};
                 if (m_pq_group_test_entropy) {
                     if (!m_pq_group_test_entropy(randomness)) return PSBTError::INCOMPLETE;
                 } else GetStrongRandBytes(randomness);
-                const auto signature = SignDigest(Digest(m_group_execution->Genesis(),info.hashes,group),key,randomness);
+                const auto signature = SignDigest(Digest(execution->Genesis(),info.hashes,group),key,randomness);
                 psbt::Put(staged.inputs[group.anchor],4,signature); count += group.members.size();
             }
             PrecomputedTransactionData native; auto outputs = spent;
@@ -2724,8 +2745,9 @@ std::optional<PSBTError> CWallet::FillPQGroupPSBT(PartiallySignedTransaction& so
                 ++count;
             }
         }
-        info = psbt::Inspect(staged,spent,*m_group_execution);
+        info = psbt::Inspect(staged,spent,*execution);
         if (live_prevouts) {
+            if (!PQGroupExecution()) return PSBTError::UNSUPPORTED;
             // Signing may outlast the authentic chain snapshot acquired above.
             // Recheck before publishing; ordinary admission must still validate
             // again because the chain can always change after this API returns.
@@ -2740,7 +2762,7 @@ std::optional<PSBTError> CWallet::FillPQGroupPSBT(PartiallySignedTransaction& so
             }
         }
         const bool staged_complete = std::all_of(info.complete.begin(),info.complete.end(),[](bool value) { return value; });
-        if (finalize) FinalizePSBT(staged,*m_group_execution,spent);
+        if (finalize) FinalizePSBT(staged,*execution,spent);
         source = std::move(staged);
         // Publish completion only after finalization's allocations and the
         // staged PSBT publication succeed. Exceptions leave complete false.
@@ -2754,7 +2776,8 @@ bool CWallet::SignPQGroupTransaction(CMutableTransaction& tx, const std::map<COu
                                     int sighash, std::map<int,bilingual_str>& errors) const
 {
     AssertLockHeld(cs_wallet);
-    if (sighash != SIGHASH_DEFAULT) return false;
+    const auto execution = PQGroupExecution();
+    if (!execution || sighash != SIGHASH_DEFAULT) return false;
     std::vector<CTxOut> spent;
     for (const auto& input : tx.vin) {
         const auto found = coins.find(input.prevout);
@@ -2764,7 +2787,7 @@ bool CWallet::SignPQGroupTransaction(CMutableTransaction& tx, const std::map<COu
     // Preserve already complete, independently verified randomized witnesses.
     PrecomputedTransactionData native; auto outputs = spent;
     native.Init(tx,std::move(outputs),true);
-    const auto verified = mercaweave::Verify(tx,spent,m_group_execution->Genesis(),
+    const auto verified = mercaweave::Verify(tx,spent,execution->Genesis(),
         [&](const auto& body, const auto& prevouts, const auto& genesis, uint32_t index) {
             return mercaweave::psbt::VerifyNative(body,prevouts,genesis,index,native);
         });
@@ -2777,7 +2800,7 @@ bool CWallet::SignPQGroupTransaction(CMutableTransaction& tx, const std::map<COu
         errors[0] = Untranslated("Grouped authorization is incomplete, locked or inconsistent"); return false;
     }
     CMutableTransaction signed_tx;
-    if (!FinalizeAndExtractPSBT(psbt,signed_tx,*m_group_execution,spent)) return false;
+    if (!FinalizeAndExtractPSBT(psbt,signed_tx,*execution,spent)) return false;
     tx = std::move(signed_tx); errors.clear(); return true;
 }
 
@@ -2803,7 +2826,16 @@ bool CWallet::SignTransaction(CMutableTransaction& tx) const
 bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint, Coin>& coins, int sighash, std::map<int, bilingual_str>& input_errors) const
 {
     AssertLockHeld(cs_wallet);
-    if (m_group_execution) {
+    for (const auto& output : tx.vout) {
+        int version;
+        std::vector<unsigned char> program;
+        if (output.scriptPubKey.IsWitnessProgram(version, program) && version == 3 &&
+            (program.size() != 32 || !PQGroupExecution())) {
+            input_errors[0] = Untranslated("MercaWeave output is unsupported or not active");
+            return false;
+        }
+    }
+    if (PQGroupExecution()) {
         for (const auto& input : tx.vin) {
             const auto found = coins.find(input.prevout);
             int version; std::vector<unsigned char> program;
@@ -3077,11 +3109,59 @@ bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint,
     return false;
 }
 
+bool CWallet::FinalizeWalletPSBT(PartiallySignedTransaction& source, CMutableTransaction* result) const
+{
+    LOCK(cs_wallet);
+    if (!mercaweave::psbt::HasGroupInputs(source)) {
+        return result ? FinalizeAndExtractPSBT(source, *result) : FinalizePSBT(source);
+    }
+    const auto execution = PQGroupExecution();
+    if (!execution || !mercaweave::psbt::Supported(source)) return false;
+    std::vector<CTxOut> spent;
+    for (size_t i = 0; i < source.inputs.size(); ++i) {
+        CTxOut output;
+        if (!source.GetInputUTXO(output, i)) return false;
+        spent.push_back(std::move(output));
+    }
+    auto staged = source;
+    CMutableTransaction transaction;
+    const bool complete = result
+        ? FinalizeAndExtractPSBT(staged, transaction, *execution, spent)
+        : FinalizePSBT(staged, *execution, spent);
+    if (!PQGroupExecution()) return false;
+    source = std::move(staged);
+    if (complete && result) *result = std::move(transaction);
+    return complete;
+}
+
 std::optional<PSBTError> CWallet::FillPSBT(PartiallySignedTransaction& psbtx, bool& complete, std::optional<int> sighash_type, bool sign, bool bip32derivs, size_t * n_signed, bool finalize) const
 {
+    complete = false;
+    if (n_signed) *n_signed = 0;
     {
         LOCK(cs_wallet);
-        if (m_group_execution) return FillPQGroupPSBT(psbtx,complete,sighash_type,sign,n_signed,finalize);
+        if (psbtx.tx) {
+            for (const auto& output : psbtx.tx->vout) {
+                int version;
+                std::vector<unsigned char> program;
+                if (output.scriptPubKey.IsWitnessProgram(version, program) && version == 3 &&
+                    (program.size() != 32 || !PQGroupExecution())) return PSBTError::UNSUPPORTED;
+            }
+            std::map<COutPoint, Coin> coins;
+            for (const auto& input : psbtx.tx->vin) coins.emplace(input.prevout, Coin{});
+            if (m_chain) m_chain->findCoins(coins);
+            for (size_t i = 0; i < psbtx.tx->vin.size(); ++i) {
+                const auto found = coins.find(psbtx.tx->vin[i].prevout);
+                const CTxOut& output = found != coins.end() && !found->second.IsSpent()
+                    ? found->second.out : psbtx.inputs.at(i).witness_utxo;
+                int version;
+                std::vector<unsigned char> program;
+                if (output.scriptPubKey.IsWitnessProgram(version, program) && version == 3) {
+                    if (!PQGroupExecution()) { complete = false; return PSBTError::UNSUPPORTED; }
+                    return FillPQGroupPSBT(psbtx,complete,sighash_type,sign,n_signed,finalize);
+                }
+            }
+        }
     }
     if (n_signed) {
         *n_signed = 0;

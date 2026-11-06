@@ -54,6 +54,8 @@ enum WalletFlags : uint64_t {
 
     //! Indicates that the wallet needs an external signer
     WALLET_FLAG_EXTERNAL_SIGNER = (1ULL << 35),
+    //! Grouped key metadata requires a client that understands MercaWeave custody.
+    WALLET_FLAG_MERCAWEAVE = (1ULL << 36),
 };
 
 //! Get the path of the wallet directory.

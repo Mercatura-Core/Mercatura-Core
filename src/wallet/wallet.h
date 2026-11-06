@@ -157,7 +157,8 @@ static constexpr uint64_t KNOWN_WALLET_FLAGS =
     |   WALLET_FLAG_LAST_HARDENED_XPUB_CACHED
     |   WALLET_FLAG_DISABLE_PRIVATE_KEYS
     |   WALLET_FLAG_DESCRIPTORS
-    |   WALLET_FLAG_EXTERNAL_SIGNER;
+    |   WALLET_FLAG_EXTERNAL_SIGNER
+    |   WALLET_FLAG_MERCAWEAVE;
 
 static constexpr uint64_t MUTABLE_WALLET_FLAGS =
         WALLET_FLAG_AVOID_REUSE;
@@ -169,7 +170,8 @@ static const std::map<WalletFlags, std::string> WALLET_FLAG_TO_STRING{
     {WALLET_FLAG_LAST_HARDENED_XPUB_CACHED, "last_hardened_xpub_cached"},
     {WALLET_FLAG_DISABLE_PRIVATE_KEYS, "disable_private_keys"},
     {WALLET_FLAG_DESCRIPTORS, "descriptor_wallet"},
-    {WALLET_FLAG_EXTERNAL_SIGNER, "external_signer"}
+    {WALLET_FLAG_EXTERNAL_SIGNER, "external_signer"},
+    {WALLET_FLAG_MERCAWEAVE, "mercaweave"}
 };
 
 static const std::map<std::string, WalletFlags> STRING_TO_WALLET_FLAG{
@@ -492,6 +494,7 @@ private:
     // fixture friend can inject deterministic/failing entropy for tests.
     mercaweave::RandomSource m_pq_group_test_entropy GUARDED_BY(cs_wallet);
     bool AuthenticatePQGroups(const CKeyingMaterial&) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    std::shared_ptr<const mercaweave::IsolatedExecution> PQGroupExecution() const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     std::optional<PQGroupRecord> IssuePQGroupAddress(uint32_t account, uint8_t purpose);
     std::optional<common::PSBTError> FillPQGroupPSBT(PartiallySignedTransaction&, bool& complete,
         std::optional<int> sighash, bool sign, size_t* signed_inputs, bool finalize,
@@ -594,6 +597,9 @@ public:
         std::function<bool(const CKeyingMaterial&)> cb) const;
 
     bool LoadPQGroupRecords(const PQGroupRecords&) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    bool MercaWeaveAvailable() const;
+    bool MercaWeaveActive() const;
+    util::Result<CTxDestination> GetNewPQGroupDestination(const std::string& label, uint32_t account = 0, uint8_t purpose = 0);
     std::optional<PQGroupRecord> GetPQGroupRecord(const CScript&) const;
     std::vector<CScript> GetPQGroupScripts() const;
     std::optional<mercaweave::Sizes> EstimatePQGroupTransaction(const CTransaction&,
@@ -809,6 +815,9 @@ public:
                   bool bip32derivs = true,
                   size_t* n_signed = nullptr,
                   bool finalize = true) const;
+
+    /** Finalize using current network rules; a null result only finalizes the PSBT. */
+    bool FinalizeWalletPSBT(PartiallySignedTransaction&, CMutableTransaction* result = nullptr) const;
 
     /**
      * Submit the transaction to the node's mempool and then relay to peers.

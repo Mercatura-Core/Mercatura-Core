@@ -157,6 +157,11 @@ public:
         LOCK(m_wallet->cs_wallet);
         return m_wallet->GetNewDestination(type, label);
     }
+    bool mercaweaveAvailable() override { return m_wallet->MercaWeaveAvailable(); }
+    util::Result<CTxDestination> getNewMercaWeaveDestination(const std::string& label) override
+    {
+        return m_wallet->GetNewPQGroupDestination(label);
+    }
     bool getPubKey(const CScript& script, const CKeyID& address, CPubKey& pub_key) override
     {
         std::unique_ptr<SigningProvider> provider = m_wallet->GetSolvingProvider(script);
@@ -380,6 +385,10 @@ public:
         bool& complete) override
     {
         return m_wallet->FillPSBT(psbtx, complete, sighash_type, sign, bip32derivs, n_signed);
+    }
+    bool finalizePSBT(PartiallySignedTransaction& psbt, CMutableTransaction* result) override
+    {
+        return m_wallet->FinalizeWalletPSBT(psbt, result);
     }
     WalletBalances getBalances() override
     {
