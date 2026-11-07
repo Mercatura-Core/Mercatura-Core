@@ -17,7 +17,7 @@ void UpdateCoins(const CTransaction&, CCoinsViewCache&, CTxUndo&, int);
 int ApplyTxInUndo(Coin&&, CCoinsViewCache&, const COutPoint&);
 namespace fixture = mercaweave::integration::test;
 namespace {
-constexpr auto FLAGS = STANDARD_SCRIPT_VERIFY_FLAGS;
+constexpr auto FLAGS = mercaweave::integration::FIXTURE_SCRIPT_VERIFY_FLAGS;
 size_t checks{}, corpus{}, rejects{};
 void Check(bool value, const char* reason) { ++checks; if (!value) throw std::runtime_error(reason); }
 uint256 Genesis(const B32& g) { return uint256{std::span<const unsigned char>{g}}; }

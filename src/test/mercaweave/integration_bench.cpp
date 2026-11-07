@@ -15,7 +15,7 @@ using namespace mercaweave::research;
 using namespace mercaweave::integration;
 namespace fixture = mercaweave::integration::test;
 namespace {
-constexpr auto FLAGS = STANDARD_SCRIPT_VERIFY_FLAGS;
+constexpr auto FLAGS = mercaweave::integration::FIXTURE_SCRIPT_VERIFY_FLAGS;
 void Require(bool b, const char* name) { if (!b) throw std::runtime_error(name); }
 struct Timing { double median{-1}, worst{-1}, user{-1}, system{-1}; };
 double Seconds(const timeval& t) { return t.tv_sec + t.tv_usec / 1e6; }

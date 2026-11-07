@@ -156,6 +156,21 @@ Prepared Engine::AcquireInputs(const ViewPtr& view, const CMutableTransaction& m
             if (!IsStandardTx(tx, std::nullopt, true, CFeeRate{DUST_RELAY_TX_FEE}, reason)) {
                 out.failure = {Stage::Policy, reason}; return out;
             }
+            if (!(flags & SCRIPT_VERIFY_MERCAWEAVE)) {
+                const auto grouped = [](const CScript& script) {
+                    int version;
+                    Bytes program;
+                    return script.IsWitnessProgram(version, program) && version == 3;
+                };
+                for (const auto& output : tx.vout) {
+                    if (grouped(output.scriptPubKey)) { out.failure = {Stage::Policy, "mercaweave-inactive"}; return out; }
+                }
+                for (const auto& input : tx.vin) {
+                    if (grouped(view->m_state->coins.AccessCoin(input.prevout).out.scriptPubKey)) {
+                        out.failure = {Stage::Policy, "mercaweave-inactive"}; return out;
+                    }
+                }
+            }
             if (!AreInputsStandard(tx, view->m_state->coins)) { out.failure = {Stage::Policy, "inputs-not-standard"}; return out; }
             if (!IsWitnessStandard(tx, view->m_state->coins)) { out.failure = {Stage::Policy, "witness-not-standard"}; return out; }
         }

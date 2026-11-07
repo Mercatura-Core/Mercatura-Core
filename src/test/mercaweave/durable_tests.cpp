@@ -45,7 +45,7 @@ void Run(const char* binary)
     Check(store->Unlock(PASS)&&store->Owner().Records()==records,"encrypted seed and rotation metadata recover from actual DB");
     Check(store->Reserve(*decision.proposal).id==reserved.id&&store->Entries().size()==1,"restart does not reschedule prior identity");
     GroupPSBT::Sign(psbt,store->Owner(),view,wt::ZeroFixture());GroupPSBT::FinalizeAvailable(psbt,view,wt::Genesis());auto signed_tx=GroupPSBT::Extract(psbt,view,wt::Genesis());
-    Check(integration::Engine::Validate(view,signed_tx,wt::Genesis(),STANDARD_SCRIPT_VERIFY_FLAGS).valid,"offline PSBT survives actual DB close and reload");
+    Check(integration::Engine::Validate(view,signed_tx,wt::Genesis(),mercaweave::integration::FIXTURE_SCRIPT_VERIFY_FLAGS).valid,"offline PSBT survives actual DB close and reload");
     store.reset();store=Store::Load(name,wt::Genesis());Check(store->Unlock(PASS)&&store->Entries()[0].status==Status::Reserved,"crash window after explicit signing preserves unsigned body reservation");
     store.reset();const auto accepting=fork();Check(accepting>=0,"fork acceptance writer");
     if(accepting==0){execl(binary,binary,"--crash-after-accept",name.c_str(),nullptr);_exit(127);}

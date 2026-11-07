@@ -7,8 +7,12 @@
 #endif
 #include <test/mercaweave/block_work.h>
 #include <coins.h>
+#include <policy/policy.h>
 
 namespace mercaweave::integration {
+// Legacy fixtures deliberately exercise the guarded research checker. The
+// network-selected production flag belongs to the normal full-node tests.
+inline constexpr auto FIXTURE_SCRIPT_VERIFY_FLAGS = STANDARD_SCRIPT_VERIFY_FLAGS & ~SCRIPT_VERIFY_MERCAWEAVE;
 using namespace research;
 class Engine;
 // Synthetic authoritative chainstate owner. Validation accepts this view, never

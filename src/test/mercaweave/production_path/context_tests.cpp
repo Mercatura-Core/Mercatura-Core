@@ -104,9 +104,12 @@ void Negatives()
     CCoinsViewCache coins{&empty}; Fill(coins,good);
     TxValidationState state;
     LOCK(cs_main);
-    Check(!CheckInputScriptsWithPQGroups(CTransaction(good.tx),state,coins,STANDARD_SCRIPT_VERIFY_FLAGS,
+    Check(!CheckInputScriptsWithPQGroups(CTransaction(good.tx),state,coins,STANDARD_SCRIPT_VERIFY_FLAGS & ~SCRIPT_VERIFY_MERCAWEAVE,
             cache,nullptr,{},Genesis(good.genesis)), "missing isolated capability fails closed");
     ++negatives;
+    TxValidationState activated;
+    Check(CheckInputScriptsWithPQGroups(CTransaction(good.tx),activated,coins,STANDARD_SCRIPT_VERIFY_FLAGS,
+            cache,nullptr,{},Genesis(good.genesis)), "activated flags select the normal immutable group context");
 }
 void Mutations()
 {

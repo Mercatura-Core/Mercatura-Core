@@ -144,7 +144,7 @@ def main():
     )
     for name in ["CMakeLists.txt", "src/CMakeLists.txt", "src/test/CMakeLists.txt"]:
         require(
-            "mercaweave" not in (ROOT / name).read_text().lower(),
+            "test/mercaweave" not in (ROOT / name).read_text().lower(),
             "research target included by normal build",
         )
     forbidden = subprocess.run(

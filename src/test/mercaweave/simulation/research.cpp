@@ -23,12 +23,12 @@ void Run(size_t inputs,size_t groups,size_t natives,uint32_t seed)
     auto start=Clock::now();
     if(natives){NativeSession native{f.tx,f.spent,f.genesis};for(size_t i=inputs;i<f.tx.vin.size();++i){auto sig=SignDigest(native.Digest(i),*f.keys[0],B32{},"Mercatura/PQAuth/v1");f.tx.vin[i].scriptWitness.stack[0].assign(sig.begin(),sig.end());}}
     SignFixture(f);double sign=Ms(start);auto view=fixture::Funded(f);
-    start=Clock::now();auto valid=Engine::Validate(view,f.tx,f.genesis,STANDARD_SCRIPT_VERIFY_FLAGS);double verify=Ms(start);Check(valid.valid);
+    start=Clock::now();auto valid=Engine::Validate(view,f.tx,f.genesis,mercaweave::integration::FIXTURE_SCRIPT_VERIFY_FLAGS);double verify=Ms(start);Check(valid.valid);
     size_t calls=valid.preparation.work.verification_calls+valid.preparation.native_prepare_calls;
     for(const auto& result:valid.scripts)calls+=result.native_calls;
     Check(calls==groups+2*natives);
-    auto policy=Engine::AcquireInputs(view,f.tx,f.genesis,STANDARD_SCRIPT_VERIFY_FLAGS,200,Policy::CurrentPolicy);Check(!policy.acquired);
-    auto bad=f.tx;bad.vin[groups-1].scriptWitness.stack[0][100]^=1;start=Clock::now();auto rejected=Engine::Validate(view,bad,f.genesis,STANDARD_SCRIPT_VERIFY_FLAGS);double invalid=Ms(start);Check(!rejected.valid&&rejected.failure.stage==Stage::Group);
+    auto policy=Engine::AcquireInputs(view,f.tx,f.genesis,mercaweave::integration::FIXTURE_SCRIPT_VERIFY_FLAGS,200,Policy::CurrentPolicy);Check(!policy.acquired);
+    auto bad=f.tx;bad.vin[groups-1].scriptWitness.stack[0][100]^=1;start=Clock::now();auto rejected=Engine::Validate(view,bad,f.genesis,mercaweave::integration::FIXTURE_SCRIPT_VERIFY_FLAGS);double invalid=Ms(start);Check(!rejected.valid&&rejected.failure.stage==Stage::Group);
     auto sizes=Measure(f.tx);auto wire=Wire(f.tx);B32 digest;CSHA256{}.Write(wire.data(),wire.size()).Finalize(digest.data());struct rusage r{};getrusage(RUSAGE_SELF,&r);
     std::cout<<inputs<<','<<groups<<','<<natives<<','<<groups+natives<<','<<calls<<','<<sizes.total<<','<<sizes.weight<<','<<seed<<",true,false,false,"<<construct<<','<<sign<<','<<verify<<','<<invalid<<','<<r.ru_maxrss<<','<<Hex(digest)<<'\n';
 }

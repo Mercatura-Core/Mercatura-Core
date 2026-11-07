@@ -14,7 +14,7 @@ using namespace mercaweave::integration;
 using node_research::Context;
 namespace fixture=mercaweave::integration::test;
 namespace {
-constexpr auto FLAGS=STANDARD_SCRIPT_VERIFY_FLAGS;
+constexpr auto FLAGS=mercaweave::integration::FIXTURE_SCRIPT_VERIFY_FLAGS;
 void Require(bool v){if(!v)throw std::runtime_error("WO07 benchmark invariant");}
 double Ms(const timeval& v){return v.tv_sec*1000.+v.tv_usec/1000.;}
 bool Run(const Fixture& f,const ViewPtr& view,ValidationCache& cache)

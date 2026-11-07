@@ -15,7 +15,7 @@ using namespace mercaweave::test;
 using namespace mercaweave::integration;
 namespace {
 namespace fixture = mercaweave::integration::test;
-constexpr auto FLAGS = STANDARD_SCRIPT_VERIFY_FLAGS;
+constexpr auto FLAGS = mercaweave::integration::FIXTURE_SCRIPT_VERIFY_FLAGS;
 size_t assertions{0}, rejected{0}, mutations{0}, concurrent{0};
 std::map<int, size_t> mutation_stages;
 void Check(bool b, const char* name) { ++assertions; if (!b) throw std::runtime_error(name); }
@@ -182,7 +182,7 @@ void StateAndPolicy()
     Bad(v,f.tx,f.genesis,Stage::Group,Error::Signature);
     SignFixture(f);Check(Engine::Validate(v,f.tx,f.genesis,FLAGS).valid,"new follower requires real fresh signature");
     auto policy=Engine::Validate(v,f.tx,f.genesis,FLAGS,200,Policy::CurrentPolicy);
-    Check(!policy.valid && policy.failure.stage==Stage::Policy && policy.failure.reason=="inputs-not-standard","experimental Script cannot bypass current unknown-v3 policy");
+    Check(!policy.valid && policy.failure.stage==Stage::Policy && policy.failure.reason=="mercaweave-inactive","fixture Script cannot bypass preactivation v3 policy");
     auto large=Make(100,100);SignFixture(large);
     const auto large_policy=Engine::Prepare(fixture::Funded(large),large.tx,large.genesis,FLAGS,200,Policy::CurrentPolicy);
     Check(!large_policy.proof && large_policy.failure.reason=="tx-size" && MAX_STANDARD_TX_WEIGHT==400000,"400000-WU standard limit unchanged");
