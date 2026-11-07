@@ -1,0 +1,13 @@
+2026-11-07T10:27:03.0964272Z     qtbase[core,doubleconversion,gui,network,png,testlib,thread,widgets]:x64-windows@6.9.1
+2026-11-07T10:27:26.7669056Z Installing 50/61 qtbase[core,doubleconversion,gui,network,png,testlib,thread,widgets]:x64-windows@6.9.1...
+2026-11-07T10:27:26.7669661Z qtbase[core,doubleconversion,gui,network,png,testlib,thread,widgets]:x64-windows@6.9.1 package ABI: a50e5dfe17e48ab63440d7ba78dd04dd8390592e33beda576507b7d186f63c49
+2026-11-07T10:27:36.9792623Z -- The CXX compiler identification is MSVC 19.51.36260.0
+2026-11-07T10:28:21.2489198Z   C++ compiler flags .................. /DWIN32 /D_WINDOWS /EHsc /Zi /O2 /Ob1 -std:c++20 /utf-8 /Zc:preprocessor /Zc:__cplusplus /sdl /W3 /wd4018 /wd4146 /wd4244 /wd4267 /wd4715 /wd4805
+2026-11-07T10:28:21.2500277Z   C++ compiler flags .................. /DWIN32 /D_WINDOWS /EHsc /Zi /Ob0 /Od /RTC1 -std:c++20 /utf-8 /Zc:preprocessor /Zc:__cplusplus /sdl /bigobj /W3 /wd4018 /wd4146 /wd4244 /wd4267 /wd4715 /wd4805
+2026-11-07T10:28:21.2509942Z   C++ compiler flags .................. /DWIN32 /D_WINDOWS /EHsc /O2 /Ob2 -std:c++20 /utf-8 /Zc:preprocessor /Zc:__cplusplus /sdl /W3 /wd4018 /wd4146 /wd4244 /wd4267 /wd4715 /wd4805
+2026-11-07T10:28:21.2519001Z   C++ compiler flags .................. /DWIN32 /D_WINDOWS /EHsc /O1 /Ob1 -std:c++20 /utf-8 /Zc:preprocessor /Zc:__cplusplus /sdl /W3 /wd4018 /wd4146 /wd4244 /wd4267 /wd4715 /wd4805
+2026-11-07T10:28:21.2527816Z   C++ compiler flags .................. /DWIN32 /D_WINDOWS /EHsc -g -Og --coverage -std:c++20 /utf-8 /Zc:preprocessor /Zc:__cplusplus /sdl /W3 /wd4018 /wd4146 /wd4244 /wd4267 /wd4715 /wd4805
+2026-11-07T10:28:21.2531089Z Treat compiler warnings as errors ..... OFF
+2026-11-07T10:28:22.1555921Z ##[group]Run cmake --build work/build --config Release --parallel 4
+2026-11-07T10:39:54.4460847Z D:\a\Mercatura-Core\Mercatura-Core\src\qt\test\wallettests.cpp(634,5): error C4996: 'QTest::useVerifyThrowsException': Don't use QVERIFY_EXCEPTION_THROWN(expr, type) anymore, use QVERIFY_THROWS_EXCEPTION(type, expr...) instead [D:\a\Mercatura-Core\Mercatura-Core\work\build\src\qt\test\test_bitcoin-qt.vcxproj]
+2026-11-07T10:45:59.8701738Z ##[error]Process completed with exit code 1.

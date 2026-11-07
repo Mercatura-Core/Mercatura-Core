@@ -11,6 +11,7 @@
 #include <QDialog>
 #include <QDir>
 #include <QFile>
+#include <QHeaderView>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -60,12 +61,24 @@ QJsonObject Describe(QWidget* widget)
         result["items"] = items;
     }
     if (auto* tree = qobject_cast<QTreeWidget*>(widget)) {
+        const auto* header = tree->header();
+        QJsonArray columns;
+        for (int column = 0; column < tree->columnCount(); ++column) {
+            columns.append(QJsonObject{{"logical", column}, {"visual", header->visualIndex(column)},
+                {"text", tree->headerItem()->text(column)}, {"x", header->sectionViewportPosition(column)},
+                {"width", header->sectionSize(column)}, {"hidden", tree->isColumnHidden(column)}});
+        }
+        result["columns"] = columns;
+        result["viewport_width"] = tree->viewport()->width();
+        result["horizontal_scroll"] = tree->horizontalScrollBar()->value();
+        result["device_pixel_ratio"] = tree->devicePixelRatioF();
         QJsonArray rows;
         for (QTreeWidgetItemIterator it(tree); *it; ++it) {
             if ((*it)->text(6).isEmpty()) continue;
             rows.append(QJsonObject{{"type", (*it)->text(6)}, {"amount", (*it)->text(1)},
                 {"confirmations", (*it)->text(5)}, {"selected", (*it)->checkState(0) == Qt::Checked},
-                {"checkable", bool((*it)->flags() & Qt::ItemIsUserCheckable)}});
+                {"checkable", bool((*it)->flags() & Qt::ItemIsUserCheckable)},
+                {"type_text_width", tree->fontMetrics().horizontalAdvance((*it)->text(6))}});
         }
         result["rows"] = rows;
     }
@@ -94,7 +107,7 @@ QJsonObject Execute(const QJsonObject& command, const QString& directory)
         }
         if (!found) return {{"ok", false}, {"error", "Wallet selector not ready"}};
     } else if (action == "resize") {
-        auto* main = Find({}, "BitcoinGUI");
+        auto* main = Find({}, command["class"].toString("BitcoinGUI"));
         if (!main) return {{"ok", false}, {"error", "Main window not ready"}};
         main->resize(command["width"].toInt(), command["height"].toInt());
         main->show();
@@ -139,6 +152,11 @@ QJsonObject Execute(const QJsonObject& command, const QString& directory)
         auto* dialog = qobject_cast<QDialog*>(Find({}, command["class"].toString()));
         if (!dialog) return {{"ok", false}, {"error", "Dialog unavailable"}};
         dialog->reject();
+    } else if (action == "expandCoins") {
+        auto* tree = qobject_cast<QTreeWidget*>(Find("treeWidget"));
+        if (!tree) return {{"ok", false}, {"error", "Coin Control tree unavailable"}};
+        tree->expandAll();
+        tree->horizontalScrollBar()->setValue(0);
     } else if (action == "scrollTypes") {
         auto* tree = qobject_cast<QTreeWidget*>(Find("treeWidget"));
         if (!tree) return {{"ok", false}, {"error", "Coin Control tree unavailable"}};

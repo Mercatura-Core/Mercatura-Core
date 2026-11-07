@@ -1,0 +1,8 @@
+{
+  "format": "gzip",
+  "uncompressed_sha256": "8ef326691b002ae1e5e0b5b5d143de6e7a81a97a271c7840ea0f4a142290d636",
+  "uncompressed_bytes": 8918,
+  "lossless_round_trip_verified": true,
+  "source": "work/preactivation-hardening/native-01.log",
+  "output": "native-clean.log.gz"
+}

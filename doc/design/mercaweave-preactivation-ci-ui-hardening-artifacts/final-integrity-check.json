@@ -1,0 +1,11 @@
+{
+  "all_final_code_hashes_match_tested_scope": true,
+  "historical_protected_paths_modified_here": 0,
+  "prior_report_and_40_artifacts_unchanged": true,
+  "production_and_research_checkouts_unchanged_and_clean": true,
+  "all_tested_binary_hashes_match": true,
+  "owned_fixture_node_processes_stopped": true,
+  "raw_native_log_losslessly_preserved": true,
+  "last_verified_remote_sha": "ca3b2d9dde296b4ebbd120212c243fcb066f1581",
+  "new_push_merge_tag_release_deployment": false
+}

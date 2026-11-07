@@ -1,0 +1,9 @@
+{
+  "clean_native_invocation_source_sha256": "37ec378b3df363412be58e3c4eb88d7ea60ee48ebdb26e08e33289709d8ffbfa",
+  "final_source_sha256": "3c8fe28cc791989b8e5c4f599791d266f7b5ba1177211a8601e18e211544fd99",
+  "only_changed_function": "MercaWeaveMultinodeTest.gui_layout_matrix",
+  "all_other_python_AST_identical": true,
+  "default_non_GUI_native_scenarios_changed": false,
+  "followup_validation": "Separate full actual Qt-backed three-node invocation with --gui-layout-matrix; receipt full-gui-125-01-receipt.json",
+  "note": "The 59 native results belong to one invocation, not combined runs. This additional helper-only change is checked by its affected full GUI invocation."
+}

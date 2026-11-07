@@ -78,6 +78,8 @@ class MercaWeaveMultinodeTest(MercaWeaveTest):
         parser.add_argument('--qt-binary', type=Path)
         parser.add_argument('--gui-probe-library', type=Path)
         parser.add_argument('--qt-platform', choices=['offscreen', 'xcb', 'wayland'], default='offscreen')
+        parser.add_argument('--gui-layout-matrix', action='store_true',
+                            help='Inspect the populated native Send/Coin Control layout at representative desktop sizes')
         parser.add_argument('--interactive', choices=['inactive', 'activated'],
                             help='Hold the disposable network for manual inspection; does not run the full qualification')
 
@@ -247,6 +249,43 @@ class MercaWeaveMultinodeTest(MercaWeaveTest):
         self.gui.require('wallet', wallet='sender')
         self.wait_until(lambda: self.gui.widget('spendingMode')['items'][2]['enabled'], timeout=30)
         self.record('actual-native-Qt-Coin-Control-and-wallet-switch', rows=rows, fee=self.gui.widget('labelCoinControlBytes'))
+        if self.options.gui_layout_matrix:
+            self.gui_layout_matrix()
+
+    def gui_layout_matrix(self):
+        previous_mode = self.gui.widget('spendingMode')['index']
+        self.gui.require('select', name='spendingMode', index=0)
+        measurements = []
+        for width, height in [(1280, 800), (1366, 768), (1920, 1080)]:
+            size = f'{width}x{height}'
+            self.gui.require('resize', width=width, height=height)
+            mode = self.gui.widget('spendingMode')
+            assert mode['visible'] and mode['index'] == 0
+            self.gui.require('screenshot', file=f'H-send-{size}.png')
+            self.gui.require('popup', name='spendingMode')
+            self.gui.require('screenshot', popup=True, file=f'H-dropdown-{size}.png')
+            self.gui.require('hidePopup')
+            self.gui.require('click', name='pushButtonCoinControl')
+            # Keep the existing ordinary dialog width, rather than enlarging it
+            # to the desktop just to make the authorization column visible.
+            self.gui.require('resize', **{'class': 'CoinControlDialog'}, width=1000, height=500)
+            for view in ['List', 'Tree']:
+                self.gui.require('click', name=f'radio{view}Mode')
+                self.gui.require('expandCoins')
+                tree = self.gui.widget('treeWidget')
+                column = next(item for item in tree['columns'] if item['logical'] == 6)
+                assert_equal(tree['horizontal_scroll'], 0)
+                assert column['x'] >= 0
+                assert column['x'] + column['width'] <= tree['viewport_width'], tree
+                assert {'Standard PQ (v2)', 'MercaWeave (v3)'} <= {row['type'] for row in tree['rows']}
+                assert all(row['type_text_width'] < column['width'] for row in tree['rows'])
+                self.gui.require('screenshot', **{'class': 'CoinControlDialog'}, file=f'H-coins-{view.lower()}-{size}.png')
+                measurements.append(dict(main_size=size, view=view, tree=tree))
+            self.gui.require('close', **{'class': 'CoinControlDialog'})
+        self.gui.require('select', name='spendingMode', index=previous_mode)
+        assert_equal(self.gui.widget('spendingMode')['index'], previous_mode)
+        self.record('actual-native-Qt-Coin-Control-layout-matrix', measurements=measurements,
+                    restored_spending_mode=previous_mode)
 
     def gui_stale_proposal(self, recipient, ancestor):
         if not self.gui:

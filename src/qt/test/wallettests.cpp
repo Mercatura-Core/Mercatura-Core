@@ -52,6 +52,9 @@
 #include <QTextEdit>
 #include <QListView>
 #include <QDialogButtonBox>
+#include <QHeaderView>
+#include <QRadioButton>
+#include <QScrollBar>
 #include <QStandardItemModel>
 #include <QTreeWidgetItemIterator>
 
@@ -698,6 +701,63 @@ void WalletTests::mercaweaveReceiveAndSendTests()
         QVERIFY(v2_found && v3_found);
         filter->setCurrentIndex(2);
         QVERIFY(control->m_spending_mode == wallet::PQSpendingMode::STANDARD_V2);
+
+        // Exercise actual populated rows: type text must fit at the leftmost
+        // scroll position, including larger font metrics and long translations.
+        filter->setCurrentIndex(0);
+        coins.show();
+        const auto normal_font = tree->font();
+        for (const double scale : {1.0, 1.25}) {
+            auto font = normal_font;
+            font.setPointSizeF(normal_font.pointSizeF() * scale);
+            tree->setFont(font);
+            for (const int width : {900, 1000, 1200}) {
+                coins.resize(width, 500);
+                for (auto* mode : {coins.findChild<QRadioButton*>("radioListMode"), coins.findChild<QRadioButton*>("radioTreeMode")}) {
+                    QVERIFY(mode);
+                    mode->click();
+                    tree->expandAll();
+                    qApp->processEvents();
+                    tree->horizontalScrollBar()->setValue(0);
+                    int typed_rows{0};
+                    for (QTreeWidgetItemIterator it(tree); *it; ++it) {
+                        if ((*it)->text(6).isEmpty()) continue;
+                        ++typed_rows;
+                        QVERIFY(!(*it)->toolTip(6).isEmpty());
+                        const auto translated = (*it)->text(6) + QStringLiteral(" / extended authorization label");
+                        (*it)->setText(6, translated);
+                    }
+                    QVERIFY(typed_rows > 0);
+                    qApp->processEvents();
+                    const auto* header = tree->header();
+                    QVERIFY(header->sectionViewportPosition(6) >= 0);
+                    QVERIFY(header->sectionViewportPosition(6) + header->sectionSize(6) <= tree->viewport()->width());
+                    for (QTreeWidgetItemIterator it(tree); *it; ++it) {
+                        if ((*it)->text(6).isEmpty()) continue;
+                        QVERIFY(tree->fontMetrics().horizontalAdvance((*it)->text(6)) < header->sectionSize(6));
+                    }
+                }
+            }
+        }
+        tree->setFont(normal_font);
+        filter->setCurrentIndex(1);
+        filter->setCurrentIndex(0);
+        // Selecting, sorting, switching views and filtering must preserve the
+        // same outpoints, including selections outside the visible filter.
+        for (QTreeWidgetItemIterator it(tree); *it; ++it) {
+            if ((*it)->text(6) == "Standard PQ (v2)") {
+                (*it)->setCheckState(0, Qt::Checked);
+                break;
+            }
+        }
+        QVERIFY(control->HasSelected());
+        const auto selected = control->ListSelected();
+        coins.findChild<QRadioButton*>("radioListMode")->click();
+        QVERIFY(QMetaObject::invokeMethod(&coins, "headerSectionClicked", Q_ARG(int, 6)));
+        coins.findChild<QRadioButton*>("radioTreeMode")->click();
+        filter->setCurrentIndex(2);
+        QVERIFY(control->ListSelected() == selected);
+        control->UnSelectAll();
     }
     control->Select(funding[0]);
     CoinControlDialog::updateLabels(*control, gui.walletModel.get(), &gui.sendCoinsDialog);

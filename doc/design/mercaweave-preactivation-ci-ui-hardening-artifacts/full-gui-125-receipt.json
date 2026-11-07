@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "/workspace/Mercatura-MercaWeave-upgrade/test/functional/mercatura_mercaweave_multinode.py",
+    "--configfile=/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/test/config.ini",
+    "--tmpdir=/workspace/Mercatura-MercaWeave-upgrade/work/preactivation-hardening/full-gui-125-01-cluster",
+    "--nocleanup",
+    "--timeout-factor=3",
+    "--artifact-dir=/workspace/Mercatura-MercaWeave-upgrade/work/preactivation-hardening/full-gui-125-01-evidence",
+    "--gui-probe-dir=/workspace/Mercatura-MercaWeave-upgrade/work/preactivation-hardening/full-gui-125-01-screenshots",
+    "--qt-binary=/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercatura-qt",
+    "--gui-probe-library=/workspace/Mercatura-MercaWeave-upgrade/work/preactivation-hardening/gui-probe.so",
+    "--qt-platform=offscreen",
+    "--gui-layout-matrix"
+  ],
+  "started_utc": "2026-11-07T15:10:48.823140+00:00",
+  "ended_utc": "2026-11-07T15:25:15.901567+00:00",
+  "elapsed_seconds": 867.078,
+  "exit_code": 0,
+  "source_head": "2d79c330f5ac246156d758e34763bbba9ff45524",
+  "tracked_diff_sha256": "eafab2d7b4f4fc18b2f6c60409064d61e2e6dfc85ca00abf6508ed891f8f02db"
+}

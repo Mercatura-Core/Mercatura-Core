@@ -1,0 +1,15 @@
+{
+  "command": [
+    "cargo",
+    "run",
+    "--manifest-path",
+    "test/lint/test_runner/Cargo.toml"
+  ],
+  "commit_range": "664d491..HEAD",
+  "started_utc": "2026-11-07T15:41:15.470318+00:00",
+  "ended_utc": "2026-11-07T15:41:30.591494+00:00",
+  "elapsed_seconds": 15.123,
+  "exit_code": 0,
+  "source_head": "2d79c330f5ac246156d758e34763bbba9ff45524",
+  "tracked_diff_sha256": "bbffe2c137beb34ba5d3b57cf1107c922858f364984df1e8774f4e9f51d299d7"
+}

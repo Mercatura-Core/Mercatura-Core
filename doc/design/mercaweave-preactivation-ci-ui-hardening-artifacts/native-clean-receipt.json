@@ -1,0 +1,15 @@
+{
+  "command": [
+    "python3",
+    "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/test/functional/test_runner.py",
+    "--jobs=4",
+    "--timeout-factor=3",
+    "--tmpdirprefix=/workspace/Mercatura-MercaWeave-upgrade/work/preactivation-hardening/runtimes"
+  ],
+  "started_utc": "2026-11-07T15:01:34.468317+00:00",
+  "ended_utc": "2026-11-07T15:38:32.228104+00:00",
+  "elapsed_seconds": 2217.76,
+  "exit_code": 0,
+  "source_head": "2d79c330f5ac246156d758e34763bbba9ff45524",
+  "tracked_diff_sha256": "d90e509fd08217853695aad4e472377f09d5857a93df80305260e50136c5c864"
+}

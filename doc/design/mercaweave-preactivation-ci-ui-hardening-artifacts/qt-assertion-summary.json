@@ -1,0 +1,75 @@
+{
+  "suites": [
+    {
+      "name": "MiningTests",
+      "passed": 23,
+      "failed": 0,
+      "skipped": 3,
+      "blacklisted": 0,
+      "milliseconds": 87344
+    },
+    {
+      "name": "PeerSecurityTests",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "blacklisted": 0,
+      "milliseconds": 859
+    },
+    {
+      "name": "AppTests",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "blacklisted": 0,
+      "milliseconds": 971
+    },
+    {
+      "name": "OptionTests",
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "blacklisted": 0,
+      "milliseconds": 3
+    },
+    {
+      "name": "URITests",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "blacklisted": 0,
+      "milliseconds": 0
+    },
+    {
+      "name": "RPCNestedTests",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "blacklisted": 0,
+      "milliseconds": 218
+    },
+    {
+      "name": "WalletTests",
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "blacklisted": 0,
+      "milliseconds": 242391
+    },
+    {
+      "name": "AddressBookTests",
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "blacklisted": 0,
+      "milliseconds": 65490
+    }
+  ],
+  "total_passed": 49,
+  "total_failed": 0,
+  "total_skipped": 3,
+  "skip_reason": "3 existing six-worker mining cases exceed host CPU/memory budget",
+  "ctest_executables_passed": 3,
+  "ctest_executables_failed": 0,
+  "ctest_executables_skipped": 0
+}

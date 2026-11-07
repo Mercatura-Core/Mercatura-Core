@@ -1,0 +1,16 @@
+{
+  "command": [
+    "cargo",
+    "run",
+    "--manifest-path",
+    "test/lint/test_runner/Cargo.toml"
+  ],
+  "commit_range": "664d491..HEAD",
+  "started_utc": "2026-11-07T15:39:36.961807+00:00",
+  "ended_utc": "2026-11-07T15:39:52.631450+00:00",
+  "elapsed_seconds": 15.67,
+  "exit_code": 1,
+  "source_head": "2d79c330f5ac246156d758e34763bbba9ff45524",
+  "tracked_diff_sha256": "c7216185cbffd783c91c6c8ae353f4f29b531d6c29c477a63318de2c03f11227",
+  "failure": "Only trailing whitespace in unmodified native runner output; source checks passed. Preserve output as lossless gzip instead of modifying it or adding a lint exception."
+}

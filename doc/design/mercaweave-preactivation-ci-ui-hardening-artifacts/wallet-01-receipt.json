@@ -1,0 +1,17 @@
+{
+  "command": [
+    "/workspace/Mercatura-MercaWeave-v0.1/work/tools/cmake/data/bin/ctest",
+    "--test-dir",
+    "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release",
+    "--output-on-failure",
+    "-j4",
+    "-R",
+    "^(spend_tests|coinselection_tests|psbt_wallet_tests|mercaweave_activation_tests)$"
+  ],
+  "started_utc": "2026-11-07T14:53:58.966298+00:00",
+  "ended_utc": "2026-11-07T14:55:42.910154+00:00",
+  "elapsed_seconds": 103.944,
+  "exit_code": 0,
+  "source_head": "2d79c330f5ac246156d758e34763bbba9ff45524",
+  "tracked_diff_sha256": "6d848ba2c745e6d3e04af81e1a2710be96007816e336e5974660567a057d6483"
+}

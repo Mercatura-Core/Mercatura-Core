@@ -1,0 +1,51 @@
+{
+  "mercaturad": {
+    "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercaturad",
+    "sha256": "28b70893a76569e739ba61c4edcb53ae80eda29136e0f72030739878b4b7932a",
+    "same_as_pushed_source_binary": true
+  },
+  "mercatura-cli": {
+    "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercatura-cli",
+    "sha256": "9d49e3135750c34586207fd5f1b3dd1a6c59dfec2d58126e859e1fab783ab2b5",
+    "same_as_pushed_source_binary": true
+  },
+  "mercatura-qt": {
+    "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercatura-qt",
+    "sha256": "31cff2a0499ff46b242f7d879a7c7bd849ac4eaf0ae8e068414eb790498fe9ca",
+    "same_as_pushed_source_binary": false
+  },
+  "test_bitcoin": {
+    "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/test_bitcoin",
+    "sha256": "2087b6b470f41176d0d6c283cc1b3f95391e35b05fa43796e3af986741f7a7f6",
+    "same_as_pushed_source_binary": true
+  },
+  "test_bitcoin-qt": {
+    "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/test_bitcoin-qt",
+    "sha256": "e224519cd4e04c3b4fac68249860d776cdfa5eaa88e816b73e869feb7216ad9e",
+    "same_as_pushed_source_binary": false
+  },
+  "test_mining-qt": {
+    "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/test_mining-qt",
+    "sha256": "70ed1a53ad747b0b093d7cd2e7cfb9f1d7fefef6d847ce27f92dd8f4b83fcf0a",
+    "same_as_pushed_source_binary": true
+  },
+  "test_peersecurity-qt": {
+    "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/test_peersecurity-qt",
+    "sha256": "d49a0fc4214870961c149dc9c66d5390b2ea9c02bb9ce6e9a9c09269895ba63a",
+    "same_as_pushed_source_binary": true
+  },
+  "environment": {
+    "host": "Debian 13.6 / Linux 6.18.57",
+    "compiler": "GCC 14.2",
+    "qt": "6.8.2",
+    "cmake": "4.4.4",
+    "build": "Release; GUI, wallet, GUI tests, unit tests enabled; IPC, CUDA, OpenCL disabled",
+    "qt_platform": "offscreen",
+    "style": "Fusion",
+    "MSVC_available": false,
+    "macOS_available": false,
+    "native_desktop_available": false,
+    "source_head": "2d79c330f5ac246156d758e34763bbba9ff45524",
+    "source_patch_sha256": "d90e509fd08217853695aad4e472377f09d5857a93df80305260e50136c5c864"
+  }
+}

@@ -1,0 +1,1350 @@
+[
+  {
+    "name": "three-independent-loopback-PQ-processes",
+    "result": "PASS",
+    "nodes": [
+      {
+        "index": 0,
+        "pid": 48142,
+        "datadir": "/workspace/Mercatura-MercaWeave-upgrade/work/preactivation-hardening/visual-1_0-01-cluster/node0",
+        "argv": [
+          "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercatura-qt",
+          "-datadir=/workspace/Mercatura-MercaWeave-upgrade/work/preactivation-hardening/visual-1_0-01-cluster/node0",
+          "-logtimemicros",
+          "-debug",
+          "-debugexclude=libevent",
+          "-debugexclude=leveldb",
+          "-debugexclude=rand",
+          "-uacomment=testnode0",
+          "-logthreadnames",
+          "-logsourcelocations",
+          "-loglevel=trace",
+          "-nologratelimit",
+          "-v2transport=0",
+          "-nosplash",
+          "-resetguisettings",
+          "-choosedatadir=0",
+          "-lang=en",
+          "-mercaweaveheight=110",
+          "-pqp2p=required",
+          "-connect=0",
+          "-rpcbind=127.0.0.1",
+          "-rpcallowip=127.0.0.1",
+          "-unsafesqlitesync=0"
+        ],
+        "config": [
+          "port=15175",
+          "rpcport=20175",
+          "discover=0",
+          "dnsseed=0",
+          "fixedseeds=0",
+          "listenonion=0",
+          "connect=0",
+          "bind=127.0.0.1"
+        ],
+        "peers": [
+          {
+            "address": "127.0.0.1:15176",
+            "subversion": "/MercaturaCore:0.1.3(testnode1)/",
+            "pq": true
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "pid": 48165,
+        "datadir": "/workspace/Mercatura-MercaWeave-upgrade/work/preactivation-hardening/visual-1_0-01-cluster/node1",
+        "argv": [
+          "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercaturad",
+          "-datadir=/workspace/Mercatura-MercaWeave-upgrade/work/preactivation-hardening/visual-1_0-01-cluster/node1",
+          "-logtimemicros",
+          "-debug",
+          "-debugexclude=libevent",
+          "-debugexclude=leveldb",
+          "-debugexclude=rand",
+          "-uacomment=testnode1",
+          "-logthreadnames",
+          "-logsourcelocations",
+          "-loglevel=trace",
+          "-nologratelimit",
+          "-v2transport=0",
+          "-mercaweaveheight=110",
+          "-pqp2p=required",
+          "-connect=0",
+          "-rpcbind=127.0.0.1",
+          "-rpcallowip=127.0.0.1",
+          "-unsafesqlitesync=0"
+        ],
+        "config": [
+          "port=15176",
+          "rpcport=20176",
+          "discover=0",
+          "dnsseed=0",
+          "fixedseeds=0",
+          "listenonion=0",
+          "connect=0",
+          "bind=127.0.0.1"
+        ],
+        "peers": [
+          {
+            "address": "127.0.0.1:46926",
+            "subversion": "/MercaturaCore:0.1.3(testnode0)/",
+            "pq": true
+          },
+          {
+            "address": "127.0.0.1:15177",
+            "subversion": "/MercaturaCore:0.1.3(testnode2)/",
+            "pq": true
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "pid": 48187,
+        "datadir": "/workspace/Mercatura-MercaWeave-upgrade/work/preactivation-hardening/visual-1_0-01-cluster/node2",
+        "argv": [
+          "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercaturad",
+          "-datadir=/workspace/Mercatura-MercaWeave-upgrade/work/preactivation-hardening/visual-1_0-01-cluster/node2",
+          "-logtimemicros",
+          "-debug",
+          "-debugexclude=libevent",
+          "-debugexclude=leveldb",
+          "-debugexclude=rand",
+          "-uacomment=testnode2",
+          "-logthreadnames",
+          "-logsourcelocations",
+          "-loglevel=trace",
+          "-nologratelimit",
+          "-v2transport=0",
+          "-mercaweaveheight=110",
+          "-pqp2p=required",
+          "-connect=0",
+          "-rpcbind=127.0.0.1",
+          "-rpcallowip=127.0.0.1",
+          "-unsafesqlitesync=0"
+        ],
+        "config": [
+          "port=15177",
+          "rpcport=20177",
+          "discover=0",
+          "dnsseed=0",
+          "fixedseeds=0",
+          "listenonion=0",
+          "connect=0",
+          "bind=127.0.0.1"
+        ],
+        "peers": [
+          {
+            "address": "127.0.0.1:50362",
+            "subversion": "/MercaturaCore:0.1.3(testnode1)/",
+            "pq": true
+          }
+        ]
+      }
+    ],
+    "tip": {
+      "hash": "8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685",
+      "height": 0
+    }
+  },
+  {
+    "name": "actual-native-Qt-inactive-Send",
+    "result": "PASS",
+    "platform": "offscreen",
+    "mode": {
+      "class": "QComboBox",
+      "enabled": true,
+      "height": 23,
+      "index": 0,
+      "items": [
+        {
+          "enabled": true,
+          "text": "Automatic (Recommended)",
+          "text_width": 152
+        },
+        {
+          "enabled": true,
+          "text": "Standard PQ \u2014 Witness v2 only",
+          "text_width": 172
+        },
+        {
+          "enabled": false,
+          "text": "MercaWeave \u2014 Witness v3 only",
+          "text_width": 172
+        }
+      ],
+      "name": "spendingMode",
+      "visible": true,
+      "width": 231,
+      "x": 245,
+      "y": 12
+    }
+  },
+  {
+    "name": "preactivation-and-real-reward-maturity",
+    "result": "PASS",
+    "tip": {
+      "hash": "2d834bd81e2a164640bc62a5fc0f52050449deb752fb74dad0174230fe2e1598",
+      "height": 109
+    },
+    "spendable": "214041.06"
+  },
+  {
+    "name": "candidate-height-H-versus-active-tip-H-minus-one",
+    "result": "PASS",
+    "tip": {
+      "hash": "2d834bd81e2a164640bc62a5fc0f52050449deb752fb74dad0174230fe2e1598",
+      "height": 109
+    }
+  },
+  {
+    "name": "activation-boundary-reorg-and-v2-preservation",
+    "result": "PASS",
+    "tip": {
+      "hash": "592e6ea80defd9d1927d39d2e435bc98d504c19d67da6e3e0f351b9fc42a927c",
+      "height": 110
+    }
+  },
+  {
+    "name": "native-v2-funding-of-v3-output-relay-and-block",
+    "result": "PASS",
+    "txid": "181773465f6c28a5e35eed134b852fe4dd167b9b50878e56efe7bba49c7f491d",
+    "tip": {
+      "hash": "af9778aa026f04c1733d3a1125de99579677f8163174d9d83d0bf8a5571dd8f7",
+      "height": 111
+    }
+  },
+  {
+    "name": "actual-native-Qt-Coin-Control-and-wallet-switch",
+    "result": "PASS",
+    "rows": [
+      {
+        "amount": "23\u2009782.34",
+        "checkable": true,
+        "confirmations": "101",
+        "selected": true,
+        "type": "Standard PQ (v2)",
+        "type_text_width": 95
+      },
+      {
+        "amount": "20.00",
+        "checkable": true,
+        "confirmations": "1",
+        "selected": false,
+        "type": "MercaWeave (v3)",
+        "type_text_width": 95
+      },
+      {
+        "amount": "20.00",
+        "checkable": true,
+        "confirmations": "1",
+        "selected": false,
+        "type": "MercaWeave (v3)",
+        "type_text_width": 95
+      }
+    ],
+    "fee": {
+      "class": "QLabel",
+      "enabled": true,
+      "height": 1,
+      "name": "labelCoinControlBytes",
+      "text": "0",
+      "visible": false,
+      "width": 0,
+      "x": 20,
+      "y": 19
+    }
+  },
+  {
+    "name": "actual-native-Qt-Coin-Control-layout-matrix",
+    "result": "PASS",
+    "measurements": [
+      {
+        "main_size": "1280x800",
+        "view": "List",
+        "tree": {
+          "class": "CoinControlTreeWidget",
+          "columns": [
+            {
+              "hidden": false,
+              "logical": 0,
+              "text": "",
+              "visual": 0,
+              "width": 40,
+              "x": 0
+            },
+            {
+              "hidden": false,
+              "logical": 1,
+              "text": "Amount",
+              "visual": 1,
+              "width": 71,
+              "x": 40
+            },
+            {
+              "hidden": false,
+              "logical": 2,
+              "text": "Received with label",
+              "visual": 3,
+              "width": 133,
+              "x": 213
+            },
+            {
+              "hidden": false,
+              "logical": 3,
+              "text": "Received with address",
+              "visual": 4,
+              "width": 423,
+              "x": 346
+            },
+            {
+              "hidden": false,
+              "logical": 4,
+              "text": "Date",
+              "visual": 5,
+              "width": 101,
+              "x": 769
+            },
+            {
+              "hidden": false,
+              "logical": 5,
+              "text": "Confirmations",
+              "visual": 6,
+              "width": 106,
+              "x": 870
+            },
+            {
+              "hidden": false,
+              "logical": 6,
+              "text": "Input type",
+              "visual": 2,
+              "width": 102,
+              "x": 111
+            }
+          ],
+          "device_pixel_ratio": 1,
+          "enabled": true,
+          "height": 315,
+          "horizontal_scroll": 0,
+          "name": "treeWidget",
+          "rows": [
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "101",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "106",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "111",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "110",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "109",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "108",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "102",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "103",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "105",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "104",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009734.28",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "20.00",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "MercaWeave (v3)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "20.00",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "MercaWeave (v3)",
+              "type_text_width": 95
+            }
+          ],
+          "viewport_width": 976,
+          "visible": true,
+          "width": 978,
+          "x": 11,
+          "y": 145
+        }
+      },
+      {
+        "main_size": "1280x800",
+        "view": "Tree",
+        "tree": {
+          "class": "CoinControlTreeWidget",
+          "columns": [
+            {
+              "hidden": false,
+              "logical": 0,
+              "text": "",
+              "visual": 0,
+              "width": 63,
+              "x": 0
+            },
+            {
+              "hidden": false,
+              "logical": 1,
+              "text": "Amount",
+              "visual": 1,
+              "width": 71,
+              "x": 63
+            },
+            {
+              "hidden": false,
+              "logical": 2,
+              "text": "Received with label",
+              "visual": 3,
+              "width": 133,
+              "x": 236
+            },
+            {
+              "hidden": false,
+              "logical": 3,
+              "text": "Received with address",
+              "visual": 4,
+              "width": 400,
+              "x": 369
+            },
+            {
+              "hidden": false,
+              "logical": 4,
+              "text": "Date",
+              "visual": 5,
+              "width": 101,
+              "x": 769
+            },
+            {
+              "hidden": false,
+              "logical": 5,
+              "text": "Confirmations",
+              "visual": 6,
+              "width": 106,
+              "x": 870
+            },
+            {
+              "hidden": false,
+              "logical": 6,
+              "text": "Input type",
+              "visual": 2,
+              "width": 102,
+              "x": 134
+            }
+          ],
+          "device_pixel_ratio": 1,
+          "enabled": true,
+          "height": 315,
+          "horizontal_scroll": 0,
+          "name": "treeWidget",
+          "rows": [
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "101",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "106",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "111",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "110",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "109",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "108",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "102",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "103",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "105",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "104",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009734.28",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "20.00",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "MercaWeave (v3)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "20.00",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "MercaWeave (v3)",
+              "type_text_width": 95
+            }
+          ],
+          "viewport_width": 976,
+          "visible": true,
+          "width": 978,
+          "x": 11,
+          "y": 145
+        }
+      },
+      {
+        "main_size": "1366x768",
+        "view": "List",
+        "tree": {
+          "class": "CoinControlTreeWidget",
+          "columns": [
+            {
+              "hidden": false,
+              "logical": 0,
+              "text": "",
+              "visual": 0,
+              "width": 40,
+              "x": 0
+            },
+            {
+              "hidden": false,
+              "logical": 1,
+              "text": "Amount",
+              "visual": 1,
+              "width": 71,
+              "x": 40
+            },
+            {
+              "hidden": false,
+              "logical": 2,
+              "text": "Received with label",
+              "visual": 3,
+              "width": 133,
+              "x": 213
+            },
+            {
+              "hidden": false,
+              "logical": 3,
+              "text": "Received with address",
+              "visual": 4,
+              "width": 423,
+              "x": 346
+            },
+            {
+              "hidden": false,
+              "logical": 4,
+              "text": "Date",
+              "visual": 5,
+              "width": 101,
+              "x": 769
+            },
+            {
+              "hidden": false,
+              "logical": 5,
+              "text": "Confirmations",
+              "visual": 6,
+              "width": 106,
+              "x": 870
+            },
+            {
+              "hidden": false,
+              "logical": 6,
+              "text": "Input type",
+              "visual": 2,
+              "width": 102,
+              "x": 111
+            }
+          ],
+          "device_pixel_ratio": 1,
+          "enabled": true,
+          "height": 315,
+          "horizontal_scroll": 0,
+          "name": "treeWidget",
+          "rows": [
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "101",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "106",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "111",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "110",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "109",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "108",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "102",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "103",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "105",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "104",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009734.28",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "20.00",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "MercaWeave (v3)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "20.00",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "MercaWeave (v3)",
+              "type_text_width": 95
+            }
+          ],
+          "viewport_width": 976,
+          "visible": true,
+          "width": 978,
+          "x": 11,
+          "y": 145
+        }
+      },
+      {
+        "main_size": "1366x768",
+        "view": "Tree",
+        "tree": {
+          "class": "CoinControlTreeWidget",
+          "columns": [
+            {
+              "hidden": false,
+              "logical": 0,
+              "text": "",
+              "visual": 0,
+              "width": 63,
+              "x": 0
+            },
+            {
+              "hidden": false,
+              "logical": 1,
+              "text": "Amount",
+              "visual": 1,
+              "width": 71,
+              "x": 63
+            },
+            {
+              "hidden": false,
+              "logical": 2,
+              "text": "Received with label",
+              "visual": 3,
+              "width": 133,
+              "x": 236
+            },
+            {
+              "hidden": false,
+              "logical": 3,
+              "text": "Received with address",
+              "visual": 4,
+              "width": 400,
+              "x": 369
+            },
+            {
+              "hidden": false,
+              "logical": 4,
+              "text": "Date",
+              "visual": 5,
+              "width": 101,
+              "x": 769
+            },
+            {
+              "hidden": false,
+              "logical": 5,
+              "text": "Confirmations",
+              "visual": 6,
+              "width": 106,
+              "x": 870
+            },
+            {
+              "hidden": false,
+              "logical": 6,
+              "text": "Input type",
+              "visual": 2,
+              "width": 102,
+              "x": 134
+            }
+          ],
+          "device_pixel_ratio": 1,
+          "enabled": true,
+          "height": 315,
+          "horizontal_scroll": 0,
+          "name": "treeWidget",
+          "rows": [
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "101",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "106",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "111",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "110",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "109",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "108",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "102",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "103",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "105",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "104",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009734.28",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "20.00",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "MercaWeave (v3)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "20.00",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "MercaWeave (v3)",
+              "type_text_width": 95
+            }
+          ],
+          "viewport_width": 976,
+          "visible": true,
+          "width": 978,
+          "x": 11,
+          "y": 145
+        }
+      },
+      {
+        "main_size": "1920x1080",
+        "view": "List",
+        "tree": {
+          "class": "CoinControlTreeWidget",
+          "columns": [
+            {
+              "hidden": false,
+              "logical": 0,
+              "text": "",
+              "visual": 0,
+              "width": 40,
+              "x": 0
+            },
+            {
+              "hidden": false,
+              "logical": 1,
+              "text": "Amount",
+              "visual": 1,
+              "width": 71,
+              "x": 40
+            },
+            {
+              "hidden": false,
+              "logical": 2,
+              "text": "Received with label",
+              "visual": 3,
+              "width": 133,
+              "x": 213
+            },
+            {
+              "hidden": false,
+              "logical": 3,
+              "text": "Received with address",
+              "visual": 4,
+              "width": 423,
+              "x": 346
+            },
+            {
+              "hidden": false,
+              "logical": 4,
+              "text": "Date",
+              "visual": 5,
+              "width": 101,
+              "x": 769
+            },
+            {
+              "hidden": false,
+              "logical": 5,
+              "text": "Confirmations",
+              "visual": 6,
+              "width": 106,
+              "x": 870
+            },
+            {
+              "hidden": false,
+              "logical": 6,
+              "text": "Input type",
+              "visual": 2,
+              "width": 102,
+              "x": 111
+            }
+          ],
+          "device_pixel_ratio": 1,
+          "enabled": true,
+          "height": 315,
+          "horizontal_scroll": 0,
+          "name": "treeWidget",
+          "rows": [
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "101",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "106",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "111",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "110",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "109",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "108",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "102",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "103",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "105",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "104",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009734.28",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "20.00",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "MercaWeave (v3)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "20.00",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "MercaWeave (v3)",
+              "type_text_width": 95
+            }
+          ],
+          "viewport_width": 976,
+          "visible": true,
+          "width": 978,
+          "x": 11,
+          "y": 145
+        }
+      },
+      {
+        "main_size": "1920x1080",
+        "view": "Tree",
+        "tree": {
+          "class": "CoinControlTreeWidget",
+          "columns": [
+            {
+              "hidden": false,
+              "logical": 0,
+              "text": "",
+              "visual": 0,
+              "width": 63,
+              "x": 0
+            },
+            {
+              "hidden": false,
+              "logical": 1,
+              "text": "Amount",
+              "visual": 1,
+              "width": 71,
+              "x": 63
+            },
+            {
+              "hidden": false,
+              "logical": 2,
+              "text": "Received with label",
+              "visual": 3,
+              "width": 133,
+              "x": 236
+            },
+            {
+              "hidden": false,
+              "logical": 3,
+              "text": "Received with address",
+              "visual": 4,
+              "width": 400,
+              "x": 369
+            },
+            {
+              "hidden": false,
+              "logical": 4,
+              "text": "Date",
+              "visual": 5,
+              "width": 101,
+              "x": 769
+            },
+            {
+              "hidden": false,
+              "logical": 5,
+              "text": "Confirmations",
+              "visual": 6,
+              "width": 106,
+              "x": 870
+            },
+            {
+              "hidden": false,
+              "logical": 6,
+              "text": "Input type",
+              "visual": 2,
+              "width": 102,
+              "x": 134
+            }
+          ],
+          "device_pixel_ratio": 1,
+          "enabled": true,
+          "height": 315,
+          "horizontal_scroll": 0,
+          "name": "treeWidget",
+          "rows": [
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "101",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "106",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "111",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "110",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "109",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "108",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "102",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "103",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "105",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009782.34",
+              "checkable": true,
+              "confirmations": "104",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "23\u2009734.28",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "Standard PQ (v2)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "20.00",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "MercaWeave (v3)",
+              "type_text_width": 95
+            },
+            {
+              "amount": "20.00",
+              "checkable": true,
+              "confirmations": "1",
+              "selected": false,
+              "type": "MercaWeave (v3)",
+              "type_text_width": 95
+            }
+          ],
+          "viewport_width": 976,
+          "visible": true,
+          "width": 978,
+          "x": 11,
+          "y": 145
+        }
+      }
+    ]
+  }
+]

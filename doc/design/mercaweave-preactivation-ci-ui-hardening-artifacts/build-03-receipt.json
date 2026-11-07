@@ -1,0 +1,17 @@
+{
+  "command": [
+    "/workspace/Mercatura-MercaWeave-v0.1/work/tools/cmake/data/bin/cmake",
+    "--build",
+    "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release",
+    "--target",
+    "bitcoin-qt",
+    "test_bitcoin-qt",
+    "-j4"
+  ],
+  "started_utc": "2026-11-07T14:53:22.119796+00:00",
+  "ended_utc": "2026-11-07T14:53:33.446842+00:00",
+  "elapsed_seconds": 11.327,
+  "exit_code": 0,
+  "source_head": "2d79c330f5ac246156d758e34763bbba9ff45524",
+  "tracked_diff_sha256": "a5b63db8c2342b07be0a4fa868112d8429afe4c52bbccc0228e8a29a17702e79"
+}

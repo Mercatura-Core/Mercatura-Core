@@ -28,6 +28,7 @@
 #include <QCursor>
 #include <QDialogButtonBox>
 #include <QFlags>
+#include <QHeaderView>
 #include <QIcon>
 #include <QSettings>
 #include <QSignalBlocker>
@@ -54,7 +55,6 @@ CoinControlDialog::CoinControlDialog(CCoinControl& coin_control, WalletModel* _m
 {
     ui->setupUi(this);
     ui->treeWidget->headerItem()->setText(COLUMN_TYPE, tr("Input type"));
-    ui->treeWidget->setColumnWidth(COLUMN_TYPE, 150);
     for (int column = COLUMN_TYPE + 1; column < ui->treeWidget->columnCount(); ++column) ui->treeWidget->setColumnHidden(column, true);
     ui->inputTypeFilter->setItemData(0, 0);
     ui->inputTypeFilter->setItemData(1, 2);
@@ -112,12 +112,17 @@ CoinControlDialog::CoinControlDialog(CCoinControl& coin_control, WalletModel* _m
     // (un)select all
     connect(ui->pushButtonSelectAll, &QPushButton::clicked, this, &CoinControlDialog::buttonSelectAllClicked);
 
-    ui->treeWidget->setColumnWidth(COLUMN_CHECKBOX, 84);
-    ui->treeWidget->setColumnWidth(COLUMN_AMOUNT, 110);
-    ui->treeWidget->setColumnWidth(COLUMN_LABEL, 190);
-    ui->treeWidget->setColumnWidth(COLUMN_ADDRESS, 320);
-    ui->treeWidget->setColumnWidth(COLUMN_DATE, 130);
-    ui->treeWidget->setColumnWidth(COLUMN_CONFIRMATIONS, 110);
+    // Keep authorization beside the amount even when long addresses or labels
+    // need extra space. Logical column indices (and saved sorting) stay stable.
+    auto* header = ui->treeWidget->header();
+    header->moveSection(header->visualIndex(COLUMN_TYPE), header->visualIndex(COLUMN_AMOUNT) + 1);
+    header->setStretchLastSection(false);
+    for (const int column : {COLUMN_CHECKBOX, COLUMN_AMOUNT, COLUMN_TYPE, COLUMN_DATE, COLUMN_CONFIRMATIONS}) {
+        header->setSectionResizeMode(column, QHeaderView::ResizeToContents);
+    }
+    header->setSectionResizeMode(COLUMN_ADDRESS, QHeaderView::Stretch);
+    // Labels remain user-resizable; their initial width follows the current font.
+    ui->treeWidget->setColumnWidth(COLUMN_LABEL, ui->treeWidget->fontMetrics().horizontalAdvance(QString(12, QLatin1Char('M'))));
 
     // default view is sorted by amount desc
     sortView(COLUMN_AMOUNT, Qt::DescendingOrder);
@@ -668,6 +673,7 @@ void CoinControlDialog::updateView()
 
             // address
             itemWalletAddress->setText(COLUMN_ADDRESS, sWalletAddress);
+            itemWalletAddress->setToolTip(COLUMN_ADDRESS, sWalletAddress);
         }
 
         CAmount nSum = 0;
@@ -696,8 +702,11 @@ void CoinControlDialog::updateView()
             if (!allowed && !selected) itemOutput->setFlags(itemOutput->flags() & ~Qt::ItemIsUserCheckable);
             itemOutput->setCheckState(COLUMN_CHECKBOX,Qt::Unchecked);
             itemOutput->setText(COLUMN_TYPE, version == 2 ? tr("Standard PQ (v2)") : tr("MercaWeave (v3)"));
+            itemOutput->setToolTip(COLUMN_TYPE, version == 2
+                ? tr("Standard PQ: independent witness-v2 authorization.")
+                : tr("MercaWeave: grouped witness-v3 authorization."));
             itemOutput->setData(COLUMN_TYPE, SpendingAllowedRole, allowed);
-            if (!allowed) itemOutput->setToolTip(COLUMN_TYPE, tr("Unavailable for the active spending mode or network. Deselect conflicting selected inputs explicitly."));
+            if (!allowed) itemOutput->setToolTip(COLUMN_TYPE, itemOutput->toolTip(COLUMN_TYPE) + QStringLiteral("\n") + tr("Unavailable for the active spending mode or network. Deselect conflicting selected inputs explicitly."));
 
             // address
             CTxDestination outputAddress;
@@ -707,8 +716,10 @@ void CoinControlDialog::updateView()
                 sAddress = QString::fromStdString(EncodeDestination(outputAddress));
 
                 // if listMode or change => show bitcoin address. In tree mode, address is not shown again for direct wallet address outputs
-                if (!treeMode || (!(sAddress == sWalletAddress)))
+                if (!treeMode || (!(sAddress == sWalletAddress))) {
                     itemOutput->setText(COLUMN_ADDRESS, sAddress);
+                    itemOutput->setToolTip(COLUMN_ADDRESS, sAddress);
+                }
             }
 
             // label

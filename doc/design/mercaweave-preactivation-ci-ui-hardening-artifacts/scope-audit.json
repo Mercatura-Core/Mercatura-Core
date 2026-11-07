@@ -1,0 +1,21 @@
+{
+  "new_changed_code_paths": [
+    "src/qt/coincontroldialog.cpp",
+    "src/qt/test/wallettests.cpp",
+    "test/functional/mercatura_mercaweave_multinode.py",
+    "test/functional/mercaweave_gui_probe.cpp"
+  ],
+  "production_change": "Qt column presentation and tooltips only",
+  "prior_190_protected_paths_modified_in_this_task": 0,
+  "historical_sole_integration_exception": "src/mining/solo.cpp (unchanged here)",
+  "production_and_research_checkouts": "Original heads, clean",
+  "public_activation_source": "Unchanged; activation unit suite PASS verifies unset public/default schedules",
+  "consensus_crypto_wallet_keys_monetary_PQ_network_source": "Unchanged",
+  "source_sha256": {
+    "src/qt/coincontroldialog.cpp": "0f95d12c5647930d4fd67e289949e45d103d76a0371f4b0ee16221f9af8a6a99",
+    "src/qt/test/wallettests.cpp": "d17a1651cef4a8f783d60ac8946e384d461d83fa9c840780f0df0a23ae8e868f",
+    "test/functional/mercatura_mercaweave_multinode.py": "3c8fe28cc791989b8e5c4f599791d266f7b5ba1177211a8601e18e211544fd99",
+    "test/functional/mercaweave_gui_probe.cpp": "f42006a7e33fc6ae9c3fe2abc1df0da88dc536aca9cefce8e1482535803668f5"
+  },
+  "final_gui_helper_note": "Restore the previous selector after optional GUI matrix; full Qt-backed three-node execution validates this final inspection-only cleanup. Default native scenarios unchanged."
+}

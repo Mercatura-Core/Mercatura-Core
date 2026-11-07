@@ -1,0 +1,418 @@
+{
+  "100-percent/A-send-inactive-1000x800.png": {
+    "bytes": 57414,
+    "sha256": "9743566e500cde8a78d2fce25dcf989b57862451c07b96563af66769247c14d8",
+    "pixel_dimensions": [
+      1000,
+      800
+    ]
+  },
+  "100-percent/B-dropdown-expanded-inactive.png": {
+    "bytes": 7158,
+    "sha256": "4c8a64c2f3c1d920068e5ca8450696fd9bd637f8153d6db58855a72b4a0c278c",
+    "pixel_dimensions": [
+      231,
+      68
+    ]
+  },
+  "100-percent/C-coin-control-v3-selection.png": {
+    "bytes": 47020,
+    "sha256": "0f60ac5d2985dbeb2ee0dbdb1fb86cc06ac6b31a08ba1ceb983b6596cdcdb915",
+    "pixel_dimensions": [
+      1000,
+      500
+    ]
+  },
+  "100-percent/D-send-active-fee-controls.png": {
+    "bytes": 73780,
+    "sha256": "e110a08bb58139c038420d76a1e245a1380c380141dcbe06a193c7ed19c0cb6a",
+    "pixel_dimensions": [
+      1000,
+      800
+    ]
+  },
+  "100-percent/D-send-active-grouped.png": {
+    "bytes": 57053,
+    "sha256": "8db0308078db70efbfa8d91924e18aef045299e9e48cd13d23423b003fef4f42",
+    "pixel_dimensions": [
+      1000,
+      800
+    ]
+  },
+  "100-percent/E-unsupported-wallet.png": {
+    "bytes": 58402,
+    "sha256": "aa744096684dfa2f68950a11432faa1573692d52193decbcefff329779ec0bfc",
+    "pixel_dimensions": [
+      1000,
+      800
+    ]
+  },
+  "100-percent/H-coins-list-1280x800.png": {
+    "bytes": 129179,
+    "sha256": "a2b171521048efb2d539263d6623dd2ca984d403e1249156d3a216d9954a343f",
+    "pixel_dimensions": [
+      1000,
+      500
+    ]
+  },
+  "100-percent/H-coins-list-1366x768.png": {
+    "bytes": 129179,
+    "sha256": "a2b171521048efb2d539263d6623dd2ca984d403e1249156d3a216d9954a343f",
+    "pixel_dimensions": [
+      1000,
+      500
+    ]
+  },
+  "100-percent/H-coins-list-1920x1080.png": {
+    "bytes": 129179,
+    "sha256": "a2b171521048efb2d539263d6623dd2ca984d403e1249156d3a216d9954a343f",
+    "pixel_dimensions": [
+      1000,
+      500
+    ]
+  },
+  "100-percent/H-coins-tree-1280x800.png": {
+    "bytes": 93413,
+    "sha256": "1b06a362c162882dbda99bac6edf7e0ba1a1b4264e66da14d62e91e85dab7fc6",
+    "pixel_dimensions": [
+      1000,
+      500
+    ]
+  },
+  "100-percent/H-coins-tree-1366x768.png": {
+    "bytes": 93413,
+    "sha256": "1b06a362c162882dbda99bac6edf7e0ba1a1b4264e66da14d62e91e85dab7fc6",
+    "pixel_dimensions": [
+      1000,
+      500
+    ]
+  },
+  "100-percent/H-coins-tree-1920x1080.png": {
+    "bytes": 93413,
+    "sha256": "1b06a362c162882dbda99bac6edf7e0ba1a1b4264e66da14d62e91e85dab7fc6",
+    "pixel_dimensions": [
+      1000,
+      500
+    ]
+  },
+  "100-percent/H-dropdown-1280x800.png": {
+    "bytes": 6587,
+    "sha256": "64ca79943ed55d14fb5ce9588cffbea4f2594f69af87a4d27ab5c094c87914a5",
+    "pixel_dimensions": [
+      311,
+      68
+    ]
+  },
+  "100-percent/H-dropdown-1366x768.png": {
+    "bytes": 6589,
+    "sha256": "c2980d062f3ea6d3f1a840cd6beb5076b50a199f5a73de935ddba183fde57ca4",
+    "pixel_dimensions": [
+      332,
+      68
+    ]
+  },
+  "100-percent/H-dropdown-1920x1080.png": {
+    "bytes": 6700,
+    "sha256": "3a8d81a05383a225b61b20db2fe3097aa55b7c88613333b16e59c8f5e92e2ace",
+    "pixel_dimensions": [
+      471,
+      68
+    ]
+  },
+  "100-percent/H-send-1280x800.png": {
+    "bytes": 76139,
+    "sha256": "6269334ffba8a5f6dd5304072d7c6e7bbff07dfb53ee164b1e971ba7a2e75407",
+    "pixel_dimensions": [
+      1280,
+      800
+    ]
+  },
+  "100-percent/H-send-1366x768.png": {
+    "bytes": 76454,
+    "sha256": "b23c47397f1d03d3074e330c7e4e10fda1d4f3fb21c69e063b6e4904b8c1724c",
+    "pixel_dimensions": [
+      1366,
+      768
+    ]
+  },
+  "100-percent/H-send-1920x1080.png": {
+    "bytes": 79568,
+    "sha256": "77bf5270b2e10f746234ea455589ee3333cda4683671f5b8ae58701a0f813200",
+    "pixel_dimensions": [
+      1920,
+      1080
+    ]
+  },
+  "125-percent/A-send-inactive-1000x800.png": {
+    "bytes": 86140,
+    "sha256": "194e79c1b638072bc59004c73f44607567e2ca0398428a9e0881311a47d04286",
+    "pixel_dimensions": [
+      1250,
+      1000
+    ]
+  },
+  "125-percent/B-dropdown-expanded-inactive.png": {
+    "bytes": 10921,
+    "sha256": "31f9e8d1e899b6b606b777eb6269f829b55f31380fc768763853329e2fbfb036",
+    "pixel_dimensions": [
+      289,
+      85
+    ]
+  },
+  "125-percent/C-coin-control-v3-selection.png": {
+    "bytes": 77469,
+    "sha256": "b7a4de6e56d3bff71c251fbee94c28f0d74c12899d7f3e2b8e576a9b7ad78544",
+    "pixel_dimensions": [
+      1250,
+      625
+    ]
+  },
+  "125-percent/D-send-active-fee-controls.png": {
+    "bytes": 112816,
+    "sha256": "cbbc80404eb950aa7712efe4b1f3edf650e90b6b3c137ceef0c58e9cafc4f3c5",
+    "pixel_dimensions": [
+      1250,
+      1000
+    ]
+  },
+  "125-percent/D-send-active-grouped.png": {
+    "bytes": 85953,
+    "sha256": "ecb72044cdbdee64fb2b55e6eb4e409e652be649087b9a1034f6d46f2a3ba45c",
+    "pixel_dimensions": [
+      1250,
+      1000
+    ]
+  },
+  "125-percent/E-unsupported-wallet.png": {
+    "bytes": 87518,
+    "sha256": "6f91263cf02987958b5ee94f8b08bd43bc026f500091283294449a0828e2c3a4",
+    "pixel_dimensions": [
+      1250,
+      1000
+    ]
+  },
+  "125-percent/H-coins-list-1280x800.png": {
+    "bytes": 212828,
+    "sha256": "3263e63cc0fc08eba188b32b91b887594a0efa1897c824dbc19a3535727ac4e8",
+    "pixel_dimensions": [
+      1250,
+      625
+    ]
+  },
+  "125-percent/H-coins-list-1366x768.png": {
+    "bytes": 212828,
+    "sha256": "3263e63cc0fc08eba188b32b91b887594a0efa1897c824dbc19a3535727ac4e8",
+    "pixel_dimensions": [
+      1250,
+      625
+    ]
+  },
+  "125-percent/H-coins-list-1920x1080.png": {
+    "bytes": 212828,
+    "sha256": "3263e63cc0fc08eba188b32b91b887594a0efa1897c824dbc19a3535727ac4e8",
+    "pixel_dimensions": [
+      1250,
+      625
+    ]
+  },
+  "125-percent/H-coins-tree-1280x800.png": {
+    "bytes": 148565,
+    "sha256": "0cda0e20054a040ab6f090ce6fc91720257d17b88a4cd6682489e5fae638d9ea",
+    "pixel_dimensions": [
+      1250,
+      625
+    ]
+  },
+  "125-percent/H-coins-tree-1366x768.png": {
+    "bytes": 148565,
+    "sha256": "0cda0e20054a040ab6f090ce6fc91720257d17b88a4cd6682489e5fae638d9ea",
+    "pixel_dimensions": [
+      1250,
+      625
+    ]
+  },
+  "125-percent/H-coins-tree-1920x1080.png": {
+    "bytes": 148565,
+    "sha256": "0cda0e20054a040ab6f090ce6fc91720257d17b88a4cd6682489e5fae638d9ea",
+    "pixel_dimensions": [
+      1250,
+      625
+    ]
+  },
+  "125-percent/H-dropdown-1280x800.png": {
+    "bytes": 10494,
+    "sha256": "c545a1b3e2e27849ea902ecf57c7fb8a1e267582dfae89c3b9ca656679e95dad",
+    "pixel_dimensions": [
+      389,
+      85
+    ]
+  },
+  "125-percent/H-dropdown-1366x768.png": {
+    "bytes": 11079,
+    "sha256": "f9e393f54642aa7d00728b8021586c47927c5451c3db0d7e6f819e2034949ca6",
+    "pixel_dimensions": [
+      415,
+      85
+    ]
+  },
+  "125-percent/H-dropdown-1920x1080.png": {
+    "bytes": 11237,
+    "sha256": "c7c18019764992e5d136ea97e8b7cbaa2076f56cbee8b5dc36adbe328a0917d3",
+    "pixel_dimensions": [
+      589,
+      85
+    ]
+  },
+  "125-percent/H-send-1280x800.png": {
+    "bytes": 116665,
+    "sha256": "1fc2a34210cb1e5fdbd00c556e930476c121cf544f78fdcd7badd733919f02b2",
+    "pixel_dimensions": [
+      1600,
+      1000
+    ]
+  },
+  "125-percent/H-send-1366x768.png": {
+    "bytes": 116930,
+    "sha256": "e7facaa92e997f7593ecec875c215f7af79377138f2f2d779948626e215737ce",
+    "pixel_dimensions": [
+      1708,
+      960
+    ]
+  },
+  "125-percent/H-send-1920x1080.png": {
+    "bytes": 122692,
+    "sha256": "9658ed7b9f547c6cbb2d6aef02b13aee6fd56cf810285c1c5f149dee06bddefe",
+    "pixel_dimensions": [
+      2400,
+      1350
+    ]
+  },
+  "binary-identities.json": {
+    "bytes": 2293,
+    "sha256": "306d77c7b1ccde6da4b7d61eabfb4f44177f076cbb579018839fdb9baba243c1"
+  },
+  "build-01-receipt.json": {
+    "bytes": 560,
+    "sha256": "9da5f687981bef63540a811447fe5dc3e55ddb5a04ccbe1348136f52227bd21d"
+  },
+  "build-02-receipt.json": {
+    "bytes": 559,
+    "sha256": "adf21f0323fa1dbcde4c3d69173fad0d417e53f5e7979d9d78465376e7eedcb0"
+  },
+  "build-03-receipt.json": {
+    "bytes": 559,
+    "sha256": "fd04e548ab87e2b100af6a18fd7f73979dd67e6b77a06d12736dca1dab613403"
+  },
+  "clean-native-three-node-results.json": {
+    "bytes": 17603,
+    "sha256": "c08b08d5855748d8a3763b1a3406dfda7335bc7ad3024071e3c20ac4bb9de70b"
+  },
+  "final-integrity-check.json": {
+    "bytes": 481,
+    "sha256": "bd314a452eb6db1ece69b6e2bd83274c4533b9474a40556247f2687dbe573a7e"
+  },
+  "final-lint-receipt.json": {
+    "bytes": 449,
+    "sha256": "ceb6386452b828e320b1f27ad50ef9ecb945db36f39672fd944c2049cf2ce7bc"
+  },
+  "full-gui-125-percent/F-grouped-send-confirmation.png": {
+    "bytes": 43026,
+    "sha256": "865dd71e6093dd542df2ef80657b4594c68cc50f58ae37ede09422bfc884d632",
+    "pixel_dimensions": [
+      635,
+      281
+    ]
+  },
+  "full-gui-125-percent/F-stale-confirmation-invalidated.png": {
+    "bytes": 121479,
+    "sha256": "2e4b8804e09ee0d4861e24cad74dc3791efeff0b6ddb591e127db197b34c1dbf",
+    "pixel_dimensions": [
+      2400,
+      1350
+    ]
+  },
+  "full-gui-125-receipt.json": {
+    "bytes": 1201,
+    "sha256": "fb44820dd4b2b6318db3d8d30074f15d63471ad11aa35bbaa8185640c11bdea0"
+  },
+  "full-gui-125-results.json": {
+    "bytes": 50039,
+    "sha256": "2ca0459f2bef5fe890389f4aa3a582d8caf139333108fd47ffae2c5c5eac9a82"
+  },
+  "gui-followup-provenance.json": {
+    "bytes": 681,
+    "sha256": "d9d97fd48081e84e6ee12dfa785657c08a9450762ac83b020913e30ccaa8bdc7"
+  },
+  "gui-probe-build-receipt.json": {
+    "bytes": 1044,
+    "sha256": "626e8763e4f972356f953a2a1f83c5dbef5cf3a486efdb53b155823c813989d1"
+  },
+  "lint-01-receipt.json": {
+    "bytes": 449,
+    "sha256": "5d6fea3eb4e778d848c102c524c26c0f70b0c90b42fc27f12b4e3f909604ed19"
+  },
+  "native-clean-log-identity.json": {
+    "bytes": 279,
+    "sha256": "0d828f95fd54f30fa2d573685847b668048ed2471745c1a194796f748c90c7a3"
+  },
+  "native-clean-receipt.json": {
+    "bytes": 589,
+    "sha256": "4ca8bd7463eb71c69b0564225e60bf4e0b430b8324ccc1751c970cc9990279f0"
+  },
+  "native-clean-summary.json": {
+    "bytes": 7878,
+    "sha256": "4ce7866e81be5904a00b9fb4b9abca57eeca4ba42ddc5016c42ad6374ad685d8"
+  },
+  "native-clean.log.gz": {
+    "bytes": 1703,
+    "sha256": "edc1ea8339bf3fd0641e22f12efbd53c5f534b207d63f7f72f4b8ccbef38d414"
+  },
+  "prior-evidence-preservation.json": {
+    "bytes": 7982,
+    "sha256": "55557c42c8cda4299e45b0204c7d4d428d28e773d45586863d461c5fef8ffff5"
+  },
+  "qt-01-receipt.json": {
+    "bytes": 563,
+    "sha256": "d22df185f7b59136d09fa564d4f068beeadd42e4a9a9015936cc4ee43f65a3ec"
+  },
+  "qt-assertion-summary.json": {
+    "bytes": 1483,
+    "sha256": "5993ba774dfe3f4964b20756505de700be985a028682ee8396b3b9f3eaee2075"
+  },
+  "raw-log-lint-failure.json": {
+    "bytes": 632,
+    "sha256": "f08a5d00df566755ebbd54327bbfe7b8c8f8d7b548746b057167d1fef30f63d5"
+  },
+  "scope-audit.json": {
+    "bytes": 1346,
+    "sha256": "ce43ccd8646e671873eb159c38eaa6e3c4bd18a01ff734d6da654eb4bc481f9b"
+  },
+  "starting-audit.json": {
+    "bytes": 7422,
+    "sha256": "59af8957a14797950b47035a29c33c52dc816eb83639983fdb8f8b4fb35cc38b"
+  },
+  "visual-1_0-receipt.json": {
+    "bytes": 1475,
+    "sha256": "4c1ed0a283d3bd8d7fa8ad7e839b8989a5cc5800edb593c72275d57f9aa86a68"
+  },
+  "visual-1_0-results.json": {
+    "bytes": 38248,
+    "sha256": "c20e6d8cff715e1872ca143400bf75df1bf09dedced26648764ac258a7b4678f"
+  },
+  "visual-1_25-receipt.json": {
+    "bytes": 1481,
+    "sha256": "365ab2b931d5ceffe9c0443f331a06712ad52ffa3e57f2446c89406abcefa22e"
+  },
+  "visual-1_25-results.json": {
+    "bytes": 38272,
+    "sha256": "4c60ddc5bc055e8da5e43967fe7502ba01cb9b937b1f36440b006b04a8d31f00"
+  },
+  "wallet-01-receipt.json": {
+    "bytes": 632,
+    "sha256": "30649933d35a77d166f437d373cba196e196cb1f2ef11ed503e6c71dbd4e4ac8"
+  },
+  "windows-msvc-original-error.txt": {
+    "bytes": 2206,
+    "sha256": "699c3e2c20347b6847c828ed9f10306e5c5fe02388a4001e65ed0fdb46ce3a59"
+  }
+}
