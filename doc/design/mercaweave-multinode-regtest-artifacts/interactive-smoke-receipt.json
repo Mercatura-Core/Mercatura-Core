@@ -1,0 +1,26 @@
+{
+  "command": [
+    "python3",
+    "/workspace/Mercatura-MercaWeave-upgrade/test/functional/mercatura_mercaweave_multinode.py",
+    "--configfile=/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/test/config.ini",
+    "--tmpdir=/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/mca-interactive-vm_efidh/cluster",
+    "--nocleanup",
+    "--timeout-factor=3",
+    "--artifact-dir=/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/mca-interactive-vm_efidh/evidence",
+    "--interactive=inactive",
+    "--qt-binary=/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercatura-qt",
+    "--qt-platform=offscreen"
+  ],
+  "started_utc": "2026-11-07T12:26:16.876388+00:00",
+  "ended_utc": "2026-11-07T12:26:21.113510+00:00",
+  "elapsed_seconds": 4.237,
+  "exit_code": 0,
+  "fixture": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/mca-interactive-vm_efidh",
+  "owned_pids": [
+    36720,
+    36742,
+    36755
+  ],
+  "all_owned_nodes_stopped": true,
+  "cleanup": "Datadir retained; no pre-existing directory deleted"
+}

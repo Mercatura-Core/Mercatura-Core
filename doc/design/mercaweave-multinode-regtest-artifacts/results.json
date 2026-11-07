@@ -1,0 +1,632 @@
+[
+  {
+    "name": "three-independent-loopback-PQ-processes",
+    "result": "PASS",
+    "nodes": [
+      {
+        "index": 0,
+        "pid": 34737,
+        "datadir": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/gui-three-node-06/node0",
+        "argv": [
+          "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercatura-qt",
+          "-datadir=/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/gui-three-node-06/node0",
+          "-logtimemicros",
+          "-debug",
+          "-debugexclude=libevent",
+          "-debugexclude=leveldb",
+          "-debugexclude=rand",
+          "-uacomment=testnode0",
+          "-logthreadnames",
+          "-logsourcelocations",
+          "-loglevel=trace",
+          "-nologratelimit",
+          "-v2transport=0",
+          "-nosplash",
+          "-resetguisettings",
+          "-choosedatadir=0",
+          "-lang=en",
+          "-mercaweaveheight=110",
+          "-pqp2p=required",
+          "-connect=0",
+          "-rpcbind=127.0.0.1",
+          "-rpcallowip=127.0.0.1",
+          "-unsafesqlitesync=0"
+        ],
+        "config": [
+          "port=13899",
+          "rpcport=18899",
+          "discover=0",
+          "dnsseed=0",
+          "fixedseeds=0",
+          "listenonion=0",
+          "connect=0",
+          "bind=127.0.0.1"
+        ],
+        "peers": [
+          {
+            "address": "127.0.0.1:13900",
+            "subversion": "/MercaturaCore:0.1.3(testnode1)/",
+            "pq": true
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "pid": 34759,
+        "datadir": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/gui-three-node-06/node1",
+        "argv": [
+          "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercaturad",
+          "-datadir=/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/gui-three-node-06/node1",
+          "-logtimemicros",
+          "-debug",
+          "-debugexclude=libevent",
+          "-debugexclude=leveldb",
+          "-debugexclude=rand",
+          "-uacomment=testnode1",
+          "-logthreadnames",
+          "-logsourcelocations",
+          "-loglevel=trace",
+          "-nologratelimit",
+          "-v2transport=0",
+          "-mercaweaveheight=110",
+          "-pqp2p=required",
+          "-connect=0",
+          "-rpcbind=127.0.0.1",
+          "-rpcallowip=127.0.0.1",
+          "-unsafesqlitesync=0"
+        ],
+        "config": [
+          "port=13900",
+          "rpcport=18900",
+          "discover=0",
+          "dnsseed=0",
+          "fixedseeds=0",
+          "listenonion=0",
+          "connect=0",
+          "bind=127.0.0.1"
+        ],
+        "peers": [
+          {
+            "address": "127.0.0.1:34602",
+            "subversion": "/MercaturaCore:0.1.3(testnode0)/",
+            "pq": true
+          },
+          {
+            "address": "127.0.0.1:13901",
+            "subversion": "/MercaturaCore:0.1.3(testnode2)/",
+            "pq": true
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "pid": 34772,
+        "datadir": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/gui-three-node-06/node2",
+        "argv": [
+          "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercaturad",
+          "-datadir=/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/gui-three-node-06/node2",
+          "-logtimemicros",
+          "-debug",
+          "-debugexclude=libevent",
+          "-debugexclude=leveldb",
+          "-debugexclude=rand",
+          "-uacomment=testnode2",
+          "-logthreadnames",
+          "-logsourcelocations",
+          "-loglevel=trace",
+          "-nologratelimit",
+          "-v2transport=0",
+          "-mercaweaveheight=110",
+          "-pqp2p=required",
+          "-connect=0",
+          "-rpcbind=127.0.0.1",
+          "-rpcallowip=127.0.0.1",
+          "-unsafesqlitesync=0"
+        ],
+        "config": [
+          "port=13901",
+          "rpcport=18901",
+          "discover=0",
+          "dnsseed=0",
+          "fixedseeds=0",
+          "listenonion=0",
+          "connect=0",
+          "bind=127.0.0.1"
+        ],
+        "peers": [
+          {
+            "address": "127.0.0.1:48990",
+            "subversion": "/MercaturaCore:0.1.3(testnode1)/",
+            "pq": true
+          }
+        ]
+      }
+    ],
+    "tip": {
+      "hash": "8e2308efb3a16b126e69444329cc0ed81bea0596e99db1032ccd750e7028f685",
+      "height": 0
+    }
+  },
+  {
+    "name": "actual-native-Qt-inactive-Send",
+    "result": "PASS",
+    "platform": "offscreen",
+    "mode": {
+      "class": "QComboBox",
+      "enabled": true,
+      "height": 23,
+      "index": 0,
+      "items": [
+        {
+          "enabled": true,
+          "text": "Automatic (Recommended)",
+          "text_width": 152
+        },
+        {
+          "enabled": true,
+          "text": "Standard PQ \u2014 Witness v2 only",
+          "text_width": 172
+        },
+        {
+          "enabled": false,
+          "text": "MercaWeave \u2014 Witness v3 only",
+          "text_width": 172
+        }
+      ],
+      "name": "spendingMode",
+      "visible": true,
+      "width": 231,
+      "x": 245,
+      "y": 12
+    }
+  },
+  {
+    "name": "preactivation-and-real-reward-maturity",
+    "result": "PASS",
+    "tip": {
+      "hash": "ccad2369d750cd3a7630a249720327a32115f8151df0b0edeb72970ab1ddcf9e",
+      "height": 109
+    },
+    "spendable": "214041.06"
+  },
+  {
+    "name": "candidate-height-H-versus-active-tip-H-minus-one",
+    "result": "PASS",
+    "tip": {
+      "hash": "ccad2369d750cd3a7630a249720327a32115f8151df0b0edeb72970ab1ddcf9e",
+      "height": 109
+    }
+  },
+  {
+    "name": "activation-boundary-reorg-and-v2-preservation",
+    "result": "PASS",
+    "tip": {
+      "hash": "64235c53892d47bf09bf2557fc72f9f1f1015ccd7c6dc7460837eb6373f8dfc6",
+      "height": 110
+    }
+  },
+  {
+    "name": "native-v2-funding-of-v3-output-relay-and-block",
+    "result": "PASS",
+    "txid": "b4689c3cf862bafdcd0085a4da1213a24daab560b28b4c06641c52481da99c06",
+    "tip": {
+      "hash": "2f4f0972a5b91e87019c300e5ce1110b1c2c60aa20e8f3b4d699303cf0a39c72",
+      "height": 111
+    }
+  },
+  {
+    "name": "actual-native-Qt-Coin-Control-and-wallet-switch",
+    "result": "PASS",
+    "rows": [
+      {
+        "amount": "23\u2009782.34",
+        "checkable": true,
+        "confirmations": "105",
+        "selected": true,
+        "type": "Standard PQ (v2)"
+      },
+      {
+        "amount": "20.00",
+        "checkable": true,
+        "confirmations": "1",
+        "selected": false,
+        "type": "MercaWeave (v3)"
+      },
+      {
+        "amount": "20.00",
+        "checkable": true,
+        "confirmations": "1",
+        "selected": false,
+        "type": "MercaWeave (v3)"
+      }
+    ],
+    "fee": {
+      "class": "QLabel",
+      "enabled": true,
+      "height": 1,
+      "name": "labelCoinControlBytes",
+      "text": "0",
+      "visible": false,
+      "width": 0,
+      "x": 20,
+      "y": 19
+    }
+  },
+  {
+    "name": "actual-native-pending-Send-invalidated-by-activation-reorg",
+    "result": "PASS",
+    "tip": {
+      "hash": "2f4f0972a5b91e87019c300e5ce1110b1c2c60aa20e8f3b4d699303cf0a39c72",
+      "height": 111
+    }
+  },
+  {
+    "name": "explicit-policies-manual-conflicts-output-independence-and-real-fees",
+    "result": "PASS",
+    "grouped_bytes": 5520,
+    "standard_bytes": 10716,
+    "saved_bytes": 5196,
+    "grouped_fee": "0.06",
+    "standard_fee": "0.11"
+  },
+  {
+    "name": "wrong-actual-prevout-snapshot-rejected-before-signing",
+    "result": "PASS"
+  },
+  {
+    "name": "independent-mempool-and-block-rejection-invalid-signature",
+    "result": "PASS",
+    "expected_mempool": "pqgroup-authorization-14",
+    "expected_block": "pqgroup-authorization-14",
+    "reasons": [
+      "pqgroup-authorization-14",
+      "pqgroup-authorization-14",
+      "pqgroup-authorization-14"
+    ],
+    "tip": {
+      "hash": "2f4f0972a5b91e87019c300e5ce1110b1c2c60aa20e8f3b4d699303cf0a39c72",
+      "height": 111
+    }
+  },
+  {
+    "name": "independent-mempool-and-block-rejection-incorrect-group-public-key",
+    "result": "PASS",
+    "expected_mempool": "pqgroup-authorization-13",
+    "expected_block": "pqgroup-authorization-13",
+    "reasons": [
+      "pqgroup-authorization-13",
+      "pqgroup-authorization-13",
+      "pqgroup-authorization-13"
+    ],
+    "tip": {
+      "hash": "2f4f0972a5b91e87019c300e5ce1110b1c2c60aa20e8f3b4d699303cf0a39c72",
+      "height": 111
+    }
+  },
+  {
+    "name": "independent-mempool-and-block-rejection-incorrect-output-commitment-nonce",
+    "result": "PASS",
+    "expected_mempool": "pqgroup-authorization-13",
+    "expected_block": "pqgroup-authorization-13",
+    "reasons": [
+      "pqgroup-authorization-13",
+      "pqgroup-authorization-13",
+      "pqgroup-authorization-13"
+    ],
+    "tip": {
+      "hash": "2f4f0972a5b91e87019c300e5ce1110b1c2c60aa20e8f3b4d699303cf0a39c72",
+      "height": 111
+    }
+  },
+  {
+    "name": "independent-mempool-and-block-rejection-self-follower-role",
+    "result": "PASS",
+    "expected_mempool": "bad-txns-too-many-sigops",
+    "expected_block": "bad-blk-sigops",
+    "reasons": [
+      "bad-txns-too-many-sigops",
+      "bad-txns-too-many-sigops",
+      "bad-txns-too-many-sigops"
+    ],
+    "tip": {
+      "hash": "2f4f0972a5b91e87019c300e5ce1110b1c2c60aa20e8f3b4d699303cf0a39c72",
+      "height": 111
+    }
+  },
+  {
+    "name": "independent-mempool-and-block-rejection-missing-required-witness",
+    "result": "PASS",
+    "expected_mempool": "bad-witness-nonstandard",
+    "expected_block": "bad-blk-sigops",
+    "reasons": [
+      "bad-witness-nonstandard",
+      "bad-witness-nonstandard",
+      "bad-witness-nonstandard"
+    ],
+    "tip": {
+      "hash": "2f4f0972a5b91e87019c300e5ce1110b1c2c60aa20e8f3b4d699303cf0a39c72",
+      "height": 111
+    }
+  },
+  {
+    "name": "independent-mempool-and-block-rejection-changed-signed-transaction-commitment",
+    "result": "PASS",
+    "expected_mempool": "pqgroup-authorization-14",
+    "expected_block": "pqgroup-authorization-14",
+    "reasons": [
+      "pqgroup-authorization-14",
+      "pqgroup-authorization-14",
+      "pqgroup-authorization-14"
+    ],
+    "tip": {
+      "hash": "2f4f0972a5b91e87019c300e5ce1110b1c2c60aa20e8f3b4d699303cf0a39c72",
+      "height": 111
+    }
+  },
+  {
+    "name": "independent-mempool-and-block-rejection-reordered-input-roles",
+    "result": "PASS",
+    "expected_mempool": "bad-txns-too-many-sigops",
+    "expected_block": "bad-blk-sigops",
+    "reasons": [
+      "bad-txns-too-many-sigops",
+      "bad-txns-too-many-sigops",
+      "bad-txns-too-many-sigops"
+    ],
+    "tip": {
+      "hash": "2f4f0972a5b91e87019c300e5ce1110b1c2c60aa20e8f3b4d699303cf0a39c72",
+      "height": 111
+    }
+  },
+  {
+    "name": "independent-mempool-and-block-rejection-duplicate-group-key-anchor",
+    "result": "PASS",
+    "expected_mempool": "bad-txns-too-many-sigops",
+    "expected_block": "bad-blk-sigops",
+    "reasons": [
+      "bad-txns-too-many-sigops",
+      "bad-txns-too-many-sigops",
+      "bad-txns-too-many-sigops"
+    ],
+    "tip": {
+      "hash": "2f4f0972a5b91e87019c300e5ce1110b1c2c60aa20e8f3b4d699303cf0a39c72",
+      "height": 111
+    }
+  },
+  {
+    "name": "real-grouped-two-hop-P2P-relay-and-independent-mined-block",
+    "result": "PASS",
+    "txid": "5f7c2e8bd4a45b54e0f6db013d3157236a2733dc99288955d47953815c25d6ce",
+    "tip": {
+      "hash": "d4a2c96750fde47e101a122fbbf8d3c3148dfa79cbfa8c4b4b623dfa8671e8b6",
+      "height": 112
+    }
+  },
+  {
+    "name": "existing-v2-authorization-accepted-after-activation",
+    "result": "PASS",
+    "txid": "d07fc4637bd2c7f83ef1a2997c01023d3fb12bde1216b2cc4b84732440837d4d",
+    "tip": {
+      "hash": "0870e4a93e5f5a628382d4b9377e1c46a0619eba9a81774a15d88882fe4cec6e",
+      "height": 113
+    }
+  },
+  {
+    "name": "receiving-wallet-process-restart-after-grouped-confirmation",
+    "result": "PASS",
+    "balance": "10.00",
+    "tip": {
+      "hash": "0870e4a93e5f5a628382d4b9377e1c46a0619eba9a81774a15d88882fe4cec6e",
+      "height": 113
+    }
+  },
+  {
+    "name": "foreign-genesis-output-commitment-rejected-by-all-validators",
+    "result": "PASS",
+    "funding_txid": "bf19963eadbc106678a8df49dab2526f5b505d66a4b07aa4499d640761458bde",
+    "expected": "pqgroup-authorization-13",
+    "tip": {
+      "hash": "75662408c8325d49f2d2bea17fc116da93958c2caa303270629055a617a8814f",
+      "height": 114
+    }
+  },
+  {
+    "name": "real-Automatic-mixed-v2-v3-relay-and-confirmation",
+    "result": "PASS",
+    "txid": "9aa7561c0ef84c9574ed59075f817f20434ba517ac8e088080a5c33553ad9c29",
+    "tip": {
+      "hash": "c278195b3bc4b9b98cb625feeae03591b6857d8fcc062d5a2697f86b287259fb",
+      "height": 116
+    }
+  },
+  {
+    "name": "validator-process-restart-and-grouped-mempool-persistence",
+    "result": "PASS",
+    "txid": "99280c24112c3347a706f37ba6fda25342c8a366602a39cc3418da47e81155b2",
+    "tip": {
+      "hash": "5fc2e1ae069c05b55b0ff8292ba2c87a65f3ddf883c818c712110823055bf339",
+      "height": 117
+    }
+  },
+  {
+    "name": "wallet-reload-rescan-authenticated-known-ranges",
+    "result": "PASS",
+    "authenticated": true,
+    "txid": "99280c24112c3347a706f37ba6fda25342c8a366602a39cc3418da47e81155b2"
+  },
+  {
+    "name": "grouped-history-reindex-and-level4-replay",
+    "result": "PASS",
+    "tip": {
+      "hash": "5fc2e1ae069c05b55b0ff8292ba2c87a65f3ddf883c818c712110823055bf339",
+      "height": 117
+    }
+  },
+  {
+    "name": "real-competing-chain-reorg-and-disconnected-grouped-mempool-return",
+    "result": "PASS",
+    "disconnected_block": "ca29d30b8421b8f9002a9d72cd5416b246f26316455eeb7c1672788d578d433f",
+    "txid": "99280c24112c3347a706f37ba6fda25342c8a366602a39cc3418da47e81155b2",
+    "tip": {
+      "hash": "5a5995fc5a7d1b1cd1585411da2e377559edf4a7a9f237317b94dbb8c039a7d2",
+      "height": 119
+    }
+  },
+  {
+    "name": "reconfirmation-stale-PSBT-rejection-and-coin-reconciliation",
+    "result": "PASS",
+    "txid": "99280c24112c3347a706f37ba6fda25342c8a366602a39cc3418da47e81155b2",
+    "tip": {
+      "hash": "8679c518284cc0853ff47e9480c66c33486b17943688f85efe49cab107464ded",
+      "height": 120
+    }
+  },
+  {
+    "name": "final-independent-validation-and-PQ-network-agreement",
+    "result": "PASS",
+    "tip": {
+      "hash": "8679c518284cc0853ff47e9480c66c33486b17943688f85efe49cab107464ded",
+      "height": 120
+    },
+    "nodes": [
+      {
+        "index": 0,
+        "pid": 34737,
+        "datadir": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/gui-three-node-06/node0",
+        "argv": [
+          "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercatura-qt",
+          "-datadir=/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/gui-three-node-06/node0",
+          "-logtimemicros",
+          "-debug",
+          "-debugexclude=libevent",
+          "-debugexclude=leveldb",
+          "-debugexclude=rand",
+          "-uacomment=testnode0",
+          "-logthreadnames",
+          "-logsourcelocations",
+          "-loglevel=trace",
+          "-nologratelimit",
+          "-v2transport=0",
+          "-nosplash",
+          "-resetguisettings",
+          "-choosedatadir=0",
+          "-lang=en",
+          "-mercaweaveheight=110",
+          "-pqp2p=required",
+          "-connect=0",
+          "-rpcbind=127.0.0.1",
+          "-rpcallowip=127.0.0.1",
+          "-unsafesqlitesync=0"
+        ],
+        "config": [
+          "port=13899",
+          "rpcport=18899",
+          "discover=0",
+          "dnsseed=0",
+          "fixedseeds=0",
+          "listenonion=0",
+          "connect=0",
+          "bind=127.0.0.1"
+        ],
+        "peers": [
+          {
+            "address": "127.0.0.1:13900",
+            "subversion": "/MercaturaCore:0.1.3(testnode1)/",
+            "pq": true
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "pid": 34798,
+        "datadir": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/gui-three-node-06/node1",
+        "argv": [
+          "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercaturad",
+          "-datadir=/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/gui-three-node-06/node1",
+          "-logtimemicros",
+          "-debug",
+          "-debugexclude=libevent",
+          "-debugexclude=leveldb",
+          "-debugexclude=rand",
+          "-uacomment=testnode1",
+          "-logthreadnames",
+          "-logsourcelocations",
+          "-loglevel=trace",
+          "-nologratelimit",
+          "-v2transport=0",
+          "-mercaweaveheight=110",
+          "-pqp2p=required",
+          "-connect=0",
+          "-rpcbind=127.0.0.1",
+          "-rpcallowip=127.0.0.1",
+          "-unsafesqlitesync=0"
+        ],
+        "config": [
+          "port=13900",
+          "rpcport=18900",
+          "discover=0",
+          "dnsseed=0",
+          "fixedseeds=0",
+          "listenonion=0",
+          "connect=0",
+          "bind=127.0.0.1"
+        ],
+        "peers": [
+          {
+            "address": "127.0.0.1:59322",
+            "subversion": "/MercaturaCore:0.1.3(testnode0)/",
+            "pq": true
+          },
+          {
+            "address": "127.0.0.1:13901",
+            "subversion": "/MercaturaCore:0.1.3(testnode2)/",
+            "pq": true
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "pid": 34850,
+        "datadir": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/gui-three-node-06/node2",
+        "argv": [
+          "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercaturad",
+          "-datadir=/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/gui-three-node-06/node2",
+          "-logtimemicros",
+          "-debug",
+          "-debugexclude=libevent",
+          "-debugexclude=leveldb",
+          "-debugexclude=rand",
+          "-uacomment=testnode2",
+          "-logthreadnames",
+          "-logsourcelocations",
+          "-loglevel=trace",
+          "-nologratelimit",
+          "-v2transport=0",
+          "-mercaweaveheight=110",
+          "-pqp2p=required",
+          "-connect=0",
+          "-rpcbind=127.0.0.1",
+          "-rpcallowip=127.0.0.1",
+          "-unsafesqlitesync=0"
+        ],
+        "config": [
+          "port=13901",
+          "rpcport=18901",
+          "discover=0",
+          "dnsseed=0",
+          "fixedseeds=0",
+          "listenonion=0",
+          "connect=0",
+          "bind=127.0.0.1"
+        ],
+        "peers": [
+          {
+            "address": "127.0.0.1:39978",
+            "subversion": "/MercaturaCore:0.1.3(testnode1)/",
+            "pq": true
+          }
+        ]
+      }
+    ]
+  }
+]

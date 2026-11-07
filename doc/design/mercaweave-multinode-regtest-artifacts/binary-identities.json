@@ -1,0 +1,93 @@
+{
+  "source_commit": "ca3b2d9dde296b4ebbd120212c243fcb066f1581",
+  "build": "work/build-native-release",
+  "cmake": "4.4.4",
+  "compiler": "g++ (Debian 14.2.0-19) 14.2.0",
+  "binaries": {
+    "mercaturad": {
+      "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercaturad",
+      "sha256": "28b70893a76569e739ba61c4edcb53ae80eda29136e0f72030739878b4b7932a"
+    },
+    "mercatura-cli": {
+      "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercatura-cli",
+      "sha256": "9d49e3135750c34586207fd5f1b3dd1a6c59dfec2d58126e859e1fab783ab2b5"
+    },
+    "mercatura-qt": {
+      "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercatura-qt",
+      "sha256": "8903685136626d79095cdfa7700087114ed9f6208443144411d76477dbdf0209"
+    },
+    "test_bitcoin": {
+      "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/test_bitcoin",
+      "sha256": "2087b6b470f41176d0d6c283cc1b3f95391e35b05fa43796e3af986741f7a7f6"
+    },
+    "test_bitcoin-qt": {
+      "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/test_bitcoin-qt",
+      "sha256": "cb818784c27a4de6e9b12e1872ef603ea423ff427714e243b1e290e67bbd510d"
+    },
+    "test_mining-qt": {
+      "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/test_mining-qt",
+      "sha256": "70ed1a53ad747b0b093d7cd2e7cfb9f1d7fefef6d847ce27f92dd8f4b83fcf0a"
+    },
+    "test_mining_app-qt": {
+      "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/test_mining_app-qt",
+      "sha256": "77d7db4cf6834d67f57420d51a9fd8376713b4a1c67408f9eefc1abd9dadfb0d"
+    },
+    "test_peersecurity-qt": {
+      "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/test_peersecurity-qt",
+      "sha256": "d49a0fc4214870961c149dc9c66d5390b2ea9c02bb9ce6e9a9c09269895ba63a"
+    }
+  },
+  "app_build_log_birth_and_end": "2026-11-07 10:28:36.208807375 +0000 2026-11-07 10:28:42.114578689 +0000",
+  "app_build_elapsed_approx_seconds": 5.906,
+  "app_build_exit_code": 0,
+  "os_release": "PRETTY_NAME=\"Debian GNU/Linux 13 (trixie)\"\nNAME=\"Debian GNU/Linux\"\nVERSION_ID=\"13\"\nVERSION=\"13 (trixie)\"\nVERSION_CODENAME=trixie\nDEBIAN_VERSION_FULL=13.6\nID=debian\nHOME_URL=\"https://www.debian.org/\"\nSUPPORT_URL=\"https://www.debian.org/support\"\nBUG_REPORT_URL=\"https://bugs.debian.org/\"\n",
+  "qt": "6.8.2",
+  "qt_platform": "offscreen",
+  "qt_style": "fusion",
+  "desktop_WSLg": "not available in this Debian cloud executor",
+  "scope": "Exact pushed native runtime; later local changes are qualification tests/probe/report only.",
+  "local_repaired_qt_test": {
+    "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/test_bitcoin-qt",
+    "sha256": "7c2cdfc2fb631f58d5befa8c0730d5d87bbb308d113cb60d26ae2b11c9150ee8",
+    "base_commit": "ca3b2d9dde296b4ebbd120212c243fcb066f1581",
+    "local_source_change": "src/qt/test/wallettests.cpp: replace deprecated Qt exception macro with typed try/catch and QVERIFY",
+    "test_source_sha256": "a289d8c9803e180baae63184a74631aa08da0a7a619b7092c6d55b091106e679",
+    "rebuild_receipt": {
+      "command": [
+        "/workspace/Mercatura-MercaWeave-v0.1/work/tools/cmake/data/bin/cmake",
+        "--build",
+        "work/build-native-release",
+        "--target",
+        "test_bitcoin-qt",
+        "-j4"
+      ],
+      "started_utc": "2026-11-07T12:13:51.202552+00:00",
+      "ended_utc": "2026-11-07T12:14:10.019556+00:00",
+      "elapsed_seconds": 18.817,
+      "exit_code": 0
+    },
+    "focused_result": {
+      "name": "focused-qt",
+      "command": [
+        "/workspace/Mercatura-MercaWeave-v0.1/work/tools/cmake/data/bin/ctest",
+        "--test-dir",
+        "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release",
+        "--output-on-failure",
+        "-j1",
+        "-R",
+        "^test_bitcoin-qt$"
+      ],
+      "started_utc": "2026-11-07T12:14:10.062262+00:00",
+      "ended_utc": "2026-11-07T12:17:51.359376+00:00",
+      "elapsed_seconds": 221.297,
+      "exit_code": 0,
+      "source_head": "ca3b2d9dde296b4ebbd120212c243fcb066f1581",
+      "tracked_diff_sha256": "c01139d8f3ccdf525f2a3f07e50a4310fada3bf07711be57f15d555ada5d85b1",
+      "untracked_source_sha256": {
+        "test/functional/mercatura_mercaweave_multinode.py": "48478a3ea38c313f3f9c07b57ee67fef1d9d01b9b0cb53fc8d9764ffa969425b",
+        "test/functional/mercaweave_gui_probe.cpp": "6d80a62b7b84f2d5205a9e060c689e00ae8c0568557aced972e3f7b57731cfc9"
+      }
+    }
+  },
+  "identity_note": "The initial build binaries are preserved in this record. Only test_bitcoin-qt was subsequently rebuilt for the local test-only repair. The daemon, CLI and actual Qt wallet hashes remain the exact pushed-source application identities."
+}

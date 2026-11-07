@@ -1,0 +1,446 @@
+{
+  "raw_batch": {
+    "selected": 59,
+    "passed": 58,
+    "failed": 1,
+    "exit_code": 1,
+    "receipt": "full-functional-receipt.json"
+  },
+  "targeted_repaired_case": {
+    "name": "mercatura_mercaweave_multinode.py",
+    "result": "PASS",
+    "elapsed_seconds": 340.134,
+    "named_checkpoints": 26,
+    "final_tip": {
+      "hash": "89f7642722e3e8e0cc2719cf103eac27e897611858f47a27d0d617fcffb2b665",
+      "height": 120
+    },
+    "receipt": "focused-new-native-receipt.json"
+  },
+  "coverage_across_invocations": {
+    "unique_cases": 59,
+    "final_passed": 59,
+    "final_failed": 0,
+    "note": "58 unchanged cases passed in the failed batch; the repaired new case passed separately. This is not a clean single 59-case run."
+  },
+  "cases": [
+    {
+      "name": "mercatura_spending_modes.py",
+      "initial_result": "PASSED",
+      "seconds": 155,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_mercaweave_multinode.py",
+      "initial_result": "FAILED",
+      "seconds": 261,
+      "final_result": "PASS",
+      "final_evidence": "focused-new-native-receipt.json"
+    },
+    {
+      "name": "mercatura_block_capacity.py",
+      "initial_result": "PASSED",
+      "seconds": 263,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_testnet_capacity.py",
+      "initial_result": "PASSED",
+      "seconds": 3,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_witness_resource.py",
+      "initial_result": "PASSED",
+      "seconds": 17,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_chain_reorg.py",
+      "initial_result": "PASSED",
+      "seconds": 41,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_capacity.py",
+      "initial_result": "PASSED",
+      "seconds": 183,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_mercaweave.py",
+      "initial_result": "PASSED",
+      "seconds": 345,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_coinbase_subsidy.py",
+      "initial_result": "PASSED",
+      "seconds": 8,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_classical_ownership_shutdown.py",
+      "initial_result": "PASSED",
+      "seconds": 102,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_coinbase_maturity.py",
+      "initial_result": "PASSED",
+      "seconds": 106,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_capacity.py --pq",
+      "initial_result": "PASSED",
+      "seconds": 202,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_headers_replay.py",
+      "initial_result": "PASSED",
+      "seconds": 11,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_mercahash_pow.py",
+      "initial_result": "PASSED",
+      "seconds": 3,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_fee_boundary.py",
+      "initial_result": "PASSED",
+      "seconds": 82,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_mining.py",
+      "initial_result": "PASSED",
+      "seconds": 3,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_network_identity.py",
+      "initial_result": "PASSED",
+      "seconds": 10,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_fee_policy.py",
+      "initial_result": "PASSED",
+      "seconds": 94,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_mercahash_v2.py",
+      "initial_result": "PASSED",
+      "seconds": 122,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "feature_pq_transport.py --mercahash-v2-height=0",
+      "initial_result": "PASSED",
+      "seconds": 58,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_p2p_propagation.py",
+      "initial_result": "PASSED",
+      "seconds": 151,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "feature_pq_transport.py --mercahash-v2-height=20",
+      "initial_result": "PASSED",
+      "seconds": 68,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "feature_pq_b1_lifecycle.py --mercahash-v2-height=0",
+      "initial_result": "PASSED",
+      "seconds": 54,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_dgw.py",
+      "initial_result": "PASSED",
+      "seconds": 376,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "feature_pq_b3_assurance.py",
+      "initial_result": "PASSED",
+      "seconds": 13,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "feature_pq_required.py",
+      "initial_result": "PASSED",
+      "seconds": 30,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "feature_pq_required.py --public-testnet",
+      "initial_result": "PASSED",
+      "seconds": 20,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "feature_pq_transport.py",
+      "initial_result": "PASSED",
+      "seconds": 250,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "feature_pq_transport_negative.py",
+      "initial_result": "PASSED",
+      "seconds": 66,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "feature_pq_discovery.py --public-testnet",
+      "initial_result": "PASSED",
+      "seconds": 10,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_address_enforcement.py",
+      "initial_result": "PASSED",
+      "seconds": 1,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "feature_pq_activation.py",
+      "initial_result": "PASSED",
+      "seconds": 65,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "feature_pq_discovery.py",
+      "initial_result": "PASSED",
+      "seconds": 86,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_auth_commitments.py",
+      "initial_result": "PASSED",
+      "seconds": 105,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_coinbase_template.py",
+      "initial_result": "PASSED",
+      "seconds": 118,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_batching.py",
+      "initial_result": "PASSED",
+      "seconds": 95,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_invalid_auth.py",
+      "initial_result": "PASSED",
+      "seconds": 108,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_mempool_persistence.py",
+      "initial_result": "PASSED",
+      "seconds": 87,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_multi_input.py",
+      "initial_result": "PASSED",
+      "seconds": 108,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_many_input_selection.py",
+      "initial_result": "PASSED",
+      "seconds": 142,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_p2p_malformed.py",
+      "initial_result": "PASSED",
+      "seconds": 114,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_package.py",
+      "initial_result": "PASSED",
+      "seconds": 85,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_prevout_amount.py",
+      "initial_result": "PASSED",
+      "seconds": 106,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_psbt.py",
+      "initial_result": "PASSED",
+      "seconds": 99,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_rbf.py",
+      "initial_result": "PASSED",
+      "seconds": 94,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_send_receive.py",
+      "initial_result": "PASSED",
+      "seconds": 94,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_reorg.py",
+      "initial_result": "PASSED",
+      "seconds": 154,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_smoke.py",
+      "initial_result": "PASSED",
+      "seconds": 1,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_reindex.py",
+      "initial_result": "PASSED",
+      "seconds": 164,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_testnet_identity.py",
+      "initial_result": "PASSED",
+      "seconds": 2,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_solo_native.py",
+      "initial_result": "PASSED",
+      "seconds": 201,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_three_node_pq.py",
+      "initial_result": "PASSED",
+      "seconds": 203,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_wallet_backup_restore.py",
+      "initial_result": "PASSED",
+      "seconds": 97,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_wallet_encryption.py",
+      "initial_result": "PASSED",
+      "seconds": 96,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_pq_rescan.py",
+      "initial_result": "PASSED",
+      "seconds": 646,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_wallet_encryption_persistence.py",
+      "initial_result": "PASSED",
+      "seconds": 131,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_storage_recovery.py",
+      "initial_result": "PASSED",
+      "seconds": 486,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_wallet_historical_recovery.py",
+      "initial_result": "PASSED",
+      "seconds": 84,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    },
+    {
+      "name": "mercatura_wallet_persistence.py",
+      "initial_result": "PASSED",
+      "seconds": 51,
+      "final_result": "PASS",
+      "final_evidence": "full-functional-receipt.json"
+    }
+  ],
+  "local_test_source_sha256": {
+    "test/functional/mercatura_mercaweave_multinode.py": "2bd886991e61848f47773145383372b58904372b0fc9d6ceabd2a5bf8a7129ce",
+    "test/functional/mercaweave_gui_probe.cpp": "6d80a62b7b84f2d5205a9e060c689e00ae8c0568557aced972e3f7b57731cfc9",
+    "src/qt/test/wallettests.cpp": "a289d8c9803e180baae63184a74631aa08da0a7a619b7092c6d55b091106e679"
+  }
+}

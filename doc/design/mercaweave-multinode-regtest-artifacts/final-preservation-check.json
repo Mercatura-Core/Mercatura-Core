@@ -1,0 +1,30 @@
+{
+  "production": {
+    "head": "4b88b619fb1b08c7f30112a38eb471880b2a6af4",
+    "clean": true
+  },
+  "research": {
+    "head": "664d491dd702a581d9914c664edbb3c53e0e977c",
+    "clean": true
+  },
+  "historical_protected_files": {
+    "total": 190,
+    "unchanged": 189,
+    "previous_integration_exception": [
+      "src/mining/solo.cpp"
+    ],
+    "modified_in_this_task": 0
+  },
+  "mercaturad": {
+    "unchanged_from_pushed_build": true,
+    "sha256": "28b70893a76569e739ba61c4edcb53ae80eda29136e0f72030739878b4b7932a"
+  },
+  "mercatura-cli": {
+    "unchanged_from_pushed_build": true,
+    "sha256": "9d49e3135750c34586207fd5f1b3dd1a6c59dfec2d58126e859e1fab783ab2b5"
+  },
+  "mercatura-qt": {
+    "unchanged_from_pushed_build": true,
+    "sha256": "8903685136626d79095cdfa7700087114ed9f6208443144411d76477dbdf0209"
+  }
+}

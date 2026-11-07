@@ -631,8 +631,14 @@ void WalletTests::mercaweaveReceiveAndSendTests()
         QCOMPARE(job->height, int64_t{102});
         QVERIFY(job->coinbase->vout[0].scriptPubKey == GetScriptForDestination(destination));
     }
-    QVERIFY_EXCEPTION_THROWN((mining::SoloWorkProvider{interfaces::MakeMining(test.m_node, false),
-        CScript{} << OP_3 << std::vector<unsigned char>(16, 1), "", true}), std::runtime_error);
+    bool malformed_reward_rejected{false};
+    try {
+        (void)mining::SoloWorkProvider{interfaces::MakeMining(test.m_node, false),
+            CScript{} << OP_3 << std::vector<unsigned char>(16, 1), "", true};
+    } catch (const std::runtime_error&) {
+        malformed_reward_rejected = true;
+    }
+    QVERIFY(malformed_reward_rejected);
     std::vector<COutPoint> funding;
     CAmount available{0};
     for (int i = 0; i < 105; ++i) {

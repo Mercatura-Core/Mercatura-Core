@@ -1,0 +1,23 @@
+{
+  "name": "focused-new-native",
+  "command": [
+    "python3",
+    "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/test/functional/test_runner.py",
+    "--jobs=4",
+    "--timeout-factor=3",
+    "--tmpdirprefix=/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/runtimes",
+    "--nocleanup",
+    "--artifact-dir=/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/repaired-native-evidence",
+    "mercatura_mercaweave_multinode.py"
+  ],
+  "started_utc": "2026-11-07T13:18:31.637288+00:00",
+  "ended_utc": "2026-11-07T13:24:11.771169+00:00",
+  "elapsed_seconds": 340.134,
+  "exit_code": 0,
+  "source_head": "ca3b2d9dde296b4ebbd120212c243fcb066f1581",
+  "tracked_diff_sha256": "5f4e30adabc09481337ccbc650bc02f6a68aaf0bd41b75c51dd4f27ecad59dd8",
+  "untracked_source_sha256": {
+    "doc/design/mercaweave-multinode-regtest-artifacts/duplicate-invalid-race-evidence.txt": "588fa1dc598001a3f49c75c77563f4dad1173d1c30f57eac97200c40bc6d1520",
+    "doc/design/mercaweave-multinode-regtest-artifacts/full-functional-receipt.json": "48784dbab3f4acda05638bd82bc2ce91f4d1b8b3788209f7a3bfd8100ed2da00"
+  }
+}

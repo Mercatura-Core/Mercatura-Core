@@ -1,0 +1,85 @@
+{
+  "command": [
+    "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercatura-qt",
+    "-regtest",
+    "-datadir=/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/mca-default-f0tfl857",
+    "-server=1",
+    "-port=58281",
+    "-rpcport=35457",
+    "-bind=127.0.0.1",
+    "-rpcbind=127.0.0.1",
+    "-rpcallowip=127.0.0.1",
+    "-connect=0",
+    "-discover=0",
+    "-dnsseed=0",
+    "-fixedseeds=0",
+    "-listenonion=0",
+    "-pqp2p=required",
+    "-unsafesqlitesync=0",
+    "-nosplash",
+    "-resetguisettings",
+    "-choosedatadir=0",
+    "-lang=en"
+  ],
+  "cli_base": [
+    "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercatura-cli",
+    "-regtest",
+    "-datadir=/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/mca-default-f0tfl857",
+    "-rpcport=35457"
+  ],
+  "source_commit": "ca3b2d9dde296b4ebbd120212c243fcb066f1581",
+  "activation_argument_absent": true,
+  "mode": {
+    "class": "QComboBox",
+    "enabled": true,
+    "height": 23,
+    "index": 0,
+    "items": [
+      {
+        "enabled": true,
+        "text": "Automatic (Recommended)",
+        "text_width": 152
+      },
+      {
+        "enabled": true,
+        "text": "Standard PQ \u2014 Witness v2 only",
+        "text_width": 172
+      },
+      {
+        "enabled": false,
+        "text": "MercaWeave \u2014 Witness v3 only",
+        "text_width": 172
+      }
+    ],
+    "name": "spendingMode",
+    "visible": true,
+    "width": 231,
+    "x": 245,
+    "y": 12
+  },
+  "chain": {
+    "chain": "regtest",
+    "blocks": 1,
+    "headers": 1,
+    "bestblockhash": "23b79348be8a91753bfb14fc3bb3de2bb8e4abdfccb0a19252bd01406f712b9b",
+    "bits": "207fffff",
+    "target": "7fffff0000000000000000000000000000000000000000000000000000000000",
+    "difficulty": 4.656542373906925e-10,
+    "time": 1794055188,
+    "mediantime": 1794055188,
+    "verificationprogress": 1,
+    "initialblockdownload": false,
+    "chainwork": "0000000000000000000000000000000000000000000000000000000000000004",
+    "size_on_disk": 528,
+    "pruned": false,
+    "warnings": []
+  },
+  "started_utc": "2026-11-07T12:39:43.562134+00:00",
+  "ended_utc": "2026-11-07T12:39:50.156505+00:00",
+  "elapsed_seconds": 6.594,
+  "exit_code": 0,
+  "owned_pid": 38542,
+  "stopped": true,
+  "fixture": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/mca-default-f0tfl857",
+  "screenshot": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/mca-default-f0tfl857/screenshots/G-default-regtest-no-activation.png"
+}

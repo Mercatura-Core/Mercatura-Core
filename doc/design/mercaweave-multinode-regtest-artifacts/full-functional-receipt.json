@@ -1,0 +1,43 @@
+{
+  "name": "full-functional",
+  "command": [
+    "python3",
+    "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/test/functional/test_runner.py",
+    "--jobs=4",
+    "--timeout-factor=3",
+    "--tmpdirprefix=/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/runtimes"
+  ],
+  "started_utc": "2026-11-07T12:35:56.660054+00:00",
+  "ended_utc": "2026-11-07T13:07:21.266045+00:00",
+  "elapsed_seconds": 1884.606,
+  "exit_code": 1,
+  "source_head": "ca3b2d9dde296b4ebbd120212c243fcb066f1581",
+  "tracked_diff_sha256": "c01139d8f3ccdf525f2a3f07e50a4310fada3bf07711be57f15d555ada5d85b1",
+  "untracked_source_sha256": {
+    "doc/design/mercaweave-multinode-regtest-artifacts/A-send-inactive-1000x800.png": "9743566e500cde8a78d2fce25dcf989b57862451c07b96563af66769247c14d8",
+    "doc/design/mercaweave-multinode-regtest-artifacts/A-send-inactive-850x650.png": "e9a20f60b5e22d30f727eaa23c002055c80502addf24ef86b4d6b5639e00bbf6",
+    "doc/design/mercaweave-multinode-regtest-artifacts/B-dropdown-expanded-active.png": "34fd4c89eca9315ae9a7565b3fbb69cf7d88c3beb5dd715afd2076d75a00bdbf",
+    "doc/design/mercaweave-multinode-regtest-artifacts/B-dropdown-expanded-inactive.png": "4c8a64c2f3c1d920068e5ca8450696fd9bd637f8153d6db58855a72b4a0c278c",
+    "doc/design/mercaweave-multinode-regtest-artifacts/C-coin-control-all-types.png": "5ff15896b294c29609fd77060f6a3083b695c7bc118caee7a1a3608f4e51e74c",
+    "doc/design/mercaweave-multinode-regtest-artifacts/C-coin-control-types-scrolled.png": "f5a1ceaf6a28f8457fe002875da98554f87b9f327f96cfde09b9bee4ac3cd76f",
+    "doc/design/mercaweave-multinode-regtest-artifacts/C-coin-control-v3-selection-scrolled.png": "5b99e714e088d07fd5b514c5e096fcc2a33f340fe7e8e53ab72fa1c9d9a60c8e",
+    "doc/design/mercaweave-multinode-regtest-artifacts/C-coin-control-v3-selection.png": "a2a1888d4d921b456275ece406ce414ad7d36789d3918c580c24108932a878df",
+    "doc/design/mercaweave-multinode-regtest-artifacts/D-send-active-automatic.png": "0e700a62c88e6fdf775219700eac2b9dd2bbe06134d17182424c32686fcd937a",
+    "doc/design/mercaweave-multinode-regtest-artifacts/D-send-active-fee-controls.png": "e110a08bb58139c038420d76a1e245a1380c380141dcbe06a193c7ed19c0cb6a",
+    "doc/design/mercaweave-multinode-regtest-artifacts/D-send-active-grouped.png": "8db0308078db70efbfa8d91924e18aef045299e9e48cd13d23423b003fef4f42",
+    "doc/design/mercaweave-multinode-regtest-artifacts/E-unsupported-wallet.png": "aa744096684dfa2f68950a11432faa1573692d52193decbcefff329779ec0bfc",
+    "doc/design/mercaweave-multinode-regtest-artifacts/F-grouped-send-confirmation.png": "7a6dca66e69f257868792a1c653b379dc07bc2349cbd930df3b40d40814e627b",
+    "doc/design/mercaweave-multinode-regtest-artifacts/F-stale-confirmation-invalidated.png": "7b94537af9802d8910646d4ce7860f754bc1cb525377a9b6679a71cfbf9a6ce7",
+    "doc/design/mercaweave-multinode-regtest-artifacts/binary-identities.json": "f9877173ebc5cda5e9521c3e073d06925c08af3860badc39f82bb25a079e99cf",
+    "doc/design/mercaweave-multinode-regtest-artifacts/ci-summary.json": "e1536b331f11ccda994a3365fc841be54f72cf548b5cb2e43a7b31cd6f547366",
+    "doc/design/mercaweave-multinode-regtest-artifacts/gui-three-node-06-receipt.json": "d79a132db866ba4cd76f7e984a902b89d16c3cd531a043fa6a112b37ba14f4b2",
+    "doc/design/mercaweave-multinode-regtest-artifacts/manifest.json": "9c3f7ea6f6cdd391951b3850898e27ac29b33ca468e620531e400fd9beca3466",
+    "doc/design/mercaweave-multinode-regtest-artifacts/qt-widget-inspection.json": "09828ea93c25c0155973ef39d69a96d7c87d79981a4a1d1ef9e41324144afd24",
+    "doc/design/mercaweave-multinode-regtest-artifacts/resources-06-summary.json": "1299ed9e364a0e876edcdd0867b358abe50f46c56defcfc5d6b77e98baa90d10",
+    "doc/design/mercaweave-multinode-regtest-artifacts/results.json": "b16b72bd999c3454efa71ffef3fa3d79ff9a6040d42958d015669a2a38f830d3",
+    "doc/design/mercaweave-multinode-regtest-artifacts/windows-qt-ci-error.txt": "2dd4f43eb0b5949949c84b23cde5695e67ab81a4e2e04f0013f492748c7781f7",
+    "doc/design/mercaweave-multinode-regtest-qualification.md": "5b8e437901f76be478384464ac4e728fc17e819dc448b80447144eface71a4b4",
+    "test/functional/mercatura_mercaweave_multinode.py": "2e0f21fedefbe22b1a388c9ceb7e6b7195672c8a4616456aeacc0f6438ed4906",
+    "test/functional/mercaweave_gui_probe.cpp": "6d80a62b7b84f2d5205a9e060c689e00ae8c0568557aced972e3f7b57731cfc9"
+  }
+}

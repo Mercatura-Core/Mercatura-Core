@@ -88,6 +88,7 @@ TEST_FRAMEWORK_UNIT_TESTS = 'feature_framework_unit_tests.py'
 # Inherited Bitcoin Core functional tests remain available as reference and
 # compatibility tests through explicit selection or --extended.
 MERCATURA_SCRIPTS = [
+    'mercatura_mercaweave_multinode.py',
     'mercatura_spending_modes.py',
     'mercatura_mercaweave.py',
     'mercatura_block_capacity.py',

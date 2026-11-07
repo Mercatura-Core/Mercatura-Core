@@ -1,0 +1,74 @@
+{
+  "pushed_commit": "ca3b2d9dde296b4ebbd120212c243fcb066f1581",
+  "main_workflow": {
+    "run_id": 42363956006,
+    "result": "PASS",
+    "url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/42363956006"
+  },
+  "qt_workflow": {
+    "run_id": 42363955984,
+    "result": "FAIL",
+    "url": "https://github.com/Mercatura-Core/Mercatura-Core/actions/runs/42363955984"
+  },
+  "jobs": [
+    {
+      "job_id": 128377962954,
+      "name": "Linux native Qt",
+      "result": "PASS",
+      "unit_pass": 194,
+      "unit_skip": 1,
+      "unit_fail": 0,
+      "unit_seconds": 1560.0,
+      "functional_pass": 58,
+      "functional_seconds": 878
+    },
+    {
+      "job_id": 128377962798,
+      "name": "macOS native Qt",
+      "result": "PASS",
+      "unit_pass": 190,
+      "unit_skip": 3,
+      "unit_fail": 0,
+      "unit_seconds": 1908.55,
+      "functional_pass": 58,
+      "functional_seconds": 1151
+    },
+    {
+      "job_id": 128377962643,
+      "name": "macOS native headless",
+      "result": "PASS",
+      "unit_pass": 187,
+      "unit_skip": 1,
+      "unit_fail": 0,
+      "unit_seconds": 2125.96,
+      "functional_pass": 58,
+      "functional_seconds": 1116
+    },
+    {
+      "job_id": 128377963208,
+      "name": "Windows native headless",
+      "result": "PASS",
+      "unit_pass": 187,
+      "unit_skip": 1,
+      "unit_fail": 0,
+      "unit_seconds": 1167.65,
+      "functional_pass": 58,
+      "functional_seconds": 758
+    },
+    {
+      "job_id": 128377962922,
+      "name": "Windows native Qt",
+      "result": "FAIL",
+      "reason": "MSVC C4996: deprecated QVERIFY_EXCEPTION_THROWN in src/qt/test/wallettests.cpp:634",
+      "unit": "NOT TESTED: build failed",
+      "functional": "NOT TESTED: build failed",
+      "local_repair": "typed exception assertion, Linux Qt verified; native MSVC NOT TESTED after repair; no further push authorized"
+    }
+  ],
+  "skip_reasons": {
+    "script_assets_tests": "Inherited classical-signature semantics intentionally disabled",
+    "macOS mining_app1/2": "Existing application-close lifecycle differs on macOS; not a native shutdown failure",
+    "cross-packaging matrix": "Integration branch deliberately excludes installers/packages; not counted as a passing build"
+  },
+  "qualification_new_test_in_remote_CI": false
+}

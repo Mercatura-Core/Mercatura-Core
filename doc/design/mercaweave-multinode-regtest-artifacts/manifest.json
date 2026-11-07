@@ -1,0 +1,178 @@
+{
+  "A-send-inactive-1000x800.png": {
+    "sha256": "9743566e500cde8a78d2fce25dcf989b57862451c07b96563af66769247c14d8",
+    "bytes": 57414,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/screenshots/A-send-inactive-1000x800.png"
+  },
+  "A-send-inactive-850x650.png": {
+    "sha256": "e9a20f60b5e22d30f727eaa23c002055c80502addf24ef86b4d6b5639e00bbf6",
+    "bytes": 55424,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/screenshots/A-send-inactive-850x650.png"
+  },
+  "B-dropdown-expanded-active.png": {
+    "sha256": "34fd4c89eca9315ae9a7565b3fbb69cf7d88c3beb5dd715afd2076d75a00bdbf",
+    "bytes": 6514,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/screenshots/B-dropdown-expanded-active.png"
+  },
+  "B-dropdown-expanded-inactive.png": {
+    "sha256": "4c8a64c2f3c1d920068e5ca8450696fd9bd637f8153d6db58855a72b4a0c278c",
+    "bytes": 7158,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/screenshots/B-dropdown-expanded-inactive.png"
+  },
+  "C-coin-control-all-types.png": {
+    "sha256": "5ff15896b294c29609fd77060f6a3083b695c7bc118caee7a1a3608f4e51e74c",
+    "bytes": 109084,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/screenshots/C-coin-control-all-types.png"
+  },
+  "C-coin-control-types-scrolled.png": {
+    "sha256": "f5a1ceaf6a28f8457fe002875da98554f87b9f327f96cfde09b9bee4ac3cd76f",
+    "bytes": 113660,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/screenshots/C-coin-control-types-scrolled.png"
+  },
+  "C-coin-control-v3-selection-scrolled.png": {
+    "sha256": "5b99e714e088d07fd5b514c5e096fcc2a33f340fe7e8e53ab72fa1c9d9a60c8e",
+    "bytes": 43561,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/screenshots/C-coin-control-v3-selection-scrolled.png"
+  },
+  "C-coin-control-v3-selection.png": {
+    "sha256": "a2a1888d4d921b456275ece406ce414ad7d36789d3918c580c24108932a878df",
+    "bytes": 41706,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/screenshots/C-coin-control-v3-selection.png"
+  },
+  "D-send-active-automatic.png": {
+    "sha256": "0e700a62c88e6fdf775219700eac2b9dd2bbe06134d17182424c32686fcd937a",
+    "bytes": 58049,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/screenshots/D-send-active-automatic.png"
+  },
+  "D-send-active-fee-controls.png": {
+    "sha256": "e110a08bb58139c038420d76a1e245a1380c380141dcbe06a193c7ed19c0cb6a",
+    "bytes": 73780,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/screenshots/D-send-active-fee-controls.png"
+  },
+  "D-send-active-grouped.png": {
+    "sha256": "8db0308078db70efbfa8d91924e18aef045299e9e48cd13d23423b003fef4f42",
+    "bytes": 57053,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/screenshots/D-send-active-grouped.png"
+  },
+  "E-unsupported-wallet.png": {
+    "sha256": "aa744096684dfa2f68950a11432faa1573692d52193decbcefff329779ec0bfc",
+    "bytes": 58402,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/screenshots/E-unsupported-wallet.png"
+  },
+  "F-grouped-send-confirmation.png": {
+    "sha256": "7a6dca66e69f257868792a1c653b379dc07bc2349cbd930df3b40d40814e627b",
+    "bytes": 27302,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/screenshots/F-grouped-send-confirmation.png"
+  },
+  "F-stale-confirmation-invalidated.png": {
+    "sha256": "7b94537af9802d8910646d4ce7860f754bc1cb525377a9b6679a71cfbf9a6ce7",
+    "bytes": 73407,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/screenshots/F-stale-confirmation-invalidated.png"
+  },
+  "G-default-regtest-no-activation.png": {
+    "sha256": "933210c96840a4bb0005fb3e7697415e02bf6ce8077d6ee460667144ae8975a4",
+    "bytes": 56517
+  },
+  "binary-identities.json": {
+    "sha256": "f9877173ebc5cda5e9521c3e073d06925c08af3860badc39f82bb25a079e99cf",
+    "bytes": 4836,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/binary-identities.json"
+  },
+  "ci-summary.json": {
+    "sha256": "e1536b331f11ccda994a3365fc841be54f72cf548b5cb2e43a7b31cd6f547366",
+    "bytes": 2293
+  },
+  "default-qt-inspection-receipt.json": {
+    "sha256": "67c1c76b02bda7f1c93d98f28d29832632861daf3a27f28f00f5ca96f025dca6",
+    "bytes": 2560
+  },
+  "duplicate-invalid-race-evidence.txt": {
+    "sha256": "588fa1dc598001a3f49c75c77563f4dad1173d1c30f57eac97200c40bc6d1520",
+    "bytes": 942
+  },
+  "final-lint-receipt.json": {
+    "sha256": "f3c636a8ab94b5b58f190200de9d7815d5b299d786dc315d243d045ecedcb590",
+    "bytes": 449
+  },
+  "final-preservation-check.json": {
+    "sha256": "f114ff72a5da8d44efaa4d09932881734c494ba2fa46e24d71c3050aa5f58fa0",
+    "bytes": 820
+  },
+  "focused-native-receipt.json": {
+    "sha256": "17d294a2017b33b72e07ef5e386dcfc575b16bb3b6277fcd0e0e8fdf10170fdf",
+    "bytes": 4211
+  },
+  "focused-new-native-receipt-preflight-interrupted.json": {
+    "sha256": "ebe7ba05de943f8b61c3215666509d3dbf8ec5c1e8fe60c360fbb3ce489453a8",
+    "bytes": 1147
+  },
+  "focused-new-native-receipt-script-builder-failure.json": {
+    "sha256": "191f7cb55c9d93997a092ed5c62bcf3ec8f08de3410b4f3168025a2b8695c230",
+    "bytes": 1146
+  },
+  "focused-new-native-receipt.json": {
+    "sha256": "d025ab5f794c2e99466e413fcd411cddc69cb8534ba212ead2e4ec46404b9e27",
+    "bytes": 1147
+  },
+  "focused-qt-receipt.json": {
+    "sha256": "4bdbbf2db051574445e88c226d33741e28afacd2f9d6d47c5f39cfa092b5cad7",
+    "bytes": 868
+  },
+  "focused-wallet-receipt.json": {
+    "sha256": "0cd9f18839c790199e4cd6d12f57afa04aa65bd2f350c3696bd26e91a71b5adc",
+    "bytes": 4002
+  },
+  "full-functional-receipt.json": {
+    "sha256": "48784dbab3f4acda05638bd82bc2ce91f4d1b8b3788209f7a3bfd8100ed2da00",
+    "bytes": 4386
+  },
+  "gui-probe-build.json": {
+    "sha256": "79d73eeb9fcbca5fb742f236801ea639084699bd20bb756fb98187e823a7f86d",
+    "bytes": 1056
+  },
+  "gui-three-node-06-receipt.json": {
+    "sha256": "d79a132db866ba4cd76f7e984a902b89d16c3cd531a043fa6a112b37ba14f4b2",
+    "bytes": 1415,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/gui-three-node-06-receipt.json"
+  },
+  "interactive-smoke-receipt.json": {
+    "sha256": "38c459755f24c6e77f7972f4ecb022dc52526bf84d188ed2f9ad629119cd4f5f",
+    "bytes": 1105
+  },
+  "native-batch-summary.json": {
+    "sha256": "f01f3648361841ac0bee1b19bed6727855f4932c7df5737894764e46c48063a8",
+    "bytes": 6965
+  },
+  "native-final-summary.json": {
+    "sha256": "00640bdc86e5199a5d045bc6752f86bd11ef210542c227760e51ab02225b7219",
+    "bytes": 12949
+  },
+  "qt-test-rebuild-receipt.json": {
+    "sha256": "9a47f3f82468edd85a428698beaa44081d505432545d0eba18488005d050b51d",
+    "bytes": 347
+  },
+  "qt-widget-inspection.json": {
+    "sha256": "09828ea93c25c0155973ef39d69a96d7c87d79981a4a1d1ef9e41324144afd24",
+    "bytes": 280752,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/screenshots/inspection.json"
+  },
+  "repaired-native-results.json": {
+    "sha256": "a92f3a40dbc2c046eb6f0fe6453c45cf31d346a71b292a024ba0203cbc9d82be",
+    "bytes": 17591
+  },
+  "resources-06-summary.json": {
+    "sha256": "1299ed9e364a0e876edcdd0867b358abe50f46c56defcfc5d6b77e98baa90d10",
+    "bytes": 213,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/resources-06-summary.json"
+  },
+  "results.json": {
+    "sha256": "b16b72bd999c3454efa71ffef3fa3d79ff9a6040d42958d015669a2a38f830d3",
+    "bytes": 18723,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/evidence-06/results.json"
+  },
+  "windows-qt-ci-error.txt": {
+    "sha256": "2dd4f43eb0b5949949c84b23cde5695e67ab81a4e2e04f0013f492748c7781f7",
+    "bytes": 340,
+    "source": "/workspace/Mercatura-MercaWeave-upgrade/work/multinode-qualification/windows-qt-ci-error.txt"
+  }
+}

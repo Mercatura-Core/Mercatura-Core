@@ -1,0 +1,22 @@
+{
+  "name": "focused-qt",
+  "command": [
+    "/workspace/Mercatura-MercaWeave-v0.1/work/tools/cmake/data/bin/ctest",
+    "--test-dir",
+    "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release",
+    "--output-on-failure",
+    "-j1",
+    "-R",
+    "^test_bitcoin-qt$"
+  ],
+  "started_utc": "2026-11-07T12:14:10.062262+00:00",
+  "ended_utc": "2026-11-07T12:17:51.359376+00:00",
+  "elapsed_seconds": 221.297,
+  "exit_code": 0,
+  "source_head": "ca3b2d9dde296b4ebbd120212c243fcb066f1581",
+  "tracked_diff_sha256": "c01139d8f3ccdf525f2a3f07e50a4310fada3bf07711be57f15d555ada5d85b1",
+  "untracked_source_sha256": {
+    "test/functional/mercatura_mercaweave_multinode.py": "48478a3ea38c313f3f9c07b57ee67fef1d9d01b9b0cb53fc8d9764ffa969425b",
+    "test/functional/mercaweave_gui_probe.cpp": "6d80a62b7b84f2d5205a9e060c689e00ae8c0568557aced972e3f7b57731cfc9"
+  }
+}

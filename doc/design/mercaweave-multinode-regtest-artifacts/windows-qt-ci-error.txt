@@ -1,0 +1,1 @@
+2026-11-07T10:39:54.4460847Z D:\a\Mercatura-Core\Mercatura-Core\src\qt\test\wallettests.cpp(634,5): error C4996: 'QTest::useVerifyThrowsException': Don't use QVERIFY_EXCEPTION_THROWN(expr, type) anymore, use QVERIFY_THROWS_EXCEPTION(type, expr...) instead [D:\a\Mercatura-Core\Mercatura-Core\work\build\src\qt\test\test_bitcoin-qt.vcxproj]

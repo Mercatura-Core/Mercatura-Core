@@ -1,0 +1,4 @@
+2026-11-07T12:42:11.582342Z [msghand] [validationinterface.cpp:255] [BlockChecked] [validation] BlockChecked: block hash=9f9a0efa7e3aec2140e725eea568b2f997dfb0cae21beb03770da3dc74ebf009 state=pqgroup-authorization-13
+2026-11-07T12:42:11.582455Z [msghand] [validation.cpp:3462] [ConnectTip] [error] ConnectTip: ConnectBlock 9f9a0efa7e3aec2140e725eea568b2f997dfb0cae21beb03770da3dc74ebf009 failed, pqgroup-authorization-13
+2026-11-07T12:42:11.881145Z [http_pool_1] [validation.cpp:4727] [AcceptBlockHeader] [validation] AcceptBlockHeader: block 9f9a0efa7e3aec2140e725eea568b2f997dfb0cae21beb03770da3dc74ebf009 is marked invalid
+2026-11-07T12:42:11.881239Z [http_pool_1] [validationinterface.cpp:255] [BlockChecked] [validation] BlockChecked: block hash=9f9a0efa7e3aec2140e725eea568b2f997dfb0cae21beb03770da3dc74ebf009 state=duplicate-invalid, block 9f9a0efa7e3aec2140e725eea568b2f997dfb0cae21beb03770da3dc74ebf009 was previously marked invalid
