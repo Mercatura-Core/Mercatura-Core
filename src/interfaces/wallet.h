@@ -249,6 +249,9 @@ public:
     //! Return wallet transaction output information.
     virtual std::vector<WalletTxOut> getCoins(const std::vector<COutPoint>& outputs) = 0;
 
+    //! Full serialized fee bytes for an activated, wallet-owned grouped input selection.
+    virtual std::optional<int64_t> estimateMercaWeaveFeeSize(const CTransaction&, const std::vector<CTxOut>&) { return {}; }
+
     //! Get required fee.
     virtual CAmount getRequiredFee(unsigned int tx_bytes) = 0;
 

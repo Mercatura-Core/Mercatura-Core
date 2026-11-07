@@ -16,6 +16,7 @@
 #include <vector>
 
 #include <QObject>
+#include <QPointer>
 
 enum class OutputType;
 
@@ -115,7 +116,7 @@ public:
         UnlockContext(WalletModel *wallet, bool valid, bool relock);
         ~UnlockContext();
 
-        bool isValid() const { return valid; }
+        bool isValid() const { return valid && wallet; }
 
         // Disable unused copy/move constructors/assignments explicitly.
         UnlockContext(const UnlockContext&) = delete;
@@ -124,7 +125,7 @@ public:
         UnlockContext& operator=(UnlockContext&&) = delete;
 
     private:
-        WalletModel *wallet;
+        QPointer<WalletModel> wallet;
         const bool valid;
         const bool relock;
     };

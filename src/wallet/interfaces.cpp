@@ -481,6 +481,17 @@ public:
         }
         return result;
     }
+    std::optional<int64_t> estimateMercaWeaveFeeSize(const CTransaction& tx, const std::vector<CTxOut>& spent) override
+    {
+        // Match the existing local grouped coordinator budget before building
+        // dummy witnesses. This is a UI preview limit, not a consensus rule.
+        if (tx.vin.size() > mercaweave::MAX_INPUTS || tx.vout.size() > mercaweave::MAX_INPUTS) return {};
+        LOCK(m_wallet->cs_wallet);
+        if (const auto sizes = m_wallet->EstimatePQGroupTransaction(tx, spent)) {
+            return static_cast<int64_t>(sizes->fee_bytes);
+        }
+        return {};
+    }
     CAmount getRequiredFee(unsigned int tx_bytes) override { return GetRequiredFee(*m_wallet, tx_bytes); }
     CAmount getMinimumFee(unsigned int tx_bytes,
         const CCoinControl& coin_control,

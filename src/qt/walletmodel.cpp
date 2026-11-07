@@ -202,7 +202,7 @@ WalletModel::SendCoinsReturn WalletModel::prepareTransaction(WalletModelTransact
     // Future: can merge this call with 'createTransaction'.
     CAmount nBalance = getAvailableBalance(&coinControl);
 
-    if(total > nBalance)
+    if(total > nBalance && coinControl.m_spending_mode == wallet::PQSpendingMode::AUTOMATIC)
     {
         return AmountExceedsBalance;
     }
@@ -467,6 +467,7 @@ void WalletModel::unsubscribeFromCoreSignals()
 // WalletModel::UnlockContext implementation
 WalletModel::UnlockContext WalletModel::requestUnlock()
 {
+    const QPointer<WalletModel> guard(this);
     // Bugs in earlier versions may have resulted in wallets with private keys disabled to become "encrypted"
     // (encryption keys are present, but not actually doing anything).
     // To avoid issues with such wallets, check if the wallet has private keys disabled, and if so, return a context
@@ -480,6 +481,7 @@ WalletModel::UnlockContext WalletModel::requestUnlock()
         // Request UI to unlock wallet
         Q_EMIT requireUnlock();
     }
+    if (!guard) return UnlockContext(nullptr, /*valid=*/false, /*relock=*/false);
     // If wallet is still locked, unlock was failed or cancelled, mark context as invalid
     bool valid = getEncryptionStatus() != Locked;
 
@@ -495,7 +497,7 @@ WalletModel::UnlockContext::UnlockContext(WalletModel *_wallet, bool _valid, boo
 
 WalletModel::UnlockContext::~UnlockContext()
 {
-    if(valid && relock)
+    if(wallet && valid && relock)
     {
         wallet->setWalletLocked(true);
     }
@@ -637,7 +639,7 @@ uint256 WalletModel::getLastBlockProcessed() const
 CAmount WalletModel::getAvailableBalance(const CCoinControl* control)
 {
     // No selected coins, return the cached balance
-    if (!control || !control->HasSelected()) {
+    if (!control || (!control->HasSelected() && control->m_spending_mode == wallet::PQSpendingMode::AUTOMATIC)) {
         const interfaces::WalletBalances& balances = getCachedBalance();
         return balances.balance;
     }

@@ -17,6 +17,21 @@
 namespace wallet {
 BOOST_FIXTURE_TEST_SUITE(spend_tests, WalletTestingSetup)
 
+BOOST_AUTO_TEST_CASE(pq_spending_modes_match_native_input_scripts)
+{
+    const CScript v2 = CScript{} << OP_2 << std::vector<unsigned char>(32, 1);
+    const CScript v3 = CScript{} << OP_3 << std::vector<unsigned char>(32, 2);
+    const CScript malformed = CScript{} << OP_3 << std::vector<unsigned char>(16, 3);
+    BOOST_CHECK(MatchesPQSpendingMode(v2, PQSpendingMode::AUTOMATIC));
+    BOOST_CHECK(MatchesPQSpendingMode(v3, PQSpendingMode::AUTOMATIC));
+    BOOST_CHECK(MatchesPQSpendingMode(v2, PQSpendingMode::STANDARD_V2));
+    BOOST_CHECK(!MatchesPQSpendingMode(v3, PQSpendingMode::STANDARD_V2));
+    BOOST_CHECK(MatchesPQSpendingMode(v3, PQSpendingMode::MERCAWEAVE_V3));
+    BOOST_CHECK(!MatchesPQSpendingMode(v2, PQSpendingMode::MERCAWEAVE_V3));
+    BOOST_CHECK(!MatchesPQSpendingMode(malformed, PQSpendingMode::MERCAWEAVE_V3));
+    BOOST_CHECK(!MatchesPQSpendingMode(CScript{} << OP_TRUE, PQSpendingMode::STANDARD_V2));
+}
+
 BOOST_AUTO_TEST_CASE(max_signed_input_size_uses_external_outpoint)
 {
     const CKey key{GenerateRandomKey()};

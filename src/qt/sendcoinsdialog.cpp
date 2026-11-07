@@ -36,6 +36,7 @@
 #include <QFontMetrics>
 #include <QScrollBar>
 #include <QSettings>
+#include <QStandardItemModel>
 #include <QTextDocument>
 
 using common::PSBTError;
@@ -67,6 +68,10 @@ SendCoinsDialog::SendCoinsDialog(const PlatformStyle *_platformStyle, QWidget *p
     platformStyle(_platformStyle)
 {
     ui->setupUi(this);
+    connect(ui->spendingMode, qOverload<int>(&QComboBox::currentIndexChanged), this, &SendCoinsDialog::spendingModeChanged);
+    connect(&m_spending_timer, &QTimer::timeout, this, &SendCoinsDialog::updateSpendingModeAvailability);
+    m_spending_timer.start(1000);
+    ui->spendingMode->setItemData(2, tr("Requires network activation, wallet support and eligible authenticated grouped UTXOs."), Qt::ToolTipRole);
 
     if (!_platformStyle->getImagesOnButtons()) {
         ui->addButton->setIcon(QIcon());
@@ -145,19 +150,31 @@ void SendCoinsDialog::setClientModel(ClientModel *_clientModel)
 
 void SendCoinsDialog::setModel(WalletModel *_model)
 {
+    if (model != _model) {
+        invalidatePreparedTransaction();
+        if (model) {
+            disconnect(model, nullptr, this, nullptr);
+            if (model->getOptionsModel()) disconnect(model->getOptionsModel(), nullptr, this, nullptr);
+        }
+        m_coin_control = std::make_unique<CCoinControl>();
+    }
     this->model = _model;
+    updateCoinControlState();
+    if (_model) connect(_model, &QObject::destroyed, this, [this, _model] {
+        if (model == _model) {
+            model = nullptr;
+            invalidatePreparedTransaction();
+            m_coin_control = std::make_unique<CCoinControl>();
+            setModel(nullptr);
+        }
+    });
+
+    for (int i = 0; i < ui->entries->count(); ++i) {
+        if (auto* entry = qobject_cast<SendCoinsEntry*>(ui->entries->itemAt(i)->widget())) entry->setModel(_model);
+    }
 
     if(_model && _model->getOptionsModel())
     {
-        for(int i = 0; i < ui->entries->count(); ++i)
-        {
-            SendCoinsEntry *entry = qobject_cast<SendCoinsEntry*>(ui->entries->itemAt(i)->widget());
-            if(entry)
-            {
-                entry->setModel(_model);
-            }
-        }
-
         connect(_model, &WalletModel::balanceChanged, this, &SendCoinsDialog::setBalance);
         connect(_model->getOptionsModel(), &OptionsModel::displayUnitChanged, this, &SendCoinsDialog::refreshBalance);
         refreshBalance();
@@ -169,22 +186,23 @@ void SendCoinsDialog::setModel(WalletModel *_model)
         coinControlUpdateLabels();
 
         // fee section
+        ui->confTargetSelector->clear();
         for (const int n : confTargets) {
             ui->confTargetSelector->addItem(tr("%1 (%2 blocks)").arg(GUIUtil::formatNiceTimeOffset(n*Params().GetConsensus().nPowTargetSpacing)).arg(n));
         }
-        connect(ui->confTargetSelector, qOverload<int>(&QComboBox::currentIndexChanged), this, &SendCoinsDialog::updateSmartFeeLabel);
-        connect(ui->confTargetSelector, qOverload<int>(&QComboBox::currentIndexChanged), this, &SendCoinsDialog::coinControlUpdateLabels);
+        connect(ui->confTargetSelector, qOverload<int>(&QComboBox::currentIndexChanged), this, &SendCoinsDialog::updateSmartFeeLabel, Qt::UniqueConnection);
+        connect(ui->confTargetSelector, qOverload<int>(&QComboBox::currentIndexChanged), this, &SendCoinsDialog::coinControlUpdateLabels, Qt::UniqueConnection);
 
-        connect(ui->groupFee, &QButtonGroup::idClicked, this, &SendCoinsDialog::updateFeeSectionControls);
-        connect(ui->groupFee, &QButtonGroup::idClicked, this, &SendCoinsDialog::coinControlUpdateLabels);
+        connect(ui->groupFee, &QButtonGroup::idClicked, this, &SendCoinsDialog::updateFeeSectionControls, Qt::UniqueConnection);
+        connect(ui->groupFee, &QButtonGroup::idClicked, this, &SendCoinsDialog::coinControlUpdateLabels, Qt::UniqueConnection);
 
-        connect(ui->customFee, &BitcoinAmountField::valueChanged, this, &SendCoinsDialog::coinControlUpdateLabels);
+        connect(ui->customFee, &BitcoinAmountField::valueChanged, this, &SendCoinsDialog::coinControlUpdateLabels, Qt::UniqueConnection);
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 7, 0))
-        connect(ui->optInRBF, &QCheckBox::checkStateChanged, this, &SendCoinsDialog::updateSmartFeeLabel);
-        connect(ui->optInRBF, &QCheckBox::checkStateChanged, this, &SendCoinsDialog::coinControlUpdateLabels);
+        connect(ui->optInRBF, &QCheckBox::checkStateChanged, this, &SendCoinsDialog::updateSmartFeeLabel, Qt::UniqueConnection);
+        connect(ui->optInRBF, &QCheckBox::checkStateChanged, this, &SendCoinsDialog::coinControlUpdateLabels, Qt::UniqueConnection);
 #else
-        connect(ui->optInRBF, &QCheckBox::stateChanged, this, &SendCoinsDialog::updateSmartFeeLabel);
-        connect(ui->optInRBF, &QCheckBox::stateChanged, this, &SendCoinsDialog::coinControlUpdateLabels);
+        connect(ui->optInRBF, &QCheckBox::stateChanged, this, &SendCoinsDialog::updateSmartFeeLabel, Qt::UniqueConnection);
+        connect(ui->optInRBF, &QCheckBox::stateChanged, this, &SendCoinsDialog::coinControlUpdateLabels, Qt::UniqueConnection);
 #endif
         CAmount requiredFee = model->wallet().getRequiredFee(1000);
         ui->customFee->SetMinValue(requiredFee);
@@ -212,6 +230,9 @@ void SendCoinsDialog::setModel(WalletModel *_model)
         } else if (model->wallet().privateKeysDisabled()) {
             ui->sendButton->setText(tr("Cr&eate Unsigned"));
             ui->sendButton->setToolTip(tr("Creates a Partially Signed Transaction (PSBT) for use with e.g. an offline %1 wallet, or a PSBT-compatible hardware wallet.").arg(CLIENT_NAME));
+        } else {
+            ui->sendButton->setText(tr("S&end"));
+            ui->sendButton->setToolTip(QString{});
         }
 
         // set the smartfee-sliders default value (wallets default conf.target or last stored value)
@@ -228,6 +249,7 @@ void SendCoinsDialog::setModel(WalletModel *_model)
         else
             ui->confTargetSelector->setCurrentIndex(getIndexForConfTarget(settings.value("nConfTarget").toInt()));
     }
+    updateSpendingModeAvailability();
 }
 
 SendCoinsDialog::~SendCoinsDialog()
@@ -269,8 +291,10 @@ bool SendCoinsDialog::PrepareSendText(QString& question_string, QString& informa
     }
 
     fNewRecipientAllowed = false;
+    const auto unlock_revision = m_spending_revision;
+    const auto* unlocking_model = model;
     WalletModel::UnlockContext ctx(model->requestUnlock());
-    if(!ctx.isValid())
+    if(!ctx.isValid() || unlocking_model != model || unlock_revision != m_spending_revision)
     {
         // Unlock wallet was cancelled
         fNewRecipientAllowed = true;
@@ -479,8 +503,14 @@ void SendCoinsDialog::sendButtonClicked([[maybe_unused]] bool checked)
     if(!model || !model->getOptionsModel())
         return;
 
+    const auto prepared_revision = m_spending_revision;
+    const auto* prepared_model = model;
     QString question_string, informative_text, detailed_text;
     if (!PrepareSendText(question_string, informative_text, detailed_text)) return;
+    if (prepared_revision != m_spending_revision || prepared_model != model || !m_current_transaction) {
+        fNewRecipientAllowed = true;
+        return;
+    }
     assert(m_current_transaction);
 
     const QString confirmation = tr("Confirm send coins");
@@ -490,6 +520,11 @@ void SendCoinsDialog::sendButtonClicked([[maybe_unused]] bool checked)
     confirmationDialog->setAttribute(Qt::WA_DeleteOnClose);
     // TODO: Replace QDialog::exec() with safer QDialog::show().
     const auto retval = static_cast<QMessageBox::StandardButton>(confirmationDialog->exec());
+
+    if (prepared_revision != m_spending_revision || prepared_model != model || !m_current_transaction) {
+        fNewRecipientAllowed = true;
+        return;
+    }
 
     if(retval != QMessageBox::Yes && retval != QMessageBox::Save)
     {
@@ -829,6 +864,7 @@ void SendCoinsDialog::updateFeeMinimizedLabel()
 
 void SendCoinsDialog::updateCoinControlState()
 {
+    m_coin_control->m_spending_mode = static_cast<wallet::PQSpendingMode>(ui->spendingMode->currentIndex());
     if (ui->radioCustomFee->isChecked()) {
         m_coin_control->m_feerate = CFeeRate(ui->customFee->value());
     } else {
@@ -838,6 +874,47 @@ void SendCoinsDialog::updateCoinControlState()
     // Either custom fee will be used or if not selected, the confirmation target from dropdown box
     m_coin_control->m_confirm_target = getConfTargetForIndex(ui->confTargetSelector->currentIndex());
     m_coin_control->m_signal_bip125_rbf = ui->optInRBF->isChecked();
+}
+
+void SendCoinsDialog::invalidatePreparedTransaction()
+{
+    ++m_spending_revision;
+    m_current_transaction.reset();
+    for (auto* confirmation : findChildren<SendConfirmationDialog*>()) confirmation->reject();
+    for (auto* control : findChildren<CoinControlDialog*>()) {
+        disconnect(control, nullptr, this, nullptr);
+        control->reject();
+        delete control;
+    }
+}
+
+void SendCoinsDialog::spendingModeChanged()
+{
+    invalidatePreparedTransaction();
+    updateCoinControlState();
+    updateSpendingModeAvailability();
+    coinControlUpdateLabels();
+}
+
+void SendCoinsDialog::updateSpendingModeAvailability()
+{
+    const bool available = model && model->wallet().mercaweaveAvailable();
+    if (available != m_group_available) {
+        m_group_available = available;
+        invalidatePreparedTransaction();
+    }
+    if (auto* items = qobject_cast<QStandardItemModel*>(ui->spendingMode->model())) items->item(2)->setEnabled(available);
+    const bool grouped = ui->spendingMode->currentIndex() == 2;
+    const bool signer_ready = model && model->getOptionsModel() &&
+        (!model->wallet().hasExternalSigner() || model->getOptionsModel()->hasSigner());
+    ui->sendButton->setEnabled(signer_ready && (!grouped || available));
+    ui->pushButtonCoinControl->setEnabled(model && model->getOptionsModel());
+    ui->spendingModeStatus->setText(grouped
+        ? (available ? (model->wallet().isLocked() ? tr("Wallet locked; unlock when asked to spend grouped coins.")
+                                                 : tr("Requires eligible authenticated grouped coins."))
+                     : tr("MercaWeave requires network activation and a supported wallet."))
+        : (ui->spendingMode->currentIndex() == 1 ? tr("Only Standard PQ (v2) inputs will be used.")
+                                               : tr("Uses currently eligible wallet coins; may mix v2/v3 after activation.")));
 }
 
 void SendCoinsDialog::updateNumberOfBlocks(int count, const QDateTime& blockDate, double nVerificationProgress, SyncType synctype, SynchronizationState sync_state) {
@@ -923,7 +1000,9 @@ void SendCoinsDialog::coinControlFeatureChanged(bool checked)
     ui->frameCoinControl->setVisible(checked);
 
     if (!checked && model) { // coin control features disabled
-        m_coin_control = std::make_unique<CCoinControl>();
+        // Hiding advanced controls must not discard explicit input choices or
+        // reset the spending policy. Inputs remains available beside the mode.
+        invalidatePreparedTransaction();
     }
 
     coinControlUpdateLabels();
@@ -932,7 +1011,8 @@ void SendCoinsDialog::coinControlFeatureChanged(bool checked)
 // Coin Control: button inputs -> show actual coin control dialog
 void SendCoinsDialog::coinControlButtonClicked()
 {
-    auto dlg = new CoinControlDialog(*m_coin_control, model, platformStyle);
+    if (!model || !model->getOptionsModel()) return;
+    auto dlg = new CoinControlDialog(*m_coin_control, model, platformStyle, this);
     connect(dlg, &QDialog::finished, this, &SendCoinsDialog::coinControlUpdateLabels);
     GUIUtil::ShowModalDialogAsynchronously(dlg);
 }

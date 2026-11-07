@@ -14,6 +14,15 @@
    <string>Coin Selection</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
+   <item><layout class="QHBoxLayout" name="inputTypeLayout">
+    <item><widget class="QLabel" name="inputTypeLabel"><property name="text"><string>Input type:</string></property><property name="buddy"><cstring>inputTypeFilter</cstring></property></widget></item>
+    <item><widget class="QComboBox" name="inputTypeFilter">
+     <property name="toolTip"><string>Filter the coins shown. The Send spending mode still restricts funding. Selected conflicting inputs remain visible so you can deselect them.</string></property>
+     <item><property name="text"><string>All supported inputs</string></property></item>
+     <item><property name="text"><string>Standard PQ (v2)</string></property></item>
+     <item><property name="text"><string>MercaWeave (v3)</string></property></item>
+    </widget></item>
+   </layout></item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayoutTop" stretch="0,0,0,0">
      <property name="topMargin">

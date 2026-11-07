@@ -27,6 +27,19 @@ const int DEFAULT_WALLET_TX_VERSION = CTransaction::CURRENT_VERSION;
 //! Default for -avoidpartialspends
 static constexpr bool DEFAULT_AVOIDPARTIALSPENDS = false;
 
+//! Input authorization policy. This never selects a recipient or change type.
+enum class PQSpendingMode { AUTOMATIC, STANDARD_V2, MERCAWEAVE_V3 };
+
+inline bool MatchesPQSpendingMode(const CScript& script, PQSpendingMode mode)
+{
+    if (mode == PQSpendingMode::AUTOMATIC) return true;
+    int version;
+    std::vector<unsigned char> program;
+    if (!script.IsWitnessProgram(version, program) || program.size() != 32) return false;
+    return (mode == PQSpendingMode::STANDARD_V2 && version == 2) ||
+           (mode == PQSpendingMode::MERCAWEAVE_V3 && version == 3);
+}
+
 class PreselectedInput
 {
 private:
@@ -83,6 +96,7 @@ public:
 class CCoinControl
 {
 public:
+    PQSpendingMode m_spending_mode{PQSpendingMode::AUTOMATIC};
     //! Custom change destination, if not set an address is generated
     CTxDestination destChange = CNoDestination();
     //! Override the default change type if set, ignored if destChange is set

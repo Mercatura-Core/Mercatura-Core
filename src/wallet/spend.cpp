@@ -492,6 +492,17 @@ util::Result<CoinsResult> FetchSelectedInputs(const CWallet& wallet, const CCoin
             txout = *out;
         }
 
+        if (!MatchesPQSpendingMode(txout.scriptPubKey, coin_control.m_spending_mode)) {
+            return util::Error{Untranslated("Selected input conflicts with the spending mode; deselect it explicitly in Coin Control")};
+        }
+        int witness_version;
+        std::vector<unsigned char> witness_program;
+        if (coin_control.m_spending_mode == PQSpendingMode::MERCAWEAVE_V3 &&
+            txout.scriptPubKey.IsWitnessProgram(witness_version, witness_program) && witness_version == 3 &&
+            (!wallet.MercaWeaveAvailable() || !wallet.GetPQGroupRecord(txout.scriptPubKey))) {
+            return util::Error{Untranslated("Selected MercaWeave input requires active consensus and authenticated wallet ownership")};
+        }
+
         if (input_bytes == -1) {
             input_bytes = CalculateMaximumSignedInputSize(txout, outpoint, &coin_control.m_external_provider, can_grind_r, &coin_control);
         }
@@ -537,6 +548,8 @@ CoinsResult AvailableCoins(const CWallet& wallet,
     for (const auto& [outpoint, txo] : wallet.GetTXOs()) {
         const CWalletTx& wtx = txo.GetWalletTx();
         const CTxOut& output = txo.GetTxOut();
+
+        if (coinControl && !MatchesPQSpendingMode(output.scriptPubKey, coinControl->m_spending_mode)) continue;
 
         if (tx_safe_cache.contains(outpoint.hash) && !tx_safe_cache.at(outpoint.hash).first) {
             continue;
@@ -1698,13 +1711,29 @@ util::Result<CreatedTransactionResult> CreateTransaction(
 
     LOCK(wallet.cs_wallet);
 
+    if (coin_control.m_spending_mode != PQSpendingMode::AUTOMATIC &&
+        coin_control.m_spending_mode != PQSpendingMode::STANDARD_V2 &&
+        coin_control.m_spending_mode != PQSpendingMode::MERCAWEAVE_V3) {
+        return util::Error{Untranslated("Unsupported spending mode")};
+    }
+    if (coin_control.m_spending_mode == PQSpendingMode::MERCAWEAVE_V3 && !wallet.MercaWeaveAvailable()) {
+        return util::Error{Untranslated("MercaWeave spending requires active consensus and a supported authenticated wallet")};
+    }
     auto res = CreateTransactionInternal(wallet, vecSend, change_pos, coin_control, sign);
     TRACEPOINT(coin_selection, normal_create_tx_internal,
            wallet.GetName().c_str(),
            bool(res),
            res ? res->fee : 0,
            res && res->change_pos.has_value() ? int32_t(*res->change_pos) : -1);
-    if (!res) return res;
+    if (!res) {
+        if (coin_control.m_spending_mode == PQSpendingMode::STANDARD_V2) {
+            return util::Error{strprintf(_("Standard PQ (v2) only: %s"), util::ErrorString(res))};
+        }
+        if (coin_control.m_spending_mode == PQSpendingMode::MERCAWEAVE_V3) {
+            return util::Error{strprintf(_("MercaWeave (v3) only: %s"), util::ErrorString(res))};
+        }
+        return res;
+    }
     const auto& txr_ungrouped = *res;
     // try with avoidpartialspends unless it's enabled already
     if (txr_ungrouped.fee > 0 /* 0 means non-functional fee rate estimation */ && wallet.m_max_aps_fee > -1 && !coin_control.m_avoid_partial_spends) {

@@ -94,8 +94,14 @@ private:
     bool signWithExternalSigner(PartiallySignedTransaction& psbt, CMutableTransaction& mtx, bool& complete);
     void updateFeeMinimizedLabel();
     void updateCoinControlState();
+    void invalidatePreparedTransaction();
+    bool m_group_available{false};
+    uint64_t m_spending_revision{0};
+    QTimer m_spending_timer;
 
 private Q_SLOTS:
+    void updateSpendingModeAvailability();
+    void spendingModeChanged();
     void sendButtonClicked(bool checked);
     void on_buttonChooseFee_clicked();
     void on_buttonMinimizeFee_clicked();

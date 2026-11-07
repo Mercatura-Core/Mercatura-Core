@@ -22,7 +22,7 @@ class WalletTests : public QObject
 
 private Q_SLOTS:
     void walletTests();
-    void mercaweaveReceiveTests();
+    void mercaweaveReceiveAndSendTests();
 };
 
 #endif // BITCOIN_QT_TEST_WALLETTESTS_H

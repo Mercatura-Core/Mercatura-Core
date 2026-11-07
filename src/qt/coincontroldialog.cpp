@@ -20,13 +20,17 @@
 #include <wallet/spend.h>
 #include <wallet/wallet.h>
 
+#include <limits>
+
 #include <QApplication>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QCursor>
 #include <QDialogButtonBox>
 #include <QFlags>
 #include <QIcon>
 #include <QSettings>
+#include <QSignalBlocker>
 #include <QTreeWidget>
 
 using wallet::CCoinControl;
@@ -49,6 +53,14 @@ CoinControlDialog::CoinControlDialog(CCoinControl& coin_control, WalletModel* _m
     platformStyle(_platformStyle)
 {
     ui->setupUi(this);
+    ui->treeWidget->headerItem()->setText(COLUMN_TYPE, tr("Input type"));
+    ui->treeWidget->setColumnWidth(COLUMN_TYPE, 150);
+    for (int column = COLUMN_TYPE + 1; column < ui->treeWidget->columnCount(); ++column) ui->treeWidget->setColumnHidden(column, true);
+    ui->inputTypeFilter->setItemData(0, 0);
+    ui->inputTypeFilter->setItemData(1, 2);
+    ui->inputTypeFilter->setItemData(2, 3);
+    ui->inputTypeFilter->setCurrentIndex(static_cast<int>(m_coin_control.m_spending_mode));
+    connect(ui->inputTypeFilter, qOverload<int>(&QComboBox::currentIndexChanged), this, [this] { updateView(); });
 
     // context menu
     contextMenu = new QMenu(this);
@@ -292,6 +304,7 @@ void CoinControlDialog::clipboardChange()
 // treeview: sort
 void CoinControlDialog::sortView(int column, Qt::SortOrder order)
 {
+    if (column < COLUMN_CHECKBOX || column > COLUMN_TYPE) column = COLUMN_AMOUNT;
     sortColumn = column;
     sortOrder = order;
     ui->treeWidget->sortItems(column, order);
@@ -336,10 +349,16 @@ void CoinControlDialog::radioListMode(bool checked)
 // checkbox clicked by user
 void CoinControlDialog::viewItemChanged(QTreeWidgetItem* item, int column)
 {
-    if (column != COLUMN_CHECKBOX) return;
+    if (column != COLUMN_CHECKBOX || m_updating_view) return;
     auto txid{Txid::FromHex(item->data(COLUMN_ADDRESS, TxHashRole).toString().toStdString())};
     if (txid) { // a valid txid means this is a child node, and not a parent node in tree mode
         COutPoint outpt(*txid, item->data(COLUMN_ADDRESS, VOutRole).toUInt());
+
+        if (item->checkState(COLUMN_CHECKBOX) == Qt::Checked && !item->data(COLUMN_TYPE, SpendingAllowedRole).toBool()) {
+            const QSignalBlocker blocker(ui->treeWidget);
+            item->setCheckState(COLUMN_CHECKBOX, Qt::Unchecked);
+            return;
+        }
 
         if (item->checkState(COLUMN_CHECKBOX) == Qt::Unchecked)
             m_coin_control.UnSelect(outpt);
@@ -387,21 +406,27 @@ void CoinControlDialog::updateLabels(CCoinControl& m_coin_control, WalletModel *
     unsigned int nQuantity      = 0;
     unsigned int nWitnessStackCountsIncluded = 0;
     bool fWitness               = false;
+    CMutableTransaction grouped_model;
+    std::vector<CTxOut> selected_outputs;
+    std::vector<COutPoint> grouped_inputs;
+    std::optional<unsigned int> grouped_fee_size;
+    bool grouped_estimate_unavailable{false};
+    unsigned int change_output_bytes{34};
 
     auto vCoinControl{m_coin_control.ListSelected()};
 
     size_t i = 0;
     for (const auto& out : model->wallet().getCoins(vCoinControl)) {
-        if (out.depth_in_main_chain < 0) continue;
-
         // unselect already spent, very unlikely scenario, this could happen
         // when selected are spent elsewhere, like rpc or another computer
         const COutPoint& outpt = vCoinControl[i++];
-        if (out.is_spent)
+        if (out.depth_in_main_chain < 0 || out.is_spent)
         {
             m_coin_control.UnSelect(outpt);
             continue;
         }
+        grouped_model.vin.emplace_back(outpt);
+        selected_outputs.push_back(out.txout);
 
         // Quantity
         nQuantity++;
@@ -436,6 +461,10 @@ void CoinControlDialog::updateLabels(CCoinControl& m_coin_control, WalletModel *
                 // The shared PQ fee-size estimate already contains this
                 // input's serialized witness-stack-count byte.
                 ++nWitnessStackCountsIncluded;
+            } else if (witnessversion == 3) {
+                // Grouped inputs share an anchor. Estimate the entire selected
+                // transaction below instead of charging a signature per input.
+                grouped_inputs.push_back(outpt);
             } else {
                 // add input skeleton bytes (outpoint, scriptSig size, nSequence)
                 nBytesInputs += (32 + 4 + 1 + 4);
@@ -467,12 +496,28 @@ void CoinControlDialog::updateLabels(CCoinControl& m_coin_control, WalletModel *
         else nBytesInputs += 148;
     }
 
+    if (!grouped_inputs.empty()) {
+        // Native v2/v3 recipient and change programs both serialize to 43-byte
+        // outputs. As in the existing labels, assume one change output; the
+        // final wallet funding calculation remains authoritative.
+        const CScript output_script{CScript{} << OP_2 << std::vector<unsigned char>(32)};
+        const size_t recipients = payAmounts.empty() ? 1 : static_cast<size_t>(payAmounts.size());
+        grouped_model.vout.assign(recipients + 1, CTxOut{0, output_script});
+        const auto size = model->wallet().estimateMercaWeaveFeeSize(CTransaction{grouped_model}, selected_outputs);
+        if (!size || *size <= 0 || *size > std::numeric_limits<unsigned int>::max()) {
+            grouped_estimate_unavailable = true;
+        } else {
+            grouped_fee_size = static_cast<unsigned int>(*size);
+            change_output_bytes = static_cast<unsigned int>(GetSerializeSize(grouped_model.vout.back()));
+        }
+    }
+
     // calculation
-    if (nQuantity > 0)
+    if (nQuantity > 0 && !grouped_estimate_unavailable)
     {
         // Bytes
-        nBytes = nBytesInputs + ((CoinControlDialog::payAmounts.size() > 0 ? CoinControlDialog::payAmounts.size() + 1 : 2) * 34) + 10; // always assume +1 output for change here
-        if (fWitness)
+        nBytes = grouped_fee_size.value_or(nBytesInputs + ((CoinControlDialog::payAmounts.size() > 0 ? CoinControlDialog::payAmounts.size() + 1 : 2) * 34) + 10); // always assume +1 output for change here
+        if (fWitness && !grouped_fee_size)
         {
             // there is some fudging in these numbers related to the actual virtual transaction size calculation that will keep this estimate from being exact.
             // Usually, the result will be an overestimate within a couple of Mercatura base units so that the confirmation dialog ends up displaying a slightly smaller fee.
@@ -486,7 +531,7 @@ void CoinControlDialog::updateLabels(CCoinControl& m_coin_control, WalletModel *
         // in the subtract fee from amount case, we can tell if zero change already and subtract the bytes, so that fee calculation afterwards is accurate
         if (CoinControlDialog::fSubtractFeeFromAmount)
             if (nAmount - nPayAmount == 0)
-                nBytes -= 34;
+                nBytes -= change_output_bytes;
 
         // Fee
         nPayFee = model->wallet().getMinimumFee(nBytes, m_coin_control, /*returned_target=*/nullptr, /*reason=*/nullptr);
@@ -499,19 +544,19 @@ void CoinControlDialog::updateLabels(CCoinControl& m_coin_control, WalletModel *
 
             if (nChange > 0) {
                 // Assumes a p2pkh script size
-                CTxOut txout(nChange, CScript() << std::vector<unsigned char>(24, 0));
+                CTxOut txout(nChange, grouped_fee_size ? grouped_model.vout.back().scriptPubKey : CScript() << std::vector<unsigned char>(24, 0));
                 // Never create dust outputs; if we would, just add the dust to the fee.
                 if (IsDust(txout, model->node().getDustRelayFee()))
                 {
                     nPayFee += nChange;
                     nChange = 0;
                     if (CoinControlDialog::fSubtractFeeFromAmount)
-                        nBytes -= 34; // we didn't detect lack of change above
+                        nBytes -= change_output_bytes; // we didn't detect lack of change above
                 }
             }
 
             if (nChange == 0 && !CoinControlDialog::fSubtractFeeFromAmount)
-                nBytes -= 34;
+                nBytes -= change_output_bytes;
         }
 
         // after fee
@@ -541,6 +586,10 @@ void CoinControlDialog::updateLabels(CCoinControl& m_coin_control, WalletModel *
     l4->setText(BitcoinUnits::formatWithUnit(nDisplayUnit, nAfterFee));      // After Fee
     l5->setText(((nBytes > 0) ? ASYMP_UTF8 : "") + QString::number(nBytes));        // Bytes
     l8->setText(BitcoinUnits::formatWithUnit(nDisplayUnit, nChange));        // Change
+    if (grouped_estimate_unavailable) {
+        l5->setText(tr("Unavailable"));
+        for (auto* value : {l3, l4, l8}) value->setText(tr("Calculated when funding"));
+    }
     if (nPayFee > 0)
     {
         l3->setText(ASYMP_UTF8 + l3->text());
@@ -552,7 +601,12 @@ void CoinControlDialog::updateLabels(CCoinControl& m_coin_control, WalletModel *
     // How many Mercatura base units the estimated fee can vary per byte we guess wrong
     double dFeeVary = (nBytes != 0) ? (double)nPayFee / nBytes : 0;
 
-    QString toolTip4 = tr("Can vary +/- %1 cent(s) per input.").arg(dFeeVary);
+    QString toolTip4 = grouped_estimate_unavailable
+        ? tr("An authenticated aggregate preview is unavailable. Selected inputs are unchanged. Send confirmation uses the actual funded transaction fee.")
+        : (!grouped_inputs.empty()
+            ? tr("Approximate full serialized bytes for the selected groups, assuming native PQ recipient and change outputs. Send confirmation uses the actual funded transaction fee.")
+            : tr("Can vary +/- %1 cent(s) per input.").arg(dFeeVary));
+    if (!grouped_inputs.empty()) l5->setToolTip(toolTip4);
 
     l3->setToolTip(toolTip4);
     l4->setToolTip(toolTip4);
@@ -565,7 +619,7 @@ void CoinControlDialog::updateLabels(CCoinControl& m_coin_control, WalletModel *
     // Insufficient funds
     QLabel *label = dialog->findChild<QLabel *>("labelCoinControlInsuffFunds");
     if (label)
-        label->setVisible(nChange < 0);
+        label->setVisible(!grouped_estimate_unavailable && nChange < 0);
 }
 
 void CoinControlDialog::changeEvent(QEvent* e)
@@ -583,6 +637,8 @@ void CoinControlDialog::updateView()
         return;
 
     bool treeMode = ui->radioTreeMode->isChecked();
+
+    m_updating_view = true;
 
     ui->treeWidget->clear();
     ui->treeWidget->setEnabled(false); // performance, otherwise updateLabels would be called for every checked checkbox
@@ -619,6 +675,17 @@ void CoinControlDialog::updateView()
         for (const auto& outpair : coins.second) {
             const COutPoint& output = std::get<0>(outpair);
             const interfaces::WalletTxOut& out = std::get<1>(outpair);
+            int version;
+            std::vector<unsigned char> program;
+            CTxDestination destination;
+            if (!out.txout.scriptPubKey.IsWitnessProgram(version, program) || program.size() != 32 ||
+                (version != 2 && version != 3) || !ExtractDestination(out.txout.scriptPubKey, destination) ||
+                !model->wallet().isSpendable(destination)) continue;
+            const int filter = ui->inputTypeFilter->currentData().toInt();
+            const bool selected = m_coin_control.IsSelected(output);
+            if (filter && filter != version && !selected) continue;
+            const bool allowed = wallet::MatchesPQSpendingMode(out.txout.scriptPubKey, m_coin_control.m_spending_mode) &&
+                (version != 3 || model->wallet().mercaweaveAvailable());
             nSum += out.txout.nValue;
             nChildren++;
 
@@ -626,7 +693,11 @@ void CoinControlDialog::updateView()
             if (treeMode)    itemOutput = new CCoinControlWidgetItem(itemWalletAddress);
             else             itemOutput = new CCoinControlWidgetItem(ui->treeWidget);
             itemOutput->setFlags(flgCheckbox);
+            if (!allowed && !selected) itemOutput->setFlags(itemOutput->flags() & ~Qt::ItemIsUserCheckable);
             itemOutput->setCheckState(COLUMN_CHECKBOX,Qt::Unchecked);
+            itemOutput->setText(COLUMN_TYPE, version == 2 ? tr("Standard PQ (v2)") : tr("MercaWeave (v3)"));
+            itemOutput->setData(COLUMN_TYPE, SpendingAllowedRole, allowed);
+            if (!allowed) itemOutput->setToolTip(COLUMN_TYPE, tr("Unavailable for the active spending mode or network. Deselect conflicting selected inputs explicitly."));
 
             // address
             CTxDestination outputAddress;
@@ -689,6 +760,7 @@ void CoinControlDialog::updateView()
         // amount
         if (treeMode)
         {
+            if (nChildren == 0) { delete itemWalletAddress; continue; }
             itemWalletAddress->setText(COLUMN_CHECKBOX, "(" + QString::number(nChildren) + ")");
             itemWalletAddress->setText(COLUMN_AMOUNT, BitcoinUnits::format(nDisplayUnit, nSum));
             itemWalletAddress->setData(COLUMN_AMOUNT, Qt::UserRole, QVariant((qlonglong)nSum));
@@ -705,5 +777,6 @@ void CoinControlDialog::updateView()
 
     // sort view
     sortView(sortColumn, sortOrder);
+    m_updating_view = false;
     ui->treeWidget->setEnabled(true);
 }

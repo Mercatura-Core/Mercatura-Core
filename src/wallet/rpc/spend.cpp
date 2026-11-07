@@ -485,6 +485,7 @@ CreatedTransactionResult FundTransaction(CWallet& wallet, const CMutableTransact
             RPCTypeCheckObj(options,
                 {
                     {"add_inputs", UniValueType(UniValue::VBOOL)},
+                    {"spending_mode", UniValueType(UniValue::VSTR)},
                     {"include_unsafe", UniValueType(UniValue::VBOOL)},
                     {"add_to_wallet", UniValueType(UniValue::VBOOL)},
                     {"changeAddress", UniValueType(UniValue::VSTR)},
@@ -516,6 +517,13 @@ CreatedTransactionResult FundTransaction(CWallet& wallet, const CMutableTransact
 
             if (options.exists("add_inputs")) {
                 coinControl.m_allow_other_inputs = options["add_inputs"].get_bool();
+            }
+            if (options.exists("spending_mode")) {
+                const auto mode = options["spending_mode"].get_str();
+                if (mode == "automatic") coinControl.m_spending_mode = PQSpendingMode::AUTOMATIC;
+                else if (mode == "v2") coinControl.m_spending_mode = PQSpendingMode::STANDARD_V2;
+                else if (mode == "v3") coinControl.m_spending_mode = PQSpendingMode::MERCAWEAVE_V3;
+                else throw JSONRPCError(RPC_INVALID_PARAMETER, "Unknown spending_mode; use automatic, v2, or v3");
             }
 
             if (options.exists("changeAddress") || options.exists("change_address")) {
@@ -734,6 +742,7 @@ RPCHelpMan fundrawtransaction()
                             {"maxconf", RPCArg::Type::NUM, RPCArg::Optional::OMITTED, "If add_inputs is specified, require inputs with at most this many confirmations."},
                             {"changeAddress", RPCArg::Type::STR, RPCArg::DefaultHint{"automatic"}, "The Mercatura address to receive the change"},
                             {"changePosition", RPCArg::Type::NUM, RPCArg::DefaultHint{"random"}, "The index of the change output"},
+                            {"spending_mode", RPCArg::Type::STR, RPCArg::DefaultHint{"automatic"}, "Input authorization policy: automatic, v2 (Standard PQ only), or v3 (MercaWeave only). Does not select recipient or change types."},
                             {"change_type", RPCArg::Type::STR, RPCArg::DefaultHint{"set by -changetype"}, "The output type to use. Only valid if changeAddress is not specified. Options are " + FormatAllOutputTypes() + "."},
                             {"includeWatching", RPCArg::Type::BOOL, RPCArg::Default{false}, "(DEPRECATED) No longer used"},
                             {"lockUnspents", RPCArg::Type::BOOL, RPCArg::Default{false}, "Lock selected unspent outputs"},
@@ -1195,6 +1204,7 @@ RPCHelpMan send()
                     {"add_to_wallet", RPCArg::Type::BOOL, RPCArg::Default{true}, "When false, returns a serialized transaction which will not be added to the wallet or broadcast"},
                     {"change_address", RPCArg::Type::STR, RPCArg::DefaultHint{"automatic"}, "The Mercatura address to receive the change"},
                     {"change_position", RPCArg::Type::NUM, RPCArg::DefaultHint{"random"}, "The index of the change output"},
+                    {"spending_mode", RPCArg::Type::STR, RPCArg::DefaultHint{"automatic"}, "Input authorization policy: automatic, v2 (Standard PQ only), or v3 (MercaWeave only). Does not select recipient or change types."},
                     {"change_type", RPCArg::Type::STR, RPCArg::DefaultHint{"set by -changetype"}, "The output type to use. Only valid if change_address is not specified. Options are " + FormatAllOutputTypes() + "."},
                     {"fee_rate", RPCArg::Type::AMOUNT, RPCArg::DefaultHint{"not set, fall back to wallet fee estimation"}, "Specify a fee rate in " + CURRENCY_ATOM + "/vB.", RPCArgOptions{.also_positional = true}},
                     {"include_watching", RPCArg::Type::BOOL, RPCArg::Default{"false"}, "(DEPRECATED) No longer used"},
@@ -1700,6 +1710,7 @@ RPCHelpMan walletcreatefundedpsbt()
                             {"maxconf", RPCArg::Type::NUM, RPCArg::Optional::OMITTED, "If add_inputs is specified, require inputs with at most this many confirmations."},
                             {"changeAddress", RPCArg::Type::STR, RPCArg::DefaultHint{"automatic"}, "The Mercatura address to receive the change"},
                             {"changePosition", RPCArg::Type::NUM, RPCArg::DefaultHint{"random"}, "The index of the change output"},
+                            {"spending_mode", RPCArg::Type::STR, RPCArg::DefaultHint{"automatic"}, "Input authorization policy: automatic, v2 (Standard PQ only), or v3 (MercaWeave only). Does not select recipient or change types."},
                             {"change_type", RPCArg::Type::STR, RPCArg::DefaultHint{"set by -changetype"}, "The output type to use. Only valid if changeAddress is not specified. Options are " + FormatAllOutputTypes() + "."},
                             {"includeWatching", RPCArg::Type::BOOL, RPCArg::Default{false}, "(DEPRECATED) No longer used"},
                             {"lockUnspents", RPCArg::Type::BOOL, RPCArg::Default{false}, "Lock selected unspent outputs"},

@@ -7,11 +7,15 @@
 
 #include <wallet/coincontrol.h>
 #include <interfaces/chain.h>
+#include <interfaces/mining.h>
 #include <interfaces/node.h>
 #include <key_io.h>
+#include <mining/solo.h>
+#include <policy/policy.h>
 #include <qt/bitcoinamountfield.h>
 #include <qt/bitcoinunits.h>
 #include <qt/clientmodel.h>
+#include <qt/coincontroldialog.h>
 #include <qt/optionsmodel.h>
 #include <qt/overviewpage.h>
 #include <qt/platformstyle.h>
@@ -29,9 +33,11 @@
 #include <validation.h>
 #include <wallet/test/util.h>
 #include <wallet/wallet.h>
+#include <wallet/spend.h>
 
 #include <chrono>
 #include <memory>
+#include <stdexcept>
 
 #include <QAbstractButton>
 #include <QAction>
@@ -47,6 +53,7 @@
 #include <QListView>
 #include <QDialogButtonBox>
 #include <QStandardItemModel>
+#include <QTreeWidgetItemIterator>
 
 using wallet::AddWallet;
 using wallet::CWallet;
@@ -508,7 +515,7 @@ void WalletTests::walletTests()
     TestGUI(m_node);
 }
 
-void WalletTests::mercaweaveReceiveTests()
+void WalletTests::mercaweaveReceiveAndSendTests()
 {
     TestChain100Setup test{ChainType::REGTEST, {.extra_args={"-mercaweaveheight=101"}}};
     auto loader = interfaces::MakeWalletLoader(*test.m_node.chain, *Assert(test.m_node.args));
@@ -528,6 +535,17 @@ void WalletTests::mercaweaveReceiveTests()
     QCOMPARE(selector->itemText(0), QString{"Standard PQ — Witness v2"});
     QCOMPARE(selector->itemText(1), QString{"MercaWeave Grouped PQ — Witness v3"});
     auto* items = qobject_cast<QStandardItemModel*>(selector->model());
+    auto* spending = gui.sendCoinsDialog.findChild<QComboBox*>("spendingMode");
+    QVERIFY(spending && !spending->isHidden());
+    QCOMPARE(spending->count(), 3);
+    QCOMPARE(spending->currentIndex(), 0);
+    QCOMPARE(spending->itemText(0), QString{"Automatic (Recommended)"});
+    QCOMPARE(spending->itemText(1), QString{"Standard PQ — Witness v2 only"});
+    QCOMPARE(spending->itemText(2), QString{"MercaWeave — Witness v3 only"});
+    QVERIFY(!qobject_cast<QStandardItemModel*>(spending->model())->item(2)->isEnabled());
+    spending->setCurrentIndex(2);
+    QVERIFY(!gui.sendCoinsDialog.findChild<QPushButton*>("sendButton")->isEnabled());
+    spending->setCurrentIndex(0);
     QVERIFY(items && !items->item(1)->isEnabled());
     QVERIFY(button->isEnabled());
     selector->setCurrentIndex(1);
@@ -564,14 +582,18 @@ void WalletTests::mercaweaveReceiveTests()
     QCOMPARE(version, 3);
     QCOMPARE(program.size(), size_t{32});
     QVERIFY(wallet->GetPQGroupRecord(GetScriptForDestination(destination)));
+    bool request_shown{false};
     for (auto* widget : QApplication::topLevelWidgets()) {
         if (auto* request_dialog = qobject_cast<ReceiveRequestDialog*>(widget)) {
+            request_shown = true;
             QCOMPARE(request_dialog->findChild<QLabel*>("address_content")->text(), request.recipient.address);
             QVERIFY(QMetaObject::invokeMethod(request_dialog, "on_btnCopyAddress_clicked"));
             QCOMPARE(QApplication::clipboard()->text(), request.recipient.address);
             request_dialog->close();
         }
     }
+    QVERIFY(request_shown);
+    spending->setCurrentIndex(2);
     auto& chainstate = test.m_node.chainman->ActiveChainstate();
     auto* activated_tip = WITH_LOCK(cs_main, return test.m_node.chainman->ActiveChain().Tip());
     BlockValidationState state;
@@ -579,6 +601,9 @@ void WalletTests::mercaweaveReceiveTests()
     QVERIFY(chainstate.ActivateBestChain(state));
     QCOMPARE(WITH_LOCK(cs_main, return test.m_node.chainman->ActiveChain().Height()), 100);
     QTRY_VERIFY_WITH_TIMEOUT(!button->isEnabled(), 3000);
+    QTRY_VERIFY(!qobject_cast<QStandardItemModel*>(spending->model())->item(2)->isEnabled());
+    QCOMPARE(spending->currentIndex(), 2);
+    QVERIFY(!gui.sendCoinsDialog.findChild<QPushButton*>("sendButton")->isEnabled());
     QCOMPARE(selector->currentIndex(), 1);
     QVERIFY(!items->item(1)->isEnabled());
     {
@@ -589,6 +614,196 @@ void WalletTests::mercaweaveReceiveTests()
     BlockValidationState restored;
     QVERIFY(chainstate.ActivateBestChain(restored));
     QTRY_VERIFY_WITH_TIMEOUT(button->isEnabled(), 3000);
+
+    QTRY_VERIFY(qobject_cast<QStandardItemModel*>(spending->model())->item(2)->isEnabled());
+    spending->setCurrentIndex(0);
+
+    // Exercise normal Qt Send with real matured native v2/v3 mining rewards.
+    // No fixture capability, injected coins or classical authorization is used.
+    const auto standard = wallet->GetNewDestination(OutputType::BECH32M, "qt-mixed-funding");
+    const auto change = wallet->GetNewPQGroupDestination("qt-group-change", 0, 1);
+    QVERIFY(standard && change);
+    {
+        mining::SoloWorkProvider provider{interfaces::MakeMining(test.m_node, false),
+            GetScriptForDestination(destination), EncodeDestination(destination), true};
+        const auto job = provider.GetJob();
+        QVERIFY(job && job->coinbase);
+        QCOMPARE(job->height, int64_t{102});
+        QVERIFY(job->coinbase->vout[0].scriptPubKey == GetScriptForDestination(destination));
+    }
+    QVERIFY_EXCEPTION_THROWN((mining::SoloWorkProvider{interfaces::MakeMining(test.m_node, false),
+        CScript{} << OP_3 << std::vector<unsigned char>(16, 1), "", true}), std::runtime_error);
+    std::vector<COutPoint> funding;
+    CAmount available{0};
+    for (int i = 0; i < 105; ++i) {
+        const auto block = test.CreateAndProcessBlock({},
+            GetScriptForDestination(i == 0 || i == 2 ? destination : *standard));
+        if (i < 3) {
+            funding.emplace_back(block.vtx[0]->GetHash(), 0);
+            available += block.vtx[0]->vout[0].nValue;
+        }
+    }
+    QVERIFY(available > 1000000);
+    QCOMPARE(WITH_LOCK(cs_main, return test.m_node.chainman->ActiveChain().Height()), 206);
+    wallet->SetLastBlockProcessed(206,
+        WITH_LOCK(cs_main, return test.m_node.chainman->ActiveChain().Tip()->GetBlockHash()));
+    SyncUpWallet(wallet, m_node);
+    gui.walletModel->pollBalanceChanged();
+    for (const auto mode : {wallet::PQSpendingMode::STANDARD_V2, wallet::PQSpendingMode::MERCAWEAVE_V3}) {
+        wallet::CCoinControl policy;
+        policy.m_spending_mode = mode;
+        const auto recipient = mode == wallet::PQSpendingMode::STANDARD_V2 ? destination : *standard;
+        const std::vector<wallet::CRecipient> recipients{{recipient, available / 4, false}};
+        const auto result = gui.walletModel->wallet().createTransaction(recipients, policy, true, std::nullopt);
+        QVERIFY(result);
+        std::vector<COutPoint> points;
+        for (const auto& input : result->tx->vin) points.push_back(input.prevout);
+        for (const auto& coin : gui.walletModel->wallet().getCoins(points)) {
+            QVERIFY(wallet::MatchesPQSpendingMode(coin.txout.scriptPubKey, mode));
+        }
+        QVERIFY(result->change_pos);
+        QVERIFY(result->tx->vout[*result->change_pos].scriptPubKey.IsWitnessProgram(version, program));
+        QCOMPARE(version, 2);
+        policy.Select(mode == wallet::PQSpendingMode::STANDARD_V2 ? funding[0] : funding[1]);
+        const auto conflict = gui.walletModel->wallet().createTransaction(recipients, policy, true, std::nullopt);
+        QVERIFY(!conflict);
+        QVERIFY(util::ErrorString(conflict).original.find("conflicts with the spending mode") != std::string::npos);
+        QVERIFY(policy.HasSelected());
+    }
+    auto* control = gui.sendCoinsDialog.getCoinControl();
+    spending->setCurrentIndex(1);
+    QCOMPARE(static_cast<int>(control->m_spending_mode), static_cast<int>(wallet::PQSpendingMode::STANDARD_V2));
+    {
+        CoinControlDialog coins(*control, gui.walletModel.get(), style.get());
+        auto* filter = coins.findChild<QComboBox*>("inputTypeFilter");
+        auto* tree = coins.findChild<QTreeWidget*>("treeWidget");
+        QVERIFY(filter && tree);
+        filter->setCurrentIndex(0);
+        bool v2_found{false}, v3_found{false};
+        for (QTreeWidgetItemIterator it(tree); *it; ++it) {
+            if ((*it)->text(6) == "Standard PQ (v2)") v2_found = true;
+            if ((*it)->text(6) == "MercaWeave (v3)") {
+                v3_found = true;
+                QVERIFY(!((*it)->flags() & Qt::ItemIsUserCheckable));
+                (*it)->setCheckState(0, Qt::Checked);
+                QVERIFY(!control->HasSelected());
+            }
+        }
+        QVERIFY(v2_found && v3_found);
+        filter->setCurrentIndex(2);
+        QVERIFY(control->m_spending_mode == wallet::PQSpendingMode::STANDARD_V2);
+    }
+    control->Select(funding[0]);
+    CoinControlDialog::updateLabels(*control, gui.walletModel.get(), &gui.sendCoinsDialog);
+    QVERIFY(control->IsSelected(funding[0]));
+    spending->setCurrentIndex(0);
+    control->Select(funding[0]);
+    control->Select(funding[1]);
+    control->Select(funding[2]);
+    control->m_allow_other_inputs = false;
+    control->destChange = *change;
+    CoinControlDialog::payAmounts = {available / 4};
+    CoinControlDialog::updateLabels(*control, gui.walletModel.get(), &gui.sendCoinsDialog);
+    const auto displayed_bytes = gui.sendCoinsDialog.findChild<QLabel*>("labelCoinControlBytes")->text();
+    bool bytes_ok{false};
+    const auto estimated_bytes = displayed_bytes.mid(1).toULongLong(&bytes_ok);
+    QVERIFY(bytes_ok);
+    QString send_error;
+    const auto error_handler = connect(&gui.sendCoinsDialog, &SendCoinsDialog::message, &dialog,
+        [&send_error](const QString&, const QString& message, unsigned int) { send_error = message; });
+    const auto txid = SendCoins(*wallet, gui.sendCoinsDialog, WitnessV2MercaturaPQ{}, available / 4, false);
+    disconnect(error_handler);
+    QVERIFY2(txid != Txid{}, qPrintable(send_error));
+    CTransactionRef sent;
+    {
+        LOCK(wallet->cs_wallet);
+        const auto* recorded = wallet->GetWalletTx(txid);
+        QVERIFY(recorded);
+        sent = recorded->tx;
+    }
+    QCOMPARE(sent->vin.size(), size_t{3});
+    QCOMPARE(estimated_bytes, static_cast<qulonglong>(GetTransactionFeeSize(*sent)));
+    int anchors{0}, followers{0};
+    bool native_input{false}, grouped_change{false};
+    for (const auto& input : sent->vin) {
+        if (input.prevout == funding[0] || input.prevout == funding[2]) {
+            if (input.scriptWitness.stack.size() == 3) {
+                QCOMPARE(input.scriptWitness.stack[0].size(), size_t{3309});
+                ++anchors;
+            } else {
+                QCOMPARE(input.scriptWitness.stack.size(), size_t{2});
+                QCOMPARE(input.scriptWitness.stack[0].size(), size_t{32});
+                QCOMPARE(input.scriptWitness.stack[1].size(), size_t{4});
+                ++followers;
+            }
+        } else {
+            QVERIFY(input.prevout == funding[1]);
+            QCOMPARE(input.scriptWitness.stack.size(), size_t{2});
+            native_input = true;
+        }
+    }
+    for (const auto& output : sent->vout) grouped_change |= output.scriptPubKey == GetScriptForDestination(*change);
+    QCOMPARE(anchors, 1);
+    QCOMPARE(followers, 1);
+    QVERIFY(native_input && grouped_change);
+    qApp->processEvents();
+    QTRY_VERIFY(FindTx(*gui.walletModel->getTransactionTableModel(), txid).isValid());
+    const auto confirmed = test.CreateAndProcessBlock({CMutableTransaction{*sent}}, GetScriptForDestination(*standard));
+    QVERIFY(WITH_LOCK(cs_main, return test.m_node.chainman->ActiveChain().Tip()->GetBlockHash() == confirmed.GetHash()));
+
+    spending->setCurrentIndex(2);
+    QVERIFY(gui.walletModel->wallet().encryptWallet(SecureString{"mode-passphrase"}));
+    QVERIFY(gui.walletModel->wallet().isLocked());
+    QVERIFY(QMetaObject::invokeMethod(&gui.sendCoinsDialog, "updateSpendingModeAvailability"));
+    QVERIFY(gui.sendCoinsDialog.findChild<QLabel*>("spendingModeStatus")->text().contains("locked"));
+    {
+        auto temporary = std::make_unique<WalletModel>(interfaces::MakeWallet(*m_node.walletLoader().context(), wallet),
+                                                      *gui.clientModel, style.get());
+        gui.sendCoinsDialog.setModel(temporary.get());
+        connect(temporary.get(), &WalletModel::requireUnlock, &gui.sendCoinsDialog, [&] {
+            QVERIFY(gui.walletModel->wallet().unlock(SecureString{"mode-passphrase"}));
+        });
+        const auto context = temporary->requestUnlock();
+        QVERIFY(context.isValid());
+        temporary.reset();
+        QVERIFY(!context.isValid());
+        QVERIFY(!gui.sendCoinsDialog.findChild<QPushButton*>("sendButton")->isEnabled());
+        QVERIFY(!gui.sendCoinsDialog.findChild<QPushButton*>("pushButtonCoinControl")->isEnabled());
+        // Recipient editing and Inputs must remain safe after the model dies.
+        auto* entry = gui.sendCoinsDialog.findChild<SendCoinsEntry*>();
+        QVERIFY(entry);
+        entry->setAddress(QString::fromStdString(EncodeDestination(*standard)));
+        QVERIFY(QMetaObject::invokeMethod(&gui.sendCoinsDialog, "coinControlButtonClicked"));
+        QVERIFY(gui.sendCoinsDialog.findChildren<CoinControlDialog*>().empty());
+    }
+    QVERIFY(gui.walletModel->wallet().lock());
+    {
+        auto temporary = std::make_unique<WalletModel>(interfaces::MakeWallet(*m_node.walletLoader().context(), wallet),
+                                                      *gui.clientModel, style.get());
+        gui.sendCoinsDialog.setModel(temporary.get());
+        connect(temporary.get(), &WalletModel::requireUnlock, &gui.sendCoinsDialog, [&] { temporary.reset(); });
+        const auto context = temporary->requestUnlock();
+        QVERIFY(!context.isValid());
+        QVERIFY(!temporary);
+    }
+    gui.sendCoinsDialog.setModel(gui.walletModel.get());
+    QVERIFY(gui.walletModel->wallet().unlock(SecureString{"mode-passphrase"}));
+    QVERIFY(QMetaObject::invokeMethod(&gui.sendCoinsDialog, "updateSpendingModeAvailability"));
+    QVERIFY(!gui.sendCoinsDialog.findChild<QLabel*>("spendingModeStatus")->text().contains("locked"));
+    gui.sendCoinsDialog.setModel(nullptr);
+    QCOMPARE(spending->currentIndex(), 2);
+    QVERIFY(!gui.sendCoinsDialog.findChild<QPushButton*>("sendButton")->isEnabled());
+    {
+        const auto unsupported = SetupDescriptorsWallet(m_node, test, true);
+        MiniGUI other(m_node, style.get());
+        other.initModelForWallet(m_node, unsupported, style.get());
+        gui.sendCoinsDialog.setModel(other.walletModel.get());
+        QCOMPARE(spending->currentIndex(), 2);
+        QVERIFY(!qobject_cast<QStandardItemModel*>(spending->model())->item(2)->isEnabled());
+    }
+    gui.sendCoinsDialog.setModel(gui.walletModel.get());
+    QCOMPARE(spending->currentIndex(), 2);
+    QVERIFY(qobject_cast<QStandardItemModel*>(spending->model())->item(2)->isEnabled());
 
     // Losing a wallet while the grouped option is selected must disable it
     // without silently issuing a different address type.

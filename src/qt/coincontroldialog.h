@@ -61,6 +61,7 @@ private:
     wallet::CCoinControl& m_coin_control;
     WalletModel *model;
     int sortColumn;
+    bool m_updating_view{false};
     Qt::SortOrder sortOrder;
 
     QMenu *contextMenu;
@@ -82,12 +83,14 @@ private:
         COLUMN_ADDRESS,
         COLUMN_DATE,
         COLUMN_CONFIRMATIONS,
+        COLUMN_TYPE,
     };
 
     enum
     {
         TxHashRole = Qt::UserRole,
-        VOutRole
+        VOutRole,
+        SpendingAllowedRole
     };
 
     friend class CCoinControlWidgetItem;
