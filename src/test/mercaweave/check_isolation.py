@@ -14,7 +14,9 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 MACRO = "MERCATURA_MERCAWEAVE_RESEARCH_TEST_ONLY"
-BASE = "326fd09"  # WO07C authorized dormant production implementation checkpoint
+# The staged integration intentionally changes ordinary validation. Pin that
+# checkpoint while retaining every research-macro, symbol and API fence below.
+BASE = "a90f95beaeab9aff68e1cb20a2ee640c95366458"
 
 
 def require(ok, message):

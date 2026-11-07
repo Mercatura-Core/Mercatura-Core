@@ -9,7 +9,9 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-BASE = "326fd09"  # Includes the reviewed WO07C dormant production call path.
+# Pin the normal staged-activation implementation, preserving research ABI and
+# macro isolation checks rather than requiring the old dormant source body.
+BASE = "a90f95beaeab9aff68e1cb20a2ee640c95366458"
 MACROS = {
     "MERCATURA_MERCAWEAVE_NODE_RESEARCH_TEST_ONLY",
     "MERCATURA_MERCAWEAVE_VALIDATION_COMPONENTS_TEST_ONLY",

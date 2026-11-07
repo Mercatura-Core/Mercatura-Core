@@ -10,7 +10,9 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 MACRO = "MERCATURA_MERCAWEAVE_WALLET_RESEARCH_TEST_ONLY"
-BASE = "671c17158949499329132fa86e1655013d8f209c"  # WO08 allocation-atomic publication checkpoint.
+# Normal activated custody supersedes WO05's dormant-source baseline. The
+# private research API and compile/symbol fences remain independently checked.
+BASE = "a90f95beaeab9aff68e1cb20a2ee640c95366458"
 
 
 def project(text):

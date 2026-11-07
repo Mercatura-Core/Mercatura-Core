@@ -10,7 +10,9 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-BASE = "259ef51316245a84348a1f6cdffaff9787bbcd8e"
+# Native Receive and activated payout integration are intentional changes. Keep
+# their checkpoint pinned and continue checking private Qt capability isolation.
+BASE = "a90f95beaeab9aff68e1cb20a2ee640c95366458"
 MACRO = "MERCATURA_MERCAWEAVE_QT_RESEARCH_TEST_ONLY"
 
 
