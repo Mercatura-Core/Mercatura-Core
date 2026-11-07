@@ -5,6 +5,7 @@
 #include <test/data/key_io_invalid.json.h>
 #include <test/data/key_io_valid.json.h>
 
+#include <bech32.h>
 #include <crypto/mercatura_mldsa.h>
 #include <crypto/mercatura_pqderive.h>
 #include <crypto/mercatura_pqkey.h>
@@ -372,6 +373,30 @@ BOOST_AUTO_TEST_CASE(mercatura_pq_deterministic_key_address_pipeline)
     BOOST_CHECK(main_address != regtest_address);
     BOOST_CHECK(testnet_address != regtest_address);
 
+    SelectParams(ChainType::MAIN);
+}
+
+BOOST_AUTO_TEST_CASE(mercaweave_reserved_program_addresses)
+{
+    for (const auto chain : {ChainType::MAIN, ChainType::TESTNET, ChainType::TESTNET4, ChainType::SIGNET, ChainType::REGTEST}) {
+        SelectParams(chain);
+        const std::vector<unsigned char> program(32, 0x42);
+        const CTxDestination destination{WitnessUnknown{3, program}};
+        const auto address = EncodeDestination(destination);
+        BOOST_REQUIRE(!address.empty());
+        BOOST_CHECK(DecodeDestination(address) == destination);
+        BOOST_CHECK(GetScriptForDestination(destination) == (CScript{} << OP_3 << program));
+        for (const auto size : {2U, 16U, 20U, 31U, 33U, 40U}) {
+            const std::vector<unsigned char> malformed(size, 0x42);
+            const CTxDestination invalid{WitnessUnknown{3, malformed}};
+            BOOST_CHECK(!IsValidDestination(invalid));
+            BOOST_CHECK(EncodeDestination(invalid).empty());
+            std::vector<unsigned char> data{3};
+            BOOST_REQUIRE((ConvertBits<8, 5, true>([&](int value) { data.push_back(value); }, malformed.begin(), malformed.end())));
+            const auto encoded = bech32::Encode(bech32::Encoding::BECH32M, Params().Bech32HRP(), data);
+            BOOST_CHECK(!IsValidDestination(DecodeDestination(encoded)));
+        }
+    }
     SelectParams(ChainType::MAIN);
 }
 

@@ -21,14 +21,6 @@ struct Dersig100Setup : public TestChain100Setup {
         : TestChain100Setup{ChainType::REGTEST, {.extra_args = {"-testactivationheight=dersig@102"}}} {}
 };
 
-bool CheckInputScripts(const CTransaction& tx, TxValidationState& state,
-                       const CCoinsViewCache& inputs, script_verify_flags flags, bool cacheSigStore,
-                       bool cacheFullScriptStore, PrecomputedTransactionData& txdata,
-                       ValidationCache& validation_cache,
-                       std::vector<CScriptCheck>* pvChecks,
-                       std::optional<uint256> pq_genesis_hash = std::nullopt)
-                       EXCLUSIVE_LOCKS_REQUIRED(cs_main);
-
 BOOST_AUTO_TEST_SUITE(txvalidationcache_tests)
 
 BOOST_FIXTURE_TEST_CASE(tx_mempool_block_doublespend, Dersig100Setup)
@@ -162,6 +154,7 @@ static void ValidateCheckInputsForAllFlags(const CTransaction &tx, script_verify
         script_verify_flags test_flags = script_verify_flags::from_int(insecure_rand.randrange(MAX_SCRIPT_VERIFY_FLAGS));
 
         // Filter out incompatible flag choices
+        if (test_flags & SCRIPT_VERIFY_MERCAWEAVE) test_flags |= SCRIPT_VERIFY_WITNESS;
         if ((test_flags & SCRIPT_VERIFY_CLEANSTACK)) {
             // CLEANSTACK requires P2SH and WITNESS, see VerifyScript() in
             // script/interpreter.cpp
@@ -171,7 +164,7 @@ static void ValidateCheckInputsForAllFlags(const CTransaction &tx, script_verify
             // WITNESS requires P2SH
             test_flags |= SCRIPT_VERIFY_P2SH;
         }
-        bool ret = CheckInputScripts(tx, state, &active_coins_tip, test_flags, true, add_to_cache, txdata, validation_cache, nullptr);
+        bool ret = CheckInputScripts(tx, state, &active_coins_tip, test_flags, true, add_to_cache, txdata, validation_cache, nullptr, std::nullopt);
         // CheckInputScripts should succeed iff test_flags doesn't intersect with
         // failing_flags
         bool expected_return_value = !(test_flags & failing_flags);
@@ -181,13 +174,13 @@ static void ValidateCheckInputsForAllFlags(const CTransaction &tx, script_verify
         if (ret && add_to_cache) {
             // Check that we get a cache hit if the tx was valid
             std::vector<CScriptCheck> scriptchecks;
-            BOOST_CHECK(CheckInputScripts(tx, state, &active_coins_tip, test_flags, true, add_to_cache, txdata, validation_cache, &scriptchecks));
+            BOOST_CHECK(CheckInputScripts(tx, state, &active_coins_tip, test_flags, true, add_to_cache, txdata, validation_cache, &scriptchecks, std::nullopt));
             BOOST_CHECK(scriptchecks.empty());
         } else {
             // Check that we get script executions to check, if the transaction
             // was invalid, or we didn't add to cache.
             std::vector<CScriptCheck> scriptchecks;
-            BOOST_CHECK(CheckInputScripts(tx, state, &active_coins_tip, test_flags, true, add_to_cache, txdata, validation_cache, &scriptchecks));
+            BOOST_CHECK(CheckInputScripts(tx, state, &active_coins_tip, test_flags, true, add_to_cache, txdata, validation_cache, &scriptchecks, std::nullopt));
             BOOST_CHECK_EQUAL(scriptchecks.size(), tx.vin.size());
         }
     }
@@ -297,7 +290,7 @@ BOOST_FIXTURE_TEST_CASE(checkinputs_test, Dersig100Setup)
             true,
             ptd_spend_tx,
             m_node.chainman->m_validation_cache,
-            nullptr));
+            nullptr, std::nullopt));
 
         // Invalid results are not cached. Asking ConnectBlock-style for
         // script checks must still return the script check object.
@@ -311,7 +304,7 @@ BOOST_FIXTURE_TEST_CASE(checkinputs_test, Dersig100Setup)
             true,
             ptd_spend_tx,
             m_node.chainman->m_validation_cache,
-            &scriptchecks));
+            &scriptchecks, std::nullopt));
         BOOST_CHECK_EQUAL(scriptchecks.size(), 1U);
 
         ValidateCheckInputsForAllFlags(
@@ -400,7 +393,7 @@ BOOST_FIXTURE_TEST_CASE(checkinputs_test, Dersig100Setup)
             true,
             txdata,
             m_node.chainman->m_validation_cache,
-            nullptr));
+            nullptr, std::nullopt));
     }
 
     // Test CHECKSEQUENCEVERIFY.
@@ -440,7 +433,7 @@ BOOST_FIXTURE_TEST_CASE(checkinputs_test, Dersig100Setup)
             true,
             txdata,
             m_node.chainman->m_validation_cache,
-            nullptr));
+            nullptr, std::nullopt));
     }
 
     // Test that caching a valid witness does not imply success for the same
@@ -518,7 +511,7 @@ BOOST_FIXTURE_TEST_CASE(checkinputs_test, Dersig100Setup)
             true,
             txdata,
             m_node.chainman->m_validation_cache,
-            nullptr));
+            nullptr, std::nullopt));
 
         std::vector<CScriptCheck> scriptchecks;
 
@@ -531,7 +524,7 @@ BOOST_FIXTURE_TEST_CASE(checkinputs_test, Dersig100Setup)
             true,
             txdata,
             m_node.chainman->m_validation_cache,
-            &scriptchecks));
+            &scriptchecks, std::nullopt));
 
         // Cache entries are whole-transaction based, so both script checks
         // must be returned rather than caching only the first valid input.

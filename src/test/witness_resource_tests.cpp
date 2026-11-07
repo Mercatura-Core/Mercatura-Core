@@ -366,7 +366,9 @@ BOOST_AUTO_TEST_CASE(mainnet_connection_templates_disk_and_reindex)
     auto& chainman = *m_node.chainman;
     PoWHashContext pow_context;
     SetMockTime(Params().GenesisBlock().Time());
-    const CScript unknown{CScript{} << OP_3 << std::vector<unsigned char>(32, 1)};
+    // V3 is assigned to grouped authorization. Keep the future-witness resource
+    // control on an unassigned version without bypassing the payout gate.
+    const CScript unknown{CScript{} << OP_4 << std::vector<unsigned char>(32, 1)};
     node::BlockAssembler::Options options;
     options.coinbase_output_script = unknown;
     options.include_dummy_extranonce = true;

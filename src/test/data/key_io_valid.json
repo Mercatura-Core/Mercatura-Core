@@ -190,8 +190,8 @@
         }
     ],
     [
-        "tmca1rgv5m6uvdk3kc7qsuz0c79v88ycsqct7y",
-        "53104329bd718db46d8f021c13f1e2b0e726",
+        "tmca1ygv5m6uvdk3kc7qsuz0c79v88yc6mq99t",
+        "54104329bd718db46d8f021c13f1e2b0e726",
         {
             "chain": "test",
             "isPrivkey": false,
@@ -461,8 +461,8 @@
         }
     ],
     [
-        "tmca1r0ecpfxg2udhtc556gqrpwwhk4sa9l3xp",
-        "53107e7014990ae36ebc529a4006173af6ac",
+        "tmca1y0ecpfxg2udhtc556gqrpwwhk4sh78law",
+        "54107e7014990ae36ebc529a4006173af6ac",
         {
             "chain": "test",
             "isPrivkey": false,

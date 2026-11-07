@@ -197,12 +197,14 @@ script_verify_flags TrimFlags(script_verify_flags flags)
 
     // CLEANSTACK requires WITNESS (and transitively CLEANSTACK requires P2SH)
     if (!(flags & SCRIPT_VERIFY_WITNESS)) flags &= ~SCRIPT_VERIFY_CLEANSTACK;
+    if (!(flags & SCRIPT_VERIFY_WITNESS)) flags &= ~SCRIPT_VERIFY_MERCAWEAVE;
     Assert(IsValidFlagCombination(flags));
     return flags;
 }
 
 script_verify_flags FillFlags(script_verify_flags flags)
 {
+    if (flags & SCRIPT_VERIFY_MERCAWEAVE) flags |= SCRIPT_VERIFY_WITNESS;
     // CLEANSTACK implies WITNESS
     if (flags & SCRIPT_VERIFY_CLEANSTACK) flags |= SCRIPT_VERIFY_WITNESS;
 
@@ -1429,12 +1431,10 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     // Check undefined future witness-program versions against
     // Mercatura's dust policy.
     //
-    // Witness version 2 is permanently assigned to PQ Authorization v1
-    // and requires exactly a 32-byte program, so a 2-byte v2 program is
-    // deliberately nonstandard and must not be treated as an undefined
-    // future witness version.
+    // Assigned v2/v3 require 32-byte programs. Two-byte programs are not
+    // future-witness fixtures for either assigned ownership mechanism.
     for (int op = OP_1; op <= OP_16; ++op) {
-        if (op == OP_2) {
+        if (op == OP_2 || op == OP_3) {
             continue;
         }
 
@@ -1463,6 +1463,19 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
 
     t.vout[0].nValue = 1;
     CheckIsNotStandard(t, "scriptpubkey");
+
+    // Grouped v3 keeps the native dust boundary for a well-formed program,
+    // while unsupported lengths fail script classification before dust.
+    t.vout[0].scriptPubKey = CScript() << OP_3 << std::vector<unsigned char>(32, 1);
+    t.vout[0].nValue = 2;
+    CheckIsStandard(t);
+    t.vout[0].nValue = 1;
+    CheckIsNotStandard(t, "dust");
+    for (const auto size : {2U, 16U, 31U, 33U, 40U}) {
+        t.vout[0].scriptPubKey = CScript() << OP_3 << std::vector<unsigned char>(size, 1);
+        t.vout[0].nValue = 2;
+        CheckIsNotStandard(t, "scriptpubkey");
+    }
 
     // Check anchor outputs
     t.vout[0].scriptPubKey = CScript() << OP_1 << ANCHOR_BYTES;
@@ -1757,12 +1770,12 @@ BOOST_AUTO_TEST_CASE(spends_witness_prog)
     tx_spend.vin[0].scriptSig.clear();
     BOOST_CHECK(!::SpendsNonAnchorWitnessProg(CTransaction{tx_spend}, coins));
 
-    // Various undefined witness versions 3-16 with 32-byte programs.
-    // Witness version 2 is permanently assigned to Mercatura PQ Authorization v1.
+    // Native grouped v3 and future witness versions 4-16 remain detectable.
     const auto program{ToByteVector(XOnlyPubKey{pubkey})};
     for (int i{3}; i <= 16; ++i) {
         tx_create.vout[0].scriptPubKey = GetScriptForDestination(WitnessUnknown{i, program});
-        BOOST_CHECK_EQUAL(Solver(tx_create.vout[0].scriptPubKey, sol_dummy), TxoutType::WITNESS_UNKNOWN);
+        BOOST_CHECK_EQUAL(Solver(tx_create.vout[0].scriptPubKey, sol_dummy),
+                          i == 3 ? TxoutType::WITNESS_V3_MERCAWEAVE : TxoutType::WITNESS_UNKNOWN);
         tx_spend.vin[0].prevout.hash = tx_create.GetHash();
         AddCoins(coins, CTransaction{tx_create}, 0, false);
         BOOST_CHECK(::SpendsNonAnchorWitnessProg(CTransaction{tx_spend}, coins));
