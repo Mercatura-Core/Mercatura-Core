@@ -78,24 +78,30 @@ int main(int argc, char* argv[])
         BitcoinApplication app;
         app.createNode(*init);
 
+        // Keep native assertion failures fatal. Qt's crash handler cannot
+        // attach a debugger in restricted workers and may recurse on SIGABRT.
+        const auto run_test = [](QObject* test) {
+            return QTest::qExec(test, QStringList{"test_bitcoin-qt", "-nocrashhandler"});
+        };
+
         AppTests app_tests(app);
-        num_test_failures += QTest::qExec(&app_tests);
+        num_test_failures += run_test(&app_tests);
 
         OptionTests options_tests(app.node());
-        num_test_failures += QTest::qExec(&options_tests);
+        num_test_failures += run_test(&options_tests);
 
         URITests test1;
-        num_test_failures += QTest::qExec(&test1);
+        num_test_failures += run_test(&test1);
 
         RPCNestedTests test3(app.node());
-        num_test_failures += QTest::qExec(&test3);
+        num_test_failures += run_test(&test3);
 
 #ifdef ENABLE_WALLET
         WalletTests test5(app.node());
-        num_test_failures += QTest::qExec(&test5);
+        num_test_failures += run_test(&test5);
 
         AddressBookTests test6(app.node());
-        num_test_failures += QTest::qExec(&test6);
+        num_test_failures += run_test(&test6);
 #endif
 
         if (num_test_failures) {

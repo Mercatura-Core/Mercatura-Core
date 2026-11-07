@@ -65,6 +65,9 @@ if(ENABLE_WALLET)
   # Retain diagnostics through the large notification burst; heartbeat and
   # lifecycle assertions keep their existing deadlines.
   add_test(NAME test_mining-qt COMMAND test_mining-qt -maxwarnings 10000)
+  # Its unchanged publication/heartbeat deadlines measure responsiveness under
+  # mining load; unrelated test processes must not consume the same CPU budget.
+  set_tests_properties(test_mining-qt PROPERTIES RUN_SERIAL TRUE)
   if(WIN32 AND VCPKG_TARGET_TRIPLET)
     set(plugin_path "$<SHELL_PATH:$<PATH:GET_PARENT_PATH,$<PATH:GET_PARENT_PATH,$<TARGET_PROPERTY:Qt6::QWindowsIntegrationPlugin,LOCATION_$<CONFIG>>>>>")
     set_property(TEST test_mining-qt APPEND PROPERTY ENVIRONMENT_MODIFICATION
@@ -84,6 +87,14 @@ if(ENABLE_WALLET)
     add_test(NAME test_mining_app-qt-${workers} COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/test/mining/qt_restart.py $<TARGET_FILE:test_mining_app-qt>)
     set_tests_properties(test_mining_app-qt-${workers} PROPERTIES TIMEOUT 200 SKIP_RETURN_CODE 77
       ENVIRONMENT "MERCATURA_TEST_WORKERS=${workers}")
+    if(WIN32 AND VCPKG_TARGET_TRIPLET)
+      set(plugin_path "$<SHELL_PATH:$<PATH:GET_PARENT_PATH,$<PATH:GET_PARENT_PATH,$<TARGET_PROPERTY:Qt6::QWindowsIntegrationPlugin,LOCATION_$<CONFIG>>>>>")
+      set_property(TEST test_mining_app-qt-${workers} APPEND PROPERTY ENVIRONMENT_MODIFICATION
+        QT_QPA_PLATFORM=set:windows
+        QT_PLUGIN_PATH=set:${plugin_path}
+      )
+      unset(plugin_path)
+    endif()
   endforeach()
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BUILD_DAEMON)
     foreach(schedule IN ITEMS v2 transition)

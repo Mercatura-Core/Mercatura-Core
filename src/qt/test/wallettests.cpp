@@ -584,6 +584,7 @@ void WalletTests::mercaweaveReceiveTests()
     {
         LOCK(cs_main);
         chainstate.ResetBlockFailureFlags(activated_tip);
+        test.m_node.chainman->RecalculateBestHeader();
     }
     BlockValidationState restored;
     QVERIFY(chainstate.ActivateBestChain(restored));
