@@ -1,0 +1,11 @@
+{
+  "source_sha": "c93806131232f5df65958102892d29007c5ff773",
+  "fixture": "owner-lifecycle-02",
+  "started_utc": "2026-11-11T15:23:54.731669Z",
+  "failed_utc": "2026-11-11T15:25:13.865639Z",
+  "expected": "mercaweave-inactive",
+  "actual": "bad-txns-premature-spend-of-coinbase",
+  "classification": "Test setup coin selection fails maturity after the two-tip rewind; native validation correctly fails first at maturity.",
+  "local_repair": "Explicit native v2 coin with at least103 confirmations at height110, preserving maturity at108; original inactive-v3 assertion unchanged.",
+  "new_push_authorized": false
+}

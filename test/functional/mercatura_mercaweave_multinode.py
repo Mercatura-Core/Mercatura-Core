@@ -379,7 +379,13 @@ class MercaWeaveMultinodeTest(MercaWeaveTest):
         assert first['pq_group_authenticated'] and second['pq_group_authenticated']
         assert_equal(first['pq_group_public_key'], second['pq_group_public_key'])
         assert first['pq_address_nonce'] != second['pq_address_nonce']
-        funding = self.fund(sender, 'v2', [], [{group0: Decimal('20')}, {group1: Decimal('20')}, {foreign: Decimal('8')}])
+        # This funding transaction is also checked after rewinding two tips to
+        # height 108. Avoid an automatically selected coinbase which is mature
+        # at 110 but premature at 108, masking the intended inactive-v3 reason.
+        mature = next(coin for coin in sender.listunspent(103)
+                      if self.version(node.gettxout(coin['txid'], coin['vout'])['scriptPubKey']) == 2)
+        funding = self.fund(sender, 'v2', [dict(txid=mature['txid'], vout=mature['vout'])],
+                            [{group0: Decimal('20')}, {group1: Decimal('20')}, {foreign: Decimal('8')}])
         funding_raw, _ = self.finish(sender, funding['psbt'])
         assert set(self.versions(node.decoderawtransaction(funding_raw))) == {2}
         boundary = node.getblockhash(110)

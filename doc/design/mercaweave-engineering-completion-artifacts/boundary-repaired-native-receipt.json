@@ -1,0 +1,18 @@
+{
+  "command": [
+    "python3",
+    "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/test/functional/test_runner.py",
+    "--jobs=4",
+    "--timeout-factor=3",
+    "--tmpdirprefix=/workspace/Mercatura-MercaWeave-upgrade/work/engineering-completion/focused-runtimes",
+    "--artifact-dir=/workspace/Mercatura-MercaWeave-upgrade/work/engineering-completion/boundary-repaired-evidence",
+    "--nocleanup",
+    "mercatura_mercaweave_multinode.py"
+  ],
+  "started_utc": "2026-11-11T15:32:19.386190+00:00",
+  "ended_utc": "2026-11-11T15:38:42.356952+00:00",
+  "elapsed_seconds": 382.971,
+  "exit_code": 0,
+  "base_commit": "c93806131232f5df65958102892d29007c5ff773",
+  "tracked_diff_sha256": "dcee2428acafb716d58b237a36e2d1eff90fb319226a47c5accea33fc6daaff7"
+}
