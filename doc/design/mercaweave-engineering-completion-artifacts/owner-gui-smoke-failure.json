@@ -1,0 +1,6 @@
+{
+  "started_utc": "2026-11-11T15:17:26.521196+00:00",
+  "elapsed_seconds": 318.566,
+  "error": "('restart', 'Fixture operation timed out: None\\n', '')",
+  "passed_events": 7
+}

@@ -1,0 +1,38 @@
+{
+  "source_sha": "c93806131232f5df65958102892d29007c5ff773",
+  "main_workflow": {
+    "id": 43043090272,
+    "conclusion": "success"
+  },
+  "dedicated_workflow": {
+    "id": 43043090273,
+    "conclusion": "failure",
+    "linux": {
+      "job_id": 130599807180,
+      "conclusion": "failure",
+      "gate": "BLOCKED infrastructure",
+      "failure": "apt exit100, temporary failure resolving azure.archive.ubuntu.com",
+      "application_build_unit_functional": "NOT RUN"
+    },
+    "windows": {
+      "job_id": 130599807693,
+      "conclusion": "success",
+      "unit_pass": 192,
+      "unit_skip": 1,
+      "native_pass": 59
+    },
+    "macos": {
+      "job_id": 130599807638,
+      "conclusion": "success",
+      "unit_pass": 190,
+      "unit_skip": 3,
+      "native_pass": 59
+    }
+  },
+  "lint_job": {
+    "id": 130599866827,
+    "conclusion": "success"
+  },
+  "cross_packaging": "SKIPPED intentionally for integration; not counted as build pass",
+  "new_local_test_repair": "Unpublished 1ecc222faa195ef1d9478147f55d94ede7e0777a; not included in these CI runs"
+}

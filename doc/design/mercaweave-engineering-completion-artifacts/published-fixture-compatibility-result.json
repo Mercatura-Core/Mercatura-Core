@@ -1,0 +1,61 @@
+{
+  "started_utc": "2026-11-11T15:55:15.189023+00:00",
+  "ended_utc": "2026-11-11T15:55:15.672464+00:00",
+  "elapsed_seconds": 0.483,
+  "exit_code": 0,
+  "one_file_helper_with_unmodified_published_fixture": true,
+  "three_native_processes_ready": true,
+  "native_v2_and_authenticated_v3_funds": true,
+  "normal_stop": true,
+  "status": {
+    "root": "/workspace/Mercatura-MercaWeave-upgrade/work/engineering-completion/owner-published-compat-04",
+    "nodes": [
+      {
+        "node": 0,
+        "wallet": "sender",
+        "height": 111,
+        "hash": "f2aa936019dd5fc538aed2a0de14fc5f036983978e99f344aa0203c383c19202",
+        "balance": "261597.68",
+        "spendable_utxos": {
+          "2": 11,
+          "3": 2
+        },
+        "mempool": [],
+        "authenticated_group_addresses": [
+          "mcrt1r5758dvuuaf6p0qtecnuhmhvs4yzxkdd7lzd0528wq3shcfg5yuuqvv4srh",
+          "mcrt1rd7t5xqyymwdj7t5f8z2s2ngggmpu74qnrzqg0fayyl5n44kudtvqld6ej9"
+        ]
+      },
+      {
+        "node": 1,
+        "wallet": "receiver",
+        "height": 111,
+        "hash": "f2aa936019dd5fc538aed2a0de14fc5f036983978e99f344aa0203c383c19202",
+        "balance": "8.00",
+        "spendable_utxos": {
+          "2": 0,
+          "3": 1
+        },
+        "mempool": [],
+        "authenticated_group_addresses": [
+          "mcrt1ruscg3zr74lzxck0zmcjlvns030y73hgeyywf3p66m6vhwqn97h6s8t09up"
+        ]
+      },
+      {
+        "node": 2,
+        "wallet": "observer",
+        "height": 111,
+        "hash": "f2aa936019dd5fc538aed2a0de14fc5f036983978e99f344aa0203c383c19202",
+        "balance": "0.00",
+        "spendable_utxos": {
+          "2": 0,
+          "3": 0
+        },
+        "mempool": [],
+        "authenticated_group_addresses": []
+      }
+    ],
+    "recipient_v2": "mcrt1zpje9ppnyjtpvz6vy8rp4q477uwehkcpdncuj9aa6rwxfkegscwjsssz0h5",
+    "recipient_v3": "mcrt1rpkqla6ven9v6y2xgwyclm2skvfh24ahtgxwnhm7lkk3d9ar0033q39tf9j"
+  }
+}

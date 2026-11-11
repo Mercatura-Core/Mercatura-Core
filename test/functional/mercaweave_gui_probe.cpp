@@ -17,6 +17,7 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMessageBox>
 #include <QSaveFile>
 #include <QScrollBar>
 #include <QStandardItemModel>
@@ -48,6 +49,7 @@ QJsonObject Describe(QWidget* widget)
                        {"visible", widget->isVisible()}, {"enabled", widget->isEnabled()},
                        {"x", rect.x()}, {"y", rect.y()}, {"width", rect.width()}, {"height", rect.height()}};
     if (auto* label = qobject_cast<QLabel*>(widget)) result["text"] = label->text();
+    if (auto* message = qobject_cast<QMessageBox*>(widget)) result["text"] = message->text();
     if (auto* button = qobject_cast<QAbstractButton*>(widget)) result["text"] = button->text();
     if (auto* combo = qobject_cast<QComboBox*>(widget)) {
         result["index"] = combo->currentIndex();
@@ -78,7 +80,9 @@ QJsonObject Describe(QWidget* widget)
             rows.append(QJsonObject{{"type", (*it)->text(6)}, {"amount", (*it)->text(1)},
                 {"confirmations", (*it)->text(5)}, {"selected", (*it)->checkState(0) == Qt::Checked},
                 {"checkable", bool((*it)->flags() & Qt::ItemIsUserCheckable)},
-                {"type_text_width", tree->fontMetrics().horizontalAdvance((*it)->text(6))}});
+                {"type_text_width", tree->fontMetrics().horizontalAdvance((*it)->text(6))},
+                {"txid", (*it)->data(3, Qt::UserRole).toString()},
+                {"vout", (*it)->data(3, Qt::UserRole + 1).toInt()}});
         }
         result["rows"] = rows;
     }
@@ -90,12 +94,12 @@ QJsonObject Execute(const QJsonObject& command, const QString& directory)
     const auto action = command["action"].toString();
     QJsonObject result{{"ok", true}, {"platform", QGuiApplication::platformName()},
                        {"qt_version", qVersion()}, {"style", qApp->style()->objectName()}};
-    if (action == "send") {
+    if (action == "send" || action == "receive") {
         auto* main = Find({}, "BitcoinGUI");
         if (!main) return {{"ok", false}, {"error", "BitcoinGUI not ready"}};
         bool found{false};
         for (auto* item : main->findChildren<QAction*>()) {
-            if (item->text().remove('&') == "Send") { item->trigger(); found = true; break; }
+            if (item->text().remove('&') == (action == "send" ? "Send" : "Receive")) { item->trigger(); found = true; break; }
         }
         if (!found) return {{"ok", false}, {"error", "Native Send action not ready"}};
     } else if (action == "wallet") {
@@ -122,6 +126,15 @@ QJsonObject Execute(const QJsonObject& command, const QString& directory)
         if (!widget->grab().save(path)) return {{"ok", false}, {"error", "Screenshot save failed"}};
         result["path"] = path;
         result["widget"] = Describe(widget);
+    } else if (action == "receiveLabel") {
+        auto* label = qobject_cast<QLineEdit*>(Find("reqLabel"));
+        if (!label || !label->isVisible()) return {{"ok", false}, {"error", "Receive label unavailable"}};
+        label->setText(command["label"].toString());
+    } else if (action == "confirmSend") {
+        auto* dialog = qobject_cast<QMessageBox*>(Find({}, "SendConfirmationDialog"));
+        auto* yes = dialog ? dialog->button(QMessageBox::Yes) : nullptr;
+        if (!yes || !yes->isEnabled()) return {{"ok", false}, {"error", "Native Send confirmation not ready"}};
+        yes->click();
     } else if (action == "recipient") {
         auto* address = qobject_cast<QLineEdit*>(Find("payTo"));
         auto* amount = Find("payAmount");
@@ -161,12 +174,14 @@ QJsonObject Execute(const QJsonObject& command, const QString& directory)
         auto* tree = qobject_cast<QTreeWidget*>(Find("treeWidget"));
         if (!tree) return {{"ok", false}, {"error", "Coin Control tree unavailable"}};
         tree->horizontalScrollBar()->setValue(tree->horizontalScrollBar()->maximum());
-    } else if (action == "coin") {
+    } else if (action == "coin" || action == "coinOutpoint") {
         auto* tree = qobject_cast<QTreeWidget*>(Find("treeWidget"));
         if (!tree) return {{"ok", false}, {"error", "Coin Control tree unavailable"}};
         bool found{false};
         for (QTreeWidgetItemIterator it(tree); *it; ++it) {
-            if ((*it)->text(6) != command["type"].toString()) continue;
+            if (action == "coin" && (*it)->text(6) != command["type"].toString()) continue;
+            if (action == "coinOutpoint" && ((*it)->data(3, Qt::UserRole).toString() != command["txid"].toString()
+                || (*it)->data(3, Qt::UserRole + 1).toInt() != command["vout"].toInt())) continue;
             if (!((*it)->flags() & Qt::ItemIsUserCheckable)) continue;
             (*it)->setCheckState(0, command["selected"].toBool() ? Qt::Checked : Qt::Unchecked);
             found = true;
@@ -177,7 +192,7 @@ QJsonObject Execute(const QJsonObject& command, const QString& directory)
         return {{"ok", false}, {"error", "Unknown inspection action"}};
     }
     QJsonArray widgets;
-    for (const auto& name : {"spendingMode", "spendingModeStatus", "pushButtonCoinControl", "frameCoinControl",
+    for (const auto& name : {"receiveAddressType", "receiveMercaWeaveAvailability", "reqLabel", "receiveButton", "spendingMode", "spendingModeStatus", "pushButtonCoinControl", "frameCoinControl",
              "sendButton", "payTo", "payAmount", "customFee", "inputTypeFilter", "treeWidget",
              "labelCoinControlBytes", "labelCoinControlFee", "labelCoinControlChange"}) {
         if (auto* widget = Find(name)) widgets.append(Describe(widget));

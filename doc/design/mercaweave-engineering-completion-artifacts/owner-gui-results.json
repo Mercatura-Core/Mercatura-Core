@@ -1,0 +1,127 @@
+[
+  {
+    "name": "reused-three-node-owner-fixture-mature-native-and-grouped-coins",
+    "result": "PASS",
+    "status": {
+      "root": "/workspace/Mercatura-MercaWeave-upgrade/work/engineering-completion/owner-smoke-01",
+      "nodes": [
+        {
+          "node": 0,
+          "wallet": "sender",
+          "height": 111,
+          "hash": "a48ecd39f8d109d25bb2bbe49bc025def636b9f62996486772a9cc12dd2a97eb",
+          "balance": "261597.68",
+          "spendable_utxos": {
+            "2": 11,
+            "3": 2
+          },
+          "mempool": [],
+          "authenticated_group_addresses": [
+            "mcrt1rhkdj28g9epx520s6qegpa38kh5w75epd0f7w6ef4pqn8xxhwj5ss6ylv0z",
+            "mcrt1rw9lvh7wmhmgfycn79ffc6lzfmwe48py3zj24aw90g9xtl6cy2stquxgp0w"
+          ]
+        },
+        {
+          "node": 1,
+          "wallet": "receiver",
+          "height": 111,
+          "hash": "a48ecd39f8d109d25bb2bbe49bc025def636b9f62996486772a9cc12dd2a97eb",
+          "balance": "8.00",
+          "spendable_utxos": {
+            "2": 0,
+            "3": 1
+          },
+          "mempool": [],
+          "authenticated_group_addresses": [
+            "mcrt1r579xxjj2kwnv54edl7ku5tcfp5lpwky3qjgnxmjhzv2a2q6mjlfsz8tuyr"
+          ]
+        },
+        {
+          "node": 2,
+          "wallet": "observer",
+          "height": 111,
+          "hash": "a48ecd39f8d109d25bb2bbe49bc025def636b9f62996486772a9cc12dd2a97eb",
+          "balance": "0.00",
+          "spendable_utxos": {
+            "2": 0,
+            "3": 0
+          },
+          "mempool": [],
+          "authenticated_group_addresses": []
+        }
+      ],
+      "recipient_v2": "mcrt1zaquvckfu4vehp4qmw8mr6dhznfafuaghz4ct574wpz7t9yqzfc6q26rgta",
+      "recipient_v3": "mcrt1rdv7m9l7nuv9hm7vhtr52az4nrvpga0k70ewqazjmz3ms0vk3uxhqjqsax2"
+    }
+  },
+  {
+    "name": "actual-Qt-Receive-generated-v2",
+    "result": "PASS",
+    "address": "mcrt1z3jd4pnehv9cscvakaneyphrc3v3r9ayc7zlm3kzjkrw799yq7klqjpwd5p",
+    "scriptPubKey": "52208c9b50cf3761710c33b6ecf240dc788b2232f498f0bfb8d852b0dde29480f5be"
+  },
+  {
+    "name": "actual-Qt-Send-mode-1-native-relay-and-block",
+    "result": "PASS",
+    "verification": {
+      "txid": "fee8227f296968e0fbf6da07165ced1bb0aa818360bd42242f2a12649f6689de",
+      "confirmations": 1,
+      "input_versions": [
+        2
+      ],
+      "grouped_anchors": 0,
+      "grouped_followers": 0,
+      "serialized_bytes": 5407,
+      "actual_wallet_fee": "-0.06",
+      "independently_present_on_all_three": true,
+      "blockhash": "bf1087f34a3279c7701020ab9bc4acda0c888fe46ab0c640def40e355b8e32b2"
+    }
+  },
+  {
+    "name": "actual-Qt-Receive-generated-v3",
+    "result": "PASS",
+    "address": "mcrt1rnl6qfh3tqfyswtdy3dwguyh28vr58v8mk8hefp4ge0vl8plxr09swuv66p",
+    "scriptPubKey": "53209ff404de2b0249072da48b5c8e12ea3b0743b0fbb1ef9486a8cbd9f387e61bcb"
+  },
+  {
+    "name": "actual-Qt-Send-mode-2-native-relay-and-block",
+    "result": "PASS",
+    "verification": {
+      "txid": "a4aeb3646ae553fde96ff6ecd73b99bb2dab9747f50ed2bea0952d0f03967c63",
+      "confirmations": 1,
+      "input_versions": [
+        3,
+        3
+      ],
+      "grouped_anchors": 1,
+      "grouped_followers": 1,
+      "serialized_bytes": 5520,
+      "actual_wallet_fee": "-0.06",
+      "independently_present_on_all_three": true,
+      "blockhash": "d90911b8e2745e1b7d95c0164598c3b761a243b105c6c1d06887f9e81c3adfeb"
+    }
+  },
+  {
+    "name": "actual-Qt-conflicting-manual-input-rejected-with-no-broadcast",
+    "result": "PASS",
+    "message": "MercaWeave (v3) only: Selected input conflicts with the spending mode; deselect it explicitly in Coin Control"
+  },
+  {
+    "name": "actual-Qt-Send-mode-0-native-relay-and-block",
+    "result": "PASS",
+    "verification": {
+      "txid": "1e6eff2d8a8dc3afe2302702d4175dcab63df1577990bc79ea6f90a4b65cf37e",
+      "confirmations": 1,
+      "input_versions": [
+        2,
+        3
+      ],
+      "grouped_anchors": 1,
+      "grouped_followers": 0,
+      "serialized_bytes": 10749,
+      "actual_wallet_fee": "-0.11",
+      "independently_present_on_all_three": true,
+      "blockhash": "75087f50d94190db34e8f84e84c7b22a6e4538e9c38e42b388fb4ecc17eac42f"
+    }
+  }
+]

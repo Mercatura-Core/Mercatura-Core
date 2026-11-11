@@ -1,0 +1,8 @@
+{
+  "production_source_unchanged": true,
+  "private_wallets_not_committed": true,
+  "owned_node_processes_stopped": true,
+  "prior_artifact_hashes_unchanged": true,
+  "production_research_heads_unchanged_and_clean": true,
+  "source_hashes_verified": true
+}

@@ -1,0 +1,138 @@
+{
+  "activation-smoke-receipt.json": {
+    "bytes": 372,
+    "sha256": "d682bef0abc62fabcf952d50e313cd6a52845264de0928f41349ad140a7e42ea"
+  },
+  "binary-identities.json": {
+    "bytes": 812,
+    "sha256": "9844dcdd3739621403fdc43851685fd98ac7aabad0c9769528c4c9d6d93d7ed3"
+  },
+  "boundary-fixture-failure.json": {
+    "bytes": 616,
+    "sha256": "068fd6aa8a54043b60f1df02696f23fcb530d22a59d8a472b5cfc539568e5bd5"
+  },
+  "boundary-fixture-failure.log.gz": {
+    "bytes": 986,
+    "sha256": "24fb43194366e179366182b184859bffa7185bd4634b74f6d8f5a94399c93100"
+  },
+  "boundary-repaired-native-receipt.json": {
+    "bytes": 773,
+    "sha256": "262ee72ab60440dea9ba627d3d82eb557948d7b3b5e7ff052652ad66e03f3640"
+  },
+  "boundary-repaired-native-results.json": {
+    "bytes": 17669,
+    "sha256": "31a51ad1290f560e6735da6ef0b6bcacccf85449b33263a243c4d1e3d89359c3"
+  },
+  "boundary-repaired-native.log.gz": {
+    "bytes": 439,
+    "sha256": "12a4178b7c6464afdc82bf0f8ba6a37933f8b53551ad6b1f5ff6b948430ccf7a"
+  },
+  "ci-job-130599790036.json": {
+    "bytes": 8773,
+    "sha256": "3f8252303ae9152abb1d995b2416964d3ac9cc96eab680b7521acdfa592faea1"
+  },
+  "ci-job-130599790361.json": {
+    "bytes": 8705,
+    "sha256": "0be9a36b758f1e283e39b9e145eb715992ac6540ebd5645e16fbb1f5ad6ac2eb"
+  },
+  "ci-job-130599807638.json": {
+    "bytes": 9420,
+    "sha256": "f0254ec95e253b12092469fa1896ca1945f6b98a0937eec1e7b0895c53d1f70b"
+  },
+  "ci-job-130599807693.json": {
+    "bytes": 9352,
+    "sha256": "1fe5948028468d825a3e0b947baa216a231978b7a287b86f217b904d0709d793"
+  },
+  "ci-summary.json": {
+    "bytes": 1068,
+    "sha256": "43c2dd5fba957488a26f0ae13788f8e5747aa252e9a85ce745d351f9133863fd"
+  },
+  "final-integrity-check.json": {
+    "bytes": 257,
+    "sha256": "d4e383079650182669debf9c24697fe400e8d2f93d262c890b641871476ea286"
+  },
+  "final-lint-receipt.json": {
+    "bytes": 363,
+    "sha256": "80797290c1ec65765c25120a4fa4cd194c343a56b3723e18c66f7826af150edd"
+  },
+  "lint-receipt.json": {
+    "bytes": 363,
+    "sha256": "b98c23101951218baad3e450d80b3348334e67e72ec3caddd7cfbd1f62b3706e"
+  },
+  "linux-ci-dns-failure.txt": {
+    "bytes": 1450,
+    "sha256": "c399259787518ec6645750e3fe3bfda493bd57ee0d2c37ad0bf3d531d0ed147b"
+  },
+  "owner-gui-driver-visibility-failure.json": {
+    "bytes": 174,
+    "sha256": "0d4b96032a3672c5f11e19a7a04f8b6a86117634b0197bf7d6e92f77dac37802"
+  },
+  "owner-gui-interruption.json": {
+    "bytes": 257,
+    "sha256": "14aa6c052019a7068c369a7b3a87ef7f166ba4ed2d5e21ea7ed95a9123c7dad2"
+  },
+  "owner-gui-results.json": {
+    "bytes": 4169,
+    "sha256": "f1d3d422a5cf4c12167f92d9580f8e2b6cd08af6b1f502300cd2b209c92d70ef"
+  },
+  "owner-gui-smoke-failure.json": {
+    "bytes": 178,
+    "sha256": "dc7ad9849a8158c66daecb0c6e3ac3effc52b3ec41003208a895c5e290cc4ac7"
+  },
+  "owner-lifecycle-receipt.json": {
+    "bytes": 3645,
+    "sha256": "c3f3ae9e493c90ba2b27588e207a26311a3886d7c5683f5f3fde475b64e18760"
+  },
+  "owner-qt/Owner-Confirm-mode-0.png": {
+    "bytes": 26131,
+    "sha256": "441a59c24d05e4bc02ad47cd80bda0e77b4d80876ccf278ad6d757b5e5c3bd70"
+  },
+  "owner-qt/Owner-Confirm-mode-1.png": {
+    "bytes": 26927,
+    "sha256": "fb5d4c562642da7f12b42a9658d78ee5b0bdd8456b3ac0dc92db06d202bca8e9"
+  },
+  "owner-qt/Owner-Confirm-mode-2.png": {
+    "bytes": 26963,
+    "sha256": "3bf0715f60ba7cdbcb75d1bca79039f531a34b68b9171b2935740e5a1dc80597"
+  },
+  "owner-qt/Owner-Conflicting-input-rejected.png": {
+    "bytes": 8984,
+    "sha256": "666b9aafc9c87039e5bf68dfc775102436302cb5b54a9b791dac80b5e37fe016"
+  },
+  "owner-qt/Owner-Inputs-mode-0.png": {
+    "bytes": 185337,
+    "sha256": "12518e3c240ce7dda65a0e4e8476248fa1a55b7fd9fbf4d978e589af79df7298"
+  },
+  "owner-qt/Owner-Inputs-mode-2.png": {
+    "bytes": 57123,
+    "sha256": "cb4e9b1d46e8112d338e0532d534b4530d4f53be2e8e6b24e9cb76765e10722b"
+  },
+  "owner-qt/Owner-Receive-v2.png": {
+    "bytes": 29859,
+    "sha256": "ceb8db14e5c3a5ad8dbdf5a478545ddbfcdb99d309fa12ccc17db97ff79b7a73"
+  },
+  "owner-qt/Owner-Receive-v3.png": {
+    "bytes": 30620,
+    "sha256": "22e63a5be6406b20dd030737dfef502b9846b061516543a9c3612c7b3a2f468d"
+  },
+  "probe-build-receipt.json": {
+    "bytes": 1049,
+    "sha256": "31e5d95338e032cf71d9f4d84d0f3187bc1f888f3be286595bd2b8618460d33b"
+  },
+  "published-fixture-compatibility-result.json": {
+    "bytes": 1929,
+    "sha256": "b9e32d8c1771c8aac34f2750534c20df782cc7b4bc40e71fd2f96f14beeaf247"
+  },
+  "published-fixture-compatibility-source.json": {
+    "bytes": 619,
+    "sha256": "be8d01e72f366a3397905b0ebec1669e76ab338199140d2947d55fe0525abc5e"
+  },
+  "push-verification.json": {
+    "bytes": 550,
+    "sha256": "f4bcb7afd9e174d45788bd23132fc962d30cf757993c06376eb35a003d6d9f5f"
+  },
+  "source-scope-audit.json": {
+    "bytes": 749,
+    "sha256": "4e74abb6ce3ec4fbb69f4f1a747bcfddd16c6e0a4743f31e0939a1561b59d1e6"
+  }
+}

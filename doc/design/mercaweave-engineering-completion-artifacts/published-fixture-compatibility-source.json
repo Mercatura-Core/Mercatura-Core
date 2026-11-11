@@ -1,0 +1,9 @@
+{
+  "published_commit": "c93806131232f5df65958102892d29007c5ff773",
+  "published_fixture_source_sha256": "3c8fe28cc791989b8e5c4f599791d266f7b5ba1177211a8601e18e211544fd99",
+  "test_source_bytes_match_git_show": true,
+  "other_framework_modules": "Symlinked unchanged repository framework",
+  "build_view": "/workspace/Mercatura-MercaWeave-upgrade/work/engineering-completion/published-source-build-view",
+  "production_binaries": "Original verified existing build, no rebuild",
+  "purpose": "Exercise one-file owner helper maturity safeguard with the actual published fixture rather than local corrected test source"
+}

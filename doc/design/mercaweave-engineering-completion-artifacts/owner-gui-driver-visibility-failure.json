@@ -1,0 +1,6 @@
+{
+  "started_utc": "2026-11-11T15:16:48.201422+00:00",
+  "elapsed_seconds": 0.115,
+  "error": "{'error': 'Combo unavailable', 'id': 49, 'ok': False}",
+  "passed_events": 5
+}

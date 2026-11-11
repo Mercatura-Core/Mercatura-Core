@@ -1,0 +1,20 @@
+{
+  "mercaturad": {
+    "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercaturad",
+    "sha256": "28b70893a76569e739ba61c4edcb53ae80eda29136e0f72030739878b4b7932a",
+    "same_as_pushed_source_binary": true,
+    "reverified": true
+  },
+  "mercatura-cli": {
+    "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercatura-cli",
+    "sha256": "9d49e3135750c34586207fd5f1b3dd1a6c59dfec2d58126e859e1fab783ab2b5",
+    "same_as_pushed_source_binary": true,
+    "reverified": true
+  },
+  "mercatura-qt": {
+    "path": "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/bin/mercatura-qt",
+    "sha256": "31cff2a0499ff46b242f7d879a7c7bd849ac4eaf0ae8e068414eb790498fe9ca",
+    "same_as_pushed_source_binary": false,
+    "reverified": true
+  }
+}

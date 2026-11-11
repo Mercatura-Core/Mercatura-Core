@@ -1,0 +1,21 @@
+{
+  "initial_remote": "ca3b2d9dde296b4ebbd120212c243fcb066f1581",
+  "pushed_commits": [
+    "2d79c330f5ac246156d758e34763bbba9ff45524",
+    "c93806131232f5df65958102892d29007c5ff773"
+  ],
+  "verified_remote": "c93806131232f5df65958102892d29007c5ff773",
+  "fast_forward": true,
+  "source_branch": "integration/mercaweave-v0.1-upgrade",
+  "further_push_authorized": false,
+  "action_run_ids": [
+    "43043090272",
+    "43043090273",
+    "42363956006",
+    "42363955984",
+    "42324438393",
+    "42324438453",
+    "42225597049",
+    "42225597174"
+  ]
+}

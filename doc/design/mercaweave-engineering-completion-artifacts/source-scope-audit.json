@@ -1,0 +1,12 @@
+{
+  "production_source_unchanged_from_c938061": true,
+  "public_activation_consensus_crypto_keys_PQ_network_and_miner_source_unchanged": true,
+  "historical_protected_paths_modified_here": 0,
+  "old_integration_exception": "src/mining/solo.cpp, unchanged here",
+  "local_test_development_code_sha256": {
+    "contrib/devtools/mercaweave-owner-regtest.py": "a920018098648e090bf984ece04b13487fe2e4da3f9bcf0b7cf01a62ec7fa4c6",
+    "test/functional/mercatura_mercaweave_multinode.py": "54f928304cf9d4cd7eacc98fade2bb8500ae0e484f3593f26b066ee2013942ba",
+    "test/functional/mercaweave_gui_probe.cpp": "870a6eab0f247ae7a672df3c093fd2969cd65a053549a42f7ae16aea6c94e110"
+  },
+  "independent_security_audit": "Not claimed; remains separate approval gate"
+}

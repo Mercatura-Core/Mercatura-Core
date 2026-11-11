@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/workspace/Mercatura-MercaWeave-v0.1/work/tools/cmake/data/bin/ctest",
+    "--test-dir",
+    "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release",
+    "--output-on-failure",
+    "-j4",
+    "-R",
+    "^mercaweave_activation_tests$"
+  ],
+  "started_utc": "2026-11-11T15:57:23.280262+00:00",
+  "elapsed_seconds": 0.73,
+  "exit_code": 0
+}

@@ -1,0 +1,11 @@
+2026-11-11T14:55:02.8964619Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +c93806131232f5df65958102892d29007c5ff773:refs/remotes/origin/integration/mercaweave-v0.1-upgrade
+2026-11-11T14:55:04.1868546Z  * [new ref]         c93806131232f5df65958102892d29007c5ff773 -> origin/integration/mercaweave-v0.1-upgrade
+2026-11-11T14:55:04.1959206Z c93806131232f5df65958102892d29007c5ff773
+2026-11-11T14:55:04.5820442Z [command]/usr/bin/git log -1 --format=%H
+2026-11-11T14:55:04.5848637Z c93806131232f5df65958102892d29007c5ff773
+2026-11-11T14:55:04.6104639Z ##[group]Run sudo apt-get update
+2026-11-11T15:56:32.5389781Z E: Failed to fetch https://security.ubuntu.com/ubuntu/pool/universe/g/gumbo-parser/libgumbo2_0.12.0%2bdfsg-2build1_amd64.deb  Temporary failure resolving 'azure.archive.ubuntu.com'
+2026-11-11T15:56:32.5392290Z E: Failed to fetch https://security.ubuntu.com/ubuntu/pool/universe/l/litehtml/liblitehtml0t64_0.6-1.2ubuntu2_amd64.deb  Temporary failure resolving 'azure.archive.ubuntu.com'
+2026-11-11T15:56:32.5394638Z E: Failed to fetch https://security.ubuntu.com/ubuntu/pool/universe/libb/libb2/libb2-1_0.98.1-1.1build1_amd64.deb  Temporary failure resolving 'azure.archive.ubuntu.com'
+2026-11-11T15:56:32.5520426Z E: Unable to fetch some archives, maybe run apt-get update or try with --fix-missing?
+2026-11-11T15:56:32.5532502Z ##[error]Process completed with exit code 100.

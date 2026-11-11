@@ -1,0 +1,26 @@
+{
+  "command": [
+    "g++",
+    "-std=c++20",
+    "-fPIC",
+    "-shared",
+    "-O2",
+    "-Wall",
+    "-Wextra",
+    "-I/workspace/Mercatura-MercaWeave-v0.1/work/wo06-tools/qt-sdk/usr/include/x86_64-linux-gnu/qt6",
+    "-I/workspace/Mercatura-MercaWeave-v0.1/work/wo06-tools/qt-sdk/usr/include/x86_64-linux-gnu/qt6/QtWidgets",
+    "-I/workspace/Mercatura-MercaWeave-v0.1/work/wo06-tools/qt-sdk/usr/include/x86_64-linux-gnu/qt6/QtGui",
+    "-I/workspace/Mercatura-MercaWeave-v0.1/work/wo06-tools/qt-sdk/usr/include/x86_64-linux-gnu/qt6/QtCore",
+    "/workspace/Mercatura-MercaWeave-upgrade/test/functional/mercaweave_gui_probe.cpp",
+    "-L/workspace/Mercatura-MercaWeave-v0.1/work/wo06-tools/qt-sdk/usr/lib/x86_64-linux-gnu",
+    "-Wl,-rpath,/workspace/Mercatura-MercaWeave-v0.1/work/wo06-tools/qt-sdk/usr/lib/x86_64-linux-gnu",
+    "-lQt6Widgets",
+    "-lQt6Gui",
+    "-lQt6Core",
+    "-ldl",
+    "-o",
+    "/workspace/Mercatura-MercaWeave-upgrade/work/engineering-completion/owner-gui-probe.so"
+  ],
+  "elapsed_seconds": 4.531,
+  "exit_code": 0
+}
