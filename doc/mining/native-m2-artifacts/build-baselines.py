@@ -1,23 +1,30 @@
 from pathlib import Path
-import subprocess,shlex,json
-root=Path.cwd(); build=root/'build-m2'; out=root/'work/m2'
+import subprocess
+import shlex
+import json
+root=Path.cwd()
+build=root/'build-m2'
+out=root/'work/m2'
 commit='48a3a614b741db541d939acd50c3603d40f3ff2e'
 commands=subprocess.check_output(['ninja','-C',str(build),'-t','commands','mining-bench','mercatura-gpu-check'],text=True).splitlines()
 records=[]
 def run(args):
     records.append(args)
     (out/'baseline-build-commands.json').write_text(json.dumps(records,indent=2)+'\n')
-    with (out/'baseline-build.log').open('a') as log:subprocess.run(args,cwd=build,stdout=log,stderr=subprocess.STDOUT,check=True)
+    with (out/'baseline-build.log').open('a') as log:
+        subprocess.run(args,cwd=build,stdout=log,stderr=subprocess.STDOUT,check=True)
 def compile_file(name,newname,content=None):
     original=root/'src'/name
     text=content if content is not None else subprocess.check_output(['git','show',f'{commit}:src/{name}'],text=True)
-    source=out/newname;source.write_text(text)
+    source=out/newname
+    source.write_text(text)
     command=next(shlex.split(line) for line in commands if f'-c {original}' in line)
     output=out/(newname+'.o')
     command[command.index('-c')+1]=str(source)
     command[command.index('-o')+1]=str(output)
     for flag in ('-MF','-MT'):
-        if flag in command:command[command.index(flag)+1]=str(output)+('.d' if flag=='-MF' else '')
+        if flag in command:
+            command[command.index(flag)+1]=str(output)+('.d' if flag=='-MF' else '')
     run(command)
     return output
 cpu=compile_file('mining/cpu_miner.cpp','cpu_miner_original.cpp')

@@ -153,22 +153,38 @@ void WriteLine(
 }
 
 
-#if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__))
+#if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(MERCAHASH_FORCE_SCALAR)
+// Named target functions avoid GCC's untargeted noncapturing-lambda thunk ABI.
+__attribute__((target("avx2")))
+inline __m256i LoadAVX2(const uint64_t* p)
+{
+    return _mm256_loadu_si256(reinterpret_cast<const __m256i_u*>(p));
+}
+
+__attribute__((target("avx2")))
+inline __m256i RotateLeftAVX2(__m256i x, int n)
+{
+    return _mm256_or_si256(_mm256_slli_epi64(x, n), _mm256_srli_epi64(x, 64 - n));
+}
+
+__attribute__((target("avx2")))
+inline __m256i RotateLeftVariableAVX2(__m256i x, __m256i n)
+{
+    return _mm256_or_si256(_mm256_sllv_epi64(x, n), _mm256_srlv_epi64(x, _mm256_sub_epi64(_mm256_set1_epi64x(64), n)));
+}
+
 __attribute__((target("avx2")))
 void FillScratchpadAVX2(State& state, std::span<unsigned char> scratchpad)
 {
-    auto load=[](const uint64_t* p) __attribute__((target("avx2"))) {return _mm256_loadu_si256(reinterpret_cast<const __m256i_u*>(p));};
-    auto rol=[](__m256i x, int n) __attribute__((target("avx2"))) {return _mm256_or_si256(_mm256_slli_epi64(x,n),_mm256_srli_epi64(x,64-n));};
-    auto rolv=[](__m256i x, __m256i n) __attribute__((target("avx2"))) {return _mm256_or_si256(_mm256_sllv_epi64(x,n),_mm256_srlv_epi64(x,_mm256_sub_epi64(_mm256_set1_epi64x(64),n)));};
     auto g=[&](__m256i& a,__m256i& b,__m256i& c,__m256i& d) __attribute__((target("avx2"))) {
-        a=_mm256_add_epi64(a,b);d=rol(_mm256_xor_si256(d,a),32);
-        c=_mm256_add_epi64(c,d);b=rol(_mm256_xor_si256(b,c),24);
-        a=_mm256_add_epi64(a,b);d=rol(_mm256_xor_si256(d,a),16);
-        c=_mm256_add_epi64(c,d);b=rol(_mm256_xor_si256(b,c),63);
+        a=_mm256_add_epi64(a,b);d=RotateLeftAVX2(_mm256_xor_si256(d,a),32);
+        c=_mm256_add_epi64(c,d);b=RotateLeftAVX2(_mm256_xor_si256(b,c),24);
+        a=_mm256_add_epi64(a,b);d=RotateLeftAVX2(_mm256_xor_si256(d,a),16);
+        c=_mm256_add_epi64(c,d);b=RotateLeftAVX2(_mm256_xor_si256(b,c),63);
     };
     state[0]^=0x9E3779B97F4A7C15ULL;state[5]^=0xBF58476D1CE4E5B9ULL;
     state[10]^=0x94D049BB133111EBULL;state[15]^=0xD6E8FEB86659FD93ULL;
-    __m256i a=load(state.data()),b=load(state.data()+4),c=load(state.data()+8),d=load(state.data()+12);
+    __m256i a=LoadAVX2(state.data()),b=LoadAVX2(state.data()+4),c=LoadAVX2(state.data()+8),d=LoadAVX2(state.data()+12);
     for(uint64_t i=0;i<LINE_COUNT;i++) {
         a=_mm256_add_epi64(a,_mm256_setr_epi64x(i,0,0,0));
         b=_mm256_xor_si256(b,_mm256_setr_epi64x(0,0,0,std::rotl(i,17)));
@@ -184,13 +200,13 @@ void FillScratchpadAVX2(State& state, std::span<unsigned char> scratchpad)
         _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(scratchpad.data()+i*64),lo);
         _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(scratchpad.data()+i*64+32),hi);
         __m256i q=_mm256_blend_epi32(_mm256_permute4x64_epi64(lo,0xff),_mm256_permute4x64_epi64(hi,0x90),0xfc);
-        q=rolv(q,_mm256_setr_epi64x(0,11,0,23));a=_mm256_blend_epi32(_mm256_add_epi64(a,q),_mm256_xor_si256(a,q),0xcc);
+        q=RotateLeftVariableAVX2(q,_mm256_setr_epi64x(0,11,0,23));a=_mm256_blend_epi32(_mm256_add_epi64(a,q),_mm256_xor_si256(a,q),0xcc);
         q=_mm256_blend_epi32(_mm256_permute4x64_epi64(hi,0xff),_mm256_permute4x64_epi64(lo,0x90),0xfc);
-        q=rolv(q,_mm256_setr_epi64x(0,37,0,53));b=_mm256_blend_epi32(_mm256_add_epi64(b,q),_mm256_xor_si256(b,q),0xcc);
+        q=RotateLeftVariableAVX2(q,_mm256_setr_epi64x(0,37,0,53));b=_mm256_blend_epi32(_mm256_add_epi64(b,q),_mm256_xor_si256(b,q),0xcc);
         q=_mm256_blend_epi32(_mm256_permute4x64_epi64(hi,0x39),_mm256_permute4x64_epi64(lo,0),0xc0);
-        q=rolv(q,_mm256_setr_epi64x(0,7,0,19));c=_mm256_blend_epi32(_mm256_xor_si256(c,q),_mm256_add_epi64(c,q),0xcc);
+        q=RotateLeftVariableAVX2(q,_mm256_setr_epi64x(0,7,0,19));c=_mm256_blend_epi32(_mm256_xor_si256(c,q),_mm256_add_epi64(c,q),0xcc);
         q=_mm256_blend_epi32(_mm256_permute4x64_epi64(lo,0x39),_mm256_permute4x64_epi64(hi,0),0xc0);
-        q=rolv(q,_mm256_setr_epi64x(0,31,0,47));d=_mm256_blend_epi32(_mm256_xor_si256(d,q),_mm256_add_epi64(d,q),0xcc);
+        q=RotateLeftVariableAVX2(q,_mm256_setr_epi64x(0,31,0,47));d=_mm256_blend_epi32(_mm256_xor_si256(d,q),_mm256_add_epi64(d,q),0xcc);
     }
     _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(state.data()),a);_mm256_storeu_si256(reinterpret_cast<__m256i_u*>(state.data()+4),b);
     _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(state.data()+8),c);_mm256_storeu_si256(reinterpret_cast<__m256i_u*>(state.data()+12),d);
@@ -284,7 +300,7 @@ Line ReadLine(
     return line;
 }
 
-#if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__))
+#if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(MERCAHASH_FORCE_SCALAR)
 __attribute__((target("avx2")))
 void BindScratchpadAVX2(
     State& state,
@@ -295,9 +311,6 @@ void BindScratchpadAVX2(
 
     const __m256i r1lo=_mm256_setr_epi64x(13,29,43,57),r1hi=_mm256_setr_epi64x(17,31,47,59);
     const __m256i r2lo=_mm256_setr_epi64x(37,53,11,23),r2hi=_mm256_setr_epi64x(41,7,19,61);
-    auto rol=[](__m256i x,__m256i n) __attribute__((target("avx2"))) {
-        return _mm256_or_si256(_mm256_sllv_epi64(x,n),_mm256_srlv_epi64(x,_mm256_sub_epi64(_mm256_set1_epi64x(64),n)));
-    };
     for (std::uint64_t pass = 0; pass < passes; ++pass) {
         state[0] ^= pass + CONSTANTS[4];
         state[8] += (pass + 1) * CONSTANTS[5];
@@ -393,16 +406,16 @@ void BindScratchpadAVX2(
                 const __m256i st0=_mm256_loadu_si256(reinterpret_cast<const __m256i_u*>(window.data()+(line&15)));
                 const __m256i st1=_mm256_loadu_si256(reinterpret_cast<const __m256i_u*>(window.data()+(line&15)+4));
                 const __m256i tag=_mm256_set1_epi64x(line_tag);
-                const __m256i bound0=_mm256_xor_si256(_mm256_xor_si256(_mm256_add_epi64(cur0,prev0),rol(_mm256_add_epi64(ref0,st0),r1lo)),rol(tag,r2lo));
-                const __m256i bound1=_mm256_xor_si256(_mm256_xor_si256(_mm256_add_epi64(cur1,prev1),rol(_mm256_add_epi64(ref1,st1),r1hi)),rol(tag,r2hi));
+                const __m256i bound0=_mm256_xor_si256(_mm256_xor_si256(_mm256_add_epi64(cur0,prev0),RotateLeftVariableAVX2(_mm256_add_epi64(ref0,st0),r1lo)),RotateLeftVariableAVX2(tag,r2lo));
+                const __m256i bound1=_mm256_xor_si256(_mm256_xor_si256(_mm256_add_epi64(cur1,prev1),RotateLeftVariableAVX2(_mm256_add_epi64(ref1,st1),r1hi)),RotateLeftVariableAVX2(tag,r2hi));
                 Line bound;
                 _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(bound.data()),bound0);
                 _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(bound.data()+4),bound1);
                 WriteLine(scratchpad,current_line,bound);
                 const __m256i b01=_mm256_permute2x128_si256(bound0,bound1,0x21),b10=_mm256_permute2x128_si256(bound1,bound0,0x21);
                 const __m256i next0=_mm256_alignr_epi8(b01,bound0,8),next1=_mm256_alignr_epi8(b10,bound1,8);
-                acc0=_mm256_xor_si256(acc0,_mm256_add_epi64(bound0,rol(next0,r2lo)));
-                acc1=_mm256_xor_si256(acc1,_mm256_add_epi64(bound1,rol(next1,r2hi)));
+                acc0=_mm256_xor_si256(acc0,_mm256_add_epi64(bound0,RotateLeftVariableAVX2(next0,r2lo)));
+                acc1=_mm256_xor_si256(acc1,_mm256_add_epi64(bound1,RotateLeftVariableAVX2(next1,r2hi)));
             }
 
             _mm256_storeu_si256(reinterpret_cast<__m256i_u*>(block_accumulator.data()),acc0);
@@ -793,7 +806,7 @@ void Checkpoint(
     MercaARXRound(state);
 }
 
-void MixScratchpad(
+[[maybe_unused]] void MixScratchpad(
     State& state,
     std::span<unsigned char> scratchpad,
     std::uint32_t mix_steps)
@@ -895,6 +908,7 @@ void FinalizeHash(
 #include <mining/mercahash_cpu_batch.h>
 #include <algorithm>
 namespace mercahash::cpu2 {
+#if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(CPU2_FORCE_SCALAR) && !defined(MERCAHASH_FORCE_SCALAR)
 // Preserve vector constant bits on C++20 toolchains without std::bit_cast.
 // memcpy avoids relying on unsigned-to-signed conversion behavior.
 static int64_t SignedBits(uint64_t value)
@@ -903,6 +917,7 @@ static int64_t SignedBits(uint64_t value)
     std::memcpy(&result, &value, sizeof(result));
     return result;
 }
+#endif
 static void Validate(std::span<Job> jobs,size_t capacity) {
  if(jobs.empty() || jobs.size()>capacity)throw std::invalid_argument("batch exceeds capacity");
  for(const auto& j:jobs)if(j.header.size()!=80||j.scratch.size()!=V2_SCRATCHPAD_BYTES||j.output.size()!=32)throw std::invalid_argument("invalid batch buffer size");
@@ -912,7 +927,7 @@ static void Validate(std::span<Job> jobs,size_t capacity) {
   if(overlap(jobs[a].scratch.data(),jobs[a].scratch.size(),jobs[b].header.data(),80)||overlap(jobs[a].scratch.data(),jobs[a].scratch.size(),jobs[b].output.data(),32)||overlap(jobs[a].output.data(),32,jobs[b].header.data(),80)||(a!=b&&overlap(jobs[a].output.data(),32,jobs[b].output.data(),32)))throw std::invalid_argument("batch buffers overlap");
  }
 }
-#if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__))
+#if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(CPU2_FORCE_SCALAR) && !defined(MERCAHASH_FORCE_SCALAR)
 #if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__))
 __attribute__((target("avx2")))
 static void FillAcross4Streamed(std::array<State,4>& states,std::span<Job> jobs) {

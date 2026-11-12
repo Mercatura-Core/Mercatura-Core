@@ -1,6 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
-#pragma once
+#ifndef BITCOIN_MINING_MERCAHASH_CPU_BATCH_H
+#define BITCOIN_MINING_MERCAHASH_CPU_BATCH_H
 #include <crypto/mercahash.h>
 #include <atomic>
 #include <span>
@@ -13,3 +14,4 @@ size_t Batch(std::span<Job> jobs,const std::atomic<bool>* cancelled=nullptr);
 size_t Capacity();
 const char* ExecutionPath();
 }
+#endif // BITCOIN_MINING_MERCAHASH_CPU_BATCH_H

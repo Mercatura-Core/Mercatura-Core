@@ -30,4 +30,4 @@ public:
     std::span<unsigned char> operator[](size_t index) { return {m_pads.at(index), mercahash::V2_SCRATCHPAD_BYTES}; }
 };
 } // namespace mining
-#endif
+#endif // BITCOIN_MINING_CPU_SCRATCHPADS_H
