@@ -1,0 +1,79 @@
+# Copyright (c) 2026 The Mercatura Core developers
+# Distributed under the MIT software license, see the accompanying file COPYING.
+# Target the failures exposed after M2 compilation was repaired. Existing
+# general CI and the full native/GPU qualification workflows remain unchanged.
+name: Native miner CI repair regressions
+on:
+  push:
+    branches: [feature/native-miner-mercaweave]
+    paths:
+      - '.github/workflows/native-miner-ci-repair.yml'
+      - '.github/workflows/mercatura-native-mining.yml'
+      - 'src/mining/mercahash_cpu_batch.cpp'
+      - 'src/qt/test/miningtests.cpp'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: native-miner-ci-repair-${{ github.ref }}
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+jobs:
+  functional-prerequisites:
+    name: Linux functional build prerequisites
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y build-essential cmake ninja-build python3 \
+            libboost-dev libevent-dev libsqlite3-dev
+      - name: Build the applications required by both failing fixtures
+        run: |
+          cmake -S . -B work/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_GUI=OFF -DBUILD_TESTS=ON -DENABLE_IPC=OFF \
+            -DWITH_ZMQ=OFF -DWITH_USDT=OFF -DWITH_CUDA_MINING=OFF -DWITH_OPENCL_MINING=OFF
+          cmake --build work/build --parallel 4 --target bitcoind bitcoin-cli bitcoin-util pq_test_peer
+          test -x work/build/bin/bitcoin-util
+          test -x work/build/bin/pq-test-peer
+      - name: Run only the two previously blocked functional tests
+        run: |
+          mkdir -p work/repair-results
+          python3 work/build/test/functional/test_runner.py --jobs=4 \
+            mercatura_witness_resource.py mercatura_mercahash_v2.py | tee work/repair-results/functional.log
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: native-miner-repair-functional
+          path: work/repair-results/*.log
+  intel-stop-responsiveness:
+    name: macOS Intel stop responsiveness
+    runs-on: macos-15-intel
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install native Qt dependencies
+        run: brew install cmake ninja boost libevent qt@6
+      - name: Build only the affected Qt test target
+        run: |
+          cmake -S . -B work/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix qt@6)" \
+            -DBUILD_GUI=ON -DBUILD_GUI_TESTS=ON -DBUILD_TESTS=ON -DENABLE_IPC=OFF \
+            -DWITH_ZMQ=OFF -DWITH_USDT=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=OFF \
+            -DWITH_CUDA_MINING=OFF -DWITH_OPENCL_MINING=OFF
+          cmake --build work/build --parallel 4 --target test_mining-qt
+      - name: Verify all supported rows of the affected responsiveness test
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          mkdir -p work/repair-results
+          work/build/bin/test_mining-qt liveSoloResponsiveness -maxwarnings 0 | tee work/repair-results/intel-stop.log
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: native-miner-repair-intel-stop
+          path: work/repair-results/*.log

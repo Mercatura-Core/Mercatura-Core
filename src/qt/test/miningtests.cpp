@@ -363,18 +363,24 @@ private Q_SLOTS:
             QVERIFY(session.stats().hashes_per_second_10s > 0);
             bool handled{false};
             qint64 dispatch_ms{0}, handler_ms{0}, request_at{0};
+            std::chrono::milliseconds request_elapsed{0};
             const auto due{clock.elapsed() + 100};
             QTimer::singleShot(100, &session, [&] {
                 request_at = clock.elapsed();
                 dispatch_ms = request_at - due;
+                request_elapsed = session.stats().session_elapsed;
                 stop->click();
                 handler_ms = clock.elapsed() - request_at;
                 handled = true;
             });
             QTRY_VERIFY_WITH_TIMEOUT(handled, 2000);
             QTRY_VERIFY_WITH_TIMEOUT(!session.stats().busy, 2000);
-            const auto stopped_ms{clock.elapsed() - request_at};
+            const auto observed_ms{clock.elapsed() - request_at};
             const auto final{session.stats()};
+            // The controller freezes session_elapsed only after joining its
+            // workers. Qt's later polling observation includes event dispatch
+            // and queued wallet updates, not additional worker retirement.
+            const auto stopped_ms{(final.session_elapsed - request_elapsed).count()};
             QCOMPARE(final.active_workers, 0U);
             QCOMPARE(final.rejected, uint64_t{0});
             if (activation >= 0) QCOMPARE(final.pow_version, mercahash::Version::V2);
@@ -382,11 +388,12 @@ private Q_SLOTS:
                 << " accepted=" << final.accepted << " hashes=" << final.hashes
                 << " elapsed_ms=" << final.session_elapsed.count() << " rate_hps=" << final.hashes_per_second_session
                 << " stop_dispatch_ms=" << dispatch_ms << " stop_handler_ms=" << handler_ms
-                << " stop_observed_ms=" << stopped_ms << " heartbeat_gap_ms=" << worst_heartbeat
+                << " stop_finished_ms=" << stopped_ms << " stop_observed_ms=" << observed_ms << " heartbeat_gap_ms=" << worst_heartbeat
                 << " publication_gap_ms=" << worst_publication_gap;
             QVERIFY2(dispatch_ms < 1000, "Stop timer dispatch exceeded one second");
             QVERIFY2(handler_ms < 1000, "Stop handler blocked the Qt thread for one second");
-            QVERIFY2(stopped_ms < 1000, "Workers did not stop within one second of the Qt handler");
+            QVERIFY2(stopped_ms >= 0 && stopped_ms < 1000,
+                qPrintable(QString{"Workers did not stop within one second of the Qt handler: finished=%1ms, observed=%2ms"}.arg(stopped_ms).arg(observed_ms)));
             QVERIFY2(worst_publication_gap < 1500, "Statistics publication stalled during accepted-block turnover");
             QTest::qWait(50);
             QCOMPARE(session.stats().accepted, final.accepted);

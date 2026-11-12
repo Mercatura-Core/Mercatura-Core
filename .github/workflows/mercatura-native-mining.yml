@@ -37,7 +37,7 @@ jobs:
             -DENABLE_IPC=OFF -DWITH_ZMQ=OFF -DWITH_DBUS=OFF -DWITH_QRENCODE=OFF \
             -DMERCATURA_PUBLIC_TESTNET_RELEASE=OFF
           cmake --build work/build --parallel 4 --target bitcoin-qt bitcoind bitcoin-cli \
-            test_bitcoin test_mining-qt mercatura-gpu-check
+            bitcoin-util pq_test_peer test_bitcoin test_mining-qt mercatura-gpu-check
       - name: Focused Solo and native regression matrix
         run: |
           work/build/bin/test_bitcoin --run_test=worker_limits_tests,cpu_miner_tests,mining_statistics_tests,gpu_miner_tests,mercahash_gpu_tests,mercahash_gpu_sync_tests,mining_tests_wallet,mining_tests_solo

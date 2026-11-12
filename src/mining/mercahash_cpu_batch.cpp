@@ -10,6 +10,9 @@
 
 #if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__))
 #include <immintrin.h>
+#if defined(__APPLE__)
+#include <compat/cpuid.h>
+#endif
 #endif
 #include <array>
 #include <bit>
@@ -154,6 +157,28 @@ void WriteLine(
 
 
 #if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(MERCAHASH_FORCE_SCALAR)
+inline bool HasAVX2()
+{
+#if defined(__APPLE__)
+    // Cross-built Darwin does not supply the compiler's __cpu_model runtime.
+    // As in SHA256AutoDetect, require CPU support and OS-enabled XMM/YMM state.
+    static const bool supported = [] {
+        uint32_t a, b, c, d;
+        GetCPUID(0, 0, a, b, c, d);
+        if (a < 7) return false;
+        GetCPUID(1, 0, a, b, c, d);
+        if ((c & ((1U << 27) | (1U << 28))) != ((1U << 27) | (1U << 28))) return false;
+        GetCPUID(7, 0, a, b, c, d);
+        if (!(b & (1U << 5))) return false;
+        __asm__("xgetbv" : "=a"(a), "=d"(d) : "c"(0));
+        return (a & 6) == 6;
+    }();
+    return supported;
+#else
+    return __builtin_cpu_supports("avx2");
+#endif
+}
+
 // Named target functions avoid GCC's untargeted noncapturing-lambda thunk ABI.
 __attribute__((target("avx2")))
 inline __m256i LoadAVX2(const uint64_t* p)
@@ -220,7 +245,7 @@ void FillScratchpad(
 {
     assert(scratchpad.size() == SCRATCHPAD_BYTES);
 #if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(MERCAHASH_FORCE_SCALAR)
-    if (mode == ScratchpadFillMode::ALTERNATING_HALF_ROUND && __builtin_cpu_supports("avx2")) { FillScratchpadAVX2(state,scratchpad); return; }
+    if (mode == ScratchpadFillMode::ALTERNATING_HALF_ROUND && HasAVX2()) { FillScratchpadAVX2(state,scratchpad); return; }
 #endif
 
     // Domain-separated transition from initial state into scratchpad fill.
@@ -449,7 +474,7 @@ void BindScratchpad(
 {
     assert(scratchpad.size() == SCRATCHPAD_BYTES);
 #if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(MERCAHASH_FORCE_SCALAR)
-    if (__builtin_cpu_supports("avx2")) { BindScratchpadAVX2(state,scratchpad,passes); return; }
+    if (HasAVX2()) { BindScratchpadAVX2(state,scratchpad,passes); return; }
 #endif
 
     for (std::uint64_t pass = 0; pass < passes; ++pass) {
@@ -1087,7 +1112,7 @@ static inline PrimaryResult PrimaryLoaded(State& state,std::span<unsigned char> 
 size_t Capacity() {return 4;}
 const char* ExecutionPath() {
 #if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(CPU2_FORCE_SCALAR) && !defined(MERCAHASH_FORCE_SCALAR)
- return __builtin_cpu_supports("avx2") ? "b4-streamed-huge AVX2" : "b4-streamed-huge scalar";
+ return HasAVX2() ? "b4-streamed-huge AVX2" : "b4-streamed-huge scalar";
 #else
  return "b4-streamed-huge scalar";
 #endif
@@ -1097,7 +1122,7 @@ size_t Batch(std::span<Job> jobs,const std::atomic<bool>* cancelled) {
  std::array<State,4> states;
  for(size_t c=0;c<jobs.size();c++)states[c]=InitialState(jobs[c].header);
  #if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(CPU2_FORCE_SCALAR) && !defined(MERCAHASH_FORCE_SCALAR)
- if(jobs.size()==4&&__builtin_cpu_supports("avx2")){
+ if(jobs.size()==4&&HasAVX2()){
  bool aligned=true;for(auto& j:jobs)aligned=aligned&&((reinterpret_cast<uintptr_t>(j.scratch.data())&31)==0);
  if(aligned)FillAcross4Streamed(states,jobs);else FillAcross4(states,jobs);
  }else
