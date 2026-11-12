@@ -1,0 +1,136 @@
+{
+  "build_dir": "build-m2",
+  "mode": "cpu",
+  "mode_sequence": "cpu,combined,cpu,gpu,combined,gpu",
+  "unload_wallet": false,
+  "schedule": "v2",
+  "harder": true,
+  "workers": 6,
+  "device": "cuda:0",
+  "contexts": 286,
+  "seconds": 2,
+  "deadline": 480,
+  "output_parent": "work/m2/transitions-o3",
+  "offscreen": true,
+  "pq": true,
+  "relay_transaction": false,
+  "memory_budget_mib": 4096,
+  "validation_threads": 2,
+  "status": "PASSED",
+  "pq_observed_endpoints": [
+    "client",
+    "peer"
+  ],
+  "mining_node_restarted": true,
+  "restart_pq_session": "3d08b9ef5610ef1d7ddcfa0731fb499923aa4bda36cce6b8693b1eb614f26418",
+  "observed_mining_height": 6,
+  "observed_mining_hash": "ba3fe6d0b6adc2bb459fefb651add89e8f4b88ad4efd7818b81dc5f69d9042a8",
+  "peer_prefix_matches": true,
+  "restart_tip_matches": true,
+  "restarted_client_verifychain": true,
+  "peer_height": 6,
+  "peer_verifychain": true,
+  "native_reward_audit": [
+    {
+      "height": 1,
+      "hash": "c2c8e8c56485a35c368542020d887c483be4d14afd2a36183ebb036edef84bba",
+      "subsidy": 2378234,
+      "ordinary_fees": 0,
+      "paid": 2378234,
+      "payouts": 1,
+      "software_fees": 0
+    },
+    {
+      "height": 2,
+      "hash": "ef31f019419b6b0ea1fc576c5d90bc71d28455c137ef0068fab7757ab074e526",
+      "subsidy": 2378234,
+      "ordinary_fees": 0,
+      "paid": 2378234,
+      "payouts": 1,
+      "software_fees": 0
+    },
+    {
+      "height": 3,
+      "hash": "0ae210606fccaadb987c635e93683bb1e8e4c035d781b556f6010805d1e9c2d6",
+      "subsidy": 2378234,
+      "ordinary_fees": 0,
+      "paid": 2378234,
+      "payouts": 1,
+      "software_fees": 0
+    },
+    {
+      "height": 4,
+      "hash": "27b3f3f59b78713f398998c6f4ed4e0e22cdc8c745579143ee6a4fdbb657f34f",
+      "subsidy": 2378234,
+      "ordinary_fees": 0,
+      "paid": 2378234,
+      "payouts": 1,
+      "software_fees": 0
+    },
+    {
+      "height": 5,
+      "hash": "3bac99abca95a22e2b97cfe64a6ac07f62fab1266fafbc802a71cdcceb12a0ae",
+      "subsidy": 2378234,
+      "ordinary_fees": 0,
+      "paid": 2378234,
+      "payouts": 1,
+      "software_fees": 0
+    },
+    {
+      "height": 6,
+      "hash": "ba3fe6d0b6adc2bb459fefb651add89e8f4b88ad4efd7818b81dc5f69d9042a8",
+      "subsidy": 2378234,
+      "ordinary_fees": 0,
+      "paid": 2378234,
+      "payouts": 1,
+      "software_fees": 0
+    }
+  ],
+  "qt_result": {
+    "accepted": "1",
+    "activation": 0,
+    "close_backlog": 0,
+    "close_complete_ms": 223,
+    "close_handler_ms": 73,
+    "cpu_hashes": "0",
+    "event": "result",
+    "gpu_hashes": "1430",
+    "harder": true,
+    "heartbeat_gap_ms": 491,
+    "mode": "gpu",
+    "rapid_wallet": false,
+    "result": 0,
+    "session_destroyed": true,
+    "stop_backlog": 0,
+    "stop_complete_ms": 74,
+    "stop_dispatch_ms": 0,
+    "stop_handler_ms": 1,
+    "unload_complete_ms": -1,
+    "unload_handler_ms": -1,
+    "wallet_reopened": false,
+    "wallet_unloaded": false,
+    "wallet_verified": false,
+    "workers": 6
+  },
+  "elapsed_seconds": 49.571,
+  "sampling_interval_seconds": 0.5,
+  "resource_summary": {
+    "samples": 82,
+    "aggregate_peak_sampled_rss_kib": 756268,
+    "peak_threads_per_process": 56,
+    "peak_fds_per_process": 58,
+    "per_pid": {
+      "212233": {
+        "peak_rss_kib": 88900,
+        "peak_virtual_kib": 1822380,
+        "observed_cpu_seconds": 0.8900000000000001
+      },
+      "212275": {
+        "peak_rss_kib": 667368,
+        "peak_virtual_kib": 38324516,
+        "observed_cpu_seconds": 172.96
+      }
+    }
+  },
+  "all_children_exited": true
+}

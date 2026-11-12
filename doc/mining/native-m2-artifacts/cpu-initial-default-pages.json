@@ -1,0 +1,101 @@
+[
+  {
+    "mode": "cpu",
+    "workload": "real controller hashing with synthetic public work; 2-second jobs; no node or wallet",
+    "workers": 6,
+    "pow_version": 2,
+    "production_recommended": 6,
+    "production_maximum": 12,
+    "responsiveness_reserve_overridden": false,
+    "scratchpad_bytes": 402653184,
+    "peak_rss_bytes": 407719936,
+    "samples": [
+      {
+        "seconds": 15.066748854,
+        "hashes": 4268,
+        "hashes_per_second": 283.272791055179,
+        "cpu_hashes": 4268,
+        "gpu_hashes": 0,
+        "cpu_hashes_per_second": 283.272791055179,
+        "gpu_hashes_per_second": 0,
+        "devices_before_stop": [],
+        "peak_sampled_rss_bytes": 407588864,
+        "first_completed_hash_ms": 160.607547,
+        "cpu_seconds": 81.916081,
+        "stop_request_ms": 0.114916,
+        "stop_join_ms": 59.480871,
+        "jobs": 8,
+        "active_after_stop": 0,
+        "rss_before_bytes": 4456448,
+        "rss_after_stop_bytes": 5087232
+      }
+    ],
+    "peak_anon_huge_kib": 393216
+  },
+  {
+    "mode": "cpu",
+    "workload": "real controller hashing with synthetic public work; 2-second jobs; no node or wallet",
+    "workers": 6,
+    "pow_version": 2,
+    "production_recommended": 6,
+    "production_maximum": 12,
+    "responsiveness_reserve_overridden": false,
+    "scratchpad_bytes": 402653184,
+    "peak_rss_bytes": 407646208,
+    "samples": [
+      {
+        "seconds": 15.041603097,
+        "hashes": 4632,
+        "hashes_per_second": 307.9458997906837,
+        "cpu_hashes": 4632,
+        "gpu_hashes": 0,
+        "cpu_hashes_per_second": 307.9458997906837,
+        "gpu_hashes_per_second": 0,
+        "devices_before_stop": [],
+        "peak_sampled_rss_bytes": 407515136,
+        "first_completed_hash_ms": 129.338082,
+        "cpu_seconds": 82.238285,
+        "stop_request_ms": 0.109372,
+        "stop_join_ms": 33.592095,
+        "jobs": 8,
+        "active_after_stop": 0,
+        "rss_before_bytes": 4325376,
+        "rss_after_stop_bytes": 4935680
+      }
+    ],
+    "peak_anon_huge_kib": 393216
+  },
+  {
+    "mode": "cpu",
+    "workload": "real controller hashing with synthetic public work; 2-second jobs; no node or wallet",
+    "workers": 6,
+    "pow_version": 2,
+    "production_recommended": 6,
+    "production_maximum": 12,
+    "responsiveness_reserve_overridden": false,
+    "scratchpad_bytes": 402653184,
+    "peak_rss_bytes": 407695360,
+    "samples": [
+      {
+        "seconds": 15.057061345,
+        "hashes": 4720,
+        "hashes_per_second": 313.474182767235,
+        "cpu_hashes": 4720,
+        "gpu_hashes": 0,
+        "cpu_hashes_per_second": 313.474182767235,
+        "gpu_hashes_per_second": 0,
+        "devices_before_stop": [],
+        "peak_sampled_rss_bytes": 407564288,
+        "first_completed_hash_ms": 130.241311,
+        "cpu_seconds": 82.071435,
+        "stop_request_ms": 0.108821,
+        "stop_join_ms": 50.721394,
+        "jobs": 8,
+        "active_after_stop": 0,
+        "rss_before_bytes": 4456448,
+        "rss_after_stop_bytes": 4984832
+      }
+    ],
+    "peak_anon_huge_kib": 393216
+  }
+]

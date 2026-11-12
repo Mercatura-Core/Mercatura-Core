@@ -1,0 +1,53 @@
+[
+  {
+    "accepted": "1",
+    "cpu_hashes": "1032",
+    "event": "mode_qualified",
+    "gpu_hashes": "3146",
+    "mode": "combined",
+    "mode_index": 0
+  },
+  {
+    "active_workers": 0,
+    "complete_ms": 113,
+    "dispatch_ms": 3,
+    "event": "stop",
+    "handler_ms": 0,
+    "mode": "combined",
+    "mode_index": 0,
+    "pending_notifications": 0
+  },
+  {
+    "active_workers": 0,
+    "complete_ms": 631,
+    "event": "wallet_unloaded",
+    "handler_ms": 530,
+    "mode": "combined"
+  },
+  {
+    "accepted": "1",
+    "activation": 0,
+    "close_backlog": 0,
+    "close_complete_ms": 539,
+    "close_handler_ms": 4,
+    "cpu_hashes": "1032",
+    "event": "result",
+    "gpu_hashes": "3146",
+    "harder": true,
+    "heartbeat_gap_ms": 632,
+    "mode": "combined",
+    "rapid_wallet": false,
+    "result": 0,
+    "session_destroyed": true,
+    "stop_backlog": 0,
+    "stop_complete_ms": 113,
+    "stop_dispatch_ms": 3,
+    "stop_handler_ms": 0,
+    "unload_complete_ms": 631,
+    "unload_handler_ms": 530,
+    "wallet_reopened": false,
+    "wallet_unloaded": true,
+    "wallet_verified": false,
+    "workers": 6
+  }
+]

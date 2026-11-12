@@ -1,0 +1,17 @@
+{
+  "combined-integrated-o3": {
+    "median_hps": 1568.261228098353,
+    "median_cpu_hps": 303.8068961611049,
+    "median_gpu_hps": 1264.454331937248
+  },
+  "cpu-integrated-o3": {
+    "median_hps": 319.5863569654085,
+    "median_cpu_hps": 319.5863569654085,
+    "median_gpu_hps": 0
+  },
+  "cpu-original-hash-o3": {
+    "median_hps": 242.8090698041491,
+    "median_cpu_hps": 242.8090698041491,
+    "median_gpu_hps": 0
+  }
+}

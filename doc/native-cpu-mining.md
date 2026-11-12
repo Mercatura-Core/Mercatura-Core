@@ -95,6 +95,10 @@ Partial batches of one to three contexts and unaligned buffers remain supported.
 The RAII scratchpad owner uses portable aligned C++ allocation/deallocation and
 optional Linux huge-page advice; failed or unavailable advice uses ordinary pages.
 The authoritative `mercahash::HashV2` consensus implementation is unchanged.
+GCC/Clang Release builds compile the mining batch unit at the frozen research
+qualification's `-O3`, without changing consensus compilation or global ISA flags.
+See [M2 integration and local qualification](mining/NATIVE-MINER-M2-INTEGRATION.md)
+for exact protocols, performance limits and source identities.
 
 Nonce leases remain shared with GPUs. Each admitted CPU batch completes all of
 its lanes before observing cancellation. Completed hashes, including hashes

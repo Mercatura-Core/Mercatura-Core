@@ -1,0 +1,15 @@
+Test project /home/gwestcot/projects/mercatura-miner/build-m2
+ 1/12 Test #187: mining_tests_v2 ..................   Passed   27.47 sec
+ 2/12 Test  #50: mercahash_activation_tests .......   Passed   29.84 sec
+ 3/12 Test  #53: cpu_miner_tests ..................   Passed    5.37 sec
+ 4/12 Test  #60: gpu_scheduling_tests .............   Passed    4.37 sec
+ 5/12 Test  #49: mercahash_cpu_batch_tests ........   Passed    2.12 sec
+ 6/12 Test  #48: mercahash_v2_tests ...............   Passed    3.53 sec
+ 7/12 Test  #52: mercaweave_activation_tests ......   Passed    0.51 sec
+ 8/12 Test   #6: test_cuda_backend_host ...........   Passed    0.13 sec
+ 9/12 Test  #61: gpu_miner_tests ..................   Passed    0.79 sec
+10/12 Test  #59: gpu_capacity_tests ...............   Passed    0.13 sec
+11/12 Test  #54: worker_limits_tests ..............   Passed    0.14 sec
+12/12 Test  #58: mining_statistics_tests ..........   Passed    0.15 sec
+100% tests passed, 0 tests failed out of 12
+Total Test time (real) =  37.33 sec

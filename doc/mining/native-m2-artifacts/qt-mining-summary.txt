@@ -1,0 +1,65 @@
+PASS   : MiningTests::initTestCase()
+QINFO  : MiningTests::walletNotificationContention() Wallet notification contention heartbeat_gap_ms=19 stop_dispatch_ms=8 stop_handler_ms=0 wallet_txs=2 model_rows=2 stop_backlog=1 accepted=2
+PASS   : MiningTests::walletNotificationContention()
+QINFO  : MiningTests::transactionStatusChainContention() Transaction status chain contention callback_ms=0 heartbeat_gap_ms=12 wallet_available=true
+PASS   : MiningTests::transactionStatusChainContention()
+PASS   : MiningTests::unrestrictedV2CapacityControls()
+QINFO  : MiningTests::liveSoloResponsiveness(height--1-workers-1) Live Solo activation=-1 workers=1 cycle=0 accepted=3 hashes=7 elapsed_ms=2326 rate_hps=3.0083 stop_dispatch_ms=2 stop_handler_ms=0 stop_observed_ms=256 heartbeat_gap_ms=19 publication_gap_ms=525
+QINFO  : MiningTests::liveSoloResponsiveness(height--1-workers-1) Live Solo activation=-1 workers=1 cycle=1 accepted=3 hashes=7 elapsed_ms=2263 rate_hps=3.09202 stop_dispatch_ms=2 stop_handler_ms=0 stop_observed_ms=153 heartbeat_gap_ms=20 publication_gap_ms=504
+QINFO  : MiningTests::liveSoloResponsiveness(height--1-workers-1) Live Solo activation=-1 workers=1 cycle=2 accepted=3 hashes=7 elapsed_ms=2329 rate_hps=3.00455 stop_dispatch_ms=3 stop_handler_ms=0 stop_observed_ms=256 heartbeat_gap_ms=20 publication_gap_ms=503
+QINFO  : MiningTests::liveSoloResponsiveness(height--1-workers-1) Live Solo activation=-1 workers=1 session_shutdown_ms=182 heartbeat_gap_ms=194
+PASS   : MiningTests::liveSoloResponsiveness(height--1-workers-1)
+QINFO  : MiningTests::liveSoloResponsiveness(height--1-workers-2) Live Solo activation=-1 workers=2 cycle=0 accepted=4 hashes=13 elapsed_ms=2311 rate_hps=5.62356 stop_dispatch_ms=1 stop_handler_ms=0 stop_observed_ms=204 heartbeat_gap_ms=21 publication_gap_ms=477
+QINFO  : MiningTests::liveSoloResponsiveness(height--1-workers-2) Live Solo activation=-1 workers=2 cycle=1 accepted=4 hashes=12 elapsed_ms=2170 rate_hps=5.52761 stop_dispatch_ms=3 stop_handler_ms=0 stop_observed_ms=102 heartbeat_gap_ms=21 publication_gap_ms=503
+QINFO  : MiningTests::liveSoloResponsiveness(height--1-workers-2) Live Solo activation=-1 workers=2 cycle=2 accepted=4 hashes=11 elapsed_ms=2396 rate_hps=4.5895 stop_dispatch_ms=2 stop_handler_ms=0 stop_observed_ms=256 heartbeat_gap_ms=21 publication_gap_ms=502
+QINFO  : MiningTests::liveSoloResponsiveness(height--1-workers-2) Live Solo activation=-1 workers=2 session_shutdown_ms=229 heartbeat_gap_ms=236
+PASS   : MiningTests::liveSoloResponsiveness(height--1-workers-2)
+QINFO  : MiningTests::liveSoloResponsiveness(height--1-workers-6) Live Solo activation=-1 workers=6 cycle=0 accepted=4 hashes=25 elapsed_ms=2329 rate_hps=10.7342 stop_dispatch_ms=2 stop_handler_ms=0 stop_observed_ms=205 heartbeat_gap_ms=19 publication_gap_ms=478
+QINFO  : MiningTests::liveSoloResponsiveness(height--1-workers-6) Live Solo activation=-1 workers=6 cycle=1 accepted=4 hashes=28 elapsed_ms=2347 rate_hps=11.9258 stop_dispatch_ms=2 stop_handler_ms=1 stop_observed_ms=205 heartbeat_gap_ms=20 publication_gap_ms=501
+QINFO  : MiningTests::liveSoloResponsiveness(height--1-workers-6) Live Solo activation=-1 workers=6 cycle=2 accepted=4 hashes=26 elapsed_ms=2373 rate_hps=10.9525 stop_dispatch_ms=3 stop_handler_ms=1 stop_observed_ms=256 heartbeat_gap_ms=20 publication_gap_ms=502
+QINFO  : MiningTests::liveSoloResponsiveness(height--1-workers-6) Live Solo activation=-1 workers=6 session_shutdown_ms=222 heartbeat_gap_ms=232
+PASS   : MiningTests::liveSoloResponsiveness(height--1-workers-6)
+QINFO  : MiningTests::liveSoloResponsiveness(height-0-workers-1) Live Solo activation=0 workers=1 cycle=0 accepted=24 hashes=108 elapsed_ms=2200 rate_hps=49.0698 stop_dispatch_ms=4 stop_handler_ms=0 stop_observed_ms=50 heartbeat_gap_ms=19 publication_gap_ms=531
+QINFO  : MiningTests::liveSoloResponsiveness(height-0-workers-1) Live Solo activation=0 workers=1 cycle=1 accepted=17 hashes=68 elapsed_ms=2165 rate_hps=31.405 stop_dispatch_ms=3 stop_handler_ms=0 stop_observed_ms=51 heartbeat_gap_ms=20 publication_gap_ms=1003
+QINFO  : MiningTests::liveSoloResponsiveness(height-0-workers-1) Live Solo activation=0 workers=1 cycle=2 accepted=23 hashes=104 elapsed_ms=2156 rate_hps=48.2161 stop_dispatch_ms=3 stop_handler_ms=0 stop_observed_ms=50 heartbeat_gap_ms=20 publication_gap_ms=505
+QINFO  : MiningTests::liveSoloResponsiveness(height-0-workers-1) Live Solo activation=0 workers=1 session_shutdown_ms=58 heartbeat_gap_ms=68
+PASS   : MiningTests::liveSoloResponsiveness(height-0-workers-1)
+QINFO  : MiningTests::liveSoloResponsiveness(height-0-workers-2) Live Solo activation=0 workers=2 cycle=0 accepted=23 hashes=188 elapsed_ms=2162 rate_hps=86.9327 stop_dispatch_ms=2 stop_handler_ms=1 stop_observed_ms=51 heartbeat_gap_ms=20 publication_gap_ms=505
+QINFO  : MiningTests::liveSoloResponsiveness(height-0-workers-2) Live Solo activation=0 workers=2 cycle=1 accepted=23 hashes=208 elapsed_ms=2200 rate_hps=94.5348 stop_dispatch_ms=3 stop_handler_ms=0 stop_observed_ms=50 heartbeat_gap_ms=20 publication_gap_ms=503
+QINFO  : MiningTests::liveSoloResponsiveness(height-0-workers-2) Live Solo activation=0 workers=2 cycle=2 accepted=24 hashes=196 elapsed_ms=2104 rate_hps=93.1136 stop_dispatch_ms=4 stop_handler_ms=0 stop_observed_ms=51 heartbeat_gap_ms=20 publication_gap_ms=501
+QINFO  : MiningTests::liveSoloResponsiveness(height-0-workers-2) Live Solo activation=0 workers=2 session_shutdown_ms=6 heartbeat_gap_ms=20
+PASS   : MiningTests::liveSoloResponsiveness(height-0-workers-2)
+QINFO  : MiningTests::liveSoloResponsiveness(height-0-workers-6) Live Solo activation=0 workers=6 cycle=0 accepted=16 hashes=412 elapsed_ms=2170 rate_hps=189.776 stop_dispatch_ms=2 stop_handler_ms=0 stop_observed_ms=101 heartbeat_gap_ms=26 publication_gap_ms=526
+QINFO  : MiningTests::liveSoloResponsiveness(height-0-workers-6) Live Solo activation=0 workers=6 cycle=1 accepted=18 hashes=436 elapsed_ms=2140 rate_hps=203.695 stop_dispatch_ms=4 stop_handler_ms=0 stop_observed_ms=51 heartbeat_gap_ms=26 publication_gap_ms=521
+QINFO  : MiningTests::liveSoloResponsiveness(height-0-workers-6) Live Solo activation=0 workers=6 cycle=2 accepted=16 hashes=404 elapsed_ms=2175 rate_hps=185.691 stop_dispatch_ms=3 stop_handler_ms=0 stop_observed_ms=101 heartbeat_gap_ms=26 publication_gap_ms=506
+QINFO  : MiningTests::liveSoloResponsiveness(height-0-workers-6) Live Solo activation=0 workers=6 session_shutdown_ms=17 heartbeat_gap_ms=26
+PASS   : MiningTests::liveSoloResponsiveness(height-0-workers-6)
+QINFO  : MiningTests::liveSoloResponsiveness(height-20-workers-1) Live Solo activation=20 workers=1 cycle=0 accepted=23 hashes=69 elapsed_ms=14853 rate_hps=4.64538 stop_dispatch_ms=3 stop_handler_ms=0 stop_observed_ms=101 heartbeat_gap_ms=20 publication_gap_ms=510
+QINFO  : MiningTests::liveSoloResponsiveness(height-20-workers-1) Live Solo activation=20 workers=1 cycle=1 accepted=24 hashes=104 elapsed_ms=2158 rate_hps=48.1904 stop_dispatch_ms=2 stop_handler_ms=0 stop_observed_ms=51 heartbeat_gap_ms=20 publication_gap_ms=502
+QINFO  : MiningTests::liveSoloResponsiveness(height-20-workers-1) Live Solo activation=20 workers=1 cycle=2 accepted=22 hashes=100 elapsed_ms=2212 rate_hps=45.2057 stop_dispatch_ms=3 stop_handler_ms=0 stop_observed_ms=102 heartbeat_gap_ms=20 publication_gap_ms=502
+QINFO  : MiningTests::liveSoloResponsiveness(height-20-workers-1) Live Solo activation=20 workers=1 session_shutdown_ms=6 heartbeat_gap_ms=20
+PASS   : MiningTests::liveSoloResponsiveness(height-20-workers-1)
+QINFO  : MiningTests::liveSoloResponsiveness(height-20-workers-2) Live Solo activation=20 workers=2 cycle=0 accepted=23 hashes=107 elapsed_ms=12822 rate_hps=8.3448 stop_dispatch_ms=3 stop_handler_ms=0 stop_observed_ms=51 heartbeat_gap_ms=20 publication_gap_ms=510
+QINFO  : MiningTests::liveSoloResponsiveness(height-20-workers-2) Live Solo activation=20 workers=2 cycle=1 accepted=21 hashes=180 elapsed_ms=2145 rate_hps=83.8952 stop_dispatch_ms=2 stop_handler_ms=0 stop_observed_ms=51 heartbeat_gap_ms=20 publication_gap_ms=501
+QINFO  : MiningTests::liveSoloResponsiveness(height-20-workers-2) Live Solo activation=20 workers=2 cycle=2 accepted=21 hashes=176 elapsed_ms=2139 rate_hps=82.2805 stop_dispatch_ms=2 stop_handler_ms=1 stop_observed_ms=52 heartbeat_gap_ms=20 publication_gap_ms=502
+QINFO  : MiningTests::liveSoloResponsiveness(height-20-workers-2) Live Solo activation=20 workers=2 session_shutdown_ms=26 heartbeat_gap_ms=37
+PASS   : MiningTests::liveSoloResponsiveness(height-20-workers-2)
+QINFO  : MiningTests::liveSoloResponsiveness(height-20-workers-6) Live Solo activation=20 workers=6 cycle=0 accepted=23 hashes=230 elapsed_ms=13136 rate_hps=17.5085 stop_dispatch_ms=3 stop_handler_ms=0 stop_observed_ms=51 heartbeat_gap_ms=32 publication_gap_ms=1004
+QINFO  : MiningTests::liveSoloResponsiveness(height-20-workers-6) Live Solo activation=20 workers=6 cycle=1 accepted=15 hashes=384 elapsed_ms=2198 rate_hps=174.699 stop_dispatch_ms=1 stop_handler_ms=0 stop_observed_ms=105 heartbeat_gap_ms=32 publication_gap_ms=501
+QINFO  : MiningTests::liveSoloResponsiveness(height-20-workers-6) Live Solo activation=20 workers=6 cycle=2 accepted=16 hashes=416 elapsed_ms=2228 rate_hps=186.707 stop_dispatch_ms=7 stop_handler_ms=0 stop_observed_ms=102 heartbeat_gap_ms=32 publication_gap_ms=500
+QINFO  : MiningTests::liveSoloResponsiveness(height-20-workers-6) Live Solo activation=20 workers=6 session_shutdown_ms=84 heartbeat_gap_ms=94
+PASS   : MiningTests::liveSoloResponsiveness(height-20-workers-6)
+PASS   : MiningTests::actualGpuContextsAfterFallback()
+PASS   : MiningTests::maximumAutomaticAndReducedManualGpuContexts()
+PASS   : MiningTests::hardwareAwareManualWorkerSelection()
+PASS   : MiningTests::combinedWorkerSelectionReservesHostVerifiers()
+PASS   : MiningTests::manualWorkersPersistAndRuntimeFormatting()
+PASS   : MiningTests::pickaxeFollowsPaletteAtHighDpi()
+PASS   : MiningTests::missingWalletUnlockCancellationAndNodeShutdown()
+PASS   : MiningTests::sharedDeviceDiscoveryRefresh()
+PASS   : MiningTests::soloWalletAndPageLifecycle()
+PASS   : MiningTests::controllerDefersWalletDestruction()
+PASS   : MiningTests::encryptedAddressCreation()
+PASS   : MiningTests::pageLifecycle()
+PASS   : MiningTests::cleanupTestCase()
+Totals: 26 passed, 0 failed, 0 skipped, 0 blacklisted, 141431ms

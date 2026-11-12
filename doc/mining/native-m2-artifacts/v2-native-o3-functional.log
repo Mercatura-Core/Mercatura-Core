@@ -1,0 +1,6 @@
+2026-11-12T09:57:23.394671Z TestFramework (INFO): PRNG seed is: 930111125566919529
+2026-11-12T09:57:23.450877Z TestFramework (INFO): Initializing test directory /tmp/mercatura-m2-v2-solo-o3
+2026-11-12T09:57:24.736212Z TestFramework (INFO): Producing 102 native controller blocks and spending a matured PQ reward
+2026-11-12T09:57:36.176414Z TestFramework (INFO): Stopping nodes
+2026-11-12T09:57:36.341562Z TestFramework (WARNING): Not cleaning up dir /tmp/mercatura-m2-v2-solo-o3
+2026-11-12T09:57:36.341659Z TestFramework (INFO): Tests successful

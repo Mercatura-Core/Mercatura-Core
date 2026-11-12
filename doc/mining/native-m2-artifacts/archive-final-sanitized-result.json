@@ -1,0 +1,1 @@
+{"mode":"verify","headers":1024,"capacity":4,"batches":256,"partial_batches":3,"repeated_hashes":86,"full_pad_comparisons":1024,"rejections":8,"alignment_classes":64,"cancellation_pre_entry":true,"seconds":264.049,"passed":true}

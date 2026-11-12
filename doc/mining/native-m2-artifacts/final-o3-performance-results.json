@@ -1,0 +1,467 @@
+{
+  "protocol": {
+    "duration_seconds": 15,
+    "repetitions": 3,
+    "version": 2,
+    "cpu_workers": 6,
+    "gpu_contexts": 286,
+    "gpu_device": "cuda:0",
+    "gpu_yield_ms": 10,
+    "job_lifetime_seconds": 2,
+    "cpu_page_policy": "ordinary pages in both binaries via PR_SET_THP_DISABLE; production default unchanged",
+    "compiler_flags": "Both CPU hash implementations -O3; controller/Core -O2; CUDA -O3 compute/sm86; see o3-control-commands.json and cpu-production-compile-command.txt",
+    "no_cpu_or_system_power_inference": true
+  },
+  "results": [
+    {
+      "label": "cpu-original-hash-o3",
+      "repetition": 1,
+      "command": [
+        "/home/gwestcot/projects/mercatura-miner/work/m2/mining-bench-original-hash-o3",
+        "6",
+        "15",
+        "1",
+        "2",
+        "cpu",
+        "286",
+        "cuda:0"
+      ],
+      "wall_seconds": 15.383158900018316,
+      "data": {
+        "mode": "cpu",
+        "workload": "real controller hashing with synthetic public work; 2-second jobs; no node or wallet",
+        "workers": 6,
+        "pow_version": 2,
+        "production_recommended": 6,
+        "production_maximum": 12,
+        "responsiveness_reserve_overridden": false,
+        "scratchpad_bytes": 100663296,
+        "peak_rss_bytes": 105250816,
+        "samples": [
+          {
+            "seconds": 15.036018039,
+            "hashes": 3665,
+            "hashes_per_second": 243.7480448941885,
+            "cpu_hashes": 3665,
+            "gpu_hashes": 0,
+            "cpu_hashes_per_second": 243.7480448941885,
+            "gpu_hashes_per_second": 0,
+            "devices_before_stop": [],
+            "peak_sampled_rss_bytes": 105119744,
+            "first_completed_hash_ms": 52.8069,
+            "cpu_seconds": 81.604513,
+            "stop_request_ms": 0.112855,
+            "stop_join_ms": 32.657943,
+            "jobs": 8,
+            "active_after_stop": 0,
+            "rss_before_bytes": 4325376,
+            "rss_after_stop_bytes": 4739072
+          }
+        ]
+      }
+    },
+    {
+      "label": "cpu-integrated-o3",
+      "repetition": 1,
+      "command": [
+        "/home/gwestcot/projects/mercatura-miner/build-m2/bin/mining-bench",
+        "6",
+        "15",
+        "1",
+        "2",
+        "cpu",
+        "286",
+        "cuda:0"
+      ],
+      "wall_seconds": 15.778573351039086,
+      "data": {
+        "mode": "cpu",
+        "workload": "real controller hashing with synthetic public work; 2-second jobs; no node or wallet",
+        "workers": 6,
+        "pow_version": 2,
+        "production_recommended": 6,
+        "production_maximum": 12,
+        "responsiveness_reserve_overridden": false,
+        "scratchpad_bytes": 402653184,
+        "peak_rss_bytes": 407240704,
+        "samples": [
+          {
+            "seconds": 15.116297967,
+            "hashes": 4808,
+            "hashes_per_second": 318.0672946839379,
+            "cpu_hashes": 4808,
+            "gpu_hashes": 0,
+            "cpu_hashes_per_second": 318.0672946839379,
+            "gpu_hashes_per_second": 0,
+            "devices_before_stop": [],
+            "peak_sampled_rss_bytes": 407240704,
+            "first_completed_hash_ms": 148.6477,
+            "cpu_seconds": 82.338446,
+            "stop_request_ms": 0.112348,
+            "stop_join_ms": 108.959843,
+            "jobs": 8,
+            "active_after_stop": 0,
+            "rss_before_bytes": 4456448,
+            "rss_after_stop_bytes": 4960256
+          }
+        ]
+      }
+    },
+    {
+      "label": "combined-integrated-o3",
+      "repetition": 1,
+      "command": [
+        "/home/gwestcot/projects/mercatura-miner/build-m2/bin/mining-bench",
+        "6",
+        "15",
+        "1",
+        "2",
+        "combined",
+        "286",
+        "cuda:0"
+      ],
+      "wall_seconds": 15.42929997399915,
+      "data": {
+        "mode": "combined",
+        "workload": "real controller hashing with synthetic public work; 2-second jobs; no node or wallet",
+        "workers": 6,
+        "pow_version": 2,
+        "production_recommended": 6,
+        "production_maximum": 12,
+        "responsiveness_reserve_overridden": false,
+        "scratchpad_bytes": 402653184,
+        "peak_rss_bytes": 510181376,
+        "samples": [
+          {
+            "seconds": 15.154363045,
+            "hashes": 23766,
+            "hashes_per_second": 1568.261228098353,
+            "cpu_hashes": 4604,
+            "gpu_hashes": 19162,
+            "cpu_hashes_per_second": 303.8068961611049,
+            "gpu_hashes_per_second": 1264.454331937248,
+            "devices_before_stop": [
+              {
+                "id": "cuda:0",
+                "contexts": 286,
+                "execution_contexts": 286,
+                "buffer_bytes": 4798352416,
+                "batches_completed": 67,
+                "batches_cancelled": 7
+              }
+            ],
+            "peak_sampled_rss_bytes": 510181376,
+            "first_completed_hash_ms": 594.426726,
+            "cpu_seconds": 84.254315,
+            "stop_request_ms": 0.097889,
+            "stop_join_ms": 145.093536,
+            "jobs": 8,
+            "active_after_stop": 0,
+            "rss_before_bytes": 4456448,
+            "rss_after_stop_bytes": 107646976
+          }
+        ]
+      }
+    },
+    {
+      "label": "cpu-original-hash-o3",
+      "repetition": 2,
+      "command": [
+        "/home/gwestcot/projects/mercatura-miner/work/m2/mining-bench-original-hash-o3",
+        "6",
+        "15",
+        "1",
+        "2",
+        "cpu",
+        "286",
+        "cuda:0"
+      ],
+      "wall_seconds": 15.649209833994973,
+      "data": {
+        "mode": "cpu",
+        "workload": "real controller hashing with synthetic public work; 2-second jobs; no node or wallet",
+        "workers": 6,
+        "pow_version": 2,
+        "production_recommended": 6,
+        "production_maximum": 12,
+        "responsiveness_reserve_overridden": false,
+        "scratchpad_bytes": 100663296,
+        "peak_rss_bytes": 105119744,
+        "samples": [
+          {
+            "seconds": 15.036505856,
+            "hashes": 3651,
+            "hashes_per_second": 242.8090698041491,
+            "cpu_hashes": 3651,
+            "gpu_hashes": 0,
+            "cpu_hashes_per_second": 242.8090698041491,
+            "gpu_hashes_per_second": 0,
+            "devices_before_stop": [],
+            "peak_sampled_rss_bytes": 104988672,
+            "first_completed_hash_ms": 42.734052,
+            "cpu_seconds": 82.013406,
+            "stop_request_ms": 0.091143,
+            "stop_join_ms": 26.626355,
+            "jobs": 8,
+            "active_after_stop": 0,
+            "rss_before_bytes": 4325376,
+            "rss_after_stop_bytes": 4587520
+          }
+        ]
+      }
+    },
+    {
+      "label": "cpu-integrated-o3",
+      "repetition": 2,
+      "command": [
+        "/home/gwestcot/projects/mercatura-miner/build-m2/bin/mining-bench",
+        "6",
+        "15",
+        "1",
+        "2",
+        "cpu",
+        "286",
+        "cuda:0"
+      ],
+      "wall_seconds": 15.763553232944105,
+      "data": {
+        "mode": "cpu",
+        "workload": "real controller hashing with synthetic public work; 2-second jobs; no node or wallet",
+        "workers": 6,
+        "pow_version": 2,
+        "production_recommended": 6,
+        "production_maximum": 12,
+        "responsiveness_reserve_overridden": false,
+        "scratchpad_bytes": 402653184,
+        "peak_rss_bytes": 407240704,
+        "samples": [
+          {
+            "seconds": 15.116958197,
+            "hashes": 4908,
+            "hashes_per_second": 324.6684905812603,
+            "cpu_hashes": 4908,
+            "gpu_hashes": 0,
+            "cpu_hashes_per_second": 324.6684905812603,
+            "gpu_hashes_per_second": 0,
+            "devices_before_stop": [],
+            "peak_sampled_rss_bytes": 407109632,
+            "first_completed_hash_ms": 147.055663,
+            "cpu_seconds": 82.350525,
+            "stop_request_ms": 0.120834,
+            "stop_join_ms": 113.882529,
+            "jobs": 8,
+            "active_after_stop": 0,
+            "rss_before_bytes": 4325376,
+            "rss_after_stop_bytes": 4833280
+          }
+        ]
+      }
+    },
+    {
+      "label": "combined-integrated-o3",
+      "repetition": 2,
+      "command": [
+        "/home/gwestcot/projects/mercatura-miner/build-m2/bin/mining-bench",
+        "6",
+        "15",
+        "1",
+        "2",
+        "combined",
+        "286",
+        "cuda:0"
+      ],
+      "wall_seconds": 15.836888217017986,
+      "data": {
+        "mode": "combined",
+        "workload": "real controller hashing with synthetic public work; 2-second jobs; no node or wallet",
+        "workers": 6,
+        "pow_version": 2,
+        "production_recommended": 6,
+        "production_maximum": 12,
+        "responsiveness_reserve_overridden": false,
+        "scratchpad_bytes": 402653184,
+        "peak_rss_bytes": 510451712,
+        "samples": [
+          {
+            "seconds": 15.191827211,
+            "hashes": 23410,
+            "hashes_per_second": 1540.960127761948,
+            "cpu_hashes": 4248,
+            "gpu_hashes": 19162,
+            "cpu_hashes_per_second": 279.6240334358289,
+            "gpu_hashes_per_second": 1261.336094326119,
+            "devices_before_stop": [
+              {
+                "id": "cuda:0",
+                "contexts": 286,
+                "execution_contexts": 286,
+                "buffer_bytes": 4798352416,
+                "batches_completed": 67,
+                "batches_cancelled": 7
+              }
+            ],
+            "peak_sampled_rss_bytes": 510451712,
+            "first_completed_hash_ms": 492.697606,
+            "cpu_seconds": 85.061066,
+            "stop_request_ms": 0.141862,
+            "stop_join_ms": 186.864476,
+            "jobs": 8,
+            "active_after_stop": 0,
+            "rss_before_bytes": 4456448,
+            "rss_after_stop_bytes": 107757568
+          }
+        ]
+      }
+    },
+    {
+      "label": "cpu-original-hash-o3",
+      "repetition": 3,
+      "command": [
+        "/home/gwestcot/projects/mercatura-miner/work/m2/mining-bench-original-hash-o3",
+        "6",
+        "15",
+        "1",
+        "2",
+        "cpu",
+        "286",
+        "cuda:0"
+      ],
+      "wall_seconds": 15.637638859974686,
+      "data": {
+        "mode": "cpu",
+        "workload": "real controller hashing with synthetic public work; 2-second jobs; no node or wallet",
+        "workers": 6,
+        "pow_version": 2,
+        "production_recommended": 6,
+        "production_maximum": 12,
+        "responsiveness_reserve_overridden": false,
+        "scratchpad_bytes": 100663296,
+        "peak_rss_bytes": 104988672,
+        "samples": [
+          {
+            "seconds": 15.033567894,
+            "hashes": 3587,
+            "hashes_per_second": 238.5993814170751,
+            "cpu_hashes": 3587,
+            "gpu_hashes": 0,
+            "cpu_hashes_per_second": 238.5993814170751,
+            "gpu_hashes_per_second": 0,
+            "devices_before_stop": [],
+            "peak_sampled_rss_bytes": 104857600,
+            "first_completed_hash_ms": 53.027982,
+            "cpu_seconds": 81.635745,
+            "stop_request_ms": 0.103642,
+            "stop_join_ms": 32.044966,
+            "jobs": 8,
+            "active_after_stop": 0,
+            "rss_before_bytes": 4194304,
+            "rss_after_stop_bytes": 4587520
+          }
+        ]
+      }
+    },
+    {
+      "label": "cpu-integrated-o3",
+      "repetition": 3,
+      "command": [
+        "/home/gwestcot/projects/mercatura-miner/build-m2/bin/mining-bench",
+        "6",
+        "15",
+        "1",
+        "2",
+        "cpu",
+        "286",
+        "cuda:0"
+      ],
+      "wall_seconds": 15.650443021033425,
+      "data": {
+        "mode": "cpu",
+        "workload": "real controller hashing with synthetic public work; 2-second jobs; no node or wallet",
+        "workers": 6,
+        "pow_version": 2,
+        "production_recommended": 6,
+        "production_maximum": 12,
+        "responsiveness_reserve_overridden": false,
+        "scratchpad_bytes": 402653184,
+        "peak_rss_bytes": 407502848,
+        "samples": [
+          {
+            "seconds": 15.119544044,
+            "hashes": 4832,
+            "hashes_per_second": 319.5863569654085,
+            "cpu_hashes": 4832,
+            "gpu_hashes": 0,
+            "cpu_hashes_per_second": 319.5863569654085,
+            "gpu_hashes_per_second": 0,
+            "devices_before_stop": [],
+            "peak_sampled_rss_bytes": 407371776,
+            "first_completed_hash_ms": 148.302821,
+            "cpu_seconds": 82.319329,
+            "stop_request_ms": 0.073212,
+            "stop_join_ms": 118.880072,
+            "jobs": 8,
+            "active_after_stop": 0,
+            "rss_before_bytes": 4456448,
+            "rss_after_stop_bytes": 4947968
+          }
+        ]
+      }
+    },
+    {
+      "label": "combined-integrated-o3",
+      "repetition": 3,
+      "command": [
+        "/home/gwestcot/projects/mercatura-miner/build-m2/bin/mining-bench",
+        "6",
+        "15",
+        "1",
+        "2",
+        "combined",
+        "286",
+        "cuda:0"
+      ],
+      "wall_seconds": 15.412884560006205,
+      "data": {
+        "mode": "combined",
+        "workload": "real controller hashing with synthetic public work; 2-second jobs; no node or wallet",
+        "workers": 6,
+        "pow_version": 2,
+        "production_recommended": 6,
+        "production_maximum": 12,
+        "responsiveness_reserve_overridden": false,
+        "scratchpad_bytes": 402653184,
+        "peak_rss_bytes": 510349312,
+        "samples": [
+          {
+            "seconds": 15.12929174,
+            "hashes": 23782,
+            "hashes_per_second": 1571.917602535438,
+            "cpu_hashes": 4620,
+            "gpu_hashes": 19162,
+            "cpu_hashes_per_second": 305.3678968847751,
+            "gpu_hashes_per_second": 1266.549705650663,
+            "devices_before_stop": [
+              {
+                "id": "cuda:0",
+                "contexts": 286,
+                "execution_contexts": 286,
+                "buffer_bytes": 4798352416,
+                "batches_completed": 67,
+                "batches_cancelled": 7
+              }
+            ],
+            "peak_sampled_rss_bytes": 510349312,
+            "first_completed_hash_ms": 471.435917,
+            "cpu_seconds": 84.606348,
+            "stop_request_ms": 0.094494,
+            "stop_join_ms": 121.094716,
+            "jobs": 8,
+            "active_after_stop": 0,
+            "rss_before_bytes": 4325376,
+            "rss_after_stop_bytes": 107749376
+          }
+        ]
+      }
+    }
+  ]
+}

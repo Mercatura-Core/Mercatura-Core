@@ -1,0 +1,4 @@
+Test project /home/gwestcot/projects/mercatura-miner/build-m2
+1/1 Test #187: mining_tests_v2 ..................   Passed   13.92 sec
+100% tests passed, 0 tests failed out of 1
+Total Test time (real) =  13.93 sec

@@ -1,0 +1,8 @@
+Test project /home/gwestcot/projects/mercatura-miner/build-m2
+1/5 Test  #8: test_mining-qt ...................   Passed  120.26 sec
+2/5 Test #62: mercahash_gpu_tests ..............   Passed    3.98 sec
+3/5 Test #63: mercahash_opencl_tests ...........   Passed   33.88 sec
+4/5 Test #64: mercahash_gpu_sync_tests .........   Passed    0.14 sec
+5/5 Test #65: cuda_binding_tests ...............   Passed    5.20 sec
+100% tests passed, 0 tests failed out of 5
+Total Test time (real) = 163.47 sec

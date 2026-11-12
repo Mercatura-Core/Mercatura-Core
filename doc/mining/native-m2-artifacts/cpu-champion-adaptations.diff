@@ -1,0 +1,70 @@
+--- /home/gwestcot/projects/mercatura-v2-codex-cpu-research/research/cpu-campaign-phase2-20261111/champions/003-full-gcc/mercahash_v2.cpp	2026-11-11 02:09:30.988856549 -0800
++++ src/mining/mercahash_cpu_batch.cpp	2026-11-12 00:40:27.041742828 -0800
+@@ -893,12 +892,0 @@
+-void HashV2(std::span<const unsigned char> header, std::span<unsigned char> scratchpad,
+-            std::span<unsigned char> output)
+-{
+-    if (header.size() != HEADER_SIZE || scratchpad.size() != V2_SCRATCHPAD_BYTES || output.size() != OUTPUT_SIZE)
+-        throw std::invalid_argument{"MercaHash V2 requires exactly 80 header bytes, 16 MiB scratchpad and 32 output bytes"};
+-    State state = InitialState(header);
+-    FillScratchpad(state, scratchpad, ScratchpadFillMode::ALTERNATING_HALF_ROUND);
+-    BindScratchpad(state, scratchpad, 1);
+-    MixScratchpad(state, scratchpad, V2_MIX_STEPS);
+-    FinalSample(state, scratchpad);
+-    FinalizeHash(state, header, output);
+-}
+@@ -907 +895 @@
+-#include "batch_api.h"
++#include <mining/mercahash_cpu_batch.h>
+@@ -909,0 +898,8 @@
++// Preserve vector constant bits on C++20 toolchains without std::bit_cast.
++// memcpy avoids relying on unsigned-to-signed conversion behavior.
++static int64_t SignedBits(uint64_t value)
++{
++    int64_t result;
++    std::memcpy(&result, &value, sizeof(result));
++    return result;
++}
+@@ -911 +907 @@
+- if(jobs.size()>capacity)throw std::invalid_argument("batch exceeds capacity");
++ if(jobs.empty() || jobs.size()>capacity)throw std::invalid_argument("batch exceeds capacity");
+@@ -925,5 +921,5 @@
+-for(size_t j=0;j<16;j++)s[j]=_mm256_setr_epi64x(std::bit_cast<int64_t>(states[0][j]),std::bit_cast<int64_t>(states[1][j]),std::bit_cast<int64_t>(states[2][j]),std::bit_cast<int64_t>(states[3][j]));
+-s[0]=_mm256_xor_si256(s[0],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(CONSTANTS[0]))));
+-s[5]=_mm256_xor_si256(s[5],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(CONSTANTS[1]))));
+-s[10]=_mm256_xor_si256(s[10],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(CONSTANTS[2]))));
+-s[15]=_mm256_xor_si256(s[15],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(CONSTANTS[3]))));
++for(size_t j=0;j<16;j++)s[j]=_mm256_setr_epi64x(SignedBits(states[0][j]),SignedBits(states[1][j]),SignedBits(states[2][j]),SignedBits(states[3][j]));
++s[0]=_mm256_xor_si256(s[0],_mm256_set1_epi64x(SignedBits(uint64_t(CONSTANTS[0]))));
++s[5]=_mm256_xor_si256(s[5],_mm256_set1_epi64x(SignedBits(uint64_t(CONSTANTS[1]))));
++s[10]=_mm256_xor_si256(s[10],_mm256_set1_epi64x(SignedBits(uint64_t(CONSTANTS[2]))));
++s[15]=_mm256_xor_si256(s[15],_mm256_set1_epi64x(SignedBits(uint64_t(CONSTANTS[3]))));
+@@ -932 +928 @@
+- s[0]=_mm256_add_epi64(s[0],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(i))));s[7]=_mm256_xor_si256(s[7],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(std::rotl(i,17)))));s[8]=_mm256_add_epi64(s[8],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(i^CONSTANTS[0]))));s[15]=_mm256_xor_si256(s[15],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(std::rotl(i,41)))));
++ s[0]=_mm256_add_epi64(s[0],_mm256_set1_epi64x(SignedBits(uint64_t(i))));s[7]=_mm256_xor_si256(s[7],_mm256_set1_epi64x(SignedBits(uint64_t(std::rotl(i,17)))));s[8]=_mm256_add_epi64(s[8],_mm256_set1_epi64x(SignedBits(uint64_t(i^CONSTANTS[0]))));s[15]=_mm256_xor_si256(s[15],_mm256_set1_epi64x(SignedBits(uint64_t(std::rotl(i,41)))));
+@@ -973,5 +969,5 @@
+-for(size_t j=0;j<16;j++)s[j]=_mm256_setr_epi64x(std::bit_cast<int64_t>(states[0][j]),std::bit_cast<int64_t>(states[1][j]),std::bit_cast<int64_t>(states[2][j]),std::bit_cast<int64_t>(states[3][j]));
+-s[0]=_mm256_xor_si256(s[0],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(CONSTANTS[0]))));
+-s[5]=_mm256_xor_si256(s[5],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(CONSTANTS[1]))));
+-s[10]=_mm256_xor_si256(s[10],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(CONSTANTS[2]))));
+-s[15]=_mm256_xor_si256(s[15],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(CONSTANTS[3]))));
++for(size_t j=0;j<16;j++)s[j]=_mm256_setr_epi64x(SignedBits(states[0][j]),SignedBits(states[1][j]),SignedBits(states[2][j]),SignedBits(states[3][j]));
++s[0]=_mm256_xor_si256(s[0],_mm256_set1_epi64x(SignedBits(uint64_t(CONSTANTS[0]))));
++s[5]=_mm256_xor_si256(s[5],_mm256_set1_epi64x(SignedBits(uint64_t(CONSTANTS[1]))));
++s[10]=_mm256_xor_si256(s[10],_mm256_set1_epi64x(SignedBits(uint64_t(CONSTANTS[2]))));
++s[15]=_mm256_xor_si256(s[15],_mm256_set1_epi64x(SignedBits(uint64_t(CONSTANTS[3]))));
+@@ -980 +976 @@
+- s[0]=_mm256_add_epi64(s[0],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(i))));s[7]=_mm256_xor_si256(s[7],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(std::rotl(i,17)))));s[8]=_mm256_add_epi64(s[8],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(i^CONSTANTS[0]))));s[15]=_mm256_xor_si256(s[15],_mm256_set1_epi64x(std::bit_cast<int64_t>(uint64_t(std::rotl(i,41)))));
++ s[0]=_mm256_add_epi64(s[0],_mm256_set1_epi64x(SignedBits(uint64_t(i))));s[7]=_mm256_xor_si256(s[7],_mm256_set1_epi64x(SignedBits(uint64_t(std::rotl(i,17)))));s[8]=_mm256_add_epi64(s[8],_mm256_set1_epi64x(SignedBits(uint64_t(i^CONSTANTS[0]))));s[15]=_mm256_xor_si256(s[15],_mm256_set1_epi64x(SignedBits(uint64_t(std::rotl(i,41)))));
+@@ -1077 +1073,7 @@
+-const char* ExecutionPath() {return "b4-streamed-huge";}
++const char* ExecutionPath() {
++#if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(CPU2_FORCE_SCALAR) && !defined(MERCAHASH_FORCE_SCALAR)
++ return __builtin_cpu_supports("avx2") ? "b4-streamed-huge AVX2" : "b4-streamed-huge scalar";
++#else
++ return "b4-streamed-huge scalar";
++#endif
++}
+@@ -1082 +1084 @@
+- #if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(CPU2_FORCE_SCALAR)
++ #if defined(__x86_64__) && (defined(__GNUC__) || defined(__clang__)) && !defined(CPU2_FORCE_SCALAR) && !defined(MERCAHASH_FORCE_SCALAR)

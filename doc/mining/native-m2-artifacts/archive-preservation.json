@@ -1,0 +1,21 @@
+{
+  "cpu": {
+    "files_checked": 23,
+    "mismatches": [],
+    "git_status_unchanged": true
+  },
+  "gpu": {
+    "files_checked": 79,
+    "mismatches": [],
+    "git_status_unchanged": true
+  },
+  "source_identities_unchanged": {
+    "/home/gwestcot/projects/mercatura-v2-codex-cpu-research/research/cpu-campaign-phase2-20261111/champions/003-full-gcc/mercahash_v2.cpp": "95cfdcd09e437fa8b1fab4e0db55c5bf226790e8919d13ad40b4ab2a06e50b73",
+    "/home/gwestcot/projects/mercatura-v2-codex-cpu-research/research/cpu-campaign-phase2-20261111/champions/003-full-gcc/batch_api.h": "c96e9b42e9adf164777f74899229eed9e2ed6af199bfc7a28bce95f7e6394b7c",
+    "/home/gwestcot/projects/mercatura-v2-codex-cpu-research/research/cpu-campaign-phase2-20261111/champions/003-full-gcc/cpu_miner_batch.cpp": "110c320fe8804444b344123c65aef877d838d2a1c4a98375132c93fecbef5918",
+    "/home/gwestcot/projects/mercatura-v2-codex-gpu-research/research/campaign-20261110/champions/005-full-resident-mining/cuda_backend.cu": "2a8ec9095e6f2d43b1c5186a85cda81321a13ad0c74fd54a12e43f268e8040fa",
+    "/home/gwestcot/projects/mercatura-v2-codex-gpu-research/research/campaign-20261110/champions/005-full-resident-mining/mercahash_gpu_specialized.h": "7f72780d72f8d3a9ee7a8ef9dc8bcb2a59ead4bc7af1b8cef833fe74c8ef682c",
+    "src/crypto/mercahash_v2.cpp": "269dbd7678b4b9869c8cc5b18c88479d6cdd2a0ac844e6145fe561517b9bc1bb",
+    "src/kernel/chainparams.cpp": "b6c9a9ad7cf3e7d067d7dafaa77e69334a1347c24b6f32e1c78e277d3b3d2afd"
+  }
+}

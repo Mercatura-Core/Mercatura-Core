@@ -1,0 +1,15 @@
+Test project /home/gwestcot/projects/mercatura-miner/build-m2
+ 1/10 Test  #55: witness_resource_tests ...........   Passed    0.55 sec
+ 2/10 Test  #57: witness_resource_tests_net .......   Passed    1.59 sec
+ 3/10 Test  #97: pq_p2p_tests .....................   Passed    0.34 sec
+ 4/10 Test #100: pq_transport_tests ...............   Passed   17.36 sec
+ 5/10 Test #101: pq_policy_tests ..................   Passed    0.31 sec
+ 6/10 Test #185: mining_tests_wallet ..............   Passed    4.47 sec
+ 7/10 Test  #56: witness_resource_tests_chain .....   Passed  142.65 sec
+ 8/10 Test #187: mining_tests_v2 ..................   Passed    1.61 sec
+ 9/10 Test #186: mining_tests_solo ................   Passed  129.83 sec
+10/10 Test #194: wallet_tests .....................***Timeout 300.10 sec
+90% tests passed, 1 tests failed out of 10
+Total Test time (real) = 444.43 sec
+The following tests FAILED:
+	194 - wallet_tests (Timeout)

@@ -1,0 +1,11 @@
+{
+  "build-m2/bin/test_bitcoin": "dd430ac18d12fdbf40988a4b2d94d2193a1ced30a50f611422fd3ba231b07860",
+  "build-m2/bin/test_mining_app-qt": "9c5a5650d2fbb10d988c022bc6f4b823d7373380aa30e718d7525dc6c0225f23",
+  "build-m2/bin/test_mining-qt": "2528bf847f842c2e128450c80329ccd5983df95da79ed50f75f9a3175e05a12f",
+  "build-m2/bin/mercaturad": "964549ce269cb66e904329379b5051a381b31ba6d763432625d69a54372860f8",
+  "build-m2/bin/mercatura-cli": "2e41ea99cfec96276e55fcef87ae22b27c1ffaa562df4a1216d7e71bf2ace1bd",
+  "build-m2/bin/mercatura-gpu-check": "2a4b126dfa5b9e72fbb08ea59ae2962b2fd4339124aa5290cabb8c7546a49c7b",
+  "build-m2/bin/mining-bench": "f627f13e33e56f89e24ca7c8f16d9c4c9b5d1a02f25f43dbc1f2b39f9762f3e4",
+  "build-m2/bin/test_cuda_backend_host": "568d13d905921157d6e001cada3f942ef1f39f702c219faea298f46ab3a537d8",
+  "build-m2-scalar/bin/test_opencl_backend_host": "12f198af157a05a4f0bc39722e7b4133e2b6640e6f04ad5d381b4a5459d8aeb3"
+}

@@ -1,0 +1,4 @@
+Test project /home/gwestcot/projects/mercatura-miner/build-m2
+1/1 Test #194: wallet_tests .....................   Passed  859.39 sec
+100% tests passed, 0 tests failed out of 1
+Total Test time (real) = 859.46 sec

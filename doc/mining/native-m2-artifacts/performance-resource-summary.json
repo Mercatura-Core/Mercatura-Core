@@ -1,0 +1,172 @@
+{
+  "combined-integrated": {
+    "hashes_per_second": {
+      "minimum": 1485.841260674697,
+      "maximum": 1544.105467077393,
+      "median": 1497.393977951788
+    },
+    "first_completed_hash_ms": {
+      "minimum": 523.627317,
+      "maximum": 673.622715,
+      "median": 609.215877
+    },
+    "stop_join_ms": {
+      "minimum": 107.675199,
+      "maximum": 136.50221,
+      "median": 109.398017
+    },
+    "peak_sampled_rss_bytes": {
+      "minimum": 509714432,
+      "maximum": 510504960,
+      "median": 510300160
+    },
+    "scratchpad_bytes": 402653184,
+    "gpu_board_power_w_range": [
+      41.44,
+      67.79
+    ],
+    "gpu_temperature_c_range": [
+      54.0,
+      61.0
+    ],
+    "gpu_power_limit_w_values": [
+      70.0
+    ]
+  },
+  "cpu-integrated": {
+    "hashes_per_second": {
+      "minimum": 273.661730399183,
+      "maximum": 295.5945975920915,
+      "median": 295.4571832205674
+    },
+    "first_completed_hash_ms": {
+      "minimum": 158.071055,
+      "maximum": 179.876059,
+      "median": 179.704128
+    },
+    "stop_join_ms": {
+      "minimum": 107.828828,
+      "maximum": 114.236153,
+      "median": 112.752918
+    },
+    "peak_sampled_rss_bytes": {
+      "minimum": 407109632,
+      "maximum": 407240704,
+      "median": 407109632
+    },
+    "scratchpad_bytes": 402653184,
+    "gpu_board_power_w_range": [
+      5.26,
+      5.82
+    ],
+    "gpu_temperature_c_range": [
+      45.0,
+      51.0
+    ],
+    "gpu_power_limit_w_values": [
+      70.0
+    ]
+  },
+  "cpu-original": {
+    "hashes_per_second": {
+      "minimum": 188.0132607029243,
+      "maximum": 200.293715305826,
+      "median": 194.0450182080996
+    },
+    "first_completed_hash_ms": {
+      "minimum": 52.592883,
+      "maximum": 53.303419,
+      "median": 52.801222
+    },
+    "stop_join_ms": {
+      "minimum": 32.875354,
+      "maximum": 37.271867,
+      "median": 34.154557
+    },
+    "peak_sampled_rss_bytes": {
+      "minimum": 104988672,
+      "maximum": 105119744,
+      "median": 104988672
+    },
+    "scratchpad_bytes": 100663296,
+    "gpu_board_power_w_range": [
+      5.24,
+      53.02
+    ],
+    "gpu_temperature_c_range": [
+      45.0,
+      57.0
+    ],
+    "gpu_power_limit_w_values": [
+      70.0
+    ]
+  },
+  "gpu-integrated": {
+    "hashes_per_second": {
+      "minimum": 1252.638099985502,
+      "maximum": 1290.622812759576,
+      "median": 1290.579345071533
+    },
+    "first_completed_hash_ms": {
+      "minimum": 1368.851233,
+      "maximum": 1387.397456,
+      "median": 1381.609124
+    },
+    "stop_join_ms": {
+      "minimum": 59.53032,
+      "maximum": 64.912697,
+      "median": 63.019252
+    },
+    "peak_sampled_rss_bytes": {
+      "minimum": 107470848,
+      "maximum": 107724800,
+      "median": 107618304
+    },
+    "scratchpad_bytes": 0,
+    "gpu_board_power_w_range": [
+      39.46,
+      68.41
+    ],
+    "gpu_temperature_c_range": [
+      52.0,
+      60.0
+    ],
+    "gpu_power_limit_w_values": [
+      70.0
+    ]
+  },
+  "gpu-original": {
+    "hashes_per_second": {
+      "minimum": 455.2779659439341,
+      "maximum": 455.6346064560138,
+      "median": 455.4599193032199
+    },
+    "first_completed_hash_ms": {
+      "minimum": 2910.082519,
+      "maximum": 2968.088239,
+      "median": 2939.339145
+    },
+    "stop_join_ms": {
+      "minimum": 60.439509,
+      "maximum": 68.56629,
+      "median": 63.672863
+    },
+    "peak_sampled_rss_bytes": {
+      "minimum": 107073536,
+      "maximum": 107307008,
+      "median": 107159552
+    },
+    "scratchpad_bytes": 0,
+    "gpu_board_power_w_range": [
+      5.33,
+      68.75
+    ],
+    "gpu_temperature_c_range": [
+      45.0,
+      60.0
+    ],
+    "gpu_power_limit_w_values": [
+      70.0
+    ]
+  }
+}

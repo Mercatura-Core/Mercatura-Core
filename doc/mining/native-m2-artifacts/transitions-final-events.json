@@ -1,0 +1,133 @@
+[
+  {
+    "accepted": "1",
+    "cpu_hashes": "21020",
+    "event": "mode_qualified",
+    "gpu_hashes": "0",
+    "mode": "cpu",
+    "mode_index": 0
+  },
+  {
+    "active_workers": 0,
+    "complete_ms": 98,
+    "dispatch_ms": 2,
+    "event": "stop",
+    "handler_ms": 0,
+    "mode": "cpu",
+    "mode_index": 0,
+    "pending_notifications": 0
+  },
+  {
+    "accepted": "1",
+    "cpu_hashes": "476",
+    "event": "mode_qualified",
+    "gpu_hashes": "858",
+    "mode": "combined",
+    "mode_index": 1
+  },
+  {
+    "active_workers": 0,
+    "complete_ms": 143,
+    "dispatch_ms": 6,
+    "event": "stop",
+    "handler_ms": 0,
+    "mode": "combined",
+    "mode_index": 1,
+    "pending_notifications": 0
+  },
+  {
+    "accepted": "1",
+    "cpu_hashes": "3988",
+    "event": "mode_qualified",
+    "gpu_hashes": "0",
+    "mode": "cpu",
+    "mode_index": 2
+  },
+  {
+    "active_workers": 0,
+    "complete_ms": 84,
+    "dispatch_ms": 16,
+    "event": "stop",
+    "handler_ms": 2,
+    "mode": "cpu",
+    "mode_index": 2,
+    "pending_notifications": 0
+  },
+  {
+    "accepted": "1",
+    "cpu_hashes": "0",
+    "event": "mode_qualified",
+    "gpu_hashes": "858",
+    "mode": "gpu",
+    "mode_index": 3
+  },
+  {
+    "active_workers": 0,
+    "complete_ms": 100,
+    "dispatch_ms": 0,
+    "event": "stop",
+    "handler_ms": 0,
+    "mode": "gpu",
+    "mode_index": 3,
+    "pending_notifications": 0
+  },
+  {
+    "accepted": "1",
+    "cpu_hashes": "424",
+    "event": "mode_qualified",
+    "gpu_hashes": "1144",
+    "mode": "combined",
+    "mode_index": 4
+  },
+  {
+    "active_workers": 0,
+    "complete_ms": 99,
+    "dispatch_ms": 2,
+    "event": "stop",
+    "handler_ms": 3,
+    "mode": "combined",
+    "mode_index": 4,
+    "pending_notifications": 0
+  },
+  {
+    "accepted": "1",
+    "cpu_hashes": "0",
+    "event": "mode_qualified",
+    "gpu_hashes": "6864",
+    "mode": "gpu",
+    "mode_index": 5
+  },
+  {
+    "active_workers": 0,
+    "complete_ms": 99,
+    "dispatch_ms": 1,
+    "event": "stop",
+    "handler_ms": 1,
+    "mode": "gpu",
+    "mode_index": 5,
+    "pending_notifications": 0
+  },
+  {
+    "accepted": "1",
+    "activation": 0,
+    "close_backlog": 0,
+    "close_complete_ms": 202,
+    "close_handler_ms": 63,
+    "cpu_hashes": "0",
+    "event": "result",
+    "gpu_hashes": "6864",
+    "harder": true,
+    "heartbeat_gap_ms": 455,
+    "mode": "gpu",
+    "rapid_wallet": false,
+    "result": 0,
+    "session_destroyed": true,
+    "stop_backlog": 0,
+    "stop_complete_ms": 99,
+    "stop_dispatch_ms": 1,
+    "stop_handler_ms": 1,
+    "wallet_reopened": false,
+    "wallet_verified": false,
+    "workers": 6
+  }
+]

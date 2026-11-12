@@ -1,0 +1,8 @@
+Internal ctest changing into directory: /home/gwestcot/projects/mercatura-miner/build-m2-scalar
+Test project /home/gwestcot/projects/mercatura-miner/build-m2-scalar
+    Start 6: test_opencl_backend_host
+1/1 Test #6: test_opencl_backend_host .........   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 1
+
+Total Test time (real) =   0.01 sec

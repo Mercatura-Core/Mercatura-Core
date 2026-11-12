@@ -1,0 +1,4 @@
+AMD OpenCL backend was not compiled
+cuda:0 NVIDIA GeForce RTX 3050 CUDA 8.6 supported
+Permanent MercaHash V1 vectors passed on cuda:0 (2 safe contexts)
+11 independent CPU/GPU comparisons passed across full/partial batches and 1 repetitions

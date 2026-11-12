@@ -1,0 +1,188 @@
+[
+  {
+    "label": "frozen-current-host",
+    "command": [
+      "/home/gwestcot/projects/mercatura-v2-codex-cpu-research/research/cpu-campaign-phase2-20261111/variants/b4-streamed-huge/controller",
+      "6",
+      "20",
+      "1",
+      "2",
+      "4",
+      "0",
+      "2"
+    ],
+    "sha256": "03006f7939d644941ea521ecbf46f94dd87c61d5eed42afa429643a35c419ba8",
+    "wall_seconds": 20.153625241015106,
+    "peak_anon_huge_kib": 393216,
+    "data": {
+      "mode": "real CPU controller hashing with synthetic public work; no node or wallet",
+      "workers": 6,
+      "contexts_per_worker": 4,
+      "memory_policy": 2,
+      "madvise_errno": 0,
+      "execution_mode": 0,
+      "execution_path": "b4-streamed-huge",
+      "pow_version": 2,
+      "production_recommended": 6,
+      "production_maximum": 12,
+      "responsiveness_reserve_overridden": false,
+      "scratchpad_bytes": 402653184,
+      "peak_rss_bytes": 407093248,
+      "samples": [
+        {
+          "seconds": 20.046199243,
+          "hashes": 6332,
+          "hashes_per_second": 315.8703514438575,
+          "cpu_seconds": 107.963319,
+          "stop_request_ms": 0.146536,
+          "stop_join_ms": 33.906521,
+          "first_completed_hash_observed_ms": 157.204345,
+          "jobs": 10,
+          "anon_huge_kib": 393216,
+          "os_threads_at_hashing": 9,
+          "active_after_stop": 0,
+          "rss_before_bytes": 3932160,
+          "rss_after_stop_bytes": 4440064
+        }
+      ]
+    }
+  },
+  {
+    "label": "native-o3-1",
+    "command": [
+      "build-m2/bin/mining-bench",
+      "6",
+      "20",
+      "1",
+      "2",
+      "cpu"
+    ],
+    "sha256": "f627f13e33e56f89e24ca7c8f16d9c4c9b5d1a02f25f43dbc1f2b39f9762f3e4",
+    "wall_seconds": 20.117012048955075,
+    "peak_anon_huge_kib": 393216,
+    "data": {
+      "mode": "cpu",
+      "workload": "real controller hashing with synthetic public work; 2-second jobs; no node or wallet",
+      "workers": 6,
+      "pow_version": 2,
+      "production_recommended": 6,
+      "production_maximum": 12,
+      "responsiveness_reserve_overridden": false,
+      "scratchpad_bytes": 402653184,
+      "peak_rss_bytes": 407797760,
+      "samples": [
+        {
+          "seconds": 20.051030617,
+          "hashes": 6524,
+          "hashes_per_second": 325.3698088949459,
+          "cpu_hashes": 6524,
+          "gpu_hashes": 0,
+          "cpu_hashes_per_second": 325.3698088949459,
+          "gpu_hashes_per_second": 0,
+          "devices_before_stop": [],
+          "peak_sampled_rss_bytes": 407666688,
+          "first_completed_hash_ms": 118.986101,
+          "cpu_seconds": 109.609843,
+          "stop_request_ms": 0.152784,
+          "stop_join_ms": 46.484611,
+          "jobs": 10,
+          "active_after_stop": 0,
+          "rss_before_bytes": 4456448,
+          "rss_after_stop_bytes": 5087232
+        }
+      ]
+    }
+  },
+  {
+    "label": "native-o3-2",
+    "command": [
+      "build-m2/bin/mining-bench",
+      "6",
+      "20",
+      "1",
+      "2",
+      "cpu"
+    ],
+    "sha256": "f627f13e33e56f89e24ca7c8f16d9c4c9b5d1a02f25f43dbc1f2b39f9762f3e4",
+    "wall_seconds": 20.137767300999258,
+    "peak_anon_huge_kib": 393216,
+    "data": {
+      "mode": "cpu",
+      "workload": "real controller hashing with synthetic public work; 2-second jobs; no node or wallet",
+      "workers": 6,
+      "pow_version": 2,
+      "production_recommended": 6,
+      "production_maximum": 12,
+      "responsiveness_reserve_overridden": false,
+      "scratchpad_bytes": 402653184,
+      "peak_rss_bytes": 407662592,
+      "samples": [
+        {
+          "seconds": 20.02917008,
+          "hashes": 6820,
+          "hashes_per_second": 340.5033744663274,
+          "cpu_hashes": 6820,
+          "gpu_hashes": 0,
+          "cpu_hashes_per_second": 340.5033744663274,
+          "gpu_hashes_per_second": 0,
+          "devices_before_stop": [],
+          "peak_sampled_rss_bytes": 407400448,
+          "first_completed_hash_ms": 119.827254,
+          "cpu_seconds": 109.12043,
+          "stop_request_ms": 0.103411,
+          "stop_join_ms": 25.188628,
+          "jobs": 10,
+          "active_after_stop": 0,
+          "rss_before_bytes": 4325376,
+          "rss_after_stop_bytes": 4947968
+        }
+      ]
+    }
+  },
+  {
+    "label": "native-o3-3",
+    "command": [
+      "build-m2/bin/mining-bench",
+      "6",
+      "20",
+      "1",
+      "2",
+      "cpu"
+    ],
+    "sha256": "f627f13e33e56f89e24ca7c8f16d9c4c9b5d1a02f25f43dbc1f2b39f9762f3e4",
+    "wall_seconds": 20.158850615960546,
+    "peak_anon_huge_kib": 393216,
+    "data": {
+      "mode": "cpu",
+      "workload": "real controller hashing with synthetic public work; 2-second jobs; no node or wallet",
+      "workers": 6,
+      "pow_version": 2,
+      "production_recommended": 6,
+      "production_maximum": 12,
+      "responsiveness_reserve_overridden": false,
+      "scratchpad_bytes": 402653184,
+      "peak_rss_bytes": 407654400,
+      "samples": [
+        {
+          "seconds": 20.023610597,
+          "hashes": 6304,
+          "hashes_per_second": 314.8283357520189,
+          "cpu_hashes": 6304,
+          "gpu_hashes": 0,
+          "cpu_hashes_per_second": 314.8283357520189,
+          "gpu_hashes_per_second": 0,
+          "devices_before_stop": [],
+          "peak_sampled_rss_bytes": 407523328,
+          "first_completed_hash_ms": 130.022773,
+          "cpu_seconds": 109.222057,
+          "stop_request_ms": 0.090461,
+          "stop_join_ms": 17.819612,
+          "jobs": 10,
+          "active_after_stop": 0,
+          "rss_before_bytes": 4325376,
+          "rss_after_stop_bytes": 4939776
+        }
+      ]
+    }
+  }
+]

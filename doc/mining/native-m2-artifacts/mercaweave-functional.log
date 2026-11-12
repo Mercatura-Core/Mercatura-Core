@@ -1,0 +1,13 @@
+2026-11-12T09:07:03.079263Z TestFramework (INFO): PRNG seed is: 1738942164896088227
+2026-11-12T09:07:03.132591Z TestFramework (INFO): Initializing test directory /tmp/mercatura-m2-mercaweave
+2026-11-12T09:07:04.910901Z TestFramework (INFO): Raw historical control: v3 before activation is not protected ownership
+2026-11-12T09:08:32.565037Z TestFramework (INFO): A genuine owner signs on the immediate chain; delayed admission remains gated
+2026-11-12T09:08:46.559871Z TestFramework (INFO): Reorg below the activation boundary removes unsafe v3 funding from the mempool
+2026-11-12T09:08:57.214293Z TestFramework (INFO): Ordinary funding, mixed v2/v3 signing, full-byte fees, combine and finalization
+2026-11-12T09:09:03.255568Z TestFramework (INFO): Two independent wallets sign only their groups and combine genuine partial PSBTs
+2026-11-12T09:09:07.398167Z TestFramework (INFO): Account/purpose separation and automatic group-key rotation at 64 addresses
+2026-11-12T09:09:07.591578Z TestFramework (INFO): Activated native mining payout and encrypted cold restart/backup/restore
+2026-11-12T09:09:52.774076Z TestFramework (INFO): Native MercaWeave activation, wallet, PSBT, mining and recovery passed
+2026-11-12T09:09:52.825490Z TestFramework (INFO): Stopping nodes
+2026-11-12T09:09:53.188594Z TestFramework (WARNING): Not cleaning up dir /tmp/mercatura-m2-mercaweave
+2026-11-12T09:09:53.188671Z TestFramework (INFO): Tests successful

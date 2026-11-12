@@ -1,0 +1,3 @@
+801 cancellation checkpoints and restarts passed
+293 V2 cancellation checkpoints and restarts passed (fake runtime)
+CUDA host scheduling, full/partial batches, faults and cleanup passed (fake runtime; no GPU execution)

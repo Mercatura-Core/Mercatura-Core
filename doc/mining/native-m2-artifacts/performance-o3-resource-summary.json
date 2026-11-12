@@ -1,0 +1,104 @@
+{
+  "combined-integrated-o3": {
+    "hashes_per_second": {
+      "minimum": 1540.960127761948,
+      "maximum": 1571.917602535438,
+      "median": 1568.261228098353
+    },
+    "first_completed_hash_ms": {
+      "minimum": 471.435917,
+      "maximum": 594.426726,
+      "median": 492.697606
+    },
+    "stop_join_ms": {
+      "minimum": 121.094716,
+      "maximum": 186.864476,
+      "median": 145.093536
+    },
+    "peak_sampled_rss_bytes": {
+      "minimum": 510181376,
+      "maximum": 510451712,
+      "median": 510349312
+    },
+    "scratchpad_bytes": 402653184,
+    "gpu_board_power_w_range": [
+      5.34,
+      67.52
+    ],
+    "gpu_temperature_c_range": [
+      41.0,
+      54.0
+    ],
+    "gpu_power_limit_w_values": [
+      70.0
+    ]
+  },
+  "cpu-integrated-o3": {
+    "hashes_per_second": {
+      "minimum": 318.0672946839379,
+      "maximum": 324.6684905812603,
+      "median": 319.5863569654085
+    },
+    "first_completed_hash_ms": {
+      "minimum": 147.055663,
+      "maximum": 148.6477,
+      "median": 148.302821
+    },
+    "stop_join_ms": {
+      "minimum": 108.959843,
+      "maximum": 118.880072,
+      "median": 113.882529
+    },
+    "peak_sampled_rss_bytes": {
+      "minimum": 407109632,
+      "maximum": 407371776,
+      "median": 407240704
+    },
+    "scratchpad_bytes": 402653184,
+    "gpu_board_power_w_range": [
+      5.31,
+      5.61
+    ],
+    "gpu_temperature_c_range": [
+      41.0,
+      47.0
+    ],
+    "gpu_power_limit_w_values": [
+      70.0
+    ]
+  },
+  "cpu-original-hash-o3": {
+    "hashes_per_second": {
+      "minimum": 238.5993814170751,
+      "maximum": 243.7480448941885,
+      "median": 242.8090698041491
+    },
+    "first_completed_hash_ms": {
+      "minimum": 42.734052,
+      "maximum": 53.027982,
+      "median": 52.8069
+    },
+    "stop_join_ms": {
+      "minimum": 26.626355,
+      "maximum": 32.657943,
+      "median": 32.044966
+    },
+    "peak_sampled_rss_bytes": {
+      "minimum": 104857600,
+      "maximum": 105119744,
+      "median": 104988672
+    },
+    "scratchpad_bytes": 100663296,
+    "gpu_board_power_w_range": [
+      5.3,
+      52.07
+    ],
+    "gpu_temperature_c_range": [
+      41.0,
+      51.0
+    ],
+    "gpu_power_limit_w_values": [
+      70.0
+    ]
+  }
+}

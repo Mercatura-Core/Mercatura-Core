@@ -1,0 +1,19 @@
+--- /home/gwestcot/projects/mercatura-v2-codex-gpu-research/research/campaign-20261110/champions/005-full-resident-mining/cuda_backend.cu	2026-11-10 19:24:25.224857855 -0800
++++ src/mining/cuda_backend.cu	2026-11-12 00:31:09.433842240 -0800
+@@ -503 +503,3 @@
+-    cudaEvent_t research_events[2]{};
++    // Each event is reused only after its preceding marker completed. Every
++    // return/exception drains the stream before caller or device buffers die.
++    cudaEvent_t completion_events[2]{};
+@@ -538 +540 @@
+-            if(version==mercahash::Version::V2) for(auto& event:research_events) Check(cudaEventCreateWithFlags(&event,cudaEventDisableTiming),"Create V2 completion event");
++            if(version==mercahash::Version::V2) for(auto& event:completion_events) Check(cudaEventCreateWithFlags(&event,cudaEventDisableTiming),"Create V2 completion event");
+@@ -720 +722 @@
+-                Check(cudaEventRecord(research_events[event_tail],stream),"Record sliding V2 completion");
++                Check(cudaEventRecord(completion_events[event_tail],stream),"Record sliding V2 completion");
+@@ -726 +728 @@
+-                        const auto status=cudaEventQuery(research_events[event_index]);
++                        const auto status=cudaEventQuery(completion_events[event_index]);
+@@ -785 +787 @@
+-        for(auto& event:research_events) { if(event) cudaEventDestroy(event); event=nullptr; }
++        for(auto& event:completion_events) { if(event) cudaEventDestroy(event); event=nullptr; }

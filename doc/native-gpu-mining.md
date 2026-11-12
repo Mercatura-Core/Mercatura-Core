@@ -87,6 +87,8 @@ and exceptions drain the stream before buffers can be reused or destroyed.
 Partially created events are also released after draining during initialization
 failure. V1 scheduling and OpenCL are unchanged. This is the resident-pool
 champion, not the separate circular fixed-batch experiment.
+See [M2 integration and local qualification](mining/NATIVE-MINER-M2-INTEGRATION.md)
+for physical CUDA, all-mode, wallet-lifecycle and benchmark evidence.
 
 Modes remain fixed while running. Use Stop, wait for cleanup, select CPU only,
 GPU only or combined, then Start. GPU-only mode reserves host memory for

@@ -1,0 +1,22 @@
+{
+  "command": [
+    "/usr/bin/g++",
+    "-std=c++20",
+    "-O3",
+    "-DNDEBUG",
+    "-pthread",
+    "-I/home/gwestcot/projects/mercatura-miner/src",
+    "/home/gwestcot/projects/mercatura-miner/work/m2/archive-o3-gcc/verify.cpp",
+    "/home/gwestcot/projects/mercatura-miner/src/mining/mercahash_cpu_batch.cpp",
+    "/home/gwestcot/projects/mercatura-miner/src/crypto/mercahash_v2.cpp",
+    "/home/gwestcot/projects/mercatura-miner/src/crypto/sha3.cpp",
+    "-o",
+    "/home/gwestcot/projects/mercatura-miner/work/m2/archive-o3-gcc/verify"
+  ],
+  "archive_sha256": {
+    "scripts/bench-live-reference.cpp": "de7106327b99ae737b13249e8f6f73fdebb11f1e667230f610f97f9dd1ea1016",
+    "baseline/headers1024.bin": "195f4f788fc7642b2097c6932c35f0c7e09a79de4f733f168330b5b586092bd3"
+  },
+  "harness_sha256": "8eca3fb6d3391b6fa14d4db3393520c3f2c7fc632c57e4d23edc5e612823daf8",
+  "compiler": "g++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0\nCopyright (C) 2021 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+}

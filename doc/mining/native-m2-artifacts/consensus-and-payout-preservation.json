@@ -1,0 +1,38 @@
+{
+  "src/crypto/mercahash.cpp": {
+    "sha256": "b4d331120ae8d6d0b8e052b65ed3891b468ad3ca28c368e3fd43b561b0fbe225",
+    "unchanged_from_start": true
+  },
+  "src/crypto/mercahash_v2.cpp": {
+    "sha256": "269dbd7678b4b9869c8cc5b18c88479d6cdd2a0ac844e6145fe561517b9bc1bb",
+    "unchanged_from_start": true
+  },
+  "src/crypto/mercahash.h": {
+    "sha256": "a3e280e12ea4a38b6c7beb20f51a0e24b1fd5e3b8ea880db071f68488775af48",
+    "unchanged_from_start": true
+  },
+  "src/pow.cpp": {
+    "sha256": "1f7a50629943e1e9b5847bf21779fa09c8cfa8d886e729ae487a6c9cb5ba10bc",
+    "unchanged_from_start": true
+  },
+  "src/consensus/params.h": {
+    "sha256": "265a86aed73d9aa32aca88ff75c9f56082f25986d984667a336ef1de6265e8f1",
+    "unchanged_from_start": true
+  },
+  "src/kernel/chainparams.cpp": {
+    "sha256": "b6c9a9ad7cf3e7d067d7dafaa77e69334a1347c24b6f32e1c78e277d3b3d2afd",
+    "unchanged_from_start": true
+  },
+  "src/node/miner.cpp": {
+    "sha256": "1c079a1cc1167a73890dc687d8654c39e0b302c75ff3008a6dfd308d226d6ca8",
+    "unchanged_from_start": true
+  },
+  "src/mining/solo.cpp": {
+    "sha256": "9c5798b2cc437be0657a85d78978e44560e0ffdfcba02c81584b65dda8fd85a9",
+    "unchanged_from_start": true
+  },
+  "src/wallet/mining.cpp": {
+    "sha256": "e4ded8891a663cf68f2a63d19a99eccbbc2151504c97d9f5c2107c4a1db7d10f",
+    "unchanged_from_start": true
+  }
+}

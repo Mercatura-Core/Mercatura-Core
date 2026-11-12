@@ -1,0 +1,72 @@
+[
+  {
+    "command": [
+      "build-m2/bin/mercatura-gpu-check",
+      "cuda:0",
+      "--version",
+      "2",
+      "--contexts",
+      "8",
+      "--repetitions",
+      "1"
+    ],
+    "returncode": 0,
+    "seconds": 2.5251139189931564
+  },
+  {
+    "command": [
+      "build-m2/bin/mercatura-gpu-check",
+      "cuda:0",
+      "--version",
+      "2",
+      "--contexts",
+      "16",
+      "--repetitions",
+      "1"
+    ],
+    "returncode": 0,
+    "seconds": 3.619627850013785
+  },
+  {
+    "command": [
+      "build-m2/bin/mercatura-gpu-check",
+      "cuda:0",
+      "--version",
+      "2",
+      "--contexts",
+      "255",
+      "--repetitions",
+      "1"
+    ],
+    "returncode": 0,
+    "seconds": 10.389990863972344
+  },
+  {
+    "command": [
+      "build-m2/bin/mercatura-gpu-check",
+      "cuda:0",
+      "--version",
+      "2",
+      "--contexts",
+      "256",
+      "--repetitions",
+      "1"
+    ],
+    "returncode": 0,
+    "seconds": 11.015414997003973
+  },
+  {
+    "command": [
+      "build-m2/bin/mercatura-gpu-check",
+      "cuda:0",
+      "--version",
+      "2",
+      "--contexts",
+      "257",
+      "--repetitions",
+      "1"
+    ],
+    "returncode": 0,
+    "seconds": 10.796459045028314
+  }
+]
