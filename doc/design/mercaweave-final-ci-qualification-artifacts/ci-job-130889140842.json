@@ -1,0 +1,16 @@
+{
+  "job_id": 130889140842,
+  "source_sha": "6738ba8e200b1487a03d90c521dae428373a1995",
+  "checkout_verified": true,
+  "compiler": [],
+  "unit_summary": [],
+  "skipped_tests": [],
+  "native": {
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "cases": []
+  },
+  "unit": null,
+  "qt_results": []
+}

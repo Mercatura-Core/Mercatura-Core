@@ -1,0 +1,17 @@
+{
+  "production_src_unchanged_from_c938061": true,
+  "workflow_changes": false,
+  "modified_existing_code": [
+    "test/functional/mercatura_mercaweave_multinode.py"
+  ],
+  "test_sha256": "af56de02f231fc49d827ec3fc6b9f4788b14e1891a1346db084ea081f58366dd",
+  "test_git_blob": "b878b59093062f6db5a62972774604d09c4ce9c3",
+  "all_existing_validation_assertions_preserved": true,
+  "prior_34_artifact_hashes_verified": true,
+  "production_and_research_worktrees_unchanged_and_clean": true,
+  "all_owned_test_nodes_stopped": true,
+  "public_activation_parameters_unchanged": true,
+  "public_wallet_datadirs_modified": false,
+  "private_wallet_data_committed": false,
+  "independent_security_approval": "Not claimed"
+}

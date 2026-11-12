@@ -577,13 +577,22 @@ class MercaWeaveMultinodeTest(MercaWeaveTest):
         assert sender.getaddressinfo(group0)['pq_group_authenticated']
         assert pending_id in node.getrawmempool()
         self.record('wallet-reload-rescan-authenticated-known-ranges', authenticated=True, txid=pending_id)
-        self.restart_node(2, extra_args=self.extra_args[2] + ['-reindex'])
+        self.stop_node(2)
+        reindex_started = time.monotonic()
+        validator.start(extra_args=self.extra_args[2] + ['-reindex'])
+        # Replaying PQ blocks can exceed the generic 60-second import wait on
+        # a shared runner. Use this test's 240-second budget, as for its RPCs,
+        # and still require full chain replay and mempool loading to complete.
+        validator.wait_for_rpc_connection(wait_for_import=False)
+        self.wait_until(lambda: validator.getblockcount() == saved_tip['height']
+                        and validator.getmempoolinfo()['loaded'], timeout=240)
         self.connect_nodes(1, 2)
         self.sync_all()
         assert_equal(self.tips(), saved_tip)
         assert validator.verifychain(4, 0)
         assert pending_id in validator.getrawmempool()
-        self.record('grouped-history-reindex-and-level4-replay', tip=self.tips())
+        self.record('grouped-history-reindex-and-level4-replay', tip=self.tips(),
+                    reindex_seconds=round(time.monotonic() - reindex_started, 3))
 
         self.disconnect_nodes(1, 2)
         self.generatetoaddress(node, 1, standard, sync_fun=self.no_op)

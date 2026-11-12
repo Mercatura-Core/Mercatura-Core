@@ -1,0 +1,18 @@
+{
+  "command": [
+    "python3",
+    "/workspace/Mercatura-MercaWeave-upgrade/work/build-native-release/test/functional/test_runner.py",
+    "--jobs=4",
+    "--timeout-factor=1",
+    "--randomseed=4475444380715087524",
+    "--artifact-dir=/workspace/Mercatura-MercaWeave-upgrade/work/final-ci-resolution/reindex-repaired-evidence",
+    "--nocleanup",
+    "mercatura_mercaweave_multinode.py"
+  ],
+  "started_utc": "2026-11-12T03:30:51.529910+00:00",
+  "elapsed_seconds": 336.367,
+  "exit_code": 0,
+  "production_binaries_reused": true,
+  "source_head": "6738ba8e200b1487a03d90c521dae428373a1995",
+  "test_diff": "diff --git a/test/functional/mercatura_mercaweave_multinode.py b/test/functional/mercatura_mercaweave_multinode.py\nindex 385bc65..b878b59 100755\n--- a/test/functional/mercatura_mercaweave_multinode.py\n+++ b/test/functional/mercatura_mercaweave_multinode.py\n@@ -577,13 +577,22 @@ class MercaWeaveMultinodeTest(MercaWeaveTest):\n         assert sender.getaddressinfo(group0)['pq_group_authenticated']\n         assert pending_id in node.getrawmempool()\n         self.record('wallet-reload-rescan-authenticated-known-ranges', authenticated=True, txid=pending_id)\n-        self.restart_node(2, extra_args=self.extra_args[2] + ['-reindex'])\n+        self.stop_node(2)\n+        reindex_started = time.monotonic()\n+        validator.start(extra_args=self.extra_args[2] + ['-reindex'])\n+        # Replaying PQ blocks can exceed the generic 60-second import wait on\n+        # a shared runner. Use this test's 240-second budget, as for its RPCs,\n+        # and still require full chain replay and mempool loading to complete.\n+        validator.wait_for_rpc_connection(wait_for_import=False)\n+        self.wait_until(lambda: validator.getblockcount() == saved_tip['height']\n+                        and validator.getmempoolinfo()['loaded'], timeout=240)\n         self.connect_nodes(1, 2)\n         self.sync_all()\n         assert_equal(self.tips(), saved_tip)\n         assert validator.verifychain(4, 0)\n         assert pending_id in validator.getrawmempool()\n-        self.record('grouped-history-reindex-and-level4-replay', tip=self.tips())\n+        self.record('grouped-history-reindex-and-level4-replay', tip=self.tips(),\n+                    reindex_seconds=round(time.monotonic() - reindex_started, 3))\n \n         self.disconnect_nodes(1, 2)\n         self.generatetoaddress(node, 1, standard, sync_fun=self.no_op)\n"
+}
