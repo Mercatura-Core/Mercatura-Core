@@ -64,7 +64,7 @@ public:
 int main(int argc, char** argv)
 {
     try {
-        if (argc > 5) throw std::runtime_error{"usage: mining-bench [workers=0] [seconds=10] [cycles=1] [version=1]"};
+        if (argc > 8) throw std::runtime_error{"usage: mining-bench [workers=0] [seconds=10] [cycles=1] [version=1] [mode=cpu] [gpu_contexts=0] [device=all]"};
         const auto number = [](std::string_view input) {
             unsigned long value{0};
             const auto [end, error]{std::from_chars(input.data(), input.data() + input.size(), value)};
@@ -78,6 +78,15 @@ int main(int argc, char** argv)
         const unsigned long requested_version{argc > 4 ? number(argv[4]) : 1};
         if (requested_version != 1 && requested_version != 2) throw std::runtime_error{"version is 1 or 2"};
         const auto version{requested_version == 2 ? mercahash::Version::V2 : mercahash::Version::V1};
+        const std::string mode{argc > 5 ? argv[5] : "cpu"};
+        if (mode != "cpu" && mode != "gpu" && mode != "combined") throw std::runtime_error{"mode is cpu, gpu or combined"};
+        const auto contexts{argc > 6 ? number(argv[6]) : 0};
+        if (contexts > std::numeric_limits<unsigned int>::max()) throw std::runtime_error{"GPU context count is too large"};
+        mining::GpuConfig hardware;
+        hardware.cpu = mode != "gpu";
+        hardware.gpu = mode != "cpu";
+        hardware.contexts = contexts;
+        if (argc > 7) hardware.devices.push_back(argv[7]);
         const auto raw{mining::DetectWorkerLimits()};
         const auto detected{mining::CalculateWorkerLimits(raw.logical_cpus, raw.available_memory, version)};
         auto budget{detected};
@@ -86,8 +95,8 @@ int main(int argc, char** argv)
         // changes production worker selection. Memory bounds remain intact.
         const auto memory{mining::CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), detected.available_memory, version)};
         budget.maximum = std::min({detected.logical_cpus, memory.maximum, 64U});
-        const unsigned int count{workers ? static_cast<unsigned int>(std::min<unsigned long>(workers, std::numeric_limits<unsigned int>::max())) : budget.recommended};
-        if (workers > budget.maximum || !count) throw std::runtime_error{"worker count exceeds the bounded benchmark CPU/memory budget"};
+        const unsigned int count{hardware.cpu ? (workers ? static_cast<unsigned int>(std::min<unsigned long>(workers, std::numeric_limits<unsigned int>::max())) : budget.recommended) : 0};
+        if (hardware.cpu && (workers > budget.maximum || !count)) throw std::runtime_error{"worker count exceeds the bounded benchmark CPU/memory budget"};
         mining::MiningController controller{{}, [budget] { return budget; }};
         UniValue samples{UniValue::VARR};
         for (unsigned int cycle{0}; cycle < cycles; ++cycle) {
@@ -95,10 +104,28 @@ int main(int argc, char** argv)
             auto jobs{std::make_shared<std::atomic<unsigned int>>(0)};
             const auto begin{std::chrono::steady_clock::now()};
             const auto cpu_begin{std::clock()};
-            if (!controller.Start([jobs, version] { return std::make_unique<BenchmarkWork>(jobs, version); }, count)) throw std::runtime_error{"benchmark Start failed"};
+            if (!controller.Start([jobs, version] { return std::make_unique<BenchmarkWork>(jobs, version); }, count, hardware)) throw std::runtime_error{"benchmark Start failed"};
             const auto deadline{begin + std::chrono::seconds{seconds}};
-            while (std::chrono::steady_clock::now() < deadline && controller.GetStats().busy)
+            std::optional<double> first_hash_ms;
+            uint64_t peak_sampled_rss{rss_before.value_or(0)};
+            UniValue devices{UniValue::VARR};
+            while (std::chrono::steady_clock::now() < deadline && controller.GetStats().busy) {
+                const auto observed{controller.GetStats()};
+                if (observed.hashes && !first_hash_ms) first_hash_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - begin).count();
+                if (const auto rss{CurrentRss()}) peak_sampled_rss = std::max(peak_sampled_rss, *rss);
+                devices = UniValue{UniValue::VARR};
+                for (const auto& device : observed.devices) {
+                    UniValue allocation{UniValue::VOBJ};
+                    allocation.pushKV("id", device.device.id);
+                    allocation.pushKV("contexts", device.contexts);
+                    allocation.pushKV("execution_contexts", device.batch_contexts);
+                    allocation.pushKV("buffer_bytes", device.memory_bytes);
+                    allocation.pushKV("batches_completed", device.batches_completed);
+                    allocation.pushKV("batches_cancelled", device.batches_cancelled);
+                    devices.push_back(allocation);
+                }
                 std::this_thread::sleep_for(std::chrono::milliseconds{10});
+            }
             const auto stopping{std::chrono::steady_clock::now()};
             controller.RequestStop();
             const auto requested{std::chrono::steady_clock::now()};
@@ -111,6 +138,13 @@ int main(int argc, char** argv)
             sample.pushKV("seconds", elapsed);
             sample.pushKV("hashes", stats.hashes);
             sample.pushKV("hashes_per_second", stats.hashes / elapsed);
+            sample.pushKV("cpu_hashes", stats.cpu_hashes);
+            sample.pushKV("gpu_hashes", stats.hashes - stats.cpu_hashes);
+            sample.pushKV("cpu_hashes_per_second", stats.cpu_hashes / elapsed);
+            sample.pushKV("gpu_hashes_per_second", (stats.hashes - stats.cpu_hashes) / elapsed);
+            sample.pushKV("devices_before_stop", devices);
+            sample.pushKV("peak_sampled_rss_bytes", peak_sampled_rss);
+            if (first_hash_ms) sample.pushKV("first_completed_hash_ms", *first_hash_ms);
             sample.pushKV("cpu_seconds", double(std::clock() - cpu_begin) / CLOCKS_PER_SEC);
             sample.pushKV("stop_request_ms", std::chrono::duration<double, std::milli>(requested - stopping).count());
             sample.pushKV("stop_join_ms", std::chrono::duration<double, std::milli>(finished - stopping).count());
@@ -121,13 +155,14 @@ int main(int argc, char** argv)
             samples.push_back(sample);
         }
         UniValue output{UniValue::VOBJ};
-        output.pushKV("mode", "real CPU controller hashing with synthetic public work; no node or wallet");
+        output.pushKV("mode", mode);
+        output.pushKV("workload", "real controller hashing with synthetic public work; 2-second jobs; no node or wallet");
         output.pushKV("workers", count);
         output.pushKV("pow_version", requested_version);
         output.pushKV("production_recommended", detected.recommended);
         output.pushKV("production_maximum", detected.maximum);
         output.pushKV("responsiveness_reserve_overridden", count > detected.maximum);
-        output.pushKV("scratchpad_bytes", count * uint64_t{mercahash::ScratchpadBytes(version)});
+        output.pushKV("scratchpad_bytes", count * mining::CpuScratchpadBytes(version));
 #ifndef WIN32
         rusage usage{};
         if (getrusage(RUSAGE_SELF, &usage) == 0) {

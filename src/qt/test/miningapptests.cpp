@@ -171,8 +171,16 @@ int main(int argc, char* argv[])
     const bool harder{qEnvironmentVariableIsSet("MERCATURA_TEST_HARDER")};
     const bool stop_first{qEnvironmentVariableIsSet("MERCATURA_TEST_STOP_FIRST")};
     const bool rapid{qEnvironmentVariableIsSet("MERCATURA_TEST_RAPID_WALLET")};
-    const auto mode{qEnvironmentVariable("MERCATURA_TEST_MODE", "cpu")};
+    const bool unload_wallet{qEnvironmentVariableIsSet("MERCATURA_TEST_UNLOAD_WALLET")};
+    if (unload_wallet && (!stop_first || rapid)) return 1;
+    auto mode{qEnvironmentVariable("MERCATURA_TEST_MODE", "cpu")};
     if (mode != "cpu" && mode != "gpu" && mode != "combined") return 1;
+    const auto mode_sequence{qEnvironmentVariable("MERCATURA_TEST_MODE_SEQUENCE", mode).split(',')};
+    if (mode_sequence.isEmpty() || mode_sequence.front() != mode ||
+        std::any_of(mode_sequence.begin(), mode_sequence.end(), [](const auto& entry) {
+            return entry != "cpu" && entry != "gpu" && entry != "combined";
+        }) || (mode_sequence.size() > 1 && (!stop_first || rapid || activation != 0))) return 1;
+    qsizetype mode_index{0};
     if (harder && activation != 0) return 1;
     if (rapid && (activation != 0 || harder || mode != "cpu" || !stop_first)) return 1;
     const auto raw{mining::DetectWorkerLimits()};
@@ -224,6 +232,9 @@ int main(int argc, char* argv[])
     };
     bool started{false}, closed{false}, destroyed{false}, qualified{false};
     bool stop_observed{false};
+    bool current_stop_observed{false};
+    bool wallet_unloaded{false};
+    qint64 unload_at{0}, unload_handler{-1}, unload_complete{-1};
     bool wallet_verified{false}, reopen_verified{false};
     size_t stop_backlog{0}, close_backlog{0};
     QPointer<WalletModel> selected_wallet;
@@ -294,7 +305,7 @@ int main(int argc, char* argv[])
                 selection->setValue(workers);
                 QPointer<MiningSession> session{controller->miningSession()};
                 poll.setInterval(25);
-                QObject::connect(&poll, &QTimer::timeout, &app, [&, window, page, start, stop, selection, session] {
+                QObject::connect(&poll, &QTimer::timeout, &app, [&, window, page, start, stop, selection, hardware, session] {
                     if (!started) {
                         if (rapid && restart && !reopen_verified) {
                             QJsonObject details;
@@ -346,12 +357,11 @@ int main(int argc, char* argv[])
                         start->click();
                     }
                     const auto stats{session->stats()};
-                    uint64_t gpu_hashes{0}, batches_started{0};
+                    uint64_t gpu_hashes{0};
                     bool device_failed{false};
                     QJsonArray devices;
                     for (const auto& device : stats.devices) {
                         gpu_hashes += device.hashes;
-                        batches_started += device.batches_started;
                         device_failed |= device.failed;
                         devices.append(QJsonObject{{"id", QString::fromStdString(device.device.id)},
                             {"hashes", QString::number(device.hashes)}, {"rate", device.hashes_per_second},
@@ -364,8 +374,12 @@ int main(int argc, char* argv[])
                     if (clock.elapsed() - last_record >= 500) {
                         last_record = clock.elapsed();
                         record({{"event", "sample"}, {"elapsed_ms", double(clock.elapsed())}, {"stage", stage},
+                            {"mode", mode}, {"mode_index", double(mode_index)},
                             {"heartbeat_gap_ms", double(worst_heartbeat)}, {"busy", stats.busy},
                             {"accepted", QString::number(stats.accepted)}, {"rejected", QString::number(stats.rejected)},
+                            {"hashes", QString::number(stats.hashes)}, {"combined_rate", stats.hashes_per_second},
+                            {"combined_rate_10s", stats.hashes_per_second_10s},
+                            {"solutions", QString::number(stats.solutions)}, {"submitted", QString::number(stats.submitted)},
                             {"stale", QString::number(stats.stale)}, {"cpu_hashes", QString::number(stats.cpu_hashes)},
                             {"wallet_notifications_pending", double(selected_wallet ? selected_wallet->getTransactionTableModel()->pendingNotificationCount() : 0)},
                             {"cpu_rate", stats.cpu_hashes_per_second}, {"job_height", double(stats.job_height)},
@@ -376,6 +390,7 @@ int main(int argc, char* argv[])
                         poll.stop(); app.requestShutdown(); return;
                     }
                     const auto schedule_stop = [&] {
+                        current_stop_observed = false;
                         stage = 1;
                         stop_due = clock.elapsed() + 100;
                         QTimer::singleShot(100, &app, [&, stop] {
@@ -454,13 +469,16 @@ int main(int argc, char* argv[])
                     if (stage == 1) return; // Waiting for the scheduled real Stop click.
                     if (stage == 2) {
                         if (stats.busy) return;
-                        if (!stop_observed) {
+                        if (!current_stop_observed) {
                             stop_complete = clock.elapsed() - stop_request;
-                            stop_observed = true;
+                            current_stop_observed = stop_observed = true;
                             record({{"event", "stop"}, {"dispatch_ms", double(stop_dispatch)},
+                                {"mode", mode}, {"mode_index", double(mode_index)},
                                 {"handler_ms", double(stop_handler)}, {"complete_ms", double(stop_complete)},
                                 {"active_workers", int(stats.active_workers)}, {"pending_notifications", double(stop_backlog)}});
-                            if (stats.active_workers) { qCritical("Stop left mining workers active"); app.requestShutdown(); return; }
+                            if (stats.active_workers || stop_dispatch >= 1000 || stop_handler >= 1000 || stop_complete >= 1000) {
+                                qCritical("Stop left active workers or exceeded the responsiveness bound"); app.requestShutdown(); return;
+                            }
                         }
                         if (rapid) {
                             if (const auto wallet{core_wallet.lock()}) wallet->ShowProgress("Rapid wallet notification regression", 100);
@@ -470,12 +488,31 @@ int main(int argc, char* argv[])
                             return;
                         }
                         if (!start->isEnabled()) return;
+                        if (mode_index + 1 < mode_sequence.size()) {
+                            if (!hardware->isEnabled()) { qCritical("Stopped hardware selector is disabled"); app.requestShutdown(); return; }
+                            mode = mode_sequence[++mode_index];
+                            hardware->setCurrentIndex(mode == "gpu" ? 1 : mode == "combined" ? 2 : 0);
+                            selection->setValue(workers);
+                            started = false;
+                            stage = 0;
+                            return;
+                        }
                         start->click();
                         mining_at = clock.elapsed();
                         stage = 3;
                         return;
                     }
-                    if (stage == 7) {
+                    if (stage == 8) {
+                        if (clock.elapsed() - unload_at > 5000) { qCritical("Wallet unload did not release mining ownership"); app.requestShutdown(); return; }
+                        if (stats.busy || session->owner() || !selected_wallet.isNull()) return;
+                        if (stats.active_workers || std::any_of(stats.devices.begin(), stats.devices.end(), [](const auto& device) { return device.memory_bytes != 0; })) {
+                            qCritical("Wallet unload retained mining resources"); app.requestShutdown(); return;
+                        }
+                        wallet_unloaded = true;
+                        unload_complete = clock.elapsed() - unload_at;
+                        record({{"event", "wallet_unloaded"}, {"mode", mode}, {"handler_ms", double(unload_handler)},
+                            {"complete_ms", double(unload_complete)}, {"active_workers", int(stats.active_workers)}});
+                    } else if (stage == 7) {
                         close_backlog = selected_wallet->getTransactionTableModel()->pendingNotificationCount();
                         if (!close_backlog) {
                             if (clock.elapsed() > verification_deadline) {
@@ -486,6 +523,16 @@ int main(int argc, char* argv[])
                         record({{"event", "close_backlog"}, {"pending_notifications", double(close_backlog)}});
                     } else if (stage == 3) {
                         if (clock.elapsed() - mining_at < 2000 || stats.active_workers == 0 || stats.hashes == 0) return;
+                        if (mode == "combined" && (!stats.cpu_hashes || !gpu_hashes)) return;
+                        if (mode == "gpu" && (stats.cpu_hashes || !gpu_hashes)) return;
+                        if (unload_wallet && !wallet_unloaded) {
+                            unload_at = clock.elapsed();
+                            selected_wallet->wallet().remove();
+                            unload_handler = clock.elapsed() - unload_at;
+                            if (unload_handler >= 1000) { qCritical("Wallet unload blocked the Qt thread"); app.requestShutdown(); return; }
+                            stage = 8;
+                            return;
+                        }
                         if (rapid) {
                             // Use the existing rescan notification queue to
                             // make the Close backlog deterministic. The normal
@@ -497,14 +544,18 @@ int main(int argc, char* argv[])
                             return;
                         }
                     } else {
-                        const bool progress{mode == "cpu" ? stats.cpu_hashes > 0 : mode == "gpu" ? gpu_hashes > 0 :
-                            stats.cpu_hashes > 0 && (harder ? gpu_hashes > 0 : batches_started > 0)};
+                        const bool progress{mode == "cpu" ? stats.cpu_hashes > 0 : mode == "gpu" ? gpu_hashes > 0 && stats.cpu_hashes == 0 :
+                            stats.cpu_hashes > 0 && gpu_hashes > 0};
                         if (activation == 20 && (stats.pow_version != mercahash::Version::V2 || stats.job_height < 20)) return;
                         if (stats.accepted < (rapid ? 300U : harder ? 1U : 3U) || clock.elapsed() - mining_at < int64_t{seconds} * 1000 || !progress) return;
+                        if (hardware->isEnabled()) { qCritical("Running hardware selector permits live mode changes"); app.requestShutdown(); return; }
                         qualified = true;
                         accepted = stats.accepted;
                         qualification_cpu = stats.cpu_hashes;
                         qualification_gpu = gpu_hashes;
+                        record({{"event", "mode_qualified"}, {"mode", mode}, {"mode_index", double(mode_index)},
+                            {"accepted", QString::number(accepted)}, {"cpu_hashes", QString::number(qualification_cpu)},
+                            {"gpu_hashes", QString::number(qualification_gpu)}});
                         if (stop_first) {
                             if (rapid) {
                                 if (const auto wallet{core_wallet.lock()}) wallet->ShowProgress("Rapid wallet notification regression", 1);
@@ -535,6 +586,7 @@ int main(int argc, char* argv[])
         if (closed) close_complete = clock.elapsed() - close_at;
         heartbeat.stop();
         result = exit_code == 0 && started && closed && destroyed && qualified &&
+            (!unload_wallet || wallet_unloaded) &&
             (!rapid || (wallet_verified && (!restart || reopen_verified) && stop_backlog > 0 && close_backlog > 0 && !self_payment.isEmpty())) &&
             (!stop_first || (stop_observed && stop_dispatch < 1000 && stop_handler < 1000 && stop_complete < 1000)) &&
             close_handler >= 0 && close_handler < 1000 && close_complete < 5000 && worst_heartbeat < 1000 ? 0 : 1;
@@ -543,6 +595,7 @@ int main(int argc, char* argv[])
             {"rapid_wallet", rapid}, {"wallet_verified", wallet_verified}, {"wallet_reopened", reopen_verified},
             {"stop_backlog", double(stop_backlog)}, {"close_backlog", double(close_backlog)},
             {"cpu_hashes", QString::number(qualification_cpu)}, {"gpu_hashes", QString::number(qualification_gpu)},
+            {"wallet_unloaded", wallet_unloaded}, {"unload_handler_ms", double(unload_handler)}, {"unload_complete_ms", double(unload_complete)},
             {"stop_dispatch_ms", double(stop_dispatch)}, {"stop_handler_ms", double(stop_handler)}, {"stop_complete_ms", double(stop_complete)},
             {"close_handler_ms", double(close_handler)}, {"close_complete_ms", double(close_complete)},
             {"heartbeat_gap_ms", double(worst_heartbeat)}, {"session_destroyed", destroyed}});

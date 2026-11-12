@@ -19,10 +19,14 @@ from test_framework.util import assert_equal
 
 
 class MercaturaSoloNativeTest(BitcoinTestFramework):
+    def add_options(self, parser):
+        parser.add_argument('--pow-version', choices=('1', '2'), default='1', help='Native producer and independent verifier MercaHash version')
+
     def set_test_params(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
         self.uses_wallet = True
+        self.extra_args = [['-mercahashv2height=0']] if self.options.pow_version == '2' else [[]]
 
     def skip_test_if_missing_module(self):
         self.skip_if_no_wallet()
@@ -39,7 +43,8 @@ class MercaturaSoloNativeTest(BitcoinTestFramework):
         environment = dict(os.environ, MERCATURA_SOLO_QUALIFICATION_OUTPUT=str(proof_path))
         self.log.info("Producing 102 native controller blocks and spending a matured PQ reward")
         with log_path.open("w", encoding="utf8") as log:
-            subprocess.run([str(binary), "--run_test=mining_tests_solo/native_rewards_maturity_fees_and_pq_spend",
+            suite = 'mining_tests_v2' if self.options.pow_version == '2' else 'mining_tests_solo'
+            subprocess.run([str(binary), f"--run_test={suite}/native_rewards_maturity_fees_and_pq_spend",
                             "--log_level=test_suite"], env=environment,
                            stdout=log, stderr=subprocess.STDOUT, check=True, timeout=300)
         proof = json.loads(proof_path.read_text(encoding="utf8"))

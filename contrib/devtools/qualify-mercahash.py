@@ -9,6 +9,7 @@ it contains a test-only regtest wallet. Never point this tool at existing data.
 """
 import argparse
 import base64
+from decimal import Decimal
 import json
 import os
 from pathlib import Path
@@ -97,6 +98,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", required=True, type=Path)
     parser.add_argument("--mode", choices=("cpu", "gpu", "combined"), required=True)
+    parser.add_argument("--mode-sequence", default="", help="Comma-separated modes; each change uses Stop before Start")
+    parser.add_argument("--unload-wallet", action='store_true', help="Unload the owned wallet during the final running mode")
     parser.add_argument("--schedule", choices=("v1", "v2", "transition"), default="v2")
     parser.add_argument("--harder", action="store_true")
     parser.add_argument("--workers", type=int, default=1)
@@ -111,6 +114,11 @@ def main():
     parser.add_argument("--memory-budget-mib", type=int, default=0, help="Optional aggregate Linux RSS watchdog; 0 preserves the original qualification")
     parser.add_argument("--validation-threads", type=int, default=0, help="0 preserves automatic script validation; 1..16 sets the same -par budget on both nodes")
     args = parser.parse_args()
+    sequence = args.mode_sequence.split(',') if args.mode_sequence else [args.mode]
+    if sequence[0] != args.mode or any(mode not in ('cpu', 'gpu', 'combined') for mode in sequence):
+        parser.error("Mode sequence must begin with --mode and contain cpu, gpu or combined")
+    if len(sequence) > 1 and args.schedule != 'v2':
+        parser.error("Mode transitions require --schedule v2")
     if os.name != "posix":
         parser.error("Run this process-group watchdog under Linux or WSL")
     if args.harder and args.schedule != "v2":
@@ -137,7 +145,7 @@ def main():
     metadata["status"] = "RUNNING"
     summary_path = root / "summary.json"
     summary_path.write_text(json.dumps(metadata, indent=2) + "\n")
-    if args.mode != "cpu":
+    if any(mode != "cpu" for mode in sequence):
         checker = binaries / "mercatura-gpu-check"
         if not checker.is_file():
             parser.error("Build mercatura-gpu-check with CUDA/OpenCL enabled")
@@ -197,6 +205,10 @@ def main():
     env.pop("MERCATURA_TEST_HARDER", None)
     env.pop("MERCATURA_TEST_GPU_DEVICE", None)
     env.pop("MERCATURA_TEST_PQ", None)
+    env["MERCATURA_TEST_MODE_SEQUENCE"] = ','.join(sequence)
+    env.pop("MERCATURA_TEST_UNLOAD_WALLET", None)
+    if args.unload_wallet:
+        env["MERCATURA_TEST_UNLOAD_WALLET"] = '1'
     if args.pq:
         env["MERCATURA_TEST_PQ"] = "1"
     if args.device:
@@ -244,8 +256,13 @@ def main():
                             try:
                                 measurements.append(process_metrics(process))
                             except (FileNotFoundError, ProcessLookupError):
-                                if process.poll() is None:
-                                    raise
+                                # /proc can lose the address space just before
+                                # waitpid reports exit. Require actual child exit
+                                # rather than misclassifying normal Qt shutdown.
+                                try:
+                                    process.wait(timeout=0.2)
+                                except subprocess.TimeoutExpired:
+                                    raise RuntimeError('Resource sample disappeared while owned child remained live')
                     resource_samples.append(measurements)
                     observation['process_resources'] = measurements
                     if sum(item['VmRSS'] for item in measurements) > args.memory_budget_mib * 1024:
@@ -392,6 +409,30 @@ def main():
                 raise RuntimeError("Independent peer verification failed")
             metadata["peer_height"] = rpc(peer_dir, peer_rpc, "getblockcount")
             metadata["peer_verifychain"] = True
+            # Audit actual native rewards. Core's getblockstats supplies exact
+            # base-unit subsidy/fees; the coinbase must pay their entire sum to
+            # native PQ outputs, with only zero-value commitment outputs added.
+            reward_heights = set(range(1, last_client_height + 1)) if last_client_height <= 32 else {1, 2, 3, 100, 101, last_client_height}
+            reward_blocks = [rpc(peer_dir, peer_rpc, 'getblockhash', (height,))
+                             for height in sorted(reward_heights) if height <= last_client_height]
+            if relay_block and relay_block not in reward_blocks:
+                reward_blocks.append(relay_block)
+            rewards = []
+            for block_hash in reward_blocks:
+                block = rpc(peer_dir, peer_rpc, 'getblock', (block_hash, 2))
+                statistics = rpc(peer_dir, peer_rpc, 'getblockstats', (block_hash, ['subsidy', 'totalfee']))
+                outputs = block['tx'][0]['vout']
+                paid = sum(int(Decimal(str(output['value'])) * 100) for output in outputs)  # Mercatura COIN = 100 base units.
+                payouts = [output for output in outputs if Decimal(str(output['value'])) > 0]
+                if paid != statistics['subsidy'] + statistics['totalfee']:
+                    raise RuntimeError('Native coinbase does not pay the full subsidy plus ordinary fees')
+                if len(payouts) != 1 or not payouts[0]['scriptPubKey']['hex'].startswith('5220'):
+                    raise RuntimeError('Native coinbase has an unexpected payout or a non-v2 PQ destination')
+                if any(Decimal(str(output['value'])) == 0 and not output['scriptPubKey']['hex'].startswith('6a') for output in outputs):
+                    raise RuntimeError('Unexpected non-payout coinbase output')
+                rewards.append({'height': block['height'], 'hash': block_hash, 'subsidy': statistics['subsidy'],
+                                'ordinary_fees': statistics['totalfee'], 'paid': paid, 'payouts': len(payouts), 'software_fees': 0})
+            metadata['native_reward_audit'] = rewards
             results = [json.loads(line) for line in (root / "qt-statistics.jsonl").read_text().splitlines()]
             metadata["qt_result"] = next(row for row in reversed(results) if row["event"] == "result")
             metadata["status"] = "PASSED"

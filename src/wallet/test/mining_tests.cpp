@@ -88,6 +88,147 @@ BOOST_AUTO_TEST_SUITE_END()
 struct SoloTestingSetup : TestingSetup {
     explicit SoloTestingSetup(TestOpts opts = {}) : TestingSetup{ChainType::REGTEST, std::move(opts)} { m_node.notifications->setChainstateLoaded(true); }
 };
+static void QualifyNativeRewards(SoloTestingSetup& fixture)
+{
+    WalletContext context;
+    context.args = &fixture.m_args;
+    context.chain = fixture.m_node.chain.get();
+    auto wallet{TestCreateWallet(CreateMockableWalletDatabase(), context, WALLET_FLAG_DESCRIPTORS)};
+    auto api{interfaces::MakeWallet(context, wallet)};
+    auto receiver{TestCreateWallet(CreateMockableWalletDatabase(), context, WALLET_FLAG_DESCRIPTORS)};
+    auto receive_api{interfaces::MakeWallet(context, receiver)};
+    const auto destination{GetMiningDestination(*api)};
+    const auto receive_destination{GetMiningDestination(*receive_api)};
+    BOOST_REQUIRE(destination && receive_destination);
+    const auto script{GetScriptForDestination(*destination)};
+    uint64_t accepted{0};
+    struct BoundedSolo : mining::WorkProvider {
+        mining::SoloWorkProvider solo;
+        std::atomic<unsigned int> remaining;
+        BoundedSolo(std::unique_ptr<interfaces::Mining> node, CScript payout, unsigned int count)
+            : solo{std::move(node), std::move(payout), "", true}, remaining{count} {}
+        std::optional<mining::MiningJob> GetJob() override { return IsCancelled() ? std::nullopt : solo.GetJob(); }
+        bool IsCurrent(const mining::MiningJob& job) override { return !IsCancelled() && solo.IsCurrent(job); }
+        mining::SubmissionResult Submit(const mining::MiningJob& job, const CBlockHeader& header) override
+        {
+            auto result{solo.Submit(job, header)};
+            if (result.active_chain) --remaining;
+            return result;
+        }
+        void Interrupt() override { solo.Interrupt(); }
+        bool IsCancelled() const override { return remaining == 0 || solo.IsCancelled(); }
+    };
+    auto mine = [&](unsigned int count, unsigned int workers) {
+        // Bound the isolated integration test's host memory and CPU budget.
+        mining::MiningController controller{{}, [] { return mining::CalculateWorkerLimits(4, 2ULL << 30); }};
+        BOOST_REQUIRE(controller.Start([&] { return std::make_unique<BoundedSolo>(interfaces::MakeMining(fixture.m_node, false), script, count); }, workers));
+        const auto deadline{std::chrono::steady_clock::now() + std::chrono::seconds{180}};
+        while (controller.GetStats().busy && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds{10});
+        controller.RequestStop();
+        controller.Wait();
+        const auto stats{controller.GetStats()};
+        BOOST_REQUIRE_MESSAGE(stats.accepted == count, stats.status);
+        BOOST_CHECK_EQUAL(stats.rejected, 0U);
+        BOOST_CHECK_EQUAL(stats.active_workers, 0U);
+        BOOST_CHECK_EQUAL(stats.hashes_per_second, 0);
+        accepted += stats.accepted;
+        fixture.m_node.validation_signals->SyncWithValidationInterfaceQueue();
+    };
+    mine(1, 1);
+    auto& chainman{*fixture.m_node.chainman};
+    CBlock first;
+    {
+        LOCK(chainman.GetMutex());
+        BOOST_REQUIRE(chainman.m_blockman.ReadBlock(first, *chainman.ActiveChain()[1]));
+    }
+    const auto first_reward{first.vtx[0]->vout[0].nValue};
+    BOOST_CHECK_EQUAL(api->getBalances().balance, 0);
+    BOOST_CHECK_EQUAL(api->getBalances().immature_balance, first_reward);
+    CCoinControl control;
+    control.Select(COutPoint{first.vtx[0]->GetHash(), 0});
+    control.m_allow_other_inputs = false;
+    control.m_feerate = CFeeRate{1};
+    control.fOverrideFeeRate = true;
+    const CRecipient recipient{*receive_destination, COIN, false};
+    CCoinControl automatic;
+    automatic.m_feerate = CFeeRate{1};
+    automatic.fOverrideFeeRate = true;
+    BOOST_CHECK(!CreateTransaction(*wallet, {recipient}, std::nullopt, automatic, true));
+    // Explicit coin control can pre-sign an immature output; ordinary wallet
+    // selection excludes it, and normal node admission must enforce maturity.
+    const auto premature{CreateTransaction(*wallet, {recipient}, std::nullopt, control, true)};
+    BOOST_REQUIRE(premature);
+    std::string premature_error;
+    BOOST_CHECK(!fixture.m_node.chain->broadcastTransaction(premature->tx, COIN, node::TxBroadcast::MEMPOOL_NO_BROADCAST, premature_error));
+    BOOST_CHECK(premature_error.find("bad-txns-premature-spend-of-coinbase") != std::string::npos);
+    mine(99, 2);
+    BOOST_CHECK_EQUAL(api->getBalances().balance, 0); // Depth 100 remains immature.
+    mine(1, 1);
+    BOOST_CHECK_EQUAL(api->getBalances().balance, first_reward);
+    auto spend{CreateTransaction(*wallet, {recipient}, std::nullopt, control, true)};
+    const std::string spend_error{spend ? std::string{} : util::ErrorString(spend).original};
+    BOOST_REQUIRE_MESSAGE(static_cast<bool>(spend), spend_error);
+    BOOST_REQUIRE_EQUAL(spend->tx->vin.size(), 1U);
+    BOOST_CHECK(spend->tx->vin[0].prevout == COutPoint(first.vtx[0]->GetHash(), 0));
+    BOOST_CHECK(!spend->tx->vin[0].scriptWitness.IsNull());
+    std::string error;
+    BOOST_REQUIRE_MESSAGE(fixture.m_node.chain->broadcastTransaction(spend->tx, COIN, node::TxBroadcast::MEMPOOL_NO_BROADCAST, error), error);
+    mine(1, 2);
+    BOOST_CHECK_EQUAL(receive_api->getBalances().balance, COIN);
+    UniValue proof{UniValue::VOBJ}, blocks{UniValue::VARR};
+    {
+        LOCK(chainman.GetMutex());
+        BOOST_REQUIRE_EQUAL(chainman.ActiveHeight(), 102);
+        for (int height{1}; height <= chainman.ActiveHeight(); ++height) {
+            const auto* index{chainman.ActiveChain()[height]};
+            CBlock block;
+            BOOST_REQUIRE(chainman.m_blockman.ReadBlock(block, *index));
+            BOOST_CHECK(block.hashMerkleRoot == BlockMerkleRoot(block));
+            BOOST_CHECK(block.GetHash() == index->GetBlockHash());
+            PoWHashContext pow;
+            BOOST_CHECK(CheckProofOfWork(block, Params().GetConsensus(), pow, height));
+            const auto& parent_state{index->pprev->m_mca_emission_state};
+            const auto command{Consensus::GetMcaEmissionCommand(parent_state ? &*parent_state : nullptr, height)};
+            BOOST_REQUIRE(command);
+            const CAmount fees{height == 102 ? spend->fee : 0};
+            BOOST_CHECK_EQUAL(block.vtx[0]->GetValueOut(), command->subsidy + fees);
+            BOOST_CHECK(block.vtx[0]->vout[0].scriptPubKey == script);
+            for (size_t output{1}; output < block.vtx[0]->vout.size(); ++output)
+                BOOST_CHECK_EQUAL(block.vtx[0]->vout[output].nValue, 0); // No fee/diversion output.
+            if (height == 102) {
+                BOOST_REQUIRE_EQUAL(block.vtx.size(), 2U);
+                BOOST_CHECK(block.vtx[1]->GetHash() == spend->tx->GetHash());
+                const auto commitment{GetWitnessCommitmentIndex(block)};
+                BOOST_REQUIRE(commitment >= 0);
+                const auto& reserved{block.vtx[0]->vin[0].scriptWitness.stack};
+                BOOST_REQUIRE_EQUAL(reserved.size(), 1U);
+                BOOST_REQUIRE_EQUAL(reserved[0].size(), 32U);
+                uint256 witness_hash;
+                CHash256{}.Write(BlockWitnessMerkleRoot(block)).Write(reserved[0]).Finalize(witness_hash);
+                const auto& output{block.vtx[0]->vout[commitment].scriptPubKey};
+                BOOST_CHECK(std::equal(witness_hash.begin(), witness_hash.end(), output.begin() + 6));
+            }
+            DataStream serialized;
+            serialized << TX_WITH_WITNESS(block);
+            blocks.push_back(HexStr(serialized));
+        }
+    }
+    proof.pushKV("blocks", blocks);
+    proof.pushKV("accepted", accepted);
+    proof.pushKV("destination", EncodeDestination(*destination));
+    proof.pushKV("first_coinbase", first.vtx[0]->GetHash().GetHex());
+    proof.pushKV("spend", spend->tx->GetHash().GetHex());
+    proof.pushKV("fee_base_units", spend->fee);
+    // Test-only proof export lets a separate RPC node validate the exact native
+    // controller-produced chain. It contains public blocks/addresses, no keys.
+    if (const char* path{std::getenv("MERCATURA_SOLO_QUALIFICATION_OUTPUT")}) {
+        std::ofstream file{path};
+        file << proof.write(2) << '\n';
+        BOOST_REQUIRE(file.good());
+    }
+}
+
 BOOST_FIXTURE_TEST_SUITE(mining_tests_solo, SoloTestingSetup)
 
 BOOST_AUTO_TEST_CASE(native_controller_submits_valid_pq_regtest_block)
@@ -254,143 +395,7 @@ BOOST_AUTO_TEST_CASE(solo_template_binding_wrong_work_hash_and_duplicate)
 
 BOOST_AUTO_TEST_CASE(native_rewards_maturity_fees_and_pq_spend)
 {
-    WalletContext context;
-    context.args = &m_args;
-    context.chain = m_node.chain.get();
-    auto wallet{TestCreateWallet(CreateMockableWalletDatabase(), context, WALLET_FLAG_DESCRIPTORS)};
-    auto api{interfaces::MakeWallet(context, wallet)};
-    auto receiver{TestCreateWallet(CreateMockableWalletDatabase(), context, WALLET_FLAG_DESCRIPTORS)};
-    auto receive_api{interfaces::MakeWallet(context, receiver)};
-    const auto destination{GetMiningDestination(*api)};
-    const auto receive_destination{GetMiningDestination(*receive_api)};
-    BOOST_REQUIRE(destination && receive_destination);
-    const auto script{GetScriptForDestination(*destination)};
-    uint64_t accepted{0};
-    struct BoundedSolo : mining::WorkProvider {
-        mining::SoloWorkProvider solo;
-        std::atomic<unsigned int> remaining;
-        BoundedSolo(std::unique_ptr<interfaces::Mining> node, CScript payout, unsigned int count)
-            : solo{std::move(node), std::move(payout), "", true}, remaining{count} {}
-        std::optional<mining::MiningJob> GetJob() override { return IsCancelled() ? std::nullopt : solo.GetJob(); }
-        bool IsCurrent(const mining::MiningJob& job) override { return !IsCancelled() && solo.IsCurrent(job); }
-        mining::SubmissionResult Submit(const mining::MiningJob& job, const CBlockHeader& header) override
-        {
-            auto result{solo.Submit(job, header)};
-            if (result.active_chain) --remaining;
-            return result;
-        }
-        void Interrupt() override { solo.Interrupt(); }
-        bool IsCancelled() const override { return remaining == 0 || solo.IsCancelled(); }
-    };
-    auto mine = [&](unsigned int count, unsigned int workers) {
-        // Bound the isolated integration test's host memory and CPU budget.
-        mining::MiningController controller{{}, [] { return mining::CalculateWorkerLimits(4, 2ULL << 30); }};
-        BOOST_REQUIRE(controller.Start([&] { return std::make_unique<BoundedSolo>(interfaces::MakeMining(m_node, false), script, count); }, workers));
-        const auto deadline{std::chrono::steady_clock::now() + std::chrono::seconds{180}};
-        while (controller.GetStats().busy && std::chrono::steady_clock::now() < deadline)
-            std::this_thread::sleep_for(std::chrono::milliseconds{10});
-        controller.RequestStop();
-        controller.Wait();
-        const auto stats{controller.GetStats()};
-        BOOST_REQUIRE_MESSAGE(stats.accepted == count, stats.status);
-        BOOST_CHECK_EQUAL(stats.rejected, 0U);
-        BOOST_CHECK_EQUAL(stats.active_workers, 0U);
-        BOOST_CHECK_EQUAL(stats.hashes_per_second, 0);
-        accepted += stats.accepted;
-        m_node.validation_signals->SyncWithValidationInterfaceQueue();
-    };
-    mine(1, 1);
-    auto& chainman{*m_node.chainman};
-    CBlock first;
-    {
-        LOCK(chainman.GetMutex());
-        BOOST_REQUIRE(chainman.m_blockman.ReadBlock(first, *chainman.ActiveChain()[1]));
-    }
-    const auto first_reward{first.vtx[0]->vout[0].nValue};
-    BOOST_CHECK_EQUAL(api->getBalances().balance, 0);
-    BOOST_CHECK_EQUAL(api->getBalances().immature_balance, first_reward);
-    CCoinControl control;
-    control.Select(COutPoint{first.vtx[0]->GetHash(), 0});
-    control.m_allow_other_inputs = false;
-    control.m_feerate = CFeeRate{1};
-    control.fOverrideFeeRate = true;
-    const CRecipient recipient{*receive_destination, COIN, false};
-    CCoinControl automatic;
-    automatic.m_feerate = CFeeRate{1};
-    automatic.fOverrideFeeRate = true;
-    BOOST_CHECK(!CreateTransaction(*wallet, {recipient}, std::nullopt, automatic, true));
-    // Explicit coin control can pre-sign an immature output; ordinary wallet
-    // selection excludes it, and normal node admission must enforce maturity.
-    const auto premature{CreateTransaction(*wallet, {recipient}, std::nullopt, control, true)};
-    BOOST_REQUIRE(premature);
-    std::string premature_error;
-    BOOST_CHECK(!m_node.chain->broadcastTransaction(premature->tx, COIN, node::TxBroadcast::MEMPOOL_NO_BROADCAST, premature_error));
-    BOOST_CHECK(premature_error.find("bad-txns-premature-spend-of-coinbase") != std::string::npos);
-    mine(99, 2);
-    BOOST_CHECK_EQUAL(api->getBalances().balance, 0); // Depth 100 remains immature.
-    mine(1, 1);
-    BOOST_CHECK_EQUAL(api->getBalances().balance, first_reward);
-    auto spend{CreateTransaction(*wallet, {recipient}, std::nullopt, control, true)};
-    const std::string spend_error{spend ? std::string{} : util::ErrorString(spend).original};
-    BOOST_REQUIRE_MESSAGE(static_cast<bool>(spend), spend_error);
-    BOOST_REQUIRE_EQUAL(spend->tx->vin.size(), 1U);
-    BOOST_CHECK(spend->tx->vin[0].prevout == COutPoint(first.vtx[0]->GetHash(), 0));
-    BOOST_CHECK(!spend->tx->vin[0].scriptWitness.IsNull());
-    std::string error;
-    BOOST_REQUIRE_MESSAGE(m_node.chain->broadcastTransaction(spend->tx, COIN, node::TxBroadcast::MEMPOOL_NO_BROADCAST, error), error);
-    mine(1, 2);
-    BOOST_CHECK_EQUAL(receive_api->getBalances().balance, COIN);
-    UniValue proof{UniValue::VOBJ}, blocks{UniValue::VARR};
-    {
-        LOCK(chainman.GetMutex());
-        BOOST_REQUIRE_EQUAL(chainman.ActiveHeight(), 102);
-        for (int height{1}; height <= chainman.ActiveHeight(); ++height) {
-            const auto* index{chainman.ActiveChain()[height]};
-            CBlock block;
-            BOOST_REQUIRE(chainman.m_blockman.ReadBlock(block, *index));
-            BOOST_CHECK(block.hashMerkleRoot == BlockMerkleRoot(block));
-            BOOST_CHECK(block.GetHash() == index->GetBlockHash());
-            PoWHashContext pow;
-            BOOST_CHECK(CheckProofOfWork(block, Params().GetConsensus(), pow));
-            const auto& parent_state{index->pprev->m_mca_emission_state};
-            const auto command{Consensus::GetMcaEmissionCommand(parent_state ? &*parent_state : nullptr, height)};
-            BOOST_REQUIRE(command);
-            const CAmount fees{height == 102 ? spend->fee : 0};
-            BOOST_CHECK_EQUAL(block.vtx[0]->GetValueOut(), command->subsidy + fees);
-            BOOST_CHECK(block.vtx[0]->vout[0].scriptPubKey == script);
-            for (size_t output{1}; output < block.vtx[0]->vout.size(); ++output)
-                BOOST_CHECK_EQUAL(block.vtx[0]->vout[output].nValue, 0); // No fee/diversion output.
-            if (height == 102) {
-                BOOST_REQUIRE_EQUAL(block.vtx.size(), 2U);
-                BOOST_CHECK(block.vtx[1]->GetHash() == spend->tx->GetHash());
-                const auto commitment{GetWitnessCommitmentIndex(block)};
-                BOOST_REQUIRE(commitment >= 0);
-                const auto& reserved{block.vtx[0]->vin[0].scriptWitness.stack};
-                BOOST_REQUIRE_EQUAL(reserved.size(), 1U);
-                BOOST_REQUIRE_EQUAL(reserved[0].size(), 32U);
-                uint256 witness_hash;
-                CHash256{}.Write(BlockWitnessMerkleRoot(block)).Write(reserved[0]).Finalize(witness_hash);
-                const auto& output{block.vtx[0]->vout[commitment].scriptPubKey};
-                BOOST_CHECK(std::equal(witness_hash.begin(), witness_hash.end(), output.begin() + 6));
-            }
-            DataStream serialized;
-            serialized << TX_WITH_WITNESS(block);
-            blocks.push_back(HexStr(serialized));
-        }
-    }
-    proof.pushKV("blocks", blocks);
-    proof.pushKV("accepted", accepted);
-    proof.pushKV("destination", EncodeDestination(*destination));
-    proof.pushKV("first_coinbase", first.vtx[0]->GetHash().GetHex());
-    proof.pushKV("spend", spend->tx->GetHash().GetHex());
-    proof.pushKV("fee_base_units", spend->fee);
-    // Test-only proof export lets a separate RPC node validate the exact native
-    // controller-produced chain. It contains public blocks/addresses, no keys.
-    if (const char* path{std::getenv("MERCATURA_SOLO_QUALIFICATION_OUTPUT")}) {
-        std::ofstream file{path};
-        file << proof.write(2) << '\n';
-        BOOST_REQUIRE(file.good());
-    }
+    QualifyNativeRewards(*this);
 }
 
 BOOST_AUTO_TEST_CASE(public_readiness_cooldown_and_interrupt)
@@ -519,7 +524,50 @@ BOOST_AUTO_TEST_SUITE_END()
 struct V2SoloTestingSetup : SoloTestingSetup {
     V2SoloTestingSetup() : SoloTestingSetup{TestOpts{.extra_args={"-mercahashv2height=0"}}} {}
 };
+struct ActiveMercaWeaveMiningSetup : SoloTestingSetup {
+    ActiveMercaWeaveMiningSetup() : SoloTestingSetup{TestOpts{.extra_args={"-mercahashv2height=0", "-mercaweaveheight=0"}}} {}
+};
+static void CheckGroupedRewardGuards(SoloTestingSetup& fixture, bool active)
+{
+    WalletContext context;
+    context.args = &fixture.m_args;
+    auto wallet{TestCreateWallet(CreateMockableWalletDatabase(), context, WALLET_FLAG_DESCRIPTORS)};
+    auto api{interfaces::MakeWallet(context, wallet)};
+    const auto destination{GetMiningDestination(*api)};
+    BOOST_REQUIRE(destination);
+    BOOST_CHECK(std::holds_alternative<WitnessV2MercaturaPQ>(*destination));
+    BOOST_CHECK(api->isSpendable(*destination));
+    const auto grouped{GetScriptForDestination(WitnessUnknown{3, std::vector<unsigned char>(32, 1)})};
+    const auto malformed{GetScriptForDestination(WitnessUnknown{3, std::vector<unsigned char>(31, 1)})};
+    auto node{interfaces::MakeMining(fixture.m_node, false)};
+    node::BlockCreateOptions options;
+    options.include_dummy_extranonce = true;
+    options.coinbase_output_script = grouped;
+    if (active) {
+        mining::SoloWorkProvider provider{interfaces::MakeMining(fixture.m_node, false), grouped, "", true};
+        BOOST_CHECK(provider.GetJob());
+        BOOST_CHECK(node->createNewBlock(options, false));
+    } else {
+        BOOST_CHECK_THROW((mining::SoloWorkProvider{interfaces::MakeMining(fixture.m_node, false), grouped, "", true}), std::runtime_error);
+        BOOST_CHECK_THROW(node->createNewBlock(options, false), std::runtime_error);
+    }
+    options.coinbase_output_script = malformed;
+    BOOST_CHECK_THROW((mining::SoloWorkProvider{interfaces::MakeMining(fixture.m_node, false), malformed, "", true}), std::runtime_error);
+    BOOST_CHECK_THROW(node->createNewBlock(options, false), std::runtime_error);
+}
 BOOST_FIXTURE_TEST_SUITE(mining_tests_v2, V2SoloTestingSetup)
+BOOST_AUTO_TEST_CASE(inactive_grouped_reward_guards)
+{
+    CheckGroupedRewardGuards(*this, false);
+}
+BOOST_FIXTURE_TEST_CASE(activated_grouped_reward_guards, ActiveMercaWeaveMiningSetup)
+{
+    CheckGroupedRewardGuards(*this, true);
+}
+BOOST_AUTO_TEST_CASE(native_rewards_maturity_fees_and_pq_spend)
+{
+    QualifyNativeRewards(*this);
+}
 BOOST_AUTO_TEST_CASE(gpu_worker_and_combined_mode_submit_genuine_v2_blocks_with_cpu_reference_device)
 {
     // The device is a CPU reference test double. Jobs, hashing, independent
