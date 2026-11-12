@@ -3,9 +3,14 @@
 option(WITH_CUDA_MINING "Build the optional NVIDIA CUDA MercaHash backend" OFF)
 option(WITH_OPENCL_MINING "Build the optional AMD OpenCL MercaHash backend" OFF)
 target_sources(bitcoin_node PRIVATE gpu_backend.cpp statistics.cpp cpu_scratchpads.cpp mercahash_cpu_batch.cpp)
+# The frozen CPU champion was qualified at -O3. Keep that setting local to
+# this mining unit; consensus hashing and global ISA/compiler flags are unchanged.
+set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/mercahash_cpu_batch.cpp TARGET_DIRECTORY bitcoin_node APPEND PROPERTY COMPILE_OPTIONS
+  "$<$<AND:$<CONFIG:Release>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-O3>")
 option(MERCAHASH_CPU_FORCE_SCALAR "Disable the mining CPU batch AVX2 dispatch for portable qualification" OFF)
 if(MERCAHASH_CPU_FORCE_SCALAR)
-  set_property(SOURCE mercahash_cpu_batch.cpp APPEND PROPERTY COMPILE_DEFINITIONS CPU2_FORCE_SCALAR MERCAHASH_FORCE_SCALAR)
+  set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/mercahash_cpu_batch.cpp TARGET_DIRECTORY bitcoin_node
+    APPEND PROPERTY COMPILE_DEFINITIONS CPU2_FORCE_SCALAR MERCAHASH_FORCE_SCALAR)
 endif()
 if(BUILD_TESTS)
   add_executable(mining-bench mining_bench.cpp)

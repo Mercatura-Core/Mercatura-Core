@@ -21,6 +21,7 @@ def main():
     parser.add_argument('--compiler', default='/usr/bin/g++')
     parser.add_argument('--scalar', action='store_true')
     parser.add_argument('--sanitize', action='store_true')
+    parser.add_argument('--optimization', choices=('-O2', '-O3'), default='-O3')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     identities = {
@@ -52,7 +53,7 @@ int main(int argc,char**argv){try{
     harness = out / 'verify.cpp'
     harness.write_text(text)
     binary = out / 'verify'
-    flags = ['-std=c++20', '-O2', '-DNDEBUG', '-pthread', f'-I{root / "src"}']
+    flags = ['-std=c++20', args.optimization, '-DNDEBUG', '-pthread', f'-I{root / "src"}']
     if args.scalar:
         flags += ['-DCPU2_FORCE_SCALAR', '-DMERCAHASH_FORCE_SCALAR']
     if args.sanitize:
