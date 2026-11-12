@@ -78,6 +78,20 @@ binding selects a supported power-of-two workgroup from 8 to 64 with an OpenCL
 1.2 local-memory XOR reduction. No MercaHash workload is shortened. Actual AMD
 runtime parity, throughput and Stop latency remain pending physical validation.
 
+Native NVIDIA V2 uses the frozen `combo-slide2` champion: sixteen independent
+hashes per fill block, 16,384-line fill chunks, word-distributed binding and eight
+independent hashes per mixing block. Occupancy queries use these actual kernels.
+Two timing-disabled completion events bound a sliding asynchronous launch window;
+not-ready events are polled with approximately 50 microsecond sleeps. Cancellation
+and exceptions drain the stream before buffers can be reused or destroyed.
+Partially created events are also released after draining during initialization
+failure. V1 scheduling and OpenCL are unchanged. This is the resident-pool
+champion, not the separate circular fixed-batch experiment.
+
+Modes remain fixed while running. Use Stop, wait for cleanup, select CPU only,
+GPU only or combined, then Start. GPU-only mode reserves host memory for
+authoritative candidate recomputation without starting CPU mining workers.
+
 A driver call itself cannot be forcibly interrupted safely. Kernel duration,
 watchdog behavior, sustained responsiveness and driver-reset behavior require
 hardware qualification. The developer's measured benchmark performance is not

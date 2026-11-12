@@ -29,7 +29,12 @@ struct Runtime {
     size_t free_memory{8ULL << 30}, extra_usage{0}, stream_memory{0};
     std::vector<Launch> launches;
     std::vector<mining::GpuHeader> observed_v2_headers;
-    std::vector<std::function<void()>> copies;
+    std::vector<std::pair<unsigned, std::function<void()>>> copies;
+    struct Event { unsigned sequence{0}; bool recorded{false}; };
+    std::map<cudaEvent_t, Event> events;
+    unsigned sequence{0}, completed{0};
+    unsigned event_creates{0}, event_records{0}, event_queries{0}, event_destroys{0};
+    unsigned fail_event_create{0}, fail_event_record{0}, fail_event_query{0}, not_ready_queries{0};
     std::vector<size_t> synchronized_at;
     dim3 grid, block;
     size_t shared{0};
@@ -48,6 +53,10 @@ struct Runtime {
     {
         if (pending) throw std::runtime_error{"Reset with pending CUDA work"};
         launches.clear(); copies.clear(); synchronized_at.clear();
+        sequence = completed = 0;
+        event_creates = event_records = event_queries = event_destroys = 0;
+        fail_event_create = fail_event_record = fail_event_query = not_ready_queries = 0;
+        for (auto& [event, marker] : events) marker = {};
         observed_v2_headers.clear();
         mallocs = transfers = syncs = 0;
         fail_malloc = fail_launch = fail_transfer = fail_sync = 0;
@@ -78,20 +87,20 @@ void CheckSchedule(unsigned count, bool v2 = false)
 {
     const auto& s{State()};
     if (v2) {
-        Require(s.launches.size() == 194 && s.synchronized_at.size() == 195, "Wrong bounded V2 launch cadence");
+        Require(s.launches.size() == 146 && s.synchronized_at.size() == 1, "Wrong sliding V2 launch cadence");
+        Require(s.event_records == 146 && s.event_queries >= 145, "Missing sliding completion markers");
         unsigned i{0};
-        const auto check = [&](const char* name, unsigned block, unsigned begin, unsigned end) {
+        const auto check = [&](const char* name, unsigned grid, unsigned block, unsigned begin, unsigned end) {
             const auto& launch{s.launches.at(i++)};
-            Require(launch.name == name && launch.grid == count && launch.block == block && launch.count == count &&
+            Require(launch.name == name && launch.grid == grid && launch.block == block && launch.count == count &&
                     launch.begin == begin && launch.end == end, "Wrong V2 launch bounds or geometry");
         };
-        check("mh_init_v2", 32, 0, 0);
-        for (unsigned begin{0}; begin < 262144; begin += 4096) check("mh_fill_v2", 1, begin, begin + 4096);
-        for (unsigned begin{0}; begin < 4096; begin += 64) check("mh_bind_v2", 32, begin, begin + 64);
-        for (unsigned begin{1}; begin <= 16384; begin += 256) check("mh_mix_v2", 32, begin, begin + 255);
-        check("mh_final_v2", 32, 0, 0);
-        for (unsigned n{0}; n < 194; ++n) Require(s.synchronized_at[n] == n + 1, "V2 kernel was not drained individually");
-        Require(s.synchronized_at.back() == 194 && s.pending == 0, "V2 output transfer not drained");
+        check("mh_init_v2", count, 32, 0, 0);
+        for (unsigned begin{0}; begin < 262144; begin += 16384) check("research_fill", (count + 15) / 16, 16, begin, begin + 16384);
+        for (unsigned begin{0}; begin < 4096; begin += 64) check("research_bind", count, 32, begin, begin + 64);
+        for (unsigned begin{1}; begin <= 16384; begin += 256) check("research_mix", (count + 7) / 8, 8, begin, begin + 255);
+        check("mh_final_v2", count, 32, 0, 0);
+        Require(s.synchronized_at.back() == 146 && s.pending == 0, "V2 output transfer not drained");
         return;
     }
     Require(s.launches.size() == (v2 ? 98U : 770U), "Wrong total kernel count");
@@ -127,7 +136,12 @@ void CUDARTAPI __cudaUnregisterFatBinary(void**) {}
 void CUDARTAPI __cudaRegisterVar(void**, char*, char*, const char*, int, size_t, int, int) {}
 void CUDARTAPI __cudaRegisterFunction(void**, const char* host, char*, const char* name, int, uint3*, uint3*, dim3*, dim3*, int*)
 {
-    State().kernels[host] = name;
+    std::string label{name};
+    // The champion's packed kernels use C++ linkage; normalize their CUDA
+    // registration names while retaining exact signature checks at launch.
+    for (const auto* kernel : {"research_fill", "research_bind", "research_mix"})
+        if (label.find(kernel) != std::string::npos) { label = kernel; break; }
+    State().kernels[host] = label;
 }
 unsigned CUDARTAPI __cudaPushCallConfiguration(dim3 grid, dim3 block, size_t shared, void* stream)
 {
@@ -201,7 +215,7 @@ cudaError_t CUDARTAPI cudaFree(void* pointer)
 cudaError_t CUDARTAPI cudaMemcpyAsync(void* dst, const void* src, size_t bytes, cudaMemcpyKind, cudaStream_t)
 {
     auto& s{State()};
-    s.copies.emplace_back([=] { std::memcpy(dst, src, bytes); }); ++s.pending;
+    s.copies.emplace_back(++s.sequence, [=] { std::memcpy(dst, src, bytes); }); ++s.pending;
     return ++s.transfers == s.fail_transfer ? cudaErrorInvalidValue : cudaSuccess;
 }
 cudaError_t CUDARTAPI cudaLaunchKernel(const void* function, dim3 grid, dim3 block, void** args, size_t, cudaStream_t)
@@ -212,15 +226,18 @@ cudaError_t CUDARTAPI cudaLaunchKernel(const void* function, dim3 grid, dim3 blo
     if (name == "mh_init_v2") {
         const auto* headers{reinterpret_cast<const mining::GpuHeader*>(*static_cast<unsigned char**>(args[0]))};
         const auto count{*static_cast<unsigned*>(args[2])};
-        s.copies.emplace_back([headers, count] {
+        s.copies.emplace_back(s.sequence + 1, [headers, count] {
             State().observed_v2_headers.insert(State().observed_v2_headers.end(), headers, headers + count);
         });
     }
-    s.launches.push_back({name, grid.x, block.x, *static_cast<unsigned*>(args[init ? 2 : 4]),
-                         init ? 0 : *static_cast<unsigned*>(args[5]), init ? 0 : *static_cast<unsigned*>(args[6])});
-    if (!init && name.ends_with("_v2"))
-        s.launches.back().scratch = reinterpret_cast<uintptr_t>(*static_cast<unsigned long long**>(args[2]));
-    ++s.pending; return cudaSuccess;
+    const bool packed{name == "research_fill" || name == "research_bind" || name == "research_mix"};
+    const unsigned count{*static_cast<unsigned*>(args[init || packed ? 2 : 4])};
+    s.launches.push_back({name, grid.x, block.x, count,
+                         init ? 0 : *static_cast<unsigned*>(args[packed ? 3 : 5]),
+                         init ? 0 : *static_cast<unsigned*>(args[packed ? 4 : 6])});
+    if (packed || (!init && name.ends_with("_v2")))
+        s.launches.back().scratch = reinterpret_cast<uintptr_t>(*static_cast<unsigned long long**>(args[packed ? 1 : 2]));
+    ++s.sequence; ++s.pending; return cudaSuccess;
 }
 #if CUDART_VERSION >= 13000
 // CUDA 13 uses an opaque kernel handle for the same host launch contract.
@@ -243,12 +260,59 @@ cudaError_t CUDARTAPI cudaGetLastError()
     s.last_error = cudaSuccess;
     return error;
 }
+void CompleteThrough(unsigned sequence)
+{
+    auto& s{State()};
+    auto it{s.copies.begin()};
+    while (it != s.copies.end()) {
+        if (it->first <= sequence) { it->second(); it = s.copies.erase(it); }
+        else ++it;
+    }
+    s.completed = std::max(s.completed, sequence);
+    s.pending = s.sequence - s.completed;
+}
 cudaError_t CUDARTAPI cudaStreamSynchronize(cudaStream_t)
 {
     auto& s{State()};
-    for (auto& copy : s.copies) copy();
-    s.copies.clear(); s.pending = 0; s.synchronized_at.push_back(s.launches.size());
+    CompleteThrough(s.sequence); s.synchronized_at.push_back(s.launches.size());
     return ++s.syncs == s.fail_sync ? cudaErrorLaunchFailure : cudaSuccess;
+}
+cudaError_t CUDARTAPI cudaEventCreateWithFlags(cudaEvent_t* event, unsigned flags)
+{
+    auto& s{State()};
+    Require(flags == cudaEventDisableTiming, "Completion event enables timing");
+    if (++s.event_creates == s.fail_event_create) return cudaErrorMemoryAllocation;
+    *event = reinterpret_cast<cudaEvent_t>(std::malloc(1));
+    s.events.emplace(*event, Runtime::Event{});
+    return cudaSuccess;
+}
+cudaError_t CUDARTAPI cudaEventRecord(cudaEvent_t event, cudaStream_t)
+{
+    auto& s{State()};
+    if (++s.event_records == s.fail_event_record) return cudaErrorInvalidResourceHandle;
+    auto& marker{s.events.at(event)};
+    // A marker may be recorded again only after its previous work completed.
+    Require(!marker.recorded || marker.sequence <= s.completed, "Reused an in-flight completion event");
+    marker = {s.sequence, true};
+    return cudaSuccess;
+}
+cudaError_t CUDARTAPI cudaEventQuery(cudaEvent_t event)
+{
+    auto& s{State()};
+    if (++s.event_queries == s.fail_event_query) return cudaErrorLaunchFailure;
+    if (s.not_ready_queries) { --s.not_ready_queries; return cudaErrorNotReady; }
+    const auto marker{s.events.at(event)};
+    Require(marker.recorded, "Queried an unrecorded event");
+    CompleteThrough(marker.sequence);
+    return cudaSuccess;
+}
+cudaError_t CUDARTAPI cudaEventDestroy(cudaEvent_t event)
+{
+    auto& s{State()};
+    Require(s.pending == 0, "Destroyed event with pending stream work");
+    Require(s.events.erase(event) == 1, "Destroyed unknown completion event");
+    std::free(event); ++s.event_destroys;
+    return cudaSuccess;
 }
 } // extern "C"
 
@@ -392,6 +456,11 @@ int main()
         }
         auto v2_device{device};
         v2_device.pow_version = mercahash::Version::V2;
+        for (unsigned fail{1}; fail <= 2; ++fail) {
+            state.Reset(); state.fail_event_create = fail;
+            ExpectFailure([&] { mining::CreateCudaBackend(v2_device, 2); });
+            Require(state.events.empty() && state.streams == 0 && state.allocations.empty(), "Partial completion-event initialization leaked resources");
+        }
         state.Reset(); state.scratchpad_bytes = 16ULL << 20; state.max_contexts = UINT_MAX; state.free_memory = 8ULL << 30;
         {
             auto automatic{mining::CreateCudaBackend(v2_device, 0)};
@@ -416,13 +485,36 @@ int main()
                 state.Reset(); state.scratchpad_bytes = 16ULL << 20; state.max_contexts = UINT_MAX;
                 Require(backend->Hash(partial, [] { return false; }).size() == 1, "V2 buffer reuse after cancellation failed");
             }
-            for (unsigned fail : {1U, 2U, 17U, 18U, 49U, 81U, 82U, 97U, 98U, 129U, 193U, 194U}) {
+            for (unsigned fail : {1U, 2U, 17U, 18U, 49U, 81U, 82U, 97U, 98U, 129U, 145U, 146U}) {
                 state.Reset(); state.scratchpad_bytes = 16ULL << 20; state.max_contexts = UINT_MAX; state.fail_launch = fail;
                 ExpectFailure([&] { backend->Hash(full, [] { return false; }); });
             }
-            for (unsigned fail : {1U, 2U, 65U, 129U, 193U, 194U, 195U}) {
+            for (unsigned fail : {1U}) {
                 state.Reset(); state.scratchpad_bytes = 16ULL << 20; state.max_contexts = UINT_MAX; state.fail_sync = fail;
                 ExpectFailure([&] { backend->Hash(full, [] { return false; }); });
+            }
+            for (unsigned fail{1}; fail <= 146; ++fail) {
+                state.Reset(); state.fail_event_record = fail;
+                ExpectFailure([&] { backend->Hash(full, [] { return false; }); });
+            }
+            for (unsigned fail{1}; fail <= 145; ++fail) {
+                state.Reset(); state.fail_event_query = fail;
+                ExpectFailure([&] { backend->Hash(full, [] { return false; }); });
+            }
+            state.Reset(); state.not_ready_queries = 3;
+            Require(backend->Hash(full, [] { return false; }).size() == 2, "Not-ready polling lost V2 work");
+            Require(state.event_queries == 148, "Not-ready events were not polled again");
+            state.Reset(); state.not_ready_queries = UINT_MAX;
+            Require(backend->Hash(full, [&] { return state.event_queries >= 2; }).empty(), "Cancellation during not-ready polling failed");
+            Require(state.pending == 0, "Not-ready cancellation left queued work");
+            for (unsigned fail : {1U, 2U, 20U, 80U, 160U, checkpoints}) {
+                state.Reset(); polls = 0;
+                ExpectFailure([&] {
+                    backend->Hash(full, [&] {
+                        if (++polls == fail) throw std::runtime_error{"Injected V2 cancellation callback failure"};
+                        return false;
+                    });
+                });
             }
             for (unsigned fail : {1U, 2U}) {
                 state.Reset(); state.fail_transfer = fail;
@@ -430,12 +522,13 @@ int main()
             }
             std::cout << checkpoints << " V2 cancellation checkpoints and restarts passed (fake runtime)\n";
         }
+        Require(state.events.empty() && !state.freed_pending, "V2 teardown leaked events or freed queued buffers");
         for (unsigned fail{1}; fail <= 4; ++fail) {
             state.Reset(); state.scratchpad_bytes = 16ULL << 20; state.max_contexts = UINT_MAX; state.fail_malloc = fail;
             ExpectFailure([&] { mining::CreateCudaBackend(v2_device, 2); });
             Require(state.allocations.empty() && state.streams == 0, "V2 partial allocation leaked resources");
         }
-        for (const unsigned n : {1U, 128U, 192U, 255U, 256U, 257U, 325U, 512U, 1024U, 8193U}) {
+        for (const unsigned n : {1U, 7U, 8U, 9U, 15U, 16U, 17U, 128U, 192U, 255U, 256U, 257U, 286U, 325U, 512U, 1024U, 8193U}) {
             state.Reset(); state.scratchpad_bytes = 16ULL << 20; state.max_contexts = UINT_MAX;
             state.free_memory = 2 * (uint64_t{n} * ((16ULL << 20) + 4096) + (576ULL << 20));
             {
@@ -453,9 +546,9 @@ int main()
                 unsigned covered{0};
                 unsigned scratch_covered{0};
                 for (const auto& launch : state.launches) {
-                    Require(launch.grid <= 325 && launch.grid == launch.count, "V2 launch exceeded the hardware window");
+                    Require(launch.grid <= 325 && launch.count <= 325 && launch.grid == (launch.name == "research_fill" ? (launch.count + 15) / 16 : launch.name == "research_mix" ? (launch.count + 7) / 8 : launch.count), "V2 launch exceeded the hardware window");
                     if (launch.name == "mh_init_v2") covered += launch.count;
-                    if (launch.name == "mh_fill_v2" && launch.begin == 0) {
+                    if (launch.name == "research_fill" && launch.begin == 0) {
                         Require(launch.scratch == scratch_base + uint64_t{scratch_covered} * (16ULL << 20), "V2 resident scratchpad windows overlap or skip contexts");
                         scratch_covered += launch.count;
                     }

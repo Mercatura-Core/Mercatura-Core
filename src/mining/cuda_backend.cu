@@ -31,6 +31,452 @@ static_assert(MH_BIND_BLOCK_COUNT == mercahash::V2_BIND_BLOCK_COUNT);
 #undef mh_final
 #undef MH_VERSION
 using mh_u64 = unsigned long long;
+
+namespace mh_v2 {
+template<unsigned W> __device__ __forceinline__ mh_u64 exchange(mh_u64 x, unsigned src, unsigned mask) {
+    return (mh_u64(__shfl_sync(mask, unsigned(x >> 32), src, W)) << 32) |
+           __shfl_sync(mask, unsigned(x), src, W);
+}
+
+constexpr unsigned FILL_THREADS=16,HASHES_PER_BLOCK=16;
+__global__ void research_fill(mh_u64* states,mh_u64* scratchpad,unsigned count,unsigned begin,unsigned end) {
+ const unsigned id=(blockIdx.x*blockDim.x+threadIdx.x)*1;
+ if(id>=count) return;
+ const unsigned id0=id+0; mh_u64 s0[16]; for(unsigned j=0;j<16;++j) s0[j]=states[(id0<count?id0:id)*16+j];
+
+
+    if (begin == 0) {
+        // Domain-separated transition from initial s0 into scratchpad fill.
+        s0[0] ^= 0x9E3779B97F4A7C15ULL;
+        s0[5] ^= 0xBF58476D1CE4E5B9ULL;
+        s0[10] ^= 0x94D049BB133111EBULL;
+        s0[15] ^= 0xD6E8FEB86659FD93ULL;
+    }
+
+ for(unsigned k=begin;k<end;k+=2) {
+{unsigned i=k;
+{        const mh_u64 x = (mh_u64)(i);
+
+        s0[0] += x;
+        s0[7] ^= mh_rotl(x, 17);
+        s0[8] += x ^ 0x9E3779B97F4A7C15ULL;
+        s0[15] ^= mh_rotl(x, 41);
+
+}
+s0[0]=s0[0]+s0[4];
+s0[1]=s0[1]+s0[5];
+s0[2]=s0[2]+s0[6];
+s0[3]=s0[3]+s0[7];
+s0[12]=mh_rotl(s0[12]^s0[0],32);
+s0[13]=mh_rotl(s0[13]^s0[1],32);
+s0[14]=mh_rotl(s0[14]^s0[2],32);
+s0[15]=mh_rotl(s0[15]^s0[3],32);
+s0[8]=s0[8]+s0[12];
+s0[9]=s0[9]+s0[13];
+s0[10]=s0[10]+s0[14];
+s0[11]=s0[11]+s0[15];
+s0[4]=mh_rotl(s0[4]^s0[8],24);
+s0[5]=mh_rotl(s0[5]^s0[9],24);
+s0[6]=mh_rotl(s0[6]^s0[10],24);
+s0[7]=mh_rotl(s0[7]^s0[11],24);
+s0[0]=s0[0]+s0[4];
+s0[1]=s0[1]+s0[5];
+s0[2]=s0[2]+s0[6];
+s0[3]=s0[3]+s0[7];
+s0[12]=mh_rotl(s0[12]^s0[0],16);
+s0[13]=mh_rotl(s0[13]^s0[1],16);
+s0[14]=mh_rotl(s0[14]^s0[2],16);
+s0[15]=mh_rotl(s0[15]^s0[3],16);
+s0[8]=s0[8]+s0[12];
+s0[9]=s0[9]+s0[13];
+s0[10]=s0[10]+s0[14];
+s0[11]=s0[11]+s0[15];
+s0[4]=mh_rotl(s0[4]^s0[8],63);
+s0[5]=mh_rotl(s0[5]^s0[9],63);
+s0[6]=mh_rotl(s0[6]^s0[10],63);
+s0[7]=mh_rotl(s0[7]^s0[11],63);
+{
+        Line line = {{0}};
+
+        for (mh_u64 j = 0; j < MH_LINE_WORDS; ++j) {
+            line.v[j] = s0[j] ^ s0[j + 8];
+        }
+
+        // Experimental single-thread scratchpad fill.
+          for (unsigned j = 0; j < MH_LINE_WORDS; ++j) {
+              if(id0<count) scratchpad[
+                  (mh_u64)id0 * MH_LINE_COUNT * MH_LINE_WORDS
+                  + (mh_u64)i * MH_LINE_WORDS + j
+              ] = line.v[j];
+          }
+
+        // Feed the newly generated line back into the evolving s0.
+        s0[0] += line.v[3];
+        s0[1] ^= mh_rotl(line.v[4], 11);
+        s0[2] += line.v[5];
+        s0[3] ^= mh_rotl(line.v[6], 23);
+
+        s0[4] += line.v[7];
+        s0[5] ^= mh_rotl(line.v[0], 37);
+        s0[6] += line.v[1];
+        s0[7] ^= mh_rotl(line.v[2], 53);
+
+        s0[8] ^= line.v[5];
+        s0[9] += mh_rotl(line.v[6], 7);
+        s0[10] ^= line.v[7];
+        s0[11] += mh_rotl(line.v[0], 19);
+
+        s0[12] ^= line.v[1];
+        s0[13] += mh_rotl(line.v[2], 31);
+        s0[14] ^= line.v[3];
+        s0[15] += mh_rotl(line.v[4], 47);
+}
+}
+{unsigned i=k+1;
+{        const mh_u64 x = (mh_u64)(i);
+
+        s0[0] += x;
+        s0[7] ^= mh_rotl(x, 17);
+        s0[8] += x ^ 0x9E3779B97F4A7C15ULL;
+        s0[15] ^= mh_rotl(x, 41);
+
+}
+s0[0]=s0[0]+s0[5];
+s0[1]=s0[1]+s0[6];
+s0[2]=s0[2]+s0[7];
+s0[3]=s0[3]+s0[4];
+s0[15]=mh_rotl(s0[15]^s0[0],32);
+s0[12]=mh_rotl(s0[12]^s0[1],32);
+s0[13]=mh_rotl(s0[13]^s0[2],32);
+s0[14]=mh_rotl(s0[14]^s0[3],32);
+s0[10]=s0[10]+s0[15];
+s0[11]=s0[11]+s0[12];
+s0[8]=s0[8]+s0[13];
+s0[9]=s0[9]+s0[14];
+s0[5]=mh_rotl(s0[5]^s0[10],24);
+s0[6]=mh_rotl(s0[6]^s0[11],24);
+s0[7]=mh_rotl(s0[7]^s0[8],24);
+s0[4]=mh_rotl(s0[4]^s0[9],24);
+s0[0]=s0[0]+s0[5];
+s0[1]=s0[1]+s0[6];
+s0[2]=s0[2]+s0[7];
+s0[3]=s0[3]+s0[4];
+s0[15]=mh_rotl(s0[15]^s0[0],16);
+s0[12]=mh_rotl(s0[12]^s0[1],16);
+s0[13]=mh_rotl(s0[13]^s0[2],16);
+s0[14]=mh_rotl(s0[14]^s0[3],16);
+s0[10]=s0[10]+s0[15];
+s0[11]=s0[11]+s0[12];
+s0[8]=s0[8]+s0[13];
+s0[9]=s0[9]+s0[14];
+s0[5]=mh_rotl(s0[5]^s0[10],63);
+s0[6]=mh_rotl(s0[6]^s0[11],63);
+s0[7]=mh_rotl(s0[7]^s0[8],63);
+s0[4]=mh_rotl(s0[4]^s0[9],63);
+{
+        Line line = {{0}};
+
+        for (mh_u64 j = 0; j < MH_LINE_WORDS; ++j) {
+            line.v[j] = s0[j] ^ s0[j + 8];
+        }
+
+        // Experimental single-thread scratchpad fill.
+          for (unsigned j = 0; j < MH_LINE_WORDS; ++j) {
+              if(id0<count) scratchpad[
+                  (mh_u64)id0 * MH_LINE_COUNT * MH_LINE_WORDS
+                  + (mh_u64)i * MH_LINE_WORDS + j
+              ] = line.v[j];
+          }
+
+        // Feed the newly generated line back into the evolving s0.
+        s0[0] += line.v[3];
+        s0[1] ^= mh_rotl(line.v[4], 11);
+        s0[2] += line.v[5];
+        s0[3] ^= mh_rotl(line.v[6], 23);
+
+        s0[4] += line.v[7];
+        s0[5] ^= mh_rotl(line.v[0], 37);
+        s0[6] += line.v[1];
+        s0[7] ^= mh_rotl(line.v[2], 53);
+
+        s0[8] ^= line.v[5];
+        s0[9] += mh_rotl(line.v[6], 7);
+        s0[10] ^= line.v[7];
+        s0[11] += mh_rotl(line.v[0], 19);
+
+        s0[12] ^= line.v[1];
+        s0[13] += mh_rotl(line.v[2], 31);
+        s0[14] ^= line.v[3];
+        s0[15] += mh_rotl(line.v[4], 47);
+}
+}
+}
+
+ if(id0<count) for(unsigned j=0;j<16;++j) states[id0*16+j]=s0[j];
+}
+}
+
+
+namespace mh_v2 {
+constexpr unsigned MIX_WIDTH=1,MIX_THREADS=8,MIX_HASHES=8;
+__device__ __forceinline__ void ResearchWriteLine(mh_u64* scratchpad,mh_u64 index,Line line,unsigned stride,unsigned id) {
+    const unsigned lane=threadIdx.x%MIX_WIDTH;
+for(unsigned j=lane;j<8;j+=MIX_WIDTH) scratchpad[mh_u64(id)*262144*8+index*8+j]=line.v[j];
+}
+
+
+MH_INLINE PrimaryResult ResearchPrimaryStep(mh_u64 *state, MH_GLOBAL mh_u64 *scratchpad, mh_u64 step, unsigned stride,
+                                    unsigned id)
+{
+    const mh_u64 primary_seed =
+        state[0] ^ mh_rotl(state[5], 17) ^ state[10] ^ mh_rotl(state[15], 41) ^ (step * CONSTANTS[0]);
+
+    const mh_u64 primary_index = (mh_u64)(primary_seed & MH_LINE_MASK);
+
+    const Line memory = ReadLine(scratchpad, primary_index, stride, id);
+
+    for (mh_u64 j = 0; j < MH_LINE_WORDS; ++j) {
+        const mh_u64 x = memory.v[j] ^ mh_rotl(state[j + 8], ROTATION_1[j]) ^ (step * CONSTANTS[j]);
+
+        state[j] += x;
+    }
+
+    for (mh_u64 j = 0; j < MH_LINE_WORDS; ++j) {
+        const mh_u64 y = state[j] + memory.v[(j + 3) & 7] + mh_rotl(state[(j + 5) & 7], ROTATION_2[j]);
+
+        state[j + 8] = mh_rotl(state[j + 8] ^ y, ROTATION_1[(j + 3) & 7]);
+    }
+
+    Line written = {{0}};
+
+    for (mh_u64 j = 0; j < MH_LINE_WORDS; ++j) {
+        written.v[j] = memory.v[j] ^ state[j] ^ mh_rotl(state[j + 8], ROTATION_2[j]) ^ (step * CONSTANTS[(j + 1) & 7]);
+    }
+
+    ResearchWriteLine(scratchpad, primary_index, written, stride, id);
+
+    state[0] ^= written.v[5];
+    state[1] += mh_rotl(written.v[6], 9);
+    state[2] ^= written.v[7];
+    state[3] += mh_rotl(written.v[0], 21);
+
+    state[4] ^= written.v[1];
+    state[5] += mh_rotl(written.v[2], 33);
+    state[6] ^= written.v[3];
+    state[7] += mh_rotl(written.v[4], 45);
+
+    state[8] += written.v[3];
+    state[9] ^= mh_rotl(written.v[4], 15);
+    state[10] += written.v[5];
+    state[11] ^= mh_rotl(written.v[6], 27);
+
+    state[12] += written.v[7];
+    state[13] ^= mh_rotl(written.v[0], 39);
+    state[14] += written.v[1];
+    state[15] ^= mh_rotl(written.v[2], 51);
+
+    PrimaryResult result = {primary_index, written};
+    return result;
+}
+
+
+
+MH_INLINE SecondaryResult ResearchSecondaryStep(mh_u64 *state, MH_GLOBAL mh_u64 *scratchpad, mh_u64 step, PrimaryResult primary,
+                                        unsigned stride, unsigned id)
+{
+    const mh_u64 secondary_seed = state[2] ^ mh_rotl(state[7], 23) ^ state[9] ^ mh_rotl(state[14], 37) ^
+                                  primary.written.v[step & 7] ^ (step * CONSTANTS[3]);
+
+    mh_u64 secondary_index = (mh_u64)(secondary_seed & MH_LINE_MASK);
+
+    const int forced_distinct = secondary_index == primary.line_index;
+
+    if (forced_distinct) {
+        secondary_index ^= 1U;
+    }
+
+    const Line memory = ReadLine(scratchpad, secondary_index, stride, id);
+
+    for (mh_u64 j = 0; j < MH_LINE_WORDS; ++j) {
+        const mh_u64 z = memory.v[j] + state[(j + 11) & 15] + (step ^ CONSTANTS[(j + 5) & 7]);
+
+        state[j + 8] += mh_rotl(z, ROTATION_2[j]);
+    }
+
+    for (mh_u64 j = 0; j < MH_LINE_WORDS; ++j) {
+        state[j] = mh_rotl(state[j] ^ memory.v[(j + 5) & 7] ^ state[j + 8], ROTATION_1[j]);
+    }
+
+    Line written = {{0}};
+
+    for (mh_u64 j = 0; j < MH_LINE_WORDS; ++j) {
+        written.v[j] =
+            memory.v[j] + state[j] + mh_rotl(state[j + 8], ROTATION_1[(j + 2) & 7]) + (step * CONSTANTS[(j + 6) & 7]);
+    }
+
+    ResearchWriteLine(scratchpad, secondary_index, written, stride, id);
+
+    state[0] += written.v[7];
+    state[1] ^= mh_rotl(written.v[0], 13);
+    state[2] += written.v[1];
+    state[3] ^= mh_rotl(written.v[2], 25);
+
+    state[4] += written.v[3];
+    state[5] ^= mh_rotl(written.v[4], 35);
+    state[6] += written.v[5];
+    state[7] ^= mh_rotl(written.v[6], 49);
+
+    state[8] ^= written.v[2];
+    state[9] += mh_rotl(written.v[3], 17);
+    state[10] ^= written.v[4];
+    state[11] += mh_rotl(written.v[5], 29);
+
+    state[12] ^= written.v[6];
+    state[13] += mh_rotl(written.v[7], 43);
+    state[14] ^= written.v[0];
+    state[15] += mh_rotl(written.v[1], 55);
+
+    SecondaryResult result = {secondary_index, written, forced_distinct};
+    return result;
+}
+
+MH_INLINE void ResearchCrossLaneMix(mh_u64 *state, mh_u64 step)
+{
+    state[0] ^= step;
+    state[8] += step * CONSTANTS[2];
+
+    MercaARXRound(state);
+    MercaARXRound(state);
+}
+
+MH_INLINE void ResearchCheckpoint(mh_u64 *state, mh_u64 step, PrimaryResult primary, SecondaryResult secondary)
+{
+    unsigned char bytes[303];
+    const char domain[] = MH_CHECKPOINT_DOMAIN;
+    unsigned pos = 0;
+    for (unsigned i = 0; i < sizeof(domain) - 1; ++i)
+        bytes[pos++] = (unsigned char)domain[i];
+    mh_write64(bytes + pos, step);
+    pos += 8;
+    mh_write64(bytes + pos, primary.line_index);
+    pos += 8;
+    mh_write64(bytes + pos, secondary.line_index);
+    pos += 8;
+    for (unsigned i = 0; i < 16; ++i) {
+        mh_write64(bytes + pos, state[i]);
+        pos += 8;
+    }
+    for (unsigned i = 0; i < 8; ++i) {
+        mh_write64(bytes + pos, primary.written.v[i]);
+        pos += 8;
+    }
+    for (unsigned i = 0; i < 8; ++i) {
+        mh_write64(bytes + pos, secondary.written.v[i]);
+        pos += 8;
+    }
+    unsigned char digest[64];
+    mh_sha3(bytes, pos, digest, 64);
+    for (unsigned j = 0; j < 8; ++j) {
+        state[j] ^= mh_read64(digest + j * 8);
+        state[j + 8] += mh_rotl(mh_read64(digest + ((j + 3) & 7) * 8), CHECKPOINT_ROTATION[j]);
+    }
+    MercaARXRound(state);
+}
+MH_INLINE void ResearchMixScratchpad(mh_u64 *state, MH_GLOBAL mh_u64 *scratchpad, unsigned begin, unsigned end, unsigned stride,
+                             unsigned id)
+{
+    for (mh_u64 step = begin; step <= end; ++step) {
+        const PrimaryResult primary = ResearchPrimaryStep(state, scratchpad, step, stride, id);
+
+        if (step % MH_SECONDARY_INTERVAL == 0) {
+            const SecondaryResult secondary = ResearchSecondaryStep(state, scratchpad, step, primary, stride, id);
+
+            if (step % MH_CROSS_LANE_INTERVAL == 0) {
+                ResearchCrossLaneMix(state, step);
+            }
+
+            if (step % MH_CHECKPOINT_INTERVAL == 0) {
+                ResearchCheckpoint(state, step, primary, secondary);
+            }
+        }
+    }
+}
+
+
+__global__ void research_mix(mh_u64* states,mh_u64* scratchpad,unsigned count,unsigned begin,unsigned end) {
+    const unsigned id=blockIdx.x*MIX_HASHES+threadIdx.x/MIX_WIDTH;
+    if(id>=count) return; // Whole subgroups exit together.
+    mh_u64 state[16];
+    for(unsigned j=0;j<16;++j) state[j]=states[id*16+j];
+    ResearchMixScratchpad(state,scratchpad,begin,end,count,id);
+    if(threadIdx.x%MIX_WIDTH==0) for(unsigned j=0;j<16;++j) states[id*16+j]=state[j];
+}
+}
+
+namespace mh_v2 {
+__device__ __forceinline__ void bind_arx8(mh_u64& a,mh_u64& b,unsigned j,unsigned mask,bool diagonal) {
+{const mh_u64 v=exchange<8>(a,((1*4+((j%4+(diagonal?1:0)+8)%4))),mask); if(j/4==0) a=a+v;}
+{const mh_u64 v=exchange<8>(a,((0*4+((j%4+(diagonal?-3:0)+8)%4))),mask); if(j/4==1) b=mh_rotl(b^v,32);}
+{const mh_u64 v=exchange<8>(b,((1*4+((j%4+(diagonal?1:0)+8)%4))),mask); if(j/4==0) b=b+v;}
+{const mh_u64 v=exchange<8>(b,((0*4+((j%4+(diagonal?1:0)+8)%4))),mask); if(j/4==1) a=mh_rotl(a^v,24);}
+{const mh_u64 v=exchange<8>(a,((1*4+((j%4+(diagonal?1:0)+8)%4))),mask); if(j/4==0) a=a+v;}
+{const mh_u64 v=exchange<8>(a,((0*4+((j%4+(diagonal?-3:0)+8)%4))),mask); if(j/4==1) b=mh_rotl(b^v,16);}
+{const mh_u64 v=exchange<8>(b,((1*4+((j%4+(diagonal?1:0)+8)%4))),mask); if(j/4==0) b=b+v;}
+{const mh_u64 v=exchange<8>(b,((0*4+((j%4+(diagonal?1:0)+8)%4))),mask); if(j/4==1) a=mh_rotl(a^v,63);}
+}
+
+__device__ __forceinline__ void bind_round8(mh_u64& a,mh_u64& b,unsigned j,unsigned mask) {
+    bind_arx8(a,b,j,mask,false); bind_arx8(a,b,j,mask,true);
+}
+__global__ void research_bind(mh_u64* states,mh_u64* scratchpad,unsigned count,unsigned begin,unsigned end) {
+    const unsigned id=blockIdx.x,j=threadIdx.x&7;
+    if(id>=count) return;
+    const unsigned mask=0xffffffffu;
+    mh_u64 a=states[id*16+j],b=states[id*16+8+j];
+    if(begin==0) {
+        if(j==0) { a^=0xA0761D6478BD642FULL; b+=0xE7037ED1A0B428DBULL; }
+        bind_round8(a,b,j,mask);
+    }
+    mh_u64* pad=scratchpad+mh_u64(id)*262144*8;
+    const unsigned r1=ROTATION_1[j],r2=ROTATION_2[j];
+    for(unsigned block=begin;block<end;++block) {
+        const mh_u64 seed=exchange<8>(a,0,mask)^mh_rotl(exchange<8>(a,7,mask),19)^exchange<8>(b,5,mask)^
+            pad[mh_u64(block)*64*8]^mh_rotl(pad[mh_u64(block)*64*8+7],31)^
+            (mh_u64(block)*0xBF58476D1CE4E5B9ULL)^0x8EBC6AF09C88C6E3ULL;
+        const unsigned previous=block==0?4095:block-1;
+        const unsigned reference=block==0?4095:unsigned(seed%mh_u64(block));
+        const unsigned rotation=(seed>>17)&63;
+        mh_u64 acc=0;
+        __syncwarp(mask);
+        for(unsigned line=threadIdx.x/8;line<64;line+=4) {
+            const mh_u64 current=pad[(mh_u64(block)*64+line)*8+j];
+            const mh_u64 prev=pad[(mh_u64(previous)*64+((line+63)&63))*8+((j+1)&7)];
+            const mh_u64 ref=pad[(mh_u64(reference)*64+((line+rotation)&63))*8+((j+3)&7)];
+            const unsigned index=(j+line)&15;
+            const mh_u64 lower=exchange<8>(a,index&7,mask),upper=exchange<8>(b,index&7,mask);
+            const mh_u64 word=index<8?lower:upper;
+            const mh_u64 tag=mh_u64(block)^(mh_u64(line)*0x9E3779B97F4A7C15ULL);
+            const mh_u64 bound=(current+prev)^mh_rotl(ref+word,r1)^mh_rotl(tag,r2);
+            pad[(mh_u64(block)*64+line)*8+j]=bound;
+            const mh_u64 next=exchange<8>(bound,(j+1)&7,mask);
+            acc^=bound+mh_rotl(next,r2);
+        }
+        __syncwarp(mask);
+        acc^=exchange<32>(acc,threadIdx.x^8,mask);
+        acc^=exchange<32>(acc,threadIdx.x^16,mask);
+        const mh_u64 rotated=exchange<8>(acc,(j+3)&7,mask);
+        a^=acc+seed;
+        b+=mh_rotl(rotated,r1)^mh_u64(block);
+        if((block+1)%16==0) bind_round8(a,b,j,mask);
+    }
+    if(end==4096) bind_round8(a,b,j,mask);
+    if(threadIdx.x<8) { states[id*16+j]=a; states[id*16+j+8]=b; }
+}
+}
+
+#include <chrono>
+#include <thread>
+
 #include <stdexcept>
 #include <util/string.h>
 #ifndef MERCATURA_CUDA_MIN_ARCH
@@ -54,6 +500,9 @@ class CudaBackend final : public GpuBackend
     GpuMemoryBudget allocation_budget;
     uint64_t memory_bytes{0};
     cudaStream_t stream{nullptr};
+    // Each event is reused only after its preceding marker completed. Every
+    // return/exception drains the stream before caller or device buffers die.
+    cudaEvent_t completion_events[2]{};
     unsigned char *headers{nullptr};
     mh_u64 *states{nullptr};
     mh_u64 *scratch{nullptr};
@@ -80,14 +529,15 @@ class CudaBackend final : public GpuBackend
                     if (blocks <= 0) throw std::runtime_error{"NVIDIA V2 kernel has no executable occupancy"};
                     active_blocks = std::min(active_blocks, blocks);
                 };
-                occupancy(mh_v2::mh_init_v2, 32); occupancy(mh_v2::mh_fill_v2, 1);
-                occupancy(mh_v2::mh_bind_v2, 32); occupancy(mh_v2::mh_mix_v2, 32); occupancy(mh_v2::mh_final_v2, 32);
+                occupancy(mh_v2::mh_init_v2, 32); occupancy(mh_v2::research_fill, mh_v2::FILL_THREADS);
+                occupancy(mh_v2::research_bind, 32); occupancy(mh_v2::research_mix, mh_v2::MIX_THREADS); occupancy(mh_v2::mh_final_v2, 32);
                 execution_limit = GpuExecutionContexts(std::numeric_limits<unsigned int>::max(),
                     uint64_t{static_cast<unsigned>(properties.multiProcessorCount)} * active_blocks, properties.maxGridSize[0]);
             }
             // Initialize the stream first, then budget from a fresh query
             // immediately before allocating the mining buffers.
             Check(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking), "Create NVIDIA mining stream");
+            if(version==mercahash::Version::V2) for(auto& event:completion_events) Check(cudaEventCreateWithFlags(&event,cudaEventDisableTiming),"Create V2 completion event");
             const auto allocation{AllocateGpuContexts(requested, [&] {
                 size_t available{0}, total{0};
                 Check(cudaMemGetInfo(&available, &total), "Read NVIDIA free memory");
@@ -266,26 +716,42 @@ class CudaBackend final : public GpuBackend
             auto* out{outputs + size_t{next_context} * 32};
             next_context = static_cast<unsigned int>((uint64_t{next_context} + count) % contexts);
             Check(cudaMemcpyAsync(h, input.data() + completed, size_t{count} * 80, cudaMemcpyHostToDevice, stream), "Upload NVIDIA V2 headers");
+            unsigned event_head=0,event_tail=0,pending_events=0;
             const auto synchronized = [&] {
-                Check(cudaGetLastError(), "Launch NVIDIA V2 kernel");
-                Check(cudaStreamSynchronize(stream), "Synchronize NVIDIA V2 kernel");
+                Check(cudaGetLastError(),"Launch sliding-window V2 kernel");
+                Check(cudaEventRecord(completion_events[event_tail],stream),"Record sliding V2 completion");
+                event_tail=(event_tail+1)%2;
+                if(++pending_events==2) {
+                    const unsigned event_index=event_head;
+
+                    for (;;) {
+                        const auto status=cudaEventQuery(completion_events[event_index]);
+                        if(status==cudaSuccess) break;
+                        if(status!=cudaErrorNotReady) Check(status,"Poll NVIDIA V2 completion");
+                        if(cancelled()) return false;
+                        std::this_thread::sleep_for(std::chrono::microseconds(50));
+                    }
+
+                    event_head=(event_head+1)%2;
+                    --pending_events;
+                }
                 return !cancelled();
             };
             mh_v2::mh_init_v2<<<count, 32, 0, stream>>>(h, s, count);
             if (!synchronized()) return {};
-            for (unsigned begin{0}; begin < mercahash::V2_LINE_COUNT; begin += 4096) {
+            for (unsigned begin{0}; begin < mercahash::V2_LINE_COUNT; begin += 16384) {
                 if (cancelled()) return {};
-                mh_v2::mh_fill_v2<<<count, 1, 0, stream>>>(h, s, pad, out, count, begin, begin + 4096);
+                mh_v2::research_fill<<<(count+mh_v2::HASHES_PER_BLOCK-1)/mh_v2::HASHES_PER_BLOCK, mh_v2::FILL_THREADS, 0, stream>>>(s, pad, count, begin, begin + 16384);
                 if (!synchronized()) return {};
             }
             for (unsigned begin{0}; begin < mercahash::V2_BIND_BLOCK_COUNT; begin += 64) {
                 if (cancelled()) return {};
-                mh_v2::mh_bind_v2<<<count, 32, 0, stream>>>(h, s, pad, out, count, begin, begin + 64);
+                mh_v2::research_bind<<<count, 32, 0, stream>>>(s, pad, count, begin, begin + 64);
                 if (!synchronized()) return {};
             }
             for (unsigned begin{1}; begin <= mercahash::V2_MIX_STEPS; begin += 256) {
                 if (cancelled()) return {};
-                mh_v2::mh_mix_v2<<<count, 32, 0, stream>>>(h, s, pad, out, count, begin, begin + 255);
+                mh_v2::research_mix<<<(count+mh_v2::MIX_HASHES-1)/mh_v2::MIX_HASHES, mh_v2::MIX_THREADS, 0, stream>>>(s, pad, count, begin, begin + 255);
                 if (!synchronized()) return {};
             }
             mh_v2::mh_final_v2<<<count, 32, 0, stream>>>(h, s, pad, out, count, 0, 0);
@@ -318,6 +784,7 @@ class CudaBackend final : public GpuBackend
     void Cleanup()
     {
         CleanupBuffers();
+        for(auto& event:completion_events) { if(event) cudaEventDestroy(event); event=nullptr; }
         if (stream)
             cudaStreamDestroy(stream);
         stream = nullptr;
