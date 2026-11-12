@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying file COPYING.
 
 #include <mining/cpu_miner.h>
+#include <mining/mercahash_cpu_batch.h>
 
 #include <pow.h>
 #include <streams.h>
@@ -239,8 +240,7 @@ void MiningController::Run(ProviderFactory factory, unsigned int requested, GpuC
             const unsigned int count{hardware.cpu ? (requested ? requested : limits.recommended) : 0};
             if (hardware.cpu && count == 0) throw std::runtime_error{"Insufficient available memory for a mining worker"};
             if (count > limits.maximum) throw std::runtime_error{"Requested worker count exceeds the current safe CPU or memory limit"};
-            const auto host{CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), limits.available_memory, version)};
-            if (selected.size() > host.maximum || count > MaximumCpuWorkers(limits, selected.size(), version))
+            if (selected.size() > MaximumGpuVerifiers(limits, version) || count > MaximumCpuWorkers(limits, selected.size(), version))
                 throw std::runtime_error{"Insufficient host memory for CPU workers and GPU candidate verification"};
             {
                 std::lock_guard lock{m_mutex};
@@ -377,7 +377,8 @@ void MiningController::Worker(uint64_t epoch)
     bool active{false}, ready{false};
     try {
         util::ThreadRename("mca-cpu-worker");
-        PoWHashContext context; // Exactly one private authoritative context.
+        PoWHashContext context; // Lazy V1 context; V2 batching never allocates it.
+        std::unique_ptr<CpuScratchpads> batch_scratch;
         auto hash{m_hash_factory ? m_hash_factory() : HashFunction{}};
         if (m_hash_factory && !hash) throw std::runtime_error{"Mining hash context is unavailable"};
         ++m_ready_workers; ready = true;
@@ -394,6 +395,40 @@ void MiningController::Worker(uint64_t epoch)
             ++m_active;
             active = true;
             CBlockHeader header{work->job.header};
+            const auto cancelled = [this, work, epoch] {
+                return m_stop.load() || epoch != m_worker_epoch || work->cancelled.load() || work->solved.load() ||
+                       (work->job.valid && !work->job.valid->load()) || std::chrono::steady_clock::now() >= work->expires;
+            };
+            if (!hash && work->job.pow_version == mercahash::Version::V2) {
+                if (!batch_scratch) batch_scratch = std::make_unique<CpuScratchpads>();
+                V2NonceBatch leases;
+                while (!cancelled()) {
+                    const auto nonces{leases.Next(work->next_nonce, CPU_BATCH_CONTEXTS, m_allocate_range, cancelled)};
+                    if (nonces.empty()) break;
+                    std::array<std::array<unsigned char, mercahash::HEADER_SIZE>, CPU_BATCH_CONTEXTS> headers;
+                    std::array<std::array<unsigned char, mercahash::OUTPUT_SIZE>, CPU_BATCH_CONTEXTS> outputs;
+                    std::array<CBlockHeader, CPU_BATCH_CONTEXTS> candidates;
+                    std::array<mercahash::cpu2::Job, CPU_BATCH_CONTEXTS> jobs;
+                    for (size_t slot{0}; slot < nonces.size(); ++slot) {
+                        candidates[slot] = work->job.header;
+                        candidates[slot].nNonce = nonces[slot];
+                        DataStream stream; stream << candidates[slot];
+                        if (stream.size() != headers[slot].size()) throw std::runtime_error{"Noncanonical mining header size"};
+                        std::memcpy(headers[slot].data(), stream.data(), headers[slot].size());
+                        jobs[slot] = {headers[slot], (*batch_scratch)[slot], outputs[slot]};
+                    }
+                    if (cancelled()) break;
+                    // Admitted CPU batches finish all lanes. Count completed
+                    // hashes even on replacement/Stop, then discard stale hits.
+                    const auto done{mercahash::cpu2::Batch(std::span{jobs}.first(nonces.size()))};
+                    m_cpu_hashes += done;
+                    if (done != nonces.size()) throw std::runtime_error{"CPU returned an incomplete hashing batch"};
+                    for (size_t slot{0}; slot < done && !cancelled(); ++slot) {
+                        if (UintToArith256(uint256{std::span<const unsigned char>{outputs[slot]}}) <= work->job.target)
+                            ReportCandidate(work, candidates[slot]);
+                    }
+                }
+            } else
             while (!m_stop && epoch == m_worker_epoch && !work->cancelled && !work->solved && (!work->job.valid || *work->job.valid) && std::chrono::steady_clock::now() < work->expires) {
                 const auto range{m_allocate_range(work->next_nonce)};
                 if (!range) break;

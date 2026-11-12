@@ -131,8 +131,24 @@ WorkerLimits CalculateWorkerLimits(unsigned int cpus, std::optional<uint64_t> me
 
 unsigned int MaximumCpuWorkers(const WorkerLimits& limits, size_t gpu_verifiers, mercahash::Version version)
 {
-    const auto host{CalculateWorkerLimits(std::numeric_limits<unsigned int>::max(), limits.available_memory, version)};
-    return gpu_verifiers < host.maximum ? std::min(limits.maximum, static_cast<unsigned int>(host.maximum - gpu_verifiers)) : 0;
+    if (!limits.available_memory) return gpu_verifiers ? 0 : std::min(limits.maximum, 1U);
+    const auto memory{*limits.available_memory};
+    const auto reserve{std::max<uint64_t>(512ULL << 20, memory / 4)};
+    const auto budget{memory > reserve ? memory - reserve : 0};
+    if (gpu_verifiers > budget / GpuVerifierMemoryBytes(version) || gpu_verifiers > std::numeric_limits<unsigned int>::max()) return 0;
+    // The controller counts CPU and GPU workers in one unsigned counter.
+    return static_cast<unsigned int>(std::min<uint64_t>({limits.maximum,
+        std::numeric_limits<unsigned int>::max() - gpu_verifiers,
+        (budget - gpu_verifiers * GpuVerifierMemoryBytes(version)) / WorkerMemoryBytes(version)}));
+}
+
+unsigned int MaximumGpuVerifiers(const WorkerLimits& limits, mercahash::Version version)
+{
+    if (!limits.available_memory) return 1;
+    const auto memory{*limits.available_memory};
+    const auto reserve{std::max<uint64_t>(512ULL << 20, memory / 4)};
+    return static_cast<unsigned int>(std::min<uint64_t>(std::numeric_limits<unsigned int>::max(),
+        (memory > reserve ? memory - reserve : 0) / GpuVerifierMemoryBytes(version)));
 }
 
 WorkerLimits ReadLinuxWorkerLimits(unsigned int cpus, std::optional<unsigned int> affinity_cpus, const ResourceFileReader& read)

@@ -6,6 +6,7 @@
 
 #include <arith_uint256.h>
 #include <crypto/mercahash.h>
+#include <mining/cpu_scratchpads.h>
 #include <mining/gpu_backend.h>
 #include <mining/statistics.h>
 #include <primitives/block.h>
@@ -46,10 +47,13 @@ struct WorkerLimits {
 // A 128 MiB private scratchpad plus 32 MiB for stacks and other worker overhead.
 inline constexpr uint64_t WORKER_OVERHEAD_BYTES{32ULL * 1024 * 1024};
 inline constexpr uint64_t WORKER_MEMORY_BYTES{mercahash::V1_SCRATCHPAD_BYTES + WORKER_OVERHEAD_BYTES};
-constexpr uint64_t WorkerMemoryBytes(mercahash::Version version) { return mercahash::ScratchpadBytes(version) + WORKER_OVERHEAD_BYTES; }
+constexpr uint64_t CpuScratchpadBytes(mercahash::Version version) { return version == mercahash::Version::V2 ? CPU_V2_SCRATCHPAD_BYTES : mercahash::ScratchpadBytes(version); }
+constexpr uint64_t WorkerMemoryBytes(mercahash::Version version) { return CpuScratchpadBytes(version) + WORKER_OVERHEAD_BYTES; }
+constexpr uint64_t GpuVerifierMemoryBytes(mercahash::Version version) { return mercahash::ScratchpadBytes(version) + WORKER_OVERHEAD_BYTES; }
 WorkerLimits CalculateWorkerLimits(unsigned int cpus, std::optional<uint64_t> memory, mercahash::Version version = mercahash::Version::V1);
 WorkerLimits DetectWorkerLimits();
 unsigned int MaximumCpuWorkers(const WorkerLimits& limits, size_t gpu_verifiers = 0, mercahash::Version version = mercahash::Version::V1);
+unsigned int MaximumGpuVerifiers(const WorkerLimits& limits, mercahash::Version version);
 // File-reader seam for deterministic Linux namespace/cgroup/resource tests.
 using ResourceFileReader = std::function<std::string(const std::string&)>;
 WorkerLimits ReadLinuxWorkerLimits(unsigned int cpus, std::optional<unsigned int> affinity_cpus, const ResourceFileReader& read);
@@ -129,7 +133,7 @@ struct MiningStats {
 class MiningController {
 public:
     using ProviderFactory = std::function<std::unique_ptr<WorkProvider>()>;
-    // Test seam: production always constructs one PoWHashContext per worker.
+    // Test seam: injected functions retain one hash call per nonce and worker.
     using HashFunction = std::function<uint256(const CBlockHeader&)>;
     using HashFactory = std::function<HashFunction()>;
     using LimitDetector = std::function<WorkerLimits()>;

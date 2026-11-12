@@ -73,7 +73,11 @@ physical memory and job per-process commit headroom, or macOS free/inactive page
 Windows shared job memory and macOS process resource restrictions still require
 additional platform qualification.
 
-Each CPU worker is budgeted at 160 MiB (128 MiB scratchpad plus overhead). The
+Each V1 CPU worker is budgeted at 160 MiB (128 MiB scratchpad plus overhead).
+Each V2 CPU worker owns four independent 16 MiB scratchpads and is budgeted at
+96 MiB, including alignment/allocation, stack and worker overhead. The consensus
+V2 context remains 16 MiB. A GPU candidate verifier reserves a separate 48 MiB
+for V2, or 160 MiB for V1. The
 memory reserve is the greater of 512 MiB or one quarter of available memory.
 Unknown memory permits at most one worker; known insufficient memory permits
 zero. GPU candidate verifiers also consume a host-memory context per device. Combined
@@ -82,6 +86,23 @@ controller, without overwriting the saved manual preference during clamping.
 Allocation/thread failures stop safely. Logical CPU counts do not predict the
 optimal hashrate; choose fewer workers if throughput or responsiveness improves.
 Automatic GPU discovery and automatic GPU context budgeting remain available.
+
+V2 native CPU mining uses the frozen `b4-streamed-huge` batch implementation in
+`src/mining/mercahash_cpu_batch.cpp`. It dispatches AVX2 only on supported x86-64
+GCC/Clang builds and hardware; other builds retain the scalar path. Four-context
+aligned batches use streaming stores followed by a memory fence before binding.
+Partial batches of one to three contexts and unaligned buffers remain supported.
+The RAII scratchpad owner uses portable aligned C++ allocation/deallocation and
+optional Linux huge-page advice; failed or unavailable advice uses ordinary pages.
+The authoritative `mercahash::HashV2` consensus implementation is unchanged.
+
+Nonce leases remain shared with GPUs. Each admitted CPU batch completes all of
+its lanes before observing cancellation. Completed hashes, including hashes
+made stale during a batch, count toward H/s; stale candidates do not submit.
+GPU batches cancelled before returning all results do not contribute hashes,
+even if some stages or windows completed. Completed-hash H/s therefore differs
+from useful, current-job throughput. CPU and GPU compete for host resources, so
+combined rates need not equal the sum of separate benchmark rates.
 
 Architecture and validation
 ---------------------------

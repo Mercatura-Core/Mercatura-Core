@@ -100,6 +100,41 @@ BOOST_AUTO_TEST_CASE(hardware_limits)
     BOOST_CHECK_EQUAL(mining::MaximumCpuWorkers(limited, 5), 0U);
     BOOST_CHECK_EQUAL(mining::MaximumCpuWorkers(CalculateWorkerLimits(12, uint64_t{8} << 30), 1), 12U);
     BOOST_CHECK_EQUAL(mining::MaximumCpuWorkers(CalculateWorkerLimits(12, {}), 1), 0U);
+    const auto v2{CalculateWorkerLimits(256, (512ULL + 96ULL * 3 + 48ULL) << 20, mercahash::Version::V2)};
+    BOOST_CHECK_EQUAL(mining::MaximumCpuWorkers(v2, 1, mercahash::Version::V2), 3U);
+    BOOST_CHECK_EQUAL(mining::MaximumCpuWorkers(v2, 2, mercahash::Version::V2), 2U);
+}
+
+BOOST_AUTO_TEST_CASE(production_v2_batches_finish_partial_final_nonce_leases)
+{
+    struct Provider final : FakeProvider {
+        using FakeProvider::FakeProvider;
+        std::optional<mining::MiningJob> GetJob() override {
+            auto job{FakeProvider::GetJob()};
+            job->pow_version = mercahash::Version::V2;
+            return job;
+        }
+    };
+    for (unsigned count{1}; count <= 4; ++count) {
+        auto state{std::make_shared<FakeState>()};
+        std::atomic<unsigned> leased{0};
+        mining::MiningController controller{{}, [] { return mining::CalculateWorkerLimits(1, 2ULL << 30); },
+            [&](auto& cursor) -> std::optional<mining::NonceRange> {
+                const auto index{leased.fetch_add(1)};
+                cursor = mining::NONCE_SPACE;
+                if (index >= count) return {};
+                // Deliberately separate one-nonce leases ending at UINT32_MAX.
+                return mining::NonceRange{mining::NONCE_SPACE - count + index, mining::NONCE_SPACE - count + index + 1};
+            }};
+        BOOST_REQUIRE(controller.Start([state] { return std::make_unique<Provider>(state); }, 1));
+        const bool finished{Until([&] { return controller.GetStats().cpu_hashes >= count; })};
+        controller.RequestStop(); controller.Wait();
+        BOOST_CHECK(finished);
+        BOOST_CHECK(controller.GetStats().state == mining::MiningState::STOPPED);
+        BOOST_CHECK_EQUAL(controller.GetStats().cpu_hashes, count);
+        BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
+        BOOST_CHECK(state->submissions == 0);
+    }
 }
 
 BOOST_AUTO_TEST_CASE(partition_contexts_counters_cancellation_and_repetition)
@@ -657,6 +692,7 @@ BOOST_AUTO_TEST_CASE(six_worker_v2_logic_and_version_turnover)
     }
     BOOST_CHECK_EQUAL(controller.GetStats().active_workers, 0U);
     BOOST_CHECK(controller.GetStats().hashes > 0);
-    BOOST_CHECK_EQUAL(mining::WorkerMemoryBytes(mercahash::Version::V2), 48ULL << 20);
+    BOOST_CHECK_EQUAL(mining::WorkerMemoryBytes(mercahash::Version::V2), 96ULL << 20);
+    BOOST_CHECK_EQUAL(mining::GpuVerifierMemoryBytes(mercahash::Version::V2), 48ULL << 20);
 }
 BOOST_AUTO_TEST_SUITE_END()
