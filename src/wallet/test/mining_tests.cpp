@@ -540,9 +540,20 @@ BOOST_FIXTURE_TEST_CASE(mining_reward_preferences, ActiveMercaWeaveMiningSetup)
     auto wallet{TestCreateWallet(CreateMockableWalletDatabase(), context, WALLET_FLAG_DESCRIPTORS)};
     auto api{interfaces::MakeWallet(context, wallet)};
     BOOST_REQUIRE(api->mercaweaveAvailable());
+    const auto ordinary{api->getNewMercaWeaveDestination(MINING_REWARD_LABEL)};
+    BOOST_REQUIRE(ordinary);
+    BOOST_CHECK(!api->isMiningMercaWeaveDestination(*ordinary));
+    BOOST_CHECK(!GetMiningDestination(*api, 0, {}, false, false));
     const auto automatic{GetMiningDestination(*api)};
     BOOST_REQUIRE(automatic);
     BOOST_CHECK(std::holds_alternative<WitnessUnknown>(*automatic));
+    BOOST_CHECK(*automatic != *ordinary);
+    BOOST_CHECK(api->isMiningMercaWeaveDestination(*automatic));
+    BOOST_CHECK(GetMiningDestination(*api, 2, EncodeDestination(*ordinary)));
+    BOOST_REQUIRE(api->setAddressBook(*automatic, "Renamed mining address", AddressPurpose::RECEIVE));
+    const auto reused{GetMiningDestination(*api)};
+    BOOST_REQUIRE(reused);
+    BOOST_CHECK(*reused == *automatic);
     const auto standard{GetMiningDestination(*api, 1)};
     BOOST_REQUIRE(standard);
     BOOST_CHECK(std::holds_alternative<WitnessV2MercaturaPQ>(*standard));
@@ -556,15 +567,23 @@ BOOST_FIXTURE_TEST_CASE(mining_reward_preferences, ActiveMercaWeaveMiningSetup)
     auto reloaded{TestLoadWallet(std::move(database), context)};
     auto reloaded_api{interfaces::MakeWallet(context, reloaded)};
     BOOST_CHECK(GetMiningDestination(*reloaded_api, 2, selected));
+    BOOST_CHECK(reloaded_api->isMiningMercaWeaveDestination(*automatic));
+    BOOST_CHECK(!GetMiningDestination(*reloaded_api, 1, selected));
     SecureString passphrase;
     passphrase.assign("mining-payout-test");
     BOOST_REQUIRE(wallet->EncryptWallet(passphrase));
     BOOST_CHECK(!GetMiningDestination(*api, 2, {}, true));
     // Authentication may require unlock after encryption/reload; never fall back.
     const auto locked{GetMiningDestination(*api, 2, selected)};
-    if (locked) BOOST_CHECK(*locked == *fresh);
+    BOOST_REQUIRE(locked);
+    BOOST_CHECK(*locked == *fresh);
     BOOST_REQUIRE(wallet->Unlock(passphrase));
     BOOST_CHECK(GetMiningDestination(*api, 2, selected));
+    auto watch{TestCreateWallet(CreateMockableWalletDatabase(), context, WALLET_FLAG_DESCRIPTORS | WALLET_FLAG_DISABLE_PRIVATE_KEYS)};
+    auto watch_api{interfaces::MakeWallet(context, watch)};
+    BOOST_CHECK(!watch_api->mercaweaveAvailable());
+    BOOST_CHECK(!GetMiningDestination(*watch_api, 2, selected));
+    BOOST_CHECK(!GetMiningDestination(*watch_api, 0, selected));
 }
 static void CheckGroupedRewardGuards(SoloTestingSetup& fixture, bool active)
 {

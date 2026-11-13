@@ -13,7 +13,8 @@ inline constexpr const char* MINING_REWARD_LABEL{"Mercatura mining reward"};
 // Payout: 0 automatic, 1 standard v2, 2 activated MercaWeave v3.
 // An explicit selection must validate as-is; never silently substitute it.
 // Fresh derivation requires unlock and uses the dedicated v3 mining purpose.
+// create=false performs a read-only lookup for GUI previews.
 // Public owned destinations can be reused while locked when authenticated.
-util::Result<CTxDestination> GetMiningDestination(interfaces::Wallet& wallet, int payout = 0, const std::string& selected = {}, bool fresh = false);
+util::Result<CTxDestination> GetMiningDestination(interfaces::Wallet& wallet, int payout = 0, const std::string& selected = {}, bool fresh = false, bool create = true);
 } // namespace wallet
 #endif // BITCOIN_WALLET_MINING_H

@@ -38,6 +38,10 @@
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSettings>
+#include <QStandardItemModel>
+#include <chainparams.h>
+#include <key_io.h>
+#include <wallet/mining.h>
 #include <QSpinBox>
 #include <QTest>
 #include <QTimer>
@@ -226,6 +230,56 @@ private Q_SLOTS:
         QCOMPARE(session.stats().active_workers, 0U);
         QVERIFY2(callback_ms < 1000, "Status lookup waited for the chain lock");
         QVERIFY2(worst_heartbeat < 1000, "Status lookup blocked the GUI heartbeat");
+    }
+
+    void payoutTypeAndAddressSynchronization()
+    {
+        TestingSetup setup{ChainType::REGTEST, {.extra_args={"-mercaweaveheight=0"}}};
+        auto node{interfaces::MakeNode(setup.m_node)};
+        auto loader{interfaces::MakeWalletLoader(*setup.m_node.chain, setup.m_args)};
+        setup.m_node.wallet_loader = loader.get();
+        auto& context{*loader->context()};
+        auto wallet{wallet::TestCreateWallet(wallet::CreateMockableWalletDatabase(), context, wallet::WALLET_FLAG_DESCRIPTORS)};
+        QVERIFY(wallet::AddWallet(context, wallet));
+        OptionsModel options{*node};
+        bilingual_str error;
+        QVERIFY(options.Init(error));
+        ClientModel client{*node, &options};
+        std::unique_ptr<const PlatformStyle> style{PlatformStyle::instantiate("other")};
+        WalletModel model{interfaces::MakeWallet(context, wallet), client, style.get()};
+        MiningSession session{*node};
+        MiningPage page{&model};
+        page.setClientModel(&client); page.setSession(&session);
+        const QString key{QStringLiteral("mining/wallet/") + QString::fromStdString(Params().GetConsensus().hashGenesisBlock.ToString()) + "/" + QString::fromStdString(model.wallet().getWalletName()) + "/"};
+        QSettings{}.remove(key);
+        auto* payout{page.findChild<QComboBox*>("miningPayoutType")};
+        auto* fresh{page.findChild<QPushButton*>("newMiningDestination")};
+        auto* address{page.findChild<QLabel*>("miningDestination")};
+        auto* start{page.findChild<QPushButton*>("startMining")};
+        QVERIFY(qobject_cast<QStandardItemModel*>(payout->model())->item(2)->isEnabled());
+        payout->setCurrentIndex(2);
+        QVERIFY(start->isEnabled()); // Missing address can be derived at Start.
+        fresh->click();
+        const auto v3{address->text()};
+        QVERIFY(model.wallet().isMiningMercaWeaveDestination(DecodeDestination(v3.toStdString())));
+        payout->setCurrentIndex(1);
+        QVERIFY(!start->isEnabled());
+        QVERIFY(address->text() != v3);
+        QCOMPARE(QSettings{}.value(key + "address").toString(), v3);
+        fresh->click();
+        const auto v2{address->text()};
+        QVERIFY(std::holds_alternative<WitnessV2MercaturaPQ>(DecodeDestination(v2.toStdString())));
+        QVERIFY(start->isEnabled());
+        payout->setCurrentIndex(2);
+        QVERIFY(!start->isEnabled());
+        payout->setCurrentIndex(1);
+        MiningPage reopened{&model};
+        QCOMPARE(reopened.findChild<QComboBox*>("miningPayoutType")->currentIndex(), 1);
+        QCOMPARE(reopened.findChild<QLabel*>("miningDestination")->text(), v2);
+        QSettings{}.remove(key);
+        session.shutdown();
+        QVERIFY(wallet::RemoveWallet(context, wallet, std::nullopt));
+        setup.m_node.wallet_loader = nullptr;
     }
 
     void unrestrictedV2CapacityControls()
@@ -472,8 +526,34 @@ private Q_SLOTS:
         devices->item(1)->setCheckState(Qt::Unchecked);
         QCOMPARE(devices->item(0)->checkState(), Qt::Checked);
         QCOMPARE(devices->item(2)->checkState(), Qt::Checked);
-        refresh->click();
-        QTRY_VERIFY(session.gpuDiscoverySnapshot());
+        const auto rescan = [&] {
+            const auto revision{session.gpuDiscoverySnapshot()->revision};
+            refresh->click();
+            QTRY_VERIFY(session.gpuDiscoverySnapshot() && session.gpuDiscoverySnapshot()->revision > revision);
+        };
+        mining::GpuDevice cuda{mining::GpuVendor::NVIDIA_CUDA};
+        cuda.available_memory = cuda.max_allocation = 6ULL << 30;
+        const auto budget{mining::CalculateGpuBudget(cuda)};
+        QCOMPARE(budget.contexts, 43U);
+        QVERIFY(budget.headroom_bytes >= budget.reserved_bytes);
+        mining::GpuDevice amd{mining::GpuVendor::AMD_OPENCL};
+        amd.total_memory = 16ULL << 30; amd.available_memory = UINT64_MAX; amd.max_allocation = 1ULL << 30;
+        QCOMPARE(mining::CalculateGpuBudget(amd).contexts, 8U);
+        free_cuda = 5200ULL << 20;
+        rescan();
+        QTRY_COMPARE(contexts->maximum(), 36);
+        QCOMPARE(devices->item(1)->checkState(), Qt::Unchecked);
+        free_cuda = 0;
+        devices->item(2)->setCheckState(Qt::Unchecked);
+        rescan();
+        QTRY_VERIFY(memory->text().contains("cannot fit"));
+        QVERIFY(!page.findChild<QPushButton*>("startMining")->isEnabled());
+        devices->item(2)->setCheckState(Qt::Checked);
+        QVERIFY(!memory->text().contains("cannot fit"));
+        devices->item(2)->setCheckState(Qt::Unchecked);
+        free_cuda = 80ULL << 30;
+        rescan();
+        QTRY_COMPARE(contexts->maximum(), static_cast<int>(mining::MAX_GPU_CONTEXTS));
         QVERIFY(!session.stats().busy);
     }
 
@@ -735,6 +815,13 @@ private Q_SLOTS:
         page.setSession(&session);
         auto* start{page.findChild<QPushButton*>("startMining")};
         auto* stop{page.findChild<QPushButton*>("stopMining")};
+        auto* payout{page.findChild<QComboBox*>("miningPayoutType")};
+        QVERIFY(payout);
+        QVERIFY(!qobject_cast<QStandardItemModel*>(payout->model())->item(2)->isEnabled());
+        payout->setCurrentIndex(2); // A persisted unavailable preference stays explicit.
+        QVERIFY(!start->isEnabled());
+        QVERIFY(page.findChild<QLabel*>("miningStatus")->text().contains("unavailable"));
+        payout->setCurrentIndex(0);
         QVERIFY(start && stop);
         QVERIFY(!page.findChild<QComboBox*>("miningMode"));
         QVERIFY(!page.findChild<QCheckBox*>("automaticWorkers"));

@@ -161,6 +161,11 @@ public:
     {
         return m_wallet->GetNewPQGroupDestination(label, 0, 2);
     }
+    bool isMiningMercaWeaveDestination(const CTxDestination& dest) override
+    {
+        const auto record{m_wallet->GetPQGroupRecord(GetScriptForDestination(dest))};
+        return record && record->purpose == 2;
+    }
     bool mercaweaveAvailable() override { return m_wallet->MercaWeaveAvailable(); }
     util::Result<CTxDestination> getNewMercaWeaveDestination(const std::string& label) override
     {

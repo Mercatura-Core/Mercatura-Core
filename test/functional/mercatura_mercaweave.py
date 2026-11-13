@@ -276,8 +276,20 @@ class MercaWeaveTest(BitcoinTestFramework):
 
         self.log.info("Activated native mining payout and encrypted cold restart/backup/restore")
         self.mine(1, mining)
-        reward = node.getblock(node.getbestblockhash(), 2)["tx"][0]["vout"][0]["scriptPubKey"]
+        reward_tx = node.getblock(node.getbestblockhash(), 2)["tx"][0]
+        reward = reward_tx["vout"][0]["scriptPubKey"]
         assert_equal(reward["type"], "witness_v3_mercaweave")
+        assert_equal(reward["address"], mining)
+        reward_point = {"txid": reward_tx["txid"], "vout": 0}
+        assert not any(coin["txid"] == reward_tx["txid"] for coin in sender.listunspent())
+        self.mine(100, standard)
+        assert any(coin["txid"] == reward_tx["txid"] for coin in sender.listunspent())
+        funded_reward = sender.walletcreatefundedpsbt([reward_point], [{recipient: Decimal("1")}], 0,
+                                                    {"add_inputs": False, "fee_rate": Decimal("0.001")})
+        signed_reward, _ = self.finish(sender, funded_reward["psbt"])
+        assert node.testmempoolaccept([signed_reward])[0]["allowed"]
+        node.sendrawtransaction(signed_reward)
+        self.mine(1, standard)
         sender.sendtoaddress(group0, Decimal("3"))
         self.mine(1, standard)
         sender.encryptwallet("public functional-test password")

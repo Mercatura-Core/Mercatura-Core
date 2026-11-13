@@ -13,6 +13,8 @@
 class ClientModel;
 class MiningSession;
 class WalletModel;
+class QBoxLayout;
+class QResizeEvent;
 class QCheckBox;
 class QLabel;
 class QPushButton;
@@ -37,6 +39,8 @@ Q_SIGNALS:
 
 private:
     void updateStatus();
+    void resizeEvent(QResizeEvent* event) override;
+    QBoxLayout* m_address_actions;
     WalletModel* const m_wallet;
     QPointer<MiningSession> m_session;
     ClientModel* m_client{nullptr};

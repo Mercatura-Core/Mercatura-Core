@@ -29,7 +29,9 @@
 #include <QListWidget>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QResizeEvent>
 #include <QSettings>
+#include <QStandardItemModel>
 #include <QSignalBlocker>
 #include <QSpinBox>
 #include <QTimer>
@@ -56,9 +58,7 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     auto* group{new QGroupBox{tr("Mining hardware"), this}};
     auto* form{new QFormLayout{group}};
     form->setRowWrapPolicy(QFormLayout::WrapLongRows);
-    auto* description{new QLabel{tr("Mine with this wallet's native PQ reward address. Mining software fees, developer fees and automatic donations are permanently 0%."), group}};
-    description->setWordWrap(true);
-    form->addRow(description);
+    group->setToolTip(tr("Mining software and developer fees: 0%."));
     m_hardware = new QComboBox{group};
     m_hardware->setObjectName(QStringLiteral("miningHardware"));
     m_hardware->addItems({tr("CPU"), tr("GPU (NVIDIA / AMD)"), tr("CPU + GPU")});
@@ -138,17 +138,20 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     destination_layout->setSpacing(2);
     destination_layout->addWidget(m_destination);
     auto* address_actions{new QHBoxLayout};
+    m_address_actions = address_actions;
     m_copy_destination = new QPushButton{tr("Copy address"), destination_row};
     m_copy_destination->setObjectName(QStringLiteral("copyMiningDestination"));
     m_show_destination = new QPushButton{tr("Select Address"), destination_row};
     m_show_destination->setObjectName(QStringLiteral("showMiningDestination"));
     m_new_destination = new QPushButton{tr("New Address"), destination_row};
+    m_new_destination->setObjectName(QStringLiteral("newMiningDestination"));
     address_actions->addWidget(m_new_destination);
     address_actions->addWidget(m_copy_destination);
     address_actions->addWidget(m_show_destination);
     address_actions->addStretch();
     destination_layout->addLayout(address_actions);
-    form->addRow(tr("PQ reward destination"), destination_row);
+    form->addRow(new QLabel{tr("PQ reward destination"), group});
+    form->addRow(destination_row);
     form->addRow(tr("CPU / GPU hashrate and power"), m_gpu_rates);
     m_hashrate = new QLabel{group};
     m_hashrate->setObjectName(QStringLiteral("miningHashrate"));
@@ -201,6 +204,13 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
         if (m_copy_destination->isEnabled()) GUIUtil::setClipboard(m_destination->text());
     });
     connect(m_show_destination, &QPushButton::clicked, this, [this, reward_key] {
+        // A cold encrypted wallet may need to authenticate its public group
+        // records before owned v3 addresses can be offered for selection.
+        std::unique_ptr<WalletModel::UnlockContext> unlock;
+        if (m_wallet->wallet().isLocked() && m_wallet->wallet().mercaweaveAvailable()) {
+            unlock.reset(new WalletModel::UnlockContext{m_wallet->requestUnlock()});
+            if (!unlock->isValid()) return;
+        }
         QStringList addresses;
         for (const auto& entry : m_wallet->wallet().getAddresses()) {
             const auto encoded{EncodeDestination(entry.dest)};
@@ -259,6 +269,14 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     timer->start(1000);
     updateStatus();
 }
+void MiningPage::resizeEvent(QResizeEvent* event)
+{
+    QWidget::resizeEvent(event);
+    const int actions_width{m_copy_destination->minimumSizeHint().width() +
+        m_show_destination->minimumSizeHint().width() + m_new_destination->minimumSizeHint().width() + 72};
+    m_address_actions->setDirection(width() < actions_width ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+}
+
 void MiningPage::setSession(MiningSession* session)
 {
     if (m_session) disconnect(m_session, nullptr, this, nullptr);
@@ -274,6 +292,22 @@ void MiningPage::updateStatus()
     const GUIUtil::NotificationTiming timing{"mining_page_status"};
     const mining::MiningStats stats{m_session ? m_session->stats() : mining::MiningStats{}};
     const bool running{stats.busy};
+    const bool v3_available{m_wallet && m_wallet->wallet().mercaweaveAvailable()};
+    auto* payout_model{qobject_cast<QStandardItemModel*>(m_payout->model())};
+    payout_model->item(2)->setEnabled(v3_available);
+    payout_model->item(2)->setToolTip(v3_available ? QString{} : tr("Requires active MercaWeave and a supported private-key wallet."));
+    const QString reward_key{QStringLiteral("mining/wallet/") + QString::fromStdString(Params().GetConsensus().hashGenesisBlock.ToString()) + "/" + QString::fromStdString(m_wallet ? m_wallet->wallet().getWalletName() : std::string{}) + "/"};
+    const auto saved{QSettings{}.value(reward_key + "address").toString()};
+    QString reward_error;
+    QString preview;
+    if (m_wallet) {
+        auto destination{wallet::GetMiningDestination(m_wallet->wallet(), m_payout->currentIndex(), saved.toStdString(), false, false)};
+        if (destination) preview = QString::fromStdString(EncodeDestination(*destination));
+        else if (!saved.isEmpty() || (m_payout->currentIndex() == 2 && !v3_available)) reward_error = QString::fromStdString(util::ErrorString(destination).original);
+    }
+
+    if (!reward_error.isEmpty() && !saved.isEmpty() && v3_available && m_wallet->wallet().isLocked())
+        reward_error = tr("Use Select Address to unlock and validate the saved reward address");
     // UI preview only. The provider resolves the actual template's parent,
     // and the controller rechecks the version's budget before starting workers.
     const auto version{running ? stats.pow_version : GetPoWVersion(Params().GetConsensus(),
@@ -343,7 +377,7 @@ void MiningPage::updateStatus()
         const QSignalBlocker block{m_workers}; // Resource clamping is not a new manual preference.
         m_workers->setMaximum(static_cast<int>(std::max(1U, std::min(maximum, static_cast<unsigned int>(std::numeric_limits<int>::max())))));
     }
-    m_start->setEnabled(m_wallet && m_session && m_client && !running && !syncing && (!use_cpu || maximum > 0) && (!use_gpu || (discovery && gpu_available && gpu_host_memory && gpu_context_memory)));
+    m_start->setEnabled(m_wallet && m_session && m_client && !running && reward_error.isEmpty() && !syncing && (!use_cpu || maximum > 0) && (!use_gpu || (discovery && gpu_available && gpu_host_memory && gpu_context_memory)));
     m_stop->setEnabled(m_session && running && stats.state != mining::MiningState::STOPPING);
     m_hardware->setEnabled(!running);
     m_all_devices->setEnabled(!running && use_gpu);
@@ -392,16 +426,20 @@ void MiningPage::updateStatus()
     if (m_session && m_session->owner() && m_session->owner() != m_wallet && running) {
         status = tr("Mining for wallet %1. Stop this session before starting with another wallet.").arg(m_session->owner()->getDisplayName());
     }
+    if (!running && !reward_error.isEmpty()) status = reward_error + tr(". Select another address or use New Address.");
     m_status->setText(status);
-    m_destination->setText(m_privacy ? tr("(hidden)") : (stats.destination.empty() || (!running && m_session && m_session->owner() != m_wallet)) ? tr("Created or reused when mining starts") : QString::fromStdString(stats.destination));
-    const bool own_destination{!m_privacy && m_wallet && m_session && m_session->owner() == m_wallet && !stats.destination.empty()};
-    m_copy_destination->setEnabled(own_destination);
+    const bool owns_session{m_session && m_session->owner() == m_wallet};
+    const QString displayed{running && owns_session ? QString::fromStdString(stats.destination) : preview};
+    m_destination->setText(m_privacy ? tr("(hidden)") : !reward_error.isEmpty() && !running
+        ? tr("Saved selection unavailable or incompatible") : displayed.isEmpty()
+        ? tr("Created when mining starts") : displayed);
+    m_destination->setToolTip(reward_error.isEmpty()
+        ? tr("A new v3 address can share a group key; address rotation does not rotate that key.") : reward_error);
+    m_copy_destination->setEnabled(!m_privacy && !displayed.isEmpty() && (running || reward_error.isEmpty()));
     m_show_destination->setEnabled(m_wallet && !running && !m_privacy);
-    m_new_destination->setEnabled(m_wallet && !running && !m_privacy);
+    m_new_destination->setEnabled(m_wallet && !running && !m_privacy && (m_payout->currentIndex() != 2 || v3_available));
     m_payout->setEnabled(m_wallet && !running);
-    const auto saved{QSettings{}.value(QStringLiteral("mining/wallet/") + QString::fromStdString(Params().GetConsensus().hashGenesisBlock.ToString()) + "/" + QString::fromStdString((m_wallet ? m_wallet->wallet().getWalletName() : std::string{})) + "/address").toString()};
-    if (!m_privacy && !running && !saved.isEmpty()) m_destination->setText(saved);
-    m_copy_destination->setEnabled(!m_privacy && (own_destination || !saved.isEmpty()));
+
 }
 
 QString MiningPage::formatGpuContexts(const mining::GpuStats& device)

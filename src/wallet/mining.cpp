@@ -11,7 +11,7 @@
 #include <util/translation.h>
 
 namespace wallet {
-util::Result<CTxDestination> GetMiningDestination(interfaces::Wallet& wallet, int payout, const std::string& selected, bool fresh)
+util::Result<CTxDestination> GetMiningDestination(interfaces::Wallet& wallet, int payout, const std::string& selected, bool fresh, bool create)
 {
     const auto is_v3 = [](const CTxDestination& dest) {
         std::vector<std::vector<unsigned char>> solutions;
@@ -32,10 +32,22 @@ util::Result<CTxDestination> GetMiningDestination(interfaces::Wallet& wallet, in
             return util::Error{Untranslated("Selected mining address is unowned, unsupported, inactive, or incompatible with the payout type")};
         return dest;
     }
-    if (!fresh) for (const auto& address : wallet.getAddresses()) {
-        if ((address.name == MINING_REWARD_LABEL || address.purpose == AddressPurpose::RECEIVE) && eligible(address.dest) &&
-            (v3 == is_v3(address.dest))) return address.dest;
+    if (!fresh) {
+        const auto addresses{wallet.getAddresses()};
+        // Labels alone cannot authenticate a v3 derivation purpose. Ordinary
+        // receiving addresses remain available only through explicit selection.
+        const auto mining_address = [&](const auto& address) {
+            return eligible(address.dest) && (v3 ? wallet.isMiningMercaWeaveDestination(address.dest)
+                : std::holds_alternative<WitnessV2MercaturaPQ>(address.dest));
+        };
+        for (const auto& address : addresses) {
+            if (address.name == MINING_REWARD_LABEL && mining_address(address)) return address.dest;
+        }
+        for (const auto& address : addresses) {
+            if (mining_address(address) && (v3 || address.purpose == AddressPurpose::RECEIVE)) return address.dest;
+        }
     }
+    if (!create) return util::Error{Untranslated("A mining reward address will be created when mining starts")};
     if (wallet.isLocked()) return util::Error{Untranslated("Unlock this wallet once to create its native PQ mining reward address, then start mining again")};
     auto destination{v3 ? wallet.getNewMiningMercaWeaveDestination(MINING_REWARD_LABEL) : wallet.getNewDestination(OutputType::BECH32M, MINING_REWARD_LABEL)};
     if (!destination) return destination;

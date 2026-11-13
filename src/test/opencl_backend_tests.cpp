@@ -22,6 +22,7 @@ struct Runtime {
     unsigned buffers{0}, kernels{0}, contexts{0}, queues{0}, programs{0}, pending{0}, peak_pending{0};
     unsigned allocations{0}, fail_allocation{0}, fail_launch{0}, finishes{0}, fail_finish{0};
     size_t kernel_limit{64}, axis_limit{64};
+    int unified_memory{-1}; // -1: optional classification unavailable.
     bool freed_pending{false};
     std::vector<Launch> launches;
 } runtime;
@@ -52,6 +53,8 @@ cl_int clGetDeviceIDs(cl_platform_id, cl_device_type type, cl_uint, cl_device_id
 cl_int clGetDeviceInfo(cl_device_id, cl_device_info field, size_t size, void* out, size_t* returned)
 {
     switch (field) {
+    case CL_DEVICE_HOST_UNIFIED_MEMORY:
+        return runtime.unified_memory < 0 ? CL_INVALID_VALUE : Value(cl_bool(runtime.unified_memory), size, out, returned);
     case CL_DEVICE_VENDOR_ID: return Value(cl_uint{0x1002}, size, out, returned);
     case CL_DEVICE_NAME: return Text("Fake AMD host-contract device", size, out, returned);
     case CL_DEVICE_VERSION: return Text("OpenCL 1.2 fake", size, out, returned);
@@ -157,6 +160,12 @@ int main()
     using namespace fake_cl;
     try {
         auto device{mining::DiscoverOpenClDevices().devices.at(0)};
+        Require(device.supported && device.dedicated, "Unknown classification excluded a compatible AMD GPU");
+        runtime.unified_memory = 1;
+        Require(!mining::DiscoverOpenClDevices().devices.at(0).dedicated, "Integrated GPU was not classified");
+        runtime.unified_memory = 0;
+        Require(mining::DiscoverOpenClDevices().devices.at(0).dedicated, "Discrete AMD GPU was excluded");
+        runtime = {};
         device.pow_version = mercahash::Version::V2;
         const auto clean = [&] {
             Require(!runtime.buffers && !runtime.kernels && !runtime.contexts && !runtime.queues && !runtime.programs, "Resource leak");

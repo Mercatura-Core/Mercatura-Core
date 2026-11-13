@@ -98,6 +98,7 @@ public:
     // Get a new address.
     virtual util::Result<CTxDestination> getNewDestination(OutputType type, const std::string& label) = 0;
     virtual util::Result<CTxDestination> getNewMiningMercaWeaveDestination(const std::string& label) { return util::Error{Untranslated("MercaWeave mining is unsupported")}; }
+    virtual bool isMiningMercaWeaveDestination(const CTxDestination&) { return false; }
     virtual bool mercaweaveAvailable() { return false; }
     virtual util::Result<CTxDestination> getNewMercaWeaveDestination(const std::string&) { return util::Error{Untranslated("MercaWeave is unsupported by this wallet interface")}; }
 
