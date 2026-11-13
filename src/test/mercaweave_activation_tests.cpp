@@ -1,6 +1,7 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
 
+#include <chain.h>
 #include <chainparams.h>
 #include <coins.h>
 #include <common/args.h>
@@ -20,6 +21,9 @@
 namespace {
 struct MercaWeaveSetup : BasicTestingSetup {
     MercaWeaveSetup() : BasicTestingSetup(ChainType::REGTEST) {}
+};
+struct TestnetMercaWeaveSetup : TestingSetup {
+    TestnetMercaWeaveSetup() : TestingSetup(ChainType::TESTNET) {}
 };
 
 struct GroupFixture {
@@ -54,13 +58,24 @@ struct GroupFixture {
 
 BOOST_FIXTURE_TEST_SUITE(mercaweave_activation_tests, MercaWeaveSetup)
 
-BOOST_AUTO_TEST_CASE(public_schedules_unset_and_regtest_boundaries)
+BOOST_AUTO_TEST_CASE(public_testnet_schedule_and_regtest_boundaries)
 {
-    for (const auto chain : {ChainType::MAIN, ChainType::TESTNET, ChainType::TESTNET4, ChainType::SIGNET, ChainType::REGTEST}) {
+    for (const auto chain : {ChainType::MAIN, ChainType::TESTNET4, ChainType::SIGNET, ChainType::REGTEST}) {
         ArgsManager args;
         const auto params = CreateChainParams(args, chain);
         BOOST_CHECK(!params->GetConsensus().nMercaWeaveHeight);
         BOOST_CHECK(!mercaweave::IsolatedExecution::ForConsensus(params->GetConsensus(), 1'000'000));
+    }
+    ArgsManager testnet_args;
+    const auto testnet = CreateChainParams(testnet_args, ChainType::TESTNET);
+    const auto& consensus = testnet->GetConsensus();
+    BOOST_CHECK(consensus.nBlockCapacity4MiBHeight == 8'000);
+    BOOST_CHECK(consensus.nMercaHashV2Height == 17'000);
+    BOOST_CHECK(consensus.nMercaWeaveHeight == 23'000);
+    for (const auto height : {20'927, 22'999, 23'000, 23'001, 1'000'000}) {
+        const bool active{height >= 23'000};
+        BOOST_CHECK_EQUAL(Consensus::MercaWeaveActive(consensus, height), active);
+        BOOST_CHECK_EQUAL(bool(mercaweave::IsolatedExecution::ForConsensus(consensus, height)), active);
     }
     CChainParams::RegTestOptions options;
     options.mercaweave_height = 20;
@@ -81,6 +96,31 @@ BOOST_AUTO_TEST_CASE(public_schedules_unset_and_regtest_boundaries)
     forbidden.ForceSetArg("-mercaweaveheight", "0");
     for (const auto chain : {ChainType::MAIN, ChainType::TESTNET, ChainType::TESTNET4, ChainType::SIGNET}) {
         BOOST_CHECK_THROW(CreateChainParams(forbidden, chain), std::runtime_error);
+    }
+}
+
+BOOST_FIXTURE_TEST_CASE(public_testnet_script_enforcement, TestnetMercaWeaveSetup)
+{
+    GroupFixture f;
+    auto corrupted = f.tx;
+    corrupted.vin[0].scriptWitness.stack[0][0] ^= 1;
+    const auto valid = MakeTransactionRef(f.tx);
+    const auto invalid = MakeTransactionRef(corrupted);
+    const auto& genesis = Params().GetConsensus().hashGenesisBlock;
+    CBlockIndex index;
+    index.phashBlock = &genesis;
+    LOCK(cs_main);
+    ValidationCache cache{1 << 20, 1 << 20};
+    for (const auto height : {22'999, 23'000, 23'001}) {
+        index.nHeight = height;
+        const auto flags = GetBlockScriptFlags(index, *m_node.chainman);
+        BOOST_CHECK_EQUAL(bool(flags & SCRIPT_VERIFY_MERCAWEAVE), height >= 23'000);
+        PrecomputedTransactionData valid_data, invalid_data;
+        TxValidationState valid_state, invalid_state;
+        BOOST_CHECK_MESSAGE(CheckInputScripts(*valid, valid_state, f.coins, flags, true, true,
+                                             valid_data, cache, nullptr, genesis), valid_state.ToString());
+        BOOST_CHECK_EQUAL(CheckInputScripts(*invalid, invalid_state, f.coins, flags, true, true,
+                                           invalid_data, cache, nullptr, genesis), height < 23'000);
     }
 }
 

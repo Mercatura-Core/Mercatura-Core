@@ -1,23 +1,24 @@
 // Copyright (c) 2026 The Mercatura Core developers
 // Distributed under the MIT software license, see the accompanying file COPYING.
 #include <mining/gpu_power.h>
+#include <tinyformat.h>
+#include <util/fs.h>
 #include <cmath>
 #include <charconv>
-#include <cstdio>
 #include <cstdlib>
-#include <filesystem>
 #include <fstream>
 #ifdef WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 #include <windows.h>
-#else
+#elif defined(__linux__)
 #include <dlfcn.h>
 #endif
 
 namespace mining {
 namespace {
+#if defined(WIN32) || defined(__linux__)
 class Library final : public GpuTelemetryLibrary {
 #ifdef WIN32
     HMODULE m_handle{nullptr};
@@ -54,6 +55,7 @@ public:
 #endif
     }
 };
+#endif
 template<typename T> T Symbol(const std::unique_ptr<GpuTelemetryLibrary>& library, const char* name)
 {
     return library ? reinterpret_cast<T>(library->Symbol(name)) : nullptr;
@@ -89,13 +91,15 @@ struct AdlAdapter {
 };
 static_assert(sizeof(AdlAdapter) == 1572);
 void* AdlAllocate(int bytes) { return bytes > 0 ? std::malloc(bytes) : nullptr; }
-[[maybe_unused]] std::string ReadText(const std::filesystem::path& path)
+#ifdef __linux__
+std::string ReadText(const fs::path& path)
 {
-    std::ifstream file{path};
+    std::ifstream file{path.std_path()};
     std::string result;
     std::getline(file, result);
     return result;
 }
+#endif
 bool SameHardware(const GpuDevice& a, const GpuDevice& b)
 {
     return a.vendor == b.vendor && a.uuid == b.uuid && a.pci_id == b.pci_id;
@@ -104,9 +108,7 @@ bool SameHardware(const GpuDevice& a, const GpuDevice& b)
 std::string GpuPciId(uint32_t domain, unsigned bus, unsigned device, unsigned function)
 {
     if (bus > 255 || device > 31 || function > 7) return {};
-    char text[32];
-    std::snprintf(text, sizeof(text), "%04x:%02x:%02x.%x", domain, bus, device, function);
-    return text;
+    return strprintf("%04x:%02x:%02x.%x", domain, bus, device, function);
 }
 std::string GpuPciTopologyId(unsigned bus, unsigned device, unsigned function, [[maybe_unused]] const std::string& pci_root)
 {
@@ -118,9 +120,10 @@ std::string GpuPciTopologyId(unsigned bus, unsigned device, unsigned function, [
     try {
         std::string match;
         std::error_code ec;
-        for (const auto& pci : std::filesystem::directory_iterator{pci_root, ec}) {
-            const auto id{pci.path().filename().string()};
-            if (id.size() < zero.size() || !id.ends_with(zero.substr(4)) || ReadText(pci.path() / "vendor") != "0x1002") continue;
+        for (const auto& pci : fs::directory_iterator{fs::u8path(pci_root), ec}) {
+            const fs::path path{pci.path()};
+            const auto id{fs::path{path.filename()}.utf8string()};
+            if (id.size() < zero.size() || !id.ends_with(zero.substr(4)) || ReadText(path / "vendor") != "0x1002") continue;
             if (!match.empty()) return {}; // Multiple domains: never guess.
             match = id;
         }
@@ -206,17 +209,18 @@ struct GpuPowerReader::Impl {
         // The supported amdgpu hwmon ABI needs no ROCm installation. Paths are
         // resolved by full PCI BDF, never by display/driver enumeration order.
         if (device.pci_id.find_first_not_of("0123456789abcdef:.") != std::string::npos) return {};
-        const auto base{std::filesystem::path{pci_root} / device.pci_id};
+        const auto base{fs::u8path(pci_root) / fs::u8path(device.pci_id)};
         if (ReadText(base / "vendor") != "0x1002") return {};
         std::error_code ec;
-        for (const auto& hwmon : std::filesystem::directory_iterator{base / "hwmon", ec}) {
-            if (ReadText(hwmon.path() / "name") != "amdgpu") continue;
+        for (const auto& hwmon : fs::directory_iterator{base / "hwmon", ec}) {
+            const fs::path path{hwmon.path()};
+            if (ReadText(path / "name") != "amdgpu") continue;
             for (const auto* sensor : {"power1_average", "power1_input"}) {
-                const auto text{ReadText(hwmon.path() / sensor)};
+                const auto text{ReadText(path / sensor)};
                 uint64_t microwatts{0};
                 const auto parsed{std::from_chars(text.data(), text.data() + text.size(), microwatts)};
                 if (parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size() || !microwatts || microwatts == UINT64_MAX) continue;
-                auto label{ReadText(hwmon.path() / "power1_label")};
+                auto label{ReadText(path / "power1_label")};
                 if (label.size() > 80) label.resize(80);
                 return GpuPower{microwatts / 1000000.0,
                     std::string{"AMD amdgpu hwmon: SoC power (not whole-board power); "} + sensor + (label.empty() ? "" : "; " + label),

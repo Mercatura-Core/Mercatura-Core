@@ -58,4 +58,4 @@ private:
     std::thread m_thread;
 };
 } // namespace mining
-#endif
+#endif // BITCOIN_MINING_GPU_POWER_H

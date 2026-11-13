@@ -1,14 +1,16 @@
-# MercaWeave candidate activation and deployment design
+# MercaWeave activation and deployment
 
-This document describes the integration candidate, not an approved deployment.
-The v0.1.3 public testnet soak continues independently. No public activation
-height, release, tag, installer, protected-branch merge or deployment is selected.
+Public Mercatura testnet (`ChainType::TESTNET`) is scheduled to activate
+MercaWeave at block **23,000**. This is the approved source-level activation
+schedule; publishing releases and upgrading deployed nodes are separate steps.
 
 ## Network rules
 
 `Consensus::Params::nMercaWeaveHeight` is an optional network consensus parameter.
-It is **unset on mainnet, public testnet, testnet4, signet and default regtest**.
-Unset means there is no activation at any height. Negative heights are inactive.
+It is **23,000 on public testnet** and **unset on mainnet, testnet4, signet and
+default regtest**. Public testnet block 22,999 remains preactivation; block 23,000
+and later blocks enforce MercaWeave. Unset means there is no activation at any
+height. Negative heights are inactive.
 The candidate block height, rather than its parent height, determines the rule.
 
 Only isolated regtest accepts `-mercaweaveheight`. The values `0` and a positive
@@ -66,9 +68,9 @@ commitments, digests, signatures and derivation bytes are unchanged.
 2. Let the founder finish the current v0.1.3 MercaHash V2 soak and assess existing
    mining, PQ networking, storage and wallet health. This document does not attest
    that the soak is complete or that deployed nodes have been inspected.
-3. Obtain explicit founder approval for a separate activation proposal. Select
-   any public height only in that later proposal, with ample upgrade lead time,
-   operator communication and measured validating/mining adoption.
+3. Coordinate operator upgrades and validating/mining adoption ahead of the
+   approved public-testnet height 23,000. Any revision to that schedule or a
+   separate mainnet activation requires its own coordinated decision.
 4. Qualify binaries built from the agreed network-parameter commit on isolated
    matching chains and all supported platforms. Reproduce V1 historical replay,
    the V2 transition, compulsory PQ transport, reorgs and wallet recovery.

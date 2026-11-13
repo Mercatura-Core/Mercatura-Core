@@ -482,9 +482,9 @@ QString MiningPage::formatGpuRate(const mining::GpuStats& device, const std::opt
 {
     auto text{tr("%1: %2 H/s").arg(QString::fromStdString(device.device.name)).arg(device.hashes_per_second, 0, 'f', 2)};
     if (power && mining::GpuEfficiency(1.0, power->watts)) {
-        text += tr(" · %1 W").arg(power->watts, 0, 'f', 2);
+        text += QStringLiteral(" · ") + tr("%1 W").arg(power->watts, 0, 'f', 2);
         if (const auto efficiency{mining::GpuEfficiency(device.hashes_per_second, power->watts)})
-            text += tr(" · %1 H/s/W").arg(*efficiency, 0, 'f', 2);
-    } else text += tr(" · telemetry unavailable");
+            text += QStringLiteral(" · ") + tr("%1 H/s/W").arg(*efficiency, 0, 'f', 2);
+    } else text += QStringLiteral(" · ") + tr("telemetry unavailable");
     return text;
 }

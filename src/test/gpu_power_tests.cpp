@@ -2,10 +2,11 @@
 // Distributed under the MIT software license, see the accompanying file COPYING.
 // Fast telemetry ABI and sampler tests; no physical GPU or vendor SDK required.
 #include <mining/gpu_power.h>
+#include <tinyformat.h>
+#include <util/fs.h>
 #include <atomic>
 #include <cmath>
 #include <cstring>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -92,6 +93,9 @@ template<typename F> void Eventually(F predicate)
 int main()
 {
     try {
+        Require(GpuPciId(0, 3, 0, 0) == "0000:03:00.0", "PCI ID zero padding");
+        Require(GpuPciId(0xffffffff, 255, 31, 7) == "ffffffff:ff:1f.7", "PCI ID hex formatting");
+        Require(GpuPciId(0, 256, 0, 0).empty() && GpuPciId(0, 0, 32, 0).empty() && GpuPciId(0, 0, 0, 8).empty(), "Invalid PCI fields");
         GpuDevice first{GpuVendor::NVIDIA_CUDA}; first.id = "cuda:8"; first.uuid = "GPU-first";
         GpuDevice second{first}; second.id = "cuda:0"; second.uuid = "GPU-second";
         {
@@ -141,35 +145,35 @@ int main()
             Require(!GpuEfficiency(value, 67.75), "Invalid/startup hashrate");
         }
 #ifdef __linux__
-        const auto root{std::filesystem::temp_directory_path() / ("mercatura-power-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()))};
-        struct Cleanup { std::filesystem::path root; ~Cleanup() { std::filesystem::remove_all(root); } } cleanup{root};
+        const auto root{fs::path{fs::temp_directory_path()} / fs::u8path(strprintf("mercatura-power-\xc3\xa9-%d", std::chrono::steady_clock::now().time_since_epoch().count()))};
+        struct Cleanup { fs::path root; ~Cleanup() { fs::remove_all(root); } } cleanup{root};
         GpuDevice amd{GpuVendor::AMD_OPENCL}; amd.id = "opencl:9"; amd.pci_id = GpuPciId(1, 3, 0, 0);
         GpuDevice amd2{amd}; amd2.id = "opencl:0"; amd2.pci_id = GpuPciId(0, 3, 0, 0);
         for (const auto& device : {amd, amd2}) {
-            auto dir{root / device.pci_id};
-            std::filesystem::create_directories(dir / "hwmon/hwmon7");
-            std::ofstream{dir / "vendor"} << "0x1002\n";
-            std::ofstream{dir / "hwmon/hwmon7/name"} << "amdgpu\n";
-            std::ofstream{dir / "hwmon/hwmon7/power1_average"} << (device.id == amd.id ? "120500000" : "90000000");
+            auto dir{root / fs::u8path(device.pci_id)};
+            fs::create_directories(dir / "hwmon/hwmon7");
+            std::ofstream{(dir / "vendor").std_path()} << "0x1002\n";
+            std::ofstream{(dir / "hwmon/hwmon7/name").std_path()} << "amdgpu\n";
+            std::ofstream{(dir / "hwmon/hwmon7/power1_average").std_path()} << (device.id == amd.id ? "120500000" : "90000000");
         }
-        Require(GpuPciTopologyId(3, 0, 0, root.string()).empty(), "Ambiguous AMD PCI domain rejected");
-        GpuPowerReader amd_reader{{}, {}, root.string()};
+        Require(GpuPciTopologyId(3, 0, 0, root.utf8string()).empty(), "Ambiguous AMD PCI domain rejected");
+        GpuPowerReader amd_reader{{}, {}, root.utf8string()};
         Require(amd_reader.Read(amd)->watts == 120.5, "AMD microwatts/full PCI domain association");
         Require(amd_reader.Read(amd2)->watts == 90.0, "AMD multi GPU");
         Require(amd_reader.Read(amd)->source.find("SoC") != std::string::npos, "Power scope disclosed");
-        const auto sensor{root / amd.pci_id / "hwmon/hwmon7/power1_average"};
-        std::ofstream{sensor} << 0;
+        const auto sensor{root / fs::u8path(amd.pci_id) / "hwmon/hwmon7/power1_average"};
+        std::ofstream{sensor.std_path()} << 0;
         Require(!amd_reader.Read(amd), "Zero AMD power");
-        std::ofstream{sensor} << "invalid";
+        std::ofstream{sensor.std_path()} << "invalid";
         Require(!amd_reader.Read(amd), "Invalid AMD power");
-        std::ofstream{sensor} << "-1";
+        std::ofstream{sensor.std_path()} << "-1";
         Require(!amd_reader.Read(amd), "Invalid unsigned AMD sentinel");
-        std::filesystem::remove(sensor);
-        std::ofstream{sensor.parent_path() / "power1_input"} << "67500000";
+        fs::remove(sensor);
+        std::ofstream{(fs::path{sensor.parent_path()} / "power1_input").std_path()} << "67500000";
         Require(amd_reader.Read(amd)->watts == 67.5, "AMD instantaneous fallback");
-        std::filesystem::remove_all(root / amd.pci_id);
+        fs::remove_all(root / fs::u8path(amd.pci_id));
         Require(!amd_reader.Read(amd), "AMD disappeared");
-        Require(GpuPciTopologyId(3, 0, 0, root.string()) == amd2.pci_id, "Unique AMD topology domain resolved");
+        Require(GpuPciTopologyId(3, 0, 0, root.utf8string()) == amd2.pci_id, "Unique AMD topology domain resolved");
         Require(amd_reader.Read(amd2).has_value(), "Another AMD device unaffected");
         amd2.dedicated = false;
         Require(!amd_reader.Read(amd2), "APU CPU-inclusive power excluded");
