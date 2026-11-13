@@ -3,6 +3,7 @@
 // Actual OpenCL host backend with a deterministic API double. No GPU executes.
 #define CL_TARGET_OPENCL_VERSION 120
 #include <CL/cl.h>
+#include <CL/cl_ext.h>
 #include <dlfcn.h>
 #include <algorithm>
 #include <array>
@@ -22,6 +23,7 @@ struct Runtime {
     unsigned buffers{0}, kernels{0}, contexts{0}, queues{0}, programs{0}, pending{0}, peak_pending{0};
     unsigned allocations{0}, fail_allocation{0}, fail_launch{0}, finishes{0}, fail_finish{0};
     size_t kernel_limit{64}, axis_limit{64};
+    bool pci_known{true};
     int unified_memory{-1}; // -1: optional classification unavailable.
     bool freed_pending{false};
     std::vector<Launch> launches;
@@ -55,6 +57,9 @@ cl_int clGetDeviceInfo(cl_device_id, cl_device_info field, size_t size, void* ou
     switch (field) {
     case CL_DEVICE_HOST_UNIFIED_MEMORY:
         return runtime.unified_memory < 0 ? CL_INVALID_VALUE : Value(cl_bool(runtime.unified_memory), size, out, returned);
+    case CL_DEVICE_PCI_BUS_INFO_KHR:
+        return runtime.pci_known ? Value(cl_device_pci_bus_info_khr{1, 3, 4, 0}, size, out, returned) : CL_INVALID_VALUE;
+    case CL_DEVICE_TOPOLOGY_AMD: return CL_INVALID_VALUE;
     case CL_DEVICE_VENDOR_ID: return Value(cl_uint{0x1002}, size, out, returned);
     case CL_DEVICE_NAME: return Text("Fake AMD host-contract device", size, out, returned);
     case CL_DEVICE_VERSION: return Text("OpenCL 1.2 fake", size, out, returned);
@@ -161,6 +166,10 @@ int main()
     try {
         auto device{mining::DiscoverOpenClDevices().devices.at(0)};
         Require(device.supported && device.dedicated, "Unknown classification excluded a compatible AMD GPU");
+        Require(device.pci_id == "0001:03:04.0", "OpenCL PCI identity lost domain/bus/device/function");
+        runtime.pci_known = false;
+        Require(mining::DiscoverOpenClDevices().devices.at(0).supported, "Missing optional telemetry identity disabled mining");
+        runtime.pci_known = true;
         runtime.unified_memory = 1;
         Require(!mining::DiscoverOpenClDevices().devices.at(0).dedicated, "Integrated GPU was not classified");
         runtime.unified_memory = 0;

@@ -166,6 +166,7 @@ cudaError_t CUDARTAPI cudaGetDeviceProperties(cudaDeviceProp* prop, int)
     prop->minor = MERCATURA_CUDA_MIN_ARCH % 10;
     prop->multiProcessorCount = State().compute_units;
     prop->maxGridSize[0] = State().max_grid;
+    for (unsigned i{0}; i < 16; ++i) prop->uuid.bytes[i] = i + 1;
     prop->totalGlobalMem = 8ULL << 30; return cudaSuccess;
 }
 cudaError_t CUDARTAPI cudaMemGetInfo(size_t* available, size_t* total)
@@ -323,6 +324,7 @@ int main()
         const auto discovery{mining::DiscoverCudaDevices()};
         Require(discovery.devices.size() == 1 && discovery.devices[0].supported, "Fake CUDA discovery failed");
         const auto device{discovery.devices[0]};
+        Require(device.uuid == "GPU-01020304-0506-0708-090a-0b0c0d0e0f10", "CUDA hardware UUID formatting/association");
         state.free_memory = 6ULL << 30;
         {
             auto automatic{mining::CreateCudaBackend(device, 0)};

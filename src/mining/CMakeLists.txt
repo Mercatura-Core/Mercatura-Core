@@ -2,7 +2,8 @@
 # import vendor SDKs. OpenCL is loaded at runtime; CUDA uses the static runtime.
 option(WITH_CUDA_MINING "Build the optional NVIDIA CUDA MercaHash backend" OFF)
 option(WITH_OPENCL_MINING "Build the optional AMD OpenCL MercaHash backend" OFF)
-target_sources(bitcoin_node PRIVATE gpu_backend.cpp statistics.cpp cpu_scratchpads.cpp mercahash_cpu_batch.cpp)
+target_sources(bitcoin_node PRIVATE gpu_backend.cpp gpu_power.cpp statistics.cpp cpu_scratchpads.cpp mercahash_cpu_batch.cpp)
+target_link_libraries(bitcoin_node PRIVATE ${CMAKE_DL_LIBS})
 # The frozen CPU champion was qualified at -O3. Keep that setting local to
 # this mining unit; consensus hashing and global ISA/compiler flags are unchanged.
 set_property(SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/mercahash_cpu_batch.cpp TARGET_DIRECTORY bitcoin_node APPEND PROPERTY COMPILE_OPTIONS
@@ -13,6 +14,9 @@ if(MERCAHASH_CPU_FORCE_SCALAR)
     APPEND PROPERTY COMPILE_DEFINITIONS CPU2_FORCE_SCALAR MERCAHASH_FORCE_SCALAR)
 endif()
 if(BUILD_TESTS)
+  add_executable(test_gpu_power ../test/gpu_power_tests.cpp gpu_power.cpp)
+  target_link_libraries(test_gpu_power PRIVATE core_interface ${CMAKE_DL_LIBS})
+  add_test(NAME test_gpu_power COMMAND test_gpu_power)
   add_executable(mining-bench mining_bench.cpp)
   target_link_libraries(mining-bench PRIVATE core_interface bitcoin_node bitcoin_crypto univalue)
 endif()
@@ -122,7 +126,7 @@ if(WITH_OPENCL_MINING)
     APPEND PROPERTY COMPILE_DEFINITIONS MERCATURA_OPENCL)
   target_link_libraries(bitcoin_node PRIVATE ${CMAKE_DL_LIBS})
   if(BUILD_TESTS AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    add_executable(test_opencl_backend_host ../test/opencl_backend_tests.cpp gpu_backend.cpp opencl_backend.cpp)
+    add_executable(test_opencl_backend_host ../test/opencl_backend_tests.cpp gpu_backend.cpp gpu_power.cpp opencl_backend.cpp)
     target_compile_definitions(test_opencl_backend_host PRIVATE MERCATURA_OPENCL)
     target_link_libraries(test_opencl_backend_host PRIVATE core_interface bitcoin_crypto ${CMAKE_DL_LIBS})
     target_link_options(test_opencl_backend_host PRIVATE -Wl,--wrap=dlopen,--wrap=dlsym,--wrap=dlclose)

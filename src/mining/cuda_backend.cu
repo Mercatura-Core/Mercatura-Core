@@ -6,6 +6,7 @@
 #define MH_CUDA
 #include <algorithm>
 #include <limits>
+#include <cstdio>
 namespace mh_v1 {
 #include <mining/mercahash_gpu_specialized.h>
 static_assert(MH_LINE_COUNT == mercahash::LINE_COUNT && MH_LINE_MASK == mercahash::LINE_MASK);
@@ -807,6 +808,17 @@ GpuDiscovery DiscoverCudaDevices()
         try {
             cudaDeviceProp properties{};
             Check(cudaGetDeviceProperties(&properties, index), "Read NVIDIA capability");
+            // UUID matches NVML even when WSL or CUDA remaps device ordinals.
+            const auto* uuid{reinterpret_cast<const unsigned char*>(properties.uuid.bytes)};
+            if (std::any_of(uuid, uuid + 16, [](unsigned char b) { return b != 0; })) {
+                entry.uuid = "GPU-";
+                for (int b{0}; b < 16; ++b) {
+                    if (b == 4 || b == 6 || b == 8 || b == 10) entry.uuid += '-';
+                    char hex[3];
+                    std::snprintf(hex, sizeof(hex), "%02x", uuid[b]);
+                    entry.uuid += hex;
+                }
+            }
             entry.dedicated = !properties.integrated;
             entry.name = properties.name;
             entry.capability = "CUDA " + util::ToString(properties.major) + "." + util::ToString(properties.minor);

@@ -101,7 +101,7 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     m_gpu_status = new QLabel{group}; m_gpu_status->setTextFormat(Qt::PlainText); m_gpu_status->setWordWrap(true);
     m_gpu_status->setObjectName(QStringLiteral("gpuMemoryStatus"));
     form->addRow(m_gpu_status);
-    m_gpu_rates = new QLabel{group}; m_gpu_rates->setTextFormat(Qt::PlainText); m_gpu_rates->setWordWrap(true);
+    m_gpu_rates = new QLabel{group}; m_gpu_rates->setObjectName(QStringLiteral("miningDeviceRates")); m_gpu_rates->setTextFormat(Qt::PlainText); m_gpu_rates->setWordWrap(true);
 
 
     QSettings settings;
@@ -118,13 +118,16 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     const QString reward_key{QStringLiteral("mining/wallet/") + QString::fromStdString(Params().GetConsensus().hashGenesisBlock.ToString()) + "/" + QString::fromStdString((m_wallet ? m_wallet->wallet().getWalletName() : std::string{})) + "/"};
     m_payout = new QComboBox{group};
     m_payout->setObjectName(QStringLiteral("miningPayoutType"));
-    m_payout->addItems({tr("Automatic"), tr("Standard PQ v2"), tr("MercaWeave v3")});
-    m_payout->setCurrentIndex(std::clamp(settings.value(reward_key + "payout", 0).toInt(), 0, 2));
+    m_payout->addItem(tr("Standard PQ (v2)"), 1);
+    m_payout->addItem(tr("MercaWeave (v3)"), 2);
+    m_payout->setCurrentIndex(m_payout->findData(m_wallet ? MiningSession::payoutPreference(m_wallet->wallet(), reward_key) : 1));
     form->addRow(tr("Payout type"), m_payout);
-    connect(m_payout, &QComboBox::currentIndexChanged, this, [this, reward_key](int index) {
-        QSettings{}.setValue(reward_key + "payout", index);
+    const auto save_payout = [this, reward_key](int) {
+        QSettings{}.setValue(reward_key + "payoutType", m_payout->currentData().toInt() == 2 ? "v3" : "v2");
         updateStatus();
-    });
+    };
+    connect(m_payout, &QComboBox::currentIndexChanged, this, save_payout);
+    connect(m_payout, &QComboBox::activated, this, save_payout);
     m_destination = new QLabel{tr("Created or reused when mining starts"), group};
     m_destination->setObjectName(QStringLiteral("miningDestination"));
     m_destination->setTextFormat(Qt::PlainText);
@@ -214,7 +217,7 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
         QStringList addresses;
         for (const auto& entry : m_wallet->wallet().getAddresses()) {
             const auto encoded{EncodeDestination(entry.dest)};
-            if (wallet::GetMiningDestination(m_wallet->wallet(), m_payout->currentIndex(), encoded)) addresses << QString::fromStdString(encoded);
+            if (wallet::GetMiningDestination(m_wallet->wallet(), m_payout->currentData().toInt(), encoded)) addresses << QString::fromStdString(encoded);
         }
         bool ok{false};
         const auto selected{QInputDialog::getItem(this, tr("Mining reward address"), tr("Wallet address"), addresses, 0, false, &ok)};
@@ -224,7 +227,7 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     connect(m_new_destination, &QPushButton::clicked, this, [this, reward_key] {
         auto unlock{m_wallet->requestUnlock()};
         if (!unlock.isValid()) return;
-        auto dest{wallet::GetMiningDestination(m_wallet->wallet(), m_payout->currentIndex(), {}, true)};
+        auto dest{wallet::GetMiningDestination(m_wallet->wallet(), m_payout->currentData().toInt(), {}, true)};
         if (!dest) QMessageBox::warning(this, tr("Mining reward address"), QString::fromStdString(util::ErrorString(dest).original));
         else QSettings{}.setValue(reward_key + "address", QString::fromStdString(EncodeDestination(*dest)));
         updateStatus();
@@ -294,16 +297,20 @@ void MiningPage::updateStatus()
     const bool running{stats.busy};
     const bool v3_available{m_wallet && m_wallet->wallet().mercaweaveAvailable()};
     auto* payout_model{qobject_cast<QStandardItemModel*>(m_payout->model())};
-    payout_model->item(2)->setEnabled(v3_available);
-    payout_model->item(2)->setToolTip(v3_available ? QString{} : tr("Requires active MercaWeave and a supported private-key wallet."));
+    payout_model->item(m_payout->findData(2))->setEnabled(v3_available);
+    payout_model->item(m_payout->findData(2))->setToolTip(v3_available ? QString{} : tr("Requires active MercaWeave and a supported private-key wallet."));
     const QString reward_key{QStringLiteral("mining/wallet/") + QString::fromStdString(Params().GetConsensus().hashGenesisBlock.ToString()) + "/" + QString::fromStdString(m_wallet ? m_wallet->wallet().getWalletName() : std::string{}) + "/"};
+    if (m_wallet) {
+        const QSignalBlocker blocker{m_payout};
+        m_payout->setCurrentIndex(m_payout->findData(MiningSession::payoutPreference(m_wallet->wallet(), reward_key)));
+    }
     const auto saved{QSettings{}.value(reward_key + "address").toString()};
     QString reward_error;
     QString preview;
     if (m_wallet) {
-        auto destination{wallet::GetMiningDestination(m_wallet->wallet(), m_payout->currentIndex(), saved.toStdString(), false, false)};
+        auto destination{wallet::GetMiningDestination(m_wallet->wallet(), m_payout->currentData().toInt(), saved.toStdString(), false, false)};
         if (destination) preview = QString::fromStdString(EncodeDestination(*destination));
-        else if (!saved.isEmpty() || (m_payout->currentIndex() == 2 && !v3_available)) reward_error = QString::fromStdString(util::ErrorString(destination).original);
+        else if (!saved.isEmpty() || (m_payout->currentData().toInt() == 2 && !v3_available)) reward_error = QString::fromStdString(util::ErrorString(destination).original);
     }
 
     if (!reward_error.isEmpty() && !saved.isEmpty() && v3_available && m_wallet->wallet().isLocked())
@@ -403,9 +410,15 @@ void MiningPage::updateStatus()
         if (gpu_available && !gpu_context_memory) gpu_messages << tr("The selected GPUs cannot fit the requested contexts within their memory budgets. Free memory or select fewer contexts/devices.");
     }
     m_gpu_status->setText(gpu_messages.join(QStringLiteral("\n")));
-    QStringList device_rates{tr("CPU: %1 H/s · Power: N/A").arg(stats.cpu_hashes_per_second, 0, 'f', 2)};
-    for (const auto& device : stats.devices) device_rates << tr("%1: %2 H/s · Power: N/A")
-        .arg(QString::fromStdString(device.device.name)).arg(device.hashes_per_second, 0, 'f', 2);
+    QStringList device_rates{tr("CPU: %1 H/s").arg(stats.cpu_hashes_per_second, 0, 'f', 2)};
+    QStringList power_sources;
+    for (const auto& device : stats.devices) {
+        const auto power{m_session && running ? m_session->gpuPower(device.device) : std::nullopt};
+        device_rates << formatGpuRate(device, power);
+        power_sources << QString::fromStdString(device.device.name) + ": " +
+            (power ? QString::fromStdString(power->source) : tr("Power telemetry unavailable"));
+    }
+    m_gpu_rates->setToolTip(power_sources.join(QStringLiteral("\n")));
     m_gpu_rates->setText(device_rates.join(QStringLiteral("\n")));
     m_workers->setEnabled(!running && use_cpu && maximum > 0);
     m_hashrate->setText(tr("%1 H/s").arg(stats.hashes_per_second_10s, 0, 'f', 2));
@@ -437,7 +450,7 @@ void MiningPage::updateStatus()
         ? tr("A new v3 address can share a group key; address rotation does not rotate that key.") : reward_error);
     m_copy_destination->setEnabled(!m_privacy && !displayed.isEmpty() && (running || reward_error.isEmpty()));
     m_show_destination->setEnabled(m_wallet && !running && !m_privacy);
-    m_new_destination->setEnabled(m_wallet && !running && !m_privacy && (m_payout->currentIndex() != 2 || v3_available));
+    m_new_destination->setEnabled(m_wallet && !running && !m_privacy && (m_payout->currentData().toInt() != 2 || v3_available));
     m_payout->setEnabled(m_wallet && !running);
 
 }
@@ -463,4 +476,15 @@ QString MiningPage::formatRuntime(uint64_t seconds)
         .arg(qulonglong{(seconds / 60) % 60}, 2, 10, QLatin1Char{'0'})
         .arg(qulonglong{seconds % 60}, 2, 10, QLatin1Char{'0'})};
     return seconds < 86400 ? time : tr("%1 d %2").arg(qulonglong{seconds / 86400}).arg(time);
+}
+
+QString MiningPage::formatGpuRate(const mining::GpuStats& device, const std::optional<mining::GpuPower>& power)
+{
+    auto text{tr("%1: %2 H/s").arg(QString::fromStdString(device.device.name)).arg(device.hashes_per_second, 0, 'f', 2)};
+    if (power && mining::GpuEfficiency(1.0, power->watts)) {
+        text += tr(" · %1 W").arg(power->watts, 0, 'f', 2);
+        if (const auto efficiency{mining::GpuEfficiency(device.hashes_per_second, power->watts)})
+            text += tr(" · %1 H/s/W").arg(*efficiency, 0, 'f', 2);
+    } else text += tr(" · telemetry unavailable");
+    return text;
 }

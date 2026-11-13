@@ -2,6 +2,8 @@
 // Distributed under the MIT software license, see the accompanying file COPYING.
 #define CL_TARGET_OPENCL_VERSION 120
 #include <CL/cl.h>
+#include <CL/cl_ext.h>
+#include <mining/gpu_power.h>
 #include <algorithm>
 #include <charconv>
 #include <cstring>
@@ -510,6 +512,18 @@ GpuDiscovery DiscoverOpenClDevices()
                 cl_bool unified{CL_FALSE};
                 const auto classification{api.clGetDeviceInfo(device, CL_DEVICE_HOST_UNIFIED_MEMORY, sizeof(unified), &unified, nullptr)};
                 entry.dedicated = classification != CL_SUCCESS || unified == CL_FALSE;
+                cl_device_pci_bus_info_khr pci{};
+                if (api.clGetDeviceInfo(device, CL_DEVICE_PCI_BUS_INFO_KHR, sizeof(pci), &pci, nullptr) == CL_SUCCESS)
+                    entry.pci_id = GpuPciId(pci.pci_domain, pci.pci_bus, pci.pci_device, pci.pci_function);
+                // AMD's older extension omits the domain; require an
+                // unambiguous system PCI match on Linux.
+                if (entry.pci_id.empty()) {
+                    cl_device_topology_amd topology{};
+                    if (api.clGetDeviceInfo(device, CL_DEVICE_TOPOLOGY_AMD, sizeof(topology), &topology, nullptr) == CL_SUCCESS &&
+                        topology.raw.type == CL_DEVICE_TOPOLOGY_TYPE_PCIE_AMD)
+                        entry.pci_id = GpuPciTopologyId(static_cast<unsigned char>(topology.pcie.bus),
+                            static_cast<unsigned char>(topology.pcie.device), static_cast<unsigned char>(topology.pcie.function));
+                }
                 entry.name = Text(api, device, CL_DEVICE_NAME);
                 entry.capability = Text(api, device, CL_DEVICE_VERSION);
                 entry.total_memory = Info<cl_ulong>(api, device, CL_DEVICE_GLOBAL_MEM_SIZE);

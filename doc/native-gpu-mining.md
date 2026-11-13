@@ -188,8 +188,41 @@ failure stops that device, while healthy selected GPUs/CPU workers continue. If
 all workers fail, the session fails visibly. Stop and Start retry device discovery
 and construction; Refresh updates manual device selection. No driver-wide reset,
 root/admin operation, shell power command, fan control or hidden fee is used.
-Optional batch rest intervals allow reduced pressure. Board power and thermal
-telemetry are not presented as available without a supported vendor API.
+Optional batch rest intervals allow reduced pressure.
+
+### GPU power and efficiency
+
+Qt samples optional driver telemetry about once a second on a separate thread.
+NVIDIA uses runtime-loaded NVML (`nvml.dll` on native Windows,
+`libnvidia-ml.so.1` on Linux, with `/usr/lib/wsl/lib` fallback for WSL2).
+CUDA hardware UUIDs associate readings with mining devices even when enumeration
+orders differ. No monitoring application or telemetry SDK installation is needed.
+
+AMD on native Linux uses the supported kernel `amdgpu` hwmon ABI directly:
+`power1_average`, falling back to `power1_input` (microWatts). This avoids a
+separate ROCm/SMI installation. Full PCI domain/bus/device/function identifies
+each GPU. Older OpenCL AMD topology is accepted only when its PCI domain can be
+resolved unambiguously. Native Windows loads the driver's `atiadlxx.dll` and
+uses ADL2 adapter PCI identity and `ADL2_Overdrive6_CurrentPower_Get` (ASIC total
+power, Watts with eight fractional bits). Unsupported ADL hardware returns
+unavailable. No driver settings are changed.
+
+The display uses actual per-device mining hashrate divided by positive measured
+Watts. Zero, missing and failed readings produce no efficiency. Startup with no
+hashrate produces no efficiency. Tooltips disclose measurement source and scope:
+NVML device/board power, Linux AMD SoC power, or Windows AMD ASIC/chip power;
+chip/SoC readings are not whole-board or wall power. Integrated AMD devices are
+excluded. Readings expire after three seconds and sensor failures clear cached
+values without affecting mining. macOS and unsupported drivers/sensors report
+unavailable. CPU statistics contain hashrate only.
+
+Telemetry tests use API doubles and temporary hwmon trees (`test_gpu_power`),
+plus the existing CUDA/OpenCL host mock targets. Compilation or mocks do not
+establish native Windows runtime or physical AMD hardware validation.
+
+References: [NVML power queries](https://docs.nvidia.com/deploy/nvml-api/latest/api/group__nvmlDeviceQueries.html),
+[amdgpu hwmon ABI](https://docs.kernel.org/gpu/amdgpu/thermal.html),
+[AMD ADL power API](https://gpuopen-librariesandsdks.github.io/adl/group__OVERDRIVE6API.html).
 
 ## Build and deployment
 

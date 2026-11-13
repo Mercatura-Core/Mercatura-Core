@@ -20,8 +20,8 @@
 
 #include <stdexcept>
 
-MiningSession::MiningSession(interfaces::Node& node, QObject* parent, mining::MiningController::DeviceDetector devices)
-    : QObject{parent}, m_node{node},
+MiningSession::MiningSession(interfaces::Node& node, QObject* parent, mining::MiningController::DeviceDetector devices, mining::GpuPowerMonitor::Reader power)
+    : QObject{parent}, m_node{node}, m_power{std::move(power)},
       m_detect_devices{devices ? std::move(devices) : mining::MiningController::DeviceDetector{mining::DiscoverGpuDevices}},
       m_timer{new QTimer{this}}
 {
@@ -54,7 +54,7 @@ bool MiningSession::startMode(WalletModel* wallet, unsigned int workers)
     // in the coordinator so address derivation and DB writes never run on Qt.
     const auto name{wallet->wallet().getWalletName()};
     const QString key{QStringLiteral("mining/wallet/") + QString::fromStdString(Params().GetConsensus().hashGenesisBlock.ToString()) + "/" + QString::fromStdString(name) + "/"};
-    const int payout{QSettings{}.value(key + "payout", 0).toInt()};
+    const int payout{payoutPreference(wallet->wallet(), key)};
     const auto reward{QSettings{}.value(key + "address").toString().toStdString()};
     const bool started{m_controller.Start([this, name, payout, reward, cancelled = m_unload_token]() -> std::unique_ptr<mining::WorkProvider> {
         auto wallets{m_node.walletLoader().getWallets()};
@@ -103,6 +103,7 @@ void MiningSession::shutdown()
     m_timer->stop();
     stop();
     m_controller.Wait();
+    m_power.Stop();
     if (m_discovery_thread.joinable()) m_discovery_thread.join();
     m_unlock_context.reset();
     m_owner = nullptr;
@@ -153,6 +154,7 @@ void MiningSession::refreshDevices()
             catch (...) { result.errors.emplace_back("Unexpected GPU discovery failure"); }
             {
                 std::lock_guard lock{m_discovery_mutex};
+                m_power.SetDevices(result.devices);
                 m_discovery = GpuDiscoverySnapshot{std::move(result), ++m_discovery_revision};
             }
             m_discovering = false;
@@ -172,4 +174,32 @@ std::optional<mining::GpuDiscovery> MiningSession::gpuDiscovery() const
 std::optional<MiningSession::GpuDiscoverySnapshot> MiningSession::gpuDiscoverySnapshot() const
 {
     std::lock_guard lock{m_discovery_mutex}; return m_discovery;
+}
+
+int MiningSession::payoutPreference(interfaces::Wallet& wallet, const QString& key)
+{
+    QSettings settings;
+    const auto stable{settings.value(key + "payoutType").toString()};
+    if (stable == "v2" || stable == "v3")
+        return stable == "v3" ? 2 : 1;
+    // Compatibility only: old integers were 0=Automatic, 1=v2, 2=v3.
+    const int legacy{settings.value(key + "payout", 0).toInt()};
+    int payout{wallet.mercaweaveAvailable() ? 2 : 1};
+    const bool explicit_legacy{legacy == 1 || legacy == 2};
+    if (explicit_legacy) payout = legacy;
+    else {
+        const auto address{DecodeDestination(settings.value(key + "address").toString().toStdString())};
+        if (std::holds_alternative<WitnessV2MercaturaPQ>(address)) payout = 1;
+        else if (const auto* unknown = std::get_if<WitnessUnknown>(&address); unknown && unknown->GetWitnessVersion() == 3) payout = 2;
+        // Ownership, activation and address validity are still enforced by
+        // GetMiningDestination. Migration must never substitute an address.
+    }
+    // Migrate saved legacy preferences once to a concrete stable identifier.
+    // With no saved preference, the default follows availability until the
+    // user explicitly chooses a type; workers always receive a concrete type.
+    if (settings.contains(key + "payout")) {
+        settings.setValue(key + "payoutType", payout == 2 ? "v3" : "v2");
+        settings.remove(key + "payout");
+    }
+    return payout;
 }

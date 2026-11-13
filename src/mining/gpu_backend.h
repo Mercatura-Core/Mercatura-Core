@@ -24,6 +24,8 @@ struct GpuDevice {
     mercahash::Version pow_version{mercahash::Version::V1}; // Selected from the immutable mining job.
     unsigned int ordinal{0};
     std::string id;
+    std::string uuid; // CUDA hardware UUID, independent of CUDA_VISIBLE_DEVICES order.
+    std::string pci_id; // Full domain:bus:device.function; empty when unknown.
     std::string name;
     std::string capability;
     uint64_t total_memory{0};

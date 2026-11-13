@@ -17,8 +17,8 @@ util::Result<CTxDestination> GetMiningDestination(interfaces::Wallet& wallet, in
         std::vector<std::vector<unsigned char>> solutions;
         return Solver(GetScriptForDestination(dest), solutions) == TxoutType::WITNESS_V3_MERCAWEAVE;
     };
-    const bool v3{payout != 1 && wallet.mercaweaveAvailable()};
-    if (payout < 0 || payout > 2 || (payout == 2 && !v3))
+    const bool v3{payout == 2 && wallet.mercaweaveAvailable()};
+    if ((payout != 1 && payout != 2) || (payout == 2 && !v3))
         return util::Error{Untranslated("MercaWeave mining payouts are unavailable")};
     const auto eligible = [&](const CTxDestination& dest) {
         return wallet.isSpendable(dest) &&
@@ -51,7 +51,7 @@ util::Result<CTxDestination> GetMiningDestination(interfaces::Wallet& wallet, in
     if (wallet.isLocked()) return util::Error{Untranslated("Unlock this wallet once to create its native PQ mining reward address, then start mining again")};
     auto destination{v3 ? wallet.getNewMiningMercaWeaveDestination(MINING_REWARD_LABEL) : wallet.getNewDestination(OutputType::BECH32M, MINING_REWARD_LABEL)};
     if (!destination) return destination;
-    if (!eligible(*destination)) {
+    if (!eligible(*destination) || (v3 ? !is_v3(*destination) : !std::holds_alternative<WitnessV2MercaturaPQ>(*destination))) {
         return util::Error{Untranslated("The selected wallet did not provide an owned native Mercatura PQ destination")};
     }
     // Require successful persistence of the public address-book marker. The

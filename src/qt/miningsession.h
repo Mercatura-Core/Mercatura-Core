@@ -6,13 +6,15 @@
 
 #ifndef Q_MOC_RUN
 #include <mining/cpu_miner.h>
+#include <mining/gpu_power.h>
 #include <qt/walletmodel.h>
 #endif
 
 #include <QObject>
 #include <QPointer>
 
-namespace interfaces { class Node; }
+namespace interfaces { class Node; class Wallet; }
+class QString;
 class QTimer;
 
 // One instance per WalletController, shared by every wallet's Mining page.
@@ -23,12 +25,14 @@ public:
         mining::GpuDiscovery result;
         uint64_t revision{0};
     };
-    explicit MiningSession(interfaces::Node& node, QObject* parent = nullptr, mining::MiningController::DeviceDetector devices = {});
+    explicit MiningSession(interfaces::Node& node, QObject* parent = nullptr, mining::MiningController::DeviceDetector devices = {}, mining::GpuPowerMonitor::Reader power = {});
     ~MiningSession();
     bool start(WalletModel* wallet, unsigned int workers, mining::GpuConfig hardware = {});
     void refreshDevices();
     std::optional<mining::GpuDiscovery> gpuDiscovery() const;
     std::optional<GpuDiscoverySnapshot> gpuDiscoverySnapshot() const;
+    static int payoutPreference(interfaces::Wallet& wallet, const QString& key);
+    std::optional<mining::GpuPower> gpuPower(const mining::GpuDevice& device) const { return m_power.Get(device); }
     void stop();
     void walletUnloaded(WalletModel* wallet);
     void shutdown();
@@ -43,6 +47,7 @@ private:
     void poll();
     interfaces::Node& m_node;
     mining::MiningController m_controller;
+    mining::GpuPowerMonitor m_power;
     QPointer<WalletModel> m_owner;
     unsigned int m_requested{0};
     mining::GpuConfig m_hardware;

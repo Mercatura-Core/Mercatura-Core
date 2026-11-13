@@ -6,6 +6,7 @@
 
 #ifndef Q_MOC_RUN
 #include <mining/cpu_miner.h>
+#include <mining/gpu_power.h>
 #endif
 #include <QPointer>
 #include <QWidget>
@@ -32,6 +33,7 @@ public:
     void setClientModel(ClientModel* client);
     void setPrivacy(bool privacy);
     static QString formatRuntime(uint64_t seconds);
+    static QString formatGpuRate(const mining::GpuStats& device, const std::optional<mining::GpuPower>& power);
     static QString formatGpuContexts(const mining::GpuStats& device);
 
 Q_SIGNALS:

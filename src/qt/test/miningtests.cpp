@@ -232,6 +232,25 @@ private Q_SLOTS:
         QVERIFY2(worst_heartbeat < 1000, "Status lookup blocked the GUI heartbeat");
     }
 
+    void gpuWattsAndEfficiencyPresentation()
+    {
+        BasicTestingSetup setup{ChainType::REGTEST};
+        mining::GpuStats stats;
+        stats.device.name = "GPU";
+        stats.hashes_per_second = 1606;
+        const mining::GpuPower power{67.75, "mock"};
+        QCOMPARE(MiningPage::formatGpuRate(stats, power), QString{"GPU: 1606.00 H/s · 67.75 W · 23.70 H/s/W"});
+        QVERIFY(!MiningPage::formatGpuRate(stats, std::nullopt).contains("H/s/W"));
+        QVERIFY(MiningPage::formatGpuRate(stats, std::nullopt).contains("telemetry unavailable"));
+        QVERIFY(!MiningPage::formatGpuRate(stats, mining::GpuPower{}).contains("H/s/W"));
+        stats.hashes_per_second = 0;
+        QVERIFY(!MiningPage::formatGpuRate(stats, power).contains("H/s/W"));
+        MiningPage page{nullptr};
+        const auto rates{page.findChild<QLabel*>("miningDeviceRates")};
+        QVERIFY(rates);
+        QCOMPARE(rates->text(), QString{"CPU: 0.00 H/s"});
+    }
+
     void payoutTypeAndAddressSynchronization()
     {
         TestingSetup setup{ChainType::REGTEST, {.extra_args={"-mercaweaveheight=0"}}};
@@ -256,13 +275,15 @@ private Q_SLOTS:
         auto* fresh{page.findChild<QPushButton*>("newMiningDestination")};
         auto* address{page.findChild<QLabel*>("miningDestination")};
         auto* start{page.findChild<QPushButton*>("startMining")};
-        QVERIFY(qobject_cast<QStandardItemModel*>(payout->model())->item(2)->isEnabled());
-        payout->setCurrentIndex(2);
+        QCOMPARE(payout->count(), 2);
+        QCOMPARE(payout->currentData().toInt(), 2);
+        QVERIFY(qobject_cast<QStandardItemModel*>(payout->model())->item(payout->findData(2))->isEnabled());
+        payout->setCurrentIndex(payout->findData(2));
         QVERIFY(start->isEnabled()); // Missing address can be derived at Start.
         fresh->click();
         const auto v3{address->text()};
         QVERIFY(model.wallet().isMiningMercaWeaveDestination(DecodeDestination(v3.toStdString())));
-        payout->setCurrentIndex(1);
+        payout->setCurrentIndex(payout->findData(1));
         QVERIFY(!start->isEnabled());
         QVERIFY(address->text() != v3);
         QCOMPARE(QSettings{}.value(key + "address").toString(), v3);
@@ -270,12 +291,31 @@ private Q_SLOTS:
         const auto v2{address->text()};
         QVERIFY(std::holds_alternative<WitnessV2MercaturaPQ>(DecodeDestination(v2.toStdString())));
         QVERIFY(start->isEnabled());
-        payout->setCurrentIndex(2);
+        payout->setCurrentIndex(payout->findData(2));
         QVERIFY(!start->isEnabled());
-        payout->setCurrentIndex(1);
+        payout->setCurrentIndex(payout->findData(1));
         MiningPage reopened{&model};
-        QCOMPARE(reopened.findChild<QComboBox*>("miningPayoutType")->currentIndex(), 1);
+        QCOMPARE(reopened.findChild<QComboBox*>("miningPayoutType")->currentData().toInt(), 1);
         QCOMPARE(reopened.findChild<QLabel*>("miningDestination")->text(), v2);
+        QSettings{}.remove(key);
+        QSettings{}.setValue(key + "payout", 0);
+        QCOMPARE(MiningSession::payoutPreference(model.wallet(), key), 2);
+        QCOMPARE(QSettings{}.value(key + "payoutType").toString(), QString{"v3"});
+        QVERIFY(!QSettings{}.contains(key + "payout"));
+        QSettings{}.remove(key);
+        QSettings{}.setValue(key + "payout", 0);
+        QSettings{}.setValue(key + "address", v2);
+        QCOMPARE(MiningSession::payoutPreference(model.wallet(), key), 1);
+        QSettings{}.remove(key);
+        QSettings{}.setValue(key + "payout", 0);
+        QSettings{}.setValue(key + "address", v3);
+        QCOMPARE(MiningSession::payoutPreference(model.wallet(), key), 2);
+        for (int legacy : {1, 2}) {
+            QSettings{}.remove(key);
+            QSettings{}.setValue(key + "payout", legacy);
+            QCOMPARE(MiningSession::payoutPreference(model.wallet(), key), legacy);
+            QCOMPARE(MiningSession::payoutPreference(model.wallet(), key), legacy);
+        }
         QSettings{}.remove(key);
         session.shutdown();
         QVERIFY(wallet::RemoveWallet(context, wallet, std::nullopt));
@@ -817,8 +857,14 @@ private Q_SLOTS:
         auto* stop{page.findChild<QPushButton*>("stopMining")};
         auto* payout{page.findChild<QComboBox*>("miningPayoutType")};
         QVERIFY(payout);
-        QVERIFY(!qobject_cast<QStandardItemModel*>(payout->model())->item(2)->isEnabled());
-        payout->setCurrentIndex(2); // A persisted unavailable preference stays explicit.
+        QCOMPARE(payout->count(), 2);
+        QCOMPARE(payout->currentData().toInt(), 1);
+        const QString reward_key{QStringLiteral("mining/wallet/") + QString::fromStdString(Params().GetConsensus().hashGenesisBlock.ToString()) + "/" + QString::fromStdString(model.wallet().getWalletName()) + "/"};
+        QSettings{}.remove(reward_key);
+        QSettings{}.setValue(reward_key + "payout", 0);
+        QCOMPARE(MiningSession::payoutPreference(model.wallet(), reward_key), 1);
+        QVERIFY(!qobject_cast<QStandardItemModel*>(payout->model())->item(payout->findData(2))->isEnabled());
+        payout->setCurrentIndex(payout->findData(2)); // A persisted unavailable preference stays explicit.
         QVERIFY(!start->isEnabled());
         QVERIFY(page.findChild<QLabel*>("miningStatus")->text().contains("unavailable"));
         payout->setCurrentIndex(0);
@@ -950,9 +996,18 @@ private Q_SLOTS:
             ++unlocks;
             QVERIFY(wallet->Unlock(passphrase));
         });
-        MiningSession session{*node};
+        std::atomic<unsigned int> telemetry_calls{0};
+        MiningSession session{*node, nullptr, [] {
+            mining::GpuDevice gpu; gpu.id = "mock"; gpu.uuid = "mock";
+            return mining::GpuDiscovery{{gpu}, {}};
+        }, [&](const auto&) -> std::optional<mining::GpuPower> {
+            ++telemetry_calls;
+            throw std::runtime_error{"Mock sensor failure"};
+        }};
         QVERIFY(session.start(&model, 1));
         QTRY_VERIFY_WITH_TIMEOUT(session.stats().hashes > 0, 30000);
+        QTRY_VERIFY_WITH_TIMEOUT(telemetry_calls.load() > 0, 5000);
+        QVERIFY(session.stats().busy);
         QCOMPARE(unlocks, 1U);
         QTRY_VERIFY_WITH_TIMEOUT(wallet->IsLocked(), 10000);
         session.stop();
