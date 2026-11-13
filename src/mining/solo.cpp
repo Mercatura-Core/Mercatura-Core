@@ -107,6 +107,11 @@ std::optional<MiningJob> SoloWorkProvider::GetJob()
         LOCK(cs_main);
         const auto* parent{context->chainman->m_blockman.LookupBlockIndex(block.hashPrevBlock)};
         if (!parent || (parent->nStatus & BLOCK_VALID_MASK) < BLOCK_VALID_TREE) return {};
+        std::vector<std::vector<unsigned char>> solutions;
+        if (Solver(m_payout, solutions) == TxoutType::WITNESS_V3_MERCAWEAVE &&
+            !Consensus::MercaWeaveActive(context->chainman->GetConsensus(), parent->nHeight + 1)) {
+            throw std::runtime_error{"Selected MercaWeave reward address is inactive after a chain reorganization"};
+        }
         m_job->height = int64_t{parent->nHeight} + 1;
         m_job->pow_version = GetPoWVersion(context->chainman->GetConsensus(), m_job->height);
     }

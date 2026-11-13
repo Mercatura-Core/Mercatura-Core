@@ -30,6 +30,7 @@ struct GpuDevice {
     uint64_t available_memory{0};
     uint64_t max_allocation{0};
     bool available_memory_known{false};
+    bool dedicated{true}; // CUDA devices; OpenCL discovery must verify discrete memory.
     bool supported{false};
     std::string error;
 };

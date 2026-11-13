@@ -499,10 +499,12 @@ GpuDiscovery DiscoverOpenClDevices()
         const auto devices{Devices(api)};
         for (unsigned int index{0}; index < devices.size(); ++index) {
             GpuDevice entry{GpuVendor::AMD_OPENCL};
+            entry.dedicated = false; // Unknown classification stays out of the ordinary list.
             entry.ordinal = index;
             entry.id = "opencl:" + util::ToString(index);
             try {
                 const auto device{devices[index]};
+                entry.dedicated = !Info<cl_bool>(api, device, CL_DEVICE_HOST_UNIFIED_MEMORY);
                 entry.name = Text(api, device, CL_DEVICE_NAME);
                 entry.capability = Text(api, device, CL_DEVICE_VERSION);
                 entry.total_memory = Info<cl_ulong>(api, device, CL_DEVICE_GLOBAL_MEM_SIZE);

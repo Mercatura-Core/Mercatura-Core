@@ -16,6 +16,7 @@
 #include <wallet/mining.h>
 
 #include <QTimer>
+#include <QSettings>
 
 #include <stdexcept>
 
@@ -52,7 +53,10 @@ bool MiningSession::startMode(WalletModel* wallet, unsigned int workers)
     // Copy the public wallet name only. Obtain an independent wallet interface
     // in the coordinator so address derivation and DB writes never run on Qt.
     const auto name{wallet->wallet().getWalletName()};
-    const bool started{m_controller.Start([this, name, cancelled = m_unload_token]() -> std::unique_ptr<mining::WorkProvider> {
+    const QString key{QStringLiteral("mining/wallet/") + QString::fromStdString(Params().GetConsensus().hashGenesisBlock.ToString()) + "/" + QString::fromStdString(name) + "/"};
+    const int payout{QSettings{}.value(key + "payout", 0).toInt()};
+    const auto reward{QSettings{}.value(key + "address").toString().toStdString()};
+    const bool started{m_controller.Start([this, name, payout, reward, cancelled = m_unload_token]() -> std::unique_ptr<mining::WorkProvider> {
         auto wallets{m_node.walletLoader().getWallets()};
         for (auto& selected : wallets) {
             if (selected->getWalletName() != name) continue;
@@ -60,7 +64,7 @@ bool MiningSession::startMode(WalletModel* wallet, unsigned int workers)
             // a raw Qt/controller pointer in a cross-thread notification. Old
             // notifications cannot cancel a later session.
             auto unload{selected->handleUnload([cancelled] { *cancelled = true; })};
-            auto destination{wallet::GetMiningDestination(*selected)};
+            auto destination{wallet::GetMiningDestination(*selected, payout, reward)};
             if (!destination) {
                 m_needs_unlock = !m_cancelled && !*cancelled && selected->isLocked();
                 throw std::runtime_error{util::ErrorString(destination).original};

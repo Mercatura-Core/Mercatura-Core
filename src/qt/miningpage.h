@@ -55,6 +55,8 @@ private:
     QLabel* m_active;
     QLabel* m_blocks;
     QLabel* m_destination;
+    QComboBox* m_payout;
+    QPushButton* m_new_destination;
     QComboBox* m_hardware;
     QCheckBox* m_all_devices;
     QListWidget* m_devices;

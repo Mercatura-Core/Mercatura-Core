@@ -157,6 +157,10 @@ public:
         LOCK(m_wallet->cs_wallet);
         return m_wallet->GetNewDestination(type, label);
     }
+    util::Result<CTxDestination> getNewMiningMercaWeaveDestination(const std::string& label) override
+    {
+        return m_wallet->GetNewPQGroupDestination(label, 0, 2);
+    }
     bool mercaweaveAvailable() override { return m_wallet->MercaWeaveAvailable(); }
     util::Result<CTxDestination> getNewMercaWeaveDestination(const std::string& label) override
     {

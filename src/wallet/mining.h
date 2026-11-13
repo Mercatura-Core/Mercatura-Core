@@ -4,13 +4,16 @@
 #ifndef BITCOIN_WALLET_MINING_H
 #define BITCOIN_WALLET_MINING_H
 #include <addresstype.h>
+#include <string>
 #include <util/result.h>
 
 namespace interfaces { class Wallet; }
 namespace wallet {
 inline constexpr const char* MINING_REWARD_LABEL{"Mercatura mining reward"};
-// Reuse an owned, persisted public PQ destination even when locked. Creating
-// one uses the normal wallet API and therefore requires an unlocked PQ seed.
-util::Result<CTxDestination> GetMiningDestination(interfaces::Wallet& wallet);
+// Payout: 0 automatic, 1 standard v2, 2 activated MercaWeave v3.
+// An explicit selection must validate as-is; never silently substitute it.
+// Fresh derivation requires unlock and uses the dedicated v3 mining purpose.
+// Public owned destinations can be reused while locked when authenticated.
+util::Result<CTxDestination> GetMiningDestination(interfaces::Wallet& wallet, int payout = 0, const std::string& selected = {}, bool fresh = false);
 } // namespace wallet
 #endif // BITCOIN_WALLET_MINING_H

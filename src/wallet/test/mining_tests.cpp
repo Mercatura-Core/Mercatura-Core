@@ -82,6 +82,11 @@ BOOST_AUTO_TEST_CASE(pq_destination_persistence_and_locked_reuse)
     BOOST_REQUIRE(other_dest);
     BOOST_CHECK(*other_dest != *first);
     BOOST_CHECK(!api->isSpendable(*other_dest));
+    BOOST_CHECK(!GetMiningDestination(*api, 0, EncodeDestination(*other_dest)));
+    BOOST_CHECK(!GetMiningDestination(*api, 2));
+    BOOST_CHECK(!GetMiningDestination(*api, 0, EncodeDestination(WitnessUnknown{3, std::vector<unsigned char>(32, 1)})));
+    BOOST_CHECK(GetMiningDestination(*api, 1, EncodeDestination(*first)));
+    BOOST_CHECK(!GetMiningDestination(*api, 1, {}, true));
 }
 BOOST_AUTO_TEST_SUITE_END()
 
@@ -527,6 +532,40 @@ struct V2SoloTestingSetup : SoloTestingSetup {
 struct ActiveMercaWeaveMiningSetup : SoloTestingSetup {
     ActiveMercaWeaveMiningSetup() : SoloTestingSetup{TestOpts{.extra_args={"-mercahashv2height=0", "-mercaweaveheight=0"}}} {}
 };
+BOOST_FIXTURE_TEST_CASE(mining_reward_preferences, ActiveMercaWeaveMiningSetup)
+{
+    WalletContext context;
+    context.args = &m_args;
+    context.chain = m_node.chain.get();
+    auto wallet{TestCreateWallet(CreateMockableWalletDatabase(), context, WALLET_FLAG_DESCRIPTORS)};
+    auto api{interfaces::MakeWallet(context, wallet)};
+    BOOST_REQUIRE(api->mercaweaveAvailable());
+    const auto automatic{GetMiningDestination(*api)};
+    BOOST_REQUIRE(automatic);
+    BOOST_CHECK(std::holds_alternative<WitnessUnknown>(*automatic));
+    const auto standard{GetMiningDestination(*api, 1)};
+    BOOST_REQUIRE(standard);
+    BOOST_CHECK(std::holds_alternative<WitnessV2MercaturaPQ>(*standard));
+    const auto fresh{GetMiningDestination(*api, 2, {}, true)};
+    BOOST_REQUIRE(fresh);
+    BOOST_CHECK(*fresh != *automatic);
+    const auto selected{EncodeDestination(*fresh)};
+    BOOST_CHECK(GetMiningDestination(*api, 0, selected));
+    BOOST_CHECK(!GetMiningDestination(*api, 1, selected));
+    auto database{DuplicateMockDatabase(wallet->GetDatabase())};
+    auto reloaded{TestLoadWallet(std::move(database), context)};
+    auto reloaded_api{interfaces::MakeWallet(context, reloaded)};
+    BOOST_CHECK(GetMiningDestination(*reloaded_api, 2, selected));
+    SecureString passphrase;
+    passphrase.assign("mining-payout-test");
+    BOOST_REQUIRE(wallet->EncryptWallet(passphrase));
+    BOOST_CHECK(!GetMiningDestination(*api, 2, {}, true));
+    // Authentication may require unlock after encryption/reload; never fall back.
+    const auto locked{GetMiningDestination(*api, 2, selected)};
+    if (locked) BOOST_CHECK(*locked == *fresh);
+    BOOST_REQUIRE(wallet->Unlock(passphrase));
+    BOOST_CHECK(GetMiningDestination(*api, 2, selected));
+}
 static void CheckGroupedRewardGuards(SoloTestingSetup& fixture, bool active)
 {
     WalletContext context;

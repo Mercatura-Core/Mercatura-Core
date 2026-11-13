@@ -6,6 +6,11 @@
 
 #include <chainparams.h>
 #include <pow.h>
+#include <key_io.h>
+#include <interfaces/wallet.h>
+#include <wallet/mining.h>
+#include <QInputDialog>
+#include <QMessageBox>
 #include <interfaces/node.h>
 #include <mining/mercahash_cpu_batch.h>
 #include <qt/clientmodel.h>
@@ -87,7 +92,7 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     m_yield = new QSpinBox{group};
     m_yield->setObjectName(QStringLiteral("gpuYield"));
     m_yield->setRange(0, 1000);
-    m_yield->setValue(10);
+    m_yield->setValue(0);
     m_yield->setSuffix(QStringLiteral(" ") + tr("ms"));
     form->addRow(tr("Rest between GPU batches"), m_yield);
     m_refresh_devices = new QPushButton{tr("Refresh GPU devices"), group};
@@ -97,7 +102,7 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     m_gpu_status->setObjectName(QStringLiteral("gpuMemoryStatus"));
     form->addRow(m_gpu_status);
     m_gpu_rates = new QLabel{group}; m_gpu_rates->setTextFormat(Qt::PlainText); m_gpu_rates->setWordWrap(true);
-    form->addRow(tr("CPU / GPU statistics"), m_gpu_rates);
+
 
     QSettings settings;
     m_workers = new QSpinBox{group};
@@ -110,13 +115,23 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     m_hardware_limits = new QLabel{group};
     m_hardware_limits->setWordWrap(true);
     form->addRow(m_hardware_limits);
+    const QString reward_key{QStringLiteral("mining/wallet/") + QString::fromStdString(Params().GetConsensus().hashGenesisBlock.ToString()) + "/" + QString::fromStdString((m_wallet ? m_wallet->wallet().getWalletName() : std::string{})) + "/"};
+    m_payout = new QComboBox{group};
+    m_payout->setObjectName(QStringLiteral("miningPayoutType"));
+    m_payout->addItems({tr("Automatic"), tr("Standard PQ v2"), tr("MercaWeave v3")});
+    m_payout->setCurrentIndex(std::clamp(settings.value(reward_key + "payout", 0).toInt(), 0, 2));
+    form->addRow(tr("Payout type"), m_payout);
+    connect(m_payout, &QComboBox::currentIndexChanged, this, [this, reward_key](int index) {
+        QSettings{}.setValue(reward_key + "payout", index);
+        updateStatus();
+    });
     m_destination = new QLabel{tr("Created or reused when mining starts"), group};
     m_destination->setObjectName(QStringLiteral("miningDestination"));
     m_destination->setTextFormat(Qt::PlainText);
     m_destination->setWordWrap(true);
     m_destination->setTextInteractionFlags(Qt::TextSelectableByMouse);
     m_destination->setFont(GUIUtil::fixedPitchFont());
-    m_destination->setToolTip(tr("This wallet-owned PQ address receives mining rewards. Show in address book opens receiving addresses. Newly created mining addresses use the label Mercatura mining reward."));
+    m_destination->setToolTip(tr("This wallet-owned address receives mining rewards. New addresses use the label Mercatura mining reward. A new v3 address can share a group key; address rotation does not rotate that key."));
     auto* destination_row{new QWidget{group}};
     auto* destination_layout{new QVBoxLayout{destination_row}};
     destination_layout->setContentsMargins(0, 0, 0, 0);
@@ -125,13 +140,16 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     auto* address_actions{new QHBoxLayout};
     m_copy_destination = new QPushButton{tr("Copy address"), destination_row};
     m_copy_destination->setObjectName(QStringLiteral("copyMiningDestination"));
-    m_show_destination = new QPushButton{tr("Show in address book"), destination_row};
+    m_show_destination = new QPushButton{tr("Select Address"), destination_row};
     m_show_destination->setObjectName(QStringLiteral("showMiningDestination"));
+    m_new_destination = new QPushButton{tr("New Address"), destination_row};
+    address_actions->addWidget(m_new_destination);
     address_actions->addWidget(m_copy_destination);
     address_actions->addWidget(m_show_destination);
     address_actions->addStretch();
     destination_layout->addLayout(address_actions);
     form->addRow(tr("PQ reward destination"), destination_row);
+    form->addRow(tr("CPU / GPU hashrate and power"), m_gpu_rates);
     m_hashrate = new QLabel{group};
     m_hashrate->setObjectName(QStringLiteral("miningHashrate"));
     auto font{m_hashrate->font()};
@@ -142,7 +160,7 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     m_statistics = new QLabel{group};
     m_statistics->setObjectName(QStringLiteral("miningSessionStatistics"));
     m_statistics->setTextFormat(Qt::PlainText);
-    form->addRow(tr("Session statistics"), m_statistics);
+    form->addRow(tr("Session average"), m_statistics);
     m_runtime = new QLabel{group};
     m_runtime->setObjectName(QStringLiteral("miningSessionRuntime"));
     form->addRow(tr("Session Runtime"), m_runtime);
@@ -151,7 +169,7 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     form->addRow(tr("Active workers"), m_active);
     m_blocks = new QLabel{group};
     m_blocks->setObjectName(QStringLiteral("miningBlocks"));
-    form->addRow(tr("Solutions / submitted / accepted"), m_blocks);
+    form->addRow(tr("Accepted blocks"), m_blocks);
     m_status = new QLabel{group};
     m_status->setObjectName(QStringLiteral("miningStatus"));
     m_status->setTextFormat(Qt::PlainText);
@@ -182,8 +200,24 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
     connect(m_copy_destination, &QPushButton::clicked, this, [this] {
         if (m_copy_destination->isEnabled()) GUIUtil::setClipboard(m_destination->text());
     });
-    connect(m_show_destination, &QPushButton::clicked, this, [this] {
-        if (m_show_destination->isEnabled()) Q_EMIT showRewardAddress(m_destination->text());
+    connect(m_show_destination, &QPushButton::clicked, this, [this, reward_key] {
+        QStringList addresses;
+        for (const auto& entry : m_wallet->wallet().getAddresses()) {
+            const auto encoded{EncodeDestination(entry.dest)};
+            if (wallet::GetMiningDestination(m_wallet->wallet(), m_payout->currentIndex(), encoded)) addresses << QString::fromStdString(encoded);
+        }
+        bool ok{false};
+        const auto selected{QInputDialog::getItem(this, tr("Mining reward address"), tr("Wallet address"), addresses, 0, false, &ok)};
+        if (ok && !selected.isEmpty()) QSettings{}.setValue(reward_key + "address", selected);
+        updateStatus();
+    });
+    connect(m_new_destination, &QPushButton::clicked, this, [this, reward_key] {
+        auto unlock{m_wallet->requestUnlock()};
+        if (!unlock.isValid()) return;
+        auto dest{wallet::GetMiningDestination(m_wallet->wallet(), m_payout->currentIndex(), {}, true)};
+        if (!dest) QMessageBox::warning(this, tr("Mining reward address"), QString::fromStdString(util::ErrorString(dest).original));
+        else QSettings{}.setValue(reward_key + "address", QString::fromStdString(EncodeDestination(*dest)));
+        updateStatus();
     });
     connect(m_hardware, &QComboBox::currentIndexChanged, this, [this] { updateStatus(); });
     connect(m_all_devices, &QCheckBox::toggled, this, [this] { updateStatus(); });
@@ -203,12 +237,12 @@ MiningPage::MiningPage(WalletModel* wallet, QWidget* parent, mining::MiningContr
             mining::GpuConfig hardware;
             hardware.cpu = m_hardware->currentIndex() != 1;
             hardware.gpu = m_hardware->currentIndex() != 0;
-            hardware.contexts = m_context_mode->currentIndex() == 1 ? static_cast<unsigned int>(m_v2_contexts ? m_contexts_v2->value() : m_contexts->value()) : 0;
-            hardware.yield_ms = static_cast<unsigned int>(m_yield->value());
-            if (!m_all_devices->isChecked()) {
+            hardware.contexts = 0;
+            hardware.yield_ms = 0;
+            {
                 for (int i{0}; i < m_devices->count(); ++i) {
                     const auto* item{m_devices->item(i)};
-                    if (item->checkState() == Qt::Checked) hardware.devices.push_back(item->data(Qt::UserRole).toString().toStdString());
+                    if ((item->flags() & Qt::ItemIsEnabled) && (m_all_devices->isChecked() || item->checkState() == Qt::Checked)) hardware.devices.push_back(item->data(Qt::UserRole).toString().toStdString());
                 }
                 if (hardware.gpu && hardware.devices.empty()) return;
             }
@@ -254,6 +288,7 @@ void MiningPage::updateStatus()
         selected.pow_version = version;
         return mining::CalculateGpuBudget(selected, requested);
     };
+    m_hardware_limits->hide();
     m_hardware_limits->setText(tr("%1 logical processors detected; up to %2 CPU-only workers within the current CPU and memory budget. Combined mode also reserves host memory for GPU verification. Each worker needs %3 MiB of private scratchpads plus overhead. Logical processor count does not predict optimal hashing throughput.").arg(m_limits.logical_cpus).arg(m_limits.maximum).arg(qulonglong{mining::CpuScratchpadBytes(version) >> 20}));
     const bool syncing{m_client && Params().GetChainType() != ChainType::REGTEST && m_client->node().isInitialBlockDownload()};
     const bool use_cpu{m_hardware->currentIndex() != 1};
@@ -266,6 +301,7 @@ void MiningPage::updateStatus()
             checked_ids.insert(m_devices->item(i)->data(Qt::UserRole).toString().toStdString());
         m_devices->clear();
         for (const auto& device : discovery->result.devices) {
+            if (!device.dedicated) continue;
             auto* item{new QListWidgetItem{QString::fromStdString(device.name + " (" + device.capability + ")"), m_devices}};
             item->setData(Qt::UserRole, QString::fromStdString(device.id));
             item->setToolTip(QString::fromStdString(device.error));
@@ -318,7 +354,7 @@ void MiningPage::updateStatus()
     m_yield->setEnabled(!running && use_gpu);
     m_refresh_devices->setEnabled(m_session && !running && bool(discovery));
     for (QWidget* field : std::array<QWidget*, 8>{m_all_devices, m_devices, m_context_mode, m_contexts, m_contexts_v2, m_yield, m_refresh_devices, m_gpu_status}) {
-        const bool visible{use_gpu && (field != m_contexts || !m_v2_contexts) && (field != m_contexts_v2 || m_v2_contexts)};
+        const bool visible{field != m_context_mode && field != m_contexts && field != m_contexts_v2 && field != m_yield && use_gpu && (field != m_contexts || !m_v2_contexts) && (field != m_contexts_v2 || m_v2_contexts)};
         field->setVisible(visible);
         if (auto* form{qobject_cast<QFormLayout*>(field->parentWidget()->layout())}) {
             if (auto* label{form->labelForField(field)}) label->setVisible(visible);
@@ -331,57 +367,18 @@ void MiningPage::updateStatus()
         if (!gpu_available) gpu_messages << tr("Select an available GPU or choose CPU mining.");
         else if (!gpu_host_memory) gpu_messages << tr("Insufficient host memory for the selected GPU verifiers. Select fewer devices or free memory.");
         if (gpu_available && !gpu_context_memory) gpu_messages << tr("The selected GPUs cannot fit the requested contexts within their memory budgets. Free memory or select fewer contexts/devices.");
-        for (const auto* device : selected_devices) {
-            const auto requested{manual_contexts ? manual_count : 0};
-            if (requested > gpu_budget(*device).maximum_contexts) continue;
-            const auto budget{gpu_budget(*device, requested)};
-            const auto name{QString::fromStdString(device->name)};
-            if (m_v2_contexts) gpu_messages << tr("%1: maximum safe resource budget %2 contexts; %3 selected. Allocation and execution limits are rechecked at startup; this is capacity sizing, not hashrate tuning.")
-                .arg(name).arg(budget.maximum_contexts).arg(budget.contexts);
-            if (device->vendor == mining::GpuVendor::NVIDIA_CUDA || (m_v2_contexts && device->available_memory_known)) {
-                gpu_messages << tr("%1: %2 MiB free at last refresh. %3 contexts: %4 MiB scratchpads + %5 MiB estimated overhead; %6 MiB estimated headroom, %7 MiB minimum reserve. Free memory is rechecked when mining starts.")
-                    .arg(name).arg(qulonglong{device->available_memory >> 20}).arg(budget.contexts)
-                    .arg(qulonglong{budget.scratchpad_bytes >> 20}).arg(qulonglong{budget.overhead_bytes >> 20})
-                    .arg(qulonglong{budget.headroom_bytes >> 20}).arg(qulonglong{budget.reserved_bytes >> 20});
-                if (budget.low_headroom) gpu_messages << tr("Warning: %1 has little VRAM headroom. Other applications may cause allocation failure or reduced desktop responsiveness. Use Manual to reduce contexts if needed.").arg(name);
-            } else {
-                gpu_messages << tr("%1: %2 MiB reported global memory; free VRAM is unknown. Conservative capacity limit: %3 contexts. %4 contexts selected: %5 MiB scratchpads + %6 MiB estimated overhead. Other applications may cause allocation failure.")
-                    .arg(name).arg(qulonglong{device->total_memory >> 20}).arg(budget.maximum_contexts).arg(budget.contexts)
-                    .arg(qulonglong{budget.scratchpad_bytes >> 20}).arg(qulonglong{budget.overhead_bytes >> 20});
-            }
-            if (budget.scheduler_limited) gpu_messages << tr("%1: memory could support more contexts, but the current nonce scheduler limits each GPU to %2 contexts.")
-                .arg(name).arg(mining::MAX_GPU_CONTEXTS);
-        }
     }
     m_gpu_status->setText(gpu_messages.join(QStringLiteral("\n")));
-    QStringList device_rates{tr("CPU: %1 H/s (%2 hashes)").arg(stats.cpu_hashes_per_second, 0, 'f', 2).arg(qulonglong{stats.cpu_hashes})};
-    if (version == mercahash::Version::V2)
-        device_rates << tr("V2 CPU: %1; four contexts per worker (%2 MiB budget).")
-            .arg(QString::fromLatin1(mercahash::cpu2::ExecutionPath())).arg(qulonglong{mining::WorkerMemoryBytes(version) >> 20});
-    for (const auto& device : stats.devices) device_rates << tr("%1 — %2; %3 H/s, %4 hashes, %5 MiB — %6")
-        .arg(QString::fromStdString(device.device.name)).arg(formatGpuContexts(device))
-        .arg(device.hashes_per_second, 0, 'f', 2).arg(qulonglong{device.hashes})
-        .arg(qulonglong{device.memory_bytes >> 20}).arg(QString::fromStdString(device.status));
-    for (const auto& device : stats.devices) if (device.device.pow_version == mercahash::Version::V2 && device.memory_bytes) {
-        device_rates << tr("%1: %2 MiB scratchpads; %3 MiB buffer memory allocated; %4 MiB %5 at allocation; %6 MiB reserve.")
-            .arg(QString::fromStdString(device.device.name)).arg(qulonglong{device.budget.scratchpad_bytes >> 20})
-            .arg(qulonglong{device.memory_bytes >> 20}).arg(qulonglong{device.budget.headroom_bytes >> 20})
-            .arg(device.budget.headroom_measured ? tr("free headroom") : tr("estimated remaining capacity (free VRAM unverified)"))
-            .arg(qulonglong{device.budget.reserved_bytes >> 20});
-    }
-    for (const auto& device : stats.devices)
-        device_rates << tr("%1: %2 batches started; %3 completed; %4 cancelled before completion.")
-            .arg(QString::fromStdString(device.device.name)).arg(qulonglong{device.batches_started})
-            .arg(qulonglong{device.batches_completed}).arg(qulonglong{device.batches_cancelled});
+    QStringList device_rates{tr("CPU: %1 H/s · Power: N/A").arg(stats.cpu_hashes_per_second, 0, 'f', 2)};
+    for (const auto& device : stats.devices) device_rates << tr("%1: %2 H/s · Power: N/A")
+        .arg(QString::fromStdString(device.device.name)).arg(device.hashes_per_second, 0, 'f', 2);
     m_gpu_rates->setText(device_rates.join(QStringLiteral("\n")));
     m_workers->setEnabled(!running && use_cpu && maximum > 0);
     m_hashrate->setText(tr("%1 H/s").arg(stats.hashes_per_second_10s, 0, 'f', 2));
-    m_statistics->setText(tr("60 s: %1 H/s · Session: %2 H/s · %3 hashes")
-        .arg(stats.hashes_per_second_60s, 0, 'f', 2)
-        .arg(stats.hashes_per_second_session, 0, 'f', 2).arg(qulonglong{stats.hashes}));
+    m_statistics->setText(tr("%1 H/s").arg(stats.hashes_per_second_session, 0, 'f', 2));
     m_runtime->setText(formatRuntime(std::chrono::duration_cast<std::chrono::seconds>(stats.session_elapsed).count()));
     m_active->setText(QString::number(stats.active_workers));
-    m_blocks->setText(QStringLiteral("%1 / %2 / %3").arg(qulonglong{stats.solutions}).arg(qulonglong{stats.submitted}).arg(qulonglong{stats.accepted}));
+    m_blocks->setText(QString::number(qulonglong{stats.accepted}));
     m_blocks->setToolTip(tr("Not processed: %1; stale or discarded: %2. Processing without observed active-chain acceptance is not counted as accepted.").arg(qulonglong{stats.rejected}).arg(qulonglong{stats.stale}));
     QString status{QString::fromStdString(stats.status)};
     if (!m_wallet || !m_session || !m_client) status = tr("Mining is unavailable until the node and wallet are loaded.");
@@ -399,7 +396,12 @@ void MiningPage::updateStatus()
     m_destination->setText(m_privacy ? tr("(hidden)") : (stats.destination.empty() || (!running && m_session && m_session->owner() != m_wallet)) ? tr("Created or reused when mining starts") : QString::fromStdString(stats.destination));
     const bool own_destination{!m_privacy && m_wallet && m_session && m_session->owner() == m_wallet && !stats.destination.empty()};
     m_copy_destination->setEnabled(own_destination);
-    m_show_destination->setEnabled(own_destination);
+    m_show_destination->setEnabled(m_wallet && !running && !m_privacy);
+    m_new_destination->setEnabled(m_wallet && !running && !m_privacy);
+    m_payout->setEnabled(m_wallet && !running);
+    const auto saved{QSettings{}.value(QStringLiteral("mining/wallet/") + QString::fromStdString(Params().GetConsensus().hashGenesisBlock.ToString()) + "/" + QString::fromStdString((m_wallet ? m_wallet->wallet().getWalletName() : std::string{})) + "/address").toString()};
+    if (!m_privacy && !running && !saved.isEmpty()) m_destination->setText(saved);
+    m_copy_destination->setEnabled(!m_privacy && (own_destination || !saved.isEmpty()));
 }
 
 QString MiningPage::formatGpuContexts(const mining::GpuStats& device)

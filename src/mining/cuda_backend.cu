@@ -807,6 +807,7 @@ GpuDiscovery DiscoverCudaDevices()
         try {
             cudaDeviceProp properties{};
             Check(cudaGetDeviceProperties(&properties, index), "Read NVIDIA capability");
+            entry.dedicated = !properties.integrated;
             entry.name = properties.name;
             entry.capability = "CUDA " + util::ToString(properties.major) + "." + util::ToString(properties.minor);
             entry.total_memory = properties.totalGlobalMem;

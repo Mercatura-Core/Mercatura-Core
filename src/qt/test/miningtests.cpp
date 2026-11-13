@@ -252,18 +252,12 @@ private Q_SLOTS:
         QVERIFY(contexts->maximum() > 1024);
         QCOMPARE(mode->currentIndex(), 0);
         QVERIFY(!contexts->isEnabled());
-        QVERIFY(memory->text().contains("maximum safe resource budget"));
-        QVERIFY(!memory->text().contains("nonce scheduler limits"));
-        mode->setCurrentIndex(1);
-        for (const unsigned n : {1U, 128U, 192U, 255U, 256U, 257U, 325U, 512U, 1024U}) {
-            contexts->setValue(n); QCOMPARE(contexts->value(), static_cast<double>(n));
-            QVERIFY(memory->text().contains(QString{"%1 selected"}.arg(n)));
-        }
+        QVERIFY(mode->isHidden());
+        QVERIFY(contexts->isHidden());
+        QVERIFY(!memory->text().contains("scratchpads"));
         available = UINT64_MAX;
-        QTest::mouseClick(refresh, Qt::LeftButton);
+        refresh->click();
         QTRY_COMPARE(contexts->maximum(), double{std::numeric_limits<unsigned int>::max()});
-        contexts->setValue(std::numeric_limits<unsigned int>::max());
-        QCOMPARE(contexts->value(), double{std::numeric_limits<unsigned int>::max()});
         QVERIFY(!session.stats().busy);
         mining::GpuStats stats;
         stats.device.pow_version = mercahash::Version::V2;
@@ -452,7 +446,8 @@ private Q_SLOTS:
             mining::GpuDevice large{mining::GpuVendor::NVIDIA_CUDA};
             large.id = "cuda:1"; large.name = "Simulated large CUDA"; large.supported = true;
             large.total_memory = large.available_memory = large.max_allocation = 24ULL << 30;
-            result.devices = {cuda, amd, large};
+            auto integrated{amd}; integrated.id = "opencl:1"; integrated.dedicated = false;
+            result.devices = {cuda, amd, large, integrated};
             return result;
         }};
         MiningPage page{nullptr};
@@ -470,58 +465,16 @@ private Q_SLOTS:
         QCOMPARE(mode->currentIndex(), 0); // Maximum safe automatic on every new page.
         QVERIFY(!contexts->isEnabled());
         QCOMPARE(contexts->maximum(), 8); // Only the Manual field uses the tightest allocation limit.
-        QVERIFY(memory->text().contains("43 contexts:"));
-        QVERIFY(memory->text().contains("181 contexts:")); // Neither CUDA device is capped by the small AMD device.
-        QVERIFY(memory->text().contains("8 contexts selected"));
-        QVERIFY(memory->text().contains("free VRAM is unknown"));
-        mode->setCurrentIndex(1);
-        QVERIFY(contexts->isEnabled());
+        QVERIFY(mode->isHidden());
+        QVERIFY(contexts->isHidden());
+        QVERIFY(!memory->text().contains("scratchpads"));
         all->setChecked(false);
         devices->item(1)->setCheckState(Qt::Unchecked);
-        devices->item(2)->setCheckState(Qt::Unchecked);
-        QVERIFY(contexts->maximum() > 36);
-        contexts->setValue(36);
-        QCOMPARE(contexts->value(), 36);
-        QVERIFY(memory->text().contains("4608 MiB scratchpads"));
-        QVERIFY(!memory->text().contains("Warning:"));
-        const auto rescan = [&] {
-            const auto revision{session.gpuDiscoverySnapshot()->revision};
-            refresh->click();
-            QTRY_VERIFY(session.gpuDiscoverySnapshot() && session.gpuDiscoverySnapshot()->revision > revision);
-            QTRY_VERIFY(refresh->isEnabled());
-        };
-        free_cuda = 5200ULL << 20; // 36 fits, with just over the required 512 MiB reserve.
-        rescan();
-        QTRY_COMPARE(contexts->maximum(), 36);
-        QCOMPARE(contexts->value(), 36);
-        QCOMPARE(devices->item(1)->checkState(), Qt::Unchecked); // Refresh preserves explicit device selection.
-        QVERIFY(memory->text().contains("Warning:"));
-        free_cuda = 5ULL << 30;
-        rescan();
-        QTRY_VERIFY(contexts->maximum() < 36);
-        QCOMPARE(contexts->value(), contexts->maximum());
-        free_cuda = 24ULL << 30;
-        rescan();
-        QTRY_VERIFY(contexts->maximum() > 128);
-        contexts->setValue(128);
-        QCOMPARE(contexts->value(), 128); // Larger GPUs are not capped at 36.
-        free_cuda = 80ULL << 30;
-        rescan();
-        QTRY_COMPARE(contexts->maximum(), static_cast<int>(mining::MAX_GPU_CONTEXTS));
-        QVERIFY(memory->text().contains("nonce scheduler limits each GPU to 256"));
-        free_cuda = 0;
-        rescan();
-        QTRY_VERIFY(!contexts->isEnabled());
-        QVERIFY(memory->text().contains("cannot fit"));
-        QVERIFY(!page.findChild<QPushButton*>("startMining")->isEnabled());
-        QVERIFY(!session.stats().busy); // Selector and asynchronous discovery never start mining.
-        mode->setCurrentIndex(0);
-        QVERIFY(!contexts->isEnabled());
-        devices->item(2)->setCheckState(Qt::Checked);
-        QVERIFY(memory->text().contains("181 contexts:"));
-        QVERIFY(!memory->text().contains("cannot fit")); // An exhausted small device does not block automatic on the large one.
-        MiningPage reopened{nullptr};
-        QCOMPARE(reopened.findChild<QComboBox*>("gpuContextMode")->currentIndex(), 0);
+        QCOMPARE(devices->item(0)->checkState(), Qt::Checked);
+        QCOMPARE(devices->item(2)->checkState(), Qt::Checked);
+        refresh->click();
+        QTRY_VERIFY(session.gpuDiscoverySnapshot());
+        QVERIFY(!session.stats().busy);
     }
 
     void hardwareAwareManualWorkerSelection()
@@ -821,13 +774,9 @@ private Q_SLOTS:
         QCOMPARE(scroll->horizontalScrollBar()->maximum(), 0);
         auto* copy{page.findChild<QPushButton*>("copyMiningDestination")};
         auto* show{page.findChild<QPushButton*>("showMiningDestination")};
-        QVERIFY(copy && show && copy->isEnabled() && show->isEnabled());
+        QVERIFY(copy && show && copy->isEnabled() && !show->isEnabled());
         copy->click();
         QCOMPARE(QApplication::clipboard()->text(), QString::fromStdString(address));
-        QSignalSpy requested{&page, &MiningPage::showRewardAddress};
-        show->click();
-        QCOMPARE(requested.count(), 1);
-        QCOMPARE(requested.front().front().toString(), QString::fromStdString(address));
         AddressBookPage book{style.get(), AddressBookPage::ForEditing, AddressBookPage::ReceivingTab};
         book.setModel(model.getAddressTableModel());
         book.selectAddress(QString::fromStdString(address));

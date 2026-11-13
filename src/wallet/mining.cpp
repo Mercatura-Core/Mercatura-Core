@@ -6,26 +6,40 @@
 
 #include <interfaces/wallet.h>
 #include <outputtype.h>
+#include <key_io.h>
+#include <script/solver.h>
 #include <util/translation.h>
 
 namespace wallet {
-util::Result<CTxDestination> GetMiningDestination(interfaces::Wallet& wallet)
+util::Result<CTxDestination> GetMiningDestination(interfaces::Wallet& wallet, int payout, const std::string& selected, bool fresh)
 {
-    const auto addresses{wallet.getAddresses()};
-    for (const auto& address : addresses) {
-        if (address.name == MINING_REWARD_LABEL && address.is_mine &&
-            std::holds_alternative<WitnessV2MercaturaPQ>(address.dest) && wallet.isSpendable(address.dest)) return address.dest;
+    const auto is_v3 = [](const CTxDestination& dest) {
+        std::vector<std::vector<unsigned char>> solutions;
+        return Solver(GetScriptForDestination(dest), solutions) == TxoutType::WITNESS_V3_MERCAWEAVE;
+    };
+    const bool v3{payout != 1 && wallet.mercaweaveAvailable()};
+    if (payout < 0 || payout > 2 || (payout == 2 && !v3))
+        return util::Error{Untranslated("MercaWeave mining payouts are unavailable")};
+    const auto eligible = [&](const CTxDestination& dest) {
+        return wallet.isSpendable(dest) &&
+            (std::holds_alternative<WitnessV2MercaturaPQ>(dest) ||
+             (wallet.mercaweaveAvailable() && is_v3(dest)));
+    };
+    if (!selected.empty()) {
+        auto dest{DecodeDestination(selected)};
+        if (!eligible(dest) || (payout == 1 && !std::holds_alternative<WitnessV2MercaturaPQ>(dest)) ||
+            (payout == 2 && !is_v3(dest)))
+            return util::Error{Untranslated("Selected mining address is unowned, unsupported, inactive, or incompatible with the payout type")};
+        return dest;
     }
-    // Reuse an eligible receiving address even if its mining label was edited.
-    // Preserve the user's label and never repurpose sending/change addresses.
-    for (const auto& address : addresses) {
-        if (address.purpose == AddressPurpose::RECEIVE && address.is_mine &&
-            std::holds_alternative<WitnessV2MercaturaPQ>(address.dest) && wallet.isSpendable(address.dest)) return address.dest;
+    if (!fresh) for (const auto& address : wallet.getAddresses()) {
+        if ((address.name == MINING_REWARD_LABEL || address.purpose == AddressPurpose::RECEIVE) && eligible(address.dest) &&
+            (v3 == is_v3(address.dest))) return address.dest;
     }
     if (wallet.isLocked()) return util::Error{Untranslated("Unlock this wallet once to create its native PQ mining reward address, then start mining again")};
-    auto destination{wallet.getNewDestination(OutputType::BECH32M, MINING_REWARD_LABEL)};
+    auto destination{v3 ? wallet.getNewMiningMercaWeaveDestination(MINING_REWARD_LABEL) : wallet.getNewDestination(OutputType::BECH32M, MINING_REWARD_LABEL)};
     if (!destination) return destination;
-    if (!std::holds_alternative<WitnessV2MercaturaPQ>(*destination) || !wallet.isSpendable(*destination)) {
+    if (!eligible(*destination)) {
         return util::Error{Untranslated("The selected wallet did not provide an owned native Mercatura PQ destination")};
     }
     // Require successful persistence of the public address-book marker. The
