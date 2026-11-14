@@ -730,7 +730,17 @@ class CudaBackend final : public GpuBackend
                         if(status==cudaSuccess) break;
                         if(status!=cudaErrorNotReady) Check(status,"Poll NVIDIA V2 completion");
                         if(cancelled()) return false;
+#ifdef _WIN32
+                        // A short sleep can take an entire Windows timer tick,
+                        // starving this two-event launch window. Yield without
+                        // a timed wait, then recheck errors and cancellation.
+                        // This may use a CPU core when no other thread is ready.
+                        std::this_thread::yield();
+#else
+                        // Retain the lower-CPU wait on platforms where the short
+                        // sleep does not incur the Windows timer-tick penalty.
                         std::this_thread::sleep_for(std::chrono::microseconds(50));
+#endif
                     }
 
                     event_head=(event_head+1)%2;

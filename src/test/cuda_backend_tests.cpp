@@ -506,9 +506,23 @@ int main()
             state.Reset(); state.not_ready_queries = 3;
             Require(backend->Hash(full, [] { return false; }).size() == 2, "Not-ready polling lost V2 work");
             Require(state.event_queries == 148, "Not-ready events were not polled again");
+            // A driver error after repeated not-ready results must escape the
+            // polling loop and drain queued work before buffers can be reused.
+            state.Reset(); state.not_ready_queries = 4096; state.fail_event_query = 4097;
+            ExpectFailure([&] { backend->Hash(full, [] { return false; }); });
+            Require(state.event_queries == 4097, "Polling masked a delayed driver error");
+            state.Reset();
+            Require(backend->Hash(full, [] { return false; }).size() == 2, "Restart after polling error failed");
             state.Reset(); state.not_ready_queries = UINT_MAX;
             Require(backend->Hash(full, [&] { return state.event_queries >= 2; }).empty(), "Cancellation during not-ready polling failed");
             Require(state.pending == 0, "Not-ready cancellation left queued work");
+            state.Reset(); state.not_ready_queries = UINT_MAX;
+            ExpectFailure([&] {
+                backend->Hash(full, [&] {
+                    if (state.event_queries >= 2) throw std::runtime_error{"Polling callback failure"};
+                    return false;
+                });
+            });
             for (unsigned fail : {1U, 2U, 20U, 80U, 160U, checkpoints}) {
                 state.Reset(); polls = 0;
                 ExpectFailure([&] {
@@ -559,6 +573,33 @@ int main()
             }
             Require(state.allocations.empty() && state.streams == 0, "Large V2 allocation leaked");
         }
+        // Start inside the pool, cross its end, and resume from the same
+        // offset. Check both header ordering and physical scratchpad rotation.
+        state.Reset(); state.scratchpad_bytes = 16ULL << 20; state.max_contexts = UINT_MAX;
+        state.free_memory = 8ULL << 30; state.compute_units = 5;
+        {
+            auto backend{mining::CreateCudaBackend(v2_device, 7)};
+            backend->Hash(partial, [] { return false; });
+            Require(backend->BatchContexts() == 5, "Partial batch changed the full execution limit");
+            state.Reset();
+            std::vector<mining::GpuHeader> input(7);
+            for (unsigned i{0}; i < input.size(); ++i) input[i][0] = i + 1;
+            Require(backend->Hash(input, [] { return false; }).size() == 7, "Wrapped batch failed");
+            Require(state.observed_v2_headers == input, "Wraparound changed input order");
+            uintptr_t base{0};
+            for (const auto& [pointer, bytes] : state.allocation_bytes)
+                if (bytes == 7ULL * (16ULL << 20)) base = reinterpret_cast<uintptr_t>(pointer);
+            std::vector<unsigned> counts;
+            std::vector<uintptr_t> pads;
+            for (const auto& launch : state.launches) {
+                if (launch.name == "mh_init_v2") counts.push_back(launch.count);
+                if (launch.name == "research_fill" && launch.begin == 0) pads.push_back(launch.scratch);
+            }
+            Require(counts == std::vector<unsigned>{5, 1, 1}, "Wrong windows at pool wraparound");
+            Require(pads == std::vector<uintptr_t>{base + (16ULL << 20), base + (96ULL << 20), base}, "Wrong scratchpad offsets at wraparound");
+            Require(backend->BatchContexts() == 5 && state.pending == 0, "Wraparound left an invalid cursor or pending work");
+        }
+        Require(state.allocations.empty() && state.events.empty() && state.streams == 0, "Wrapped pool cleanup leaked resources");
         state.Reset(); state.scratchpad_bytes = 16ULL << 20; state.max_contexts = 325; state.free_memory = 32ULL << 30;
         {
             auto backend{mining::CreateCudaBackend(v2_device, 0)};
