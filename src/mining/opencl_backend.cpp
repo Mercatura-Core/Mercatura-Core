@@ -517,6 +517,7 @@ GpuDiscovery DiscoverOpenClDevices()
                     entry.pci_id = GpuPciId(pci.pci_domain, pci.pci_bus, pci.pci_device, pci.pci_function);
                 // AMD's older extension omits the domain; require an
                 // unambiguous system PCI match on Linux.
+#if !defined(WIN32) && defined(CL_DEVICE_TOPOLOGY_TYPE_PCIE_AMD)
                 if (entry.pci_id.empty()) {
                     cl_device_topology_amd topology{};
                     if (api.clGetDeviceInfo(device, CL_DEVICE_TOPOLOGY_AMD, sizeof(topology), &topology, nullptr) == CL_SUCCESS &&
@@ -524,6 +525,7 @@ GpuDiscovery DiscoverOpenClDevices()
                         entry.pci_id = GpuPciTopologyId(static_cast<unsigned char>(topology.pcie.bus),
                             static_cast<unsigned char>(topology.pcie.device), static_cast<unsigned char>(topology.pcie.function));
                 }
+#endif
                 entry.name = Text(api, device, CL_DEVICE_NAME);
                 entry.capability = Text(api, device, CL_DEVICE_VERSION);
                 entry.total_memory = Info<cl_ulong>(api, device, CL_DEVICE_GLOBAL_MEM_SIZE);
