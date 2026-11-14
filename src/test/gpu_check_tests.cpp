@@ -3,9 +3,16 @@
 
 // Exercise the standalone checker's real setup and measurement loop with a
 // CPU-backed rotating pool. This test provides no GPU correctness evidence.
-#define main GpuCheckMain
-#include <mining/gpu_check.cpp>
-#undef main
+#include <crypto/mercahash.h>
+#include <mining/gpu_backend.h>
+#include <mining/gpu_check.h>
+
+#include <algorithm>
+#include <iostream>
+#include <iterator>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 namespace {
 unsigned benchmark_batches{0}, execution_window{5};
@@ -73,7 +80,7 @@ int main()
     for (const auto window : {5U, 7U}) {
         execution_window = window;
         benchmark_batches = 0;
-        const auto result{GpuCheckMain(argv.size(), argv.data())};
+        const auto result{mining::GpuCheckMain(argv.size(), argv.data())};
         if (result || !benchmark_batches) return 1;
     }
     std::cout << "Full benchmark window preserved after correctness checks (CPU test double)\n";

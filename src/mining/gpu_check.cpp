@@ -7,6 +7,7 @@
 #include <fstream>
 #include <iostream>
 #include <mining/gpu_backend.h>
+#include <mining/gpu_check.h>
 #include <stdexcept>
 
 namespace {
@@ -55,7 +56,7 @@ public:
 };
 } // namespace
 
-int main(int argc, char** argv)
+int mining::GpuCheckMain(int argc, char** argv)
 {
     try {
         unsigned requested{0}, repetitions{3}, version{1}, benchmark_seconds{0};
@@ -196,3 +197,10 @@ int main(int argc, char** argv)
         return 1;
     }
 }
+
+#ifndef MERCATURA_GPU_CHECK_NO_MAIN
+int main(int argc, char** argv)
+{
+    return mining::GpuCheckMain(argc, argv);
+}
+#endif
