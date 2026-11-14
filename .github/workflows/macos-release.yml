@@ -16,11 +16,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: f736730e91350c190f5f82e8809ce47932cac22d
+          ref: b5403534c92401b9a46ac55751de3420f0ff8335
 
       - name: Verify approved release source and ARM64
         run: |
-          test "$(git rev-parse HEAD)" = "f736730e91350c190f5f82e8809ce47932cac22d"
+          test "$(git rev-parse HEAD)" = "b5403534c92401b9a46ac55751de3420f0ff8335"
           test "$(uname -m)" = "arm64"
 
       - name: Install dependencies
