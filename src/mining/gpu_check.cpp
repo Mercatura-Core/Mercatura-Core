@@ -95,6 +95,10 @@ int main(int argc, char** argv)
         auto selected{*device};
         selected.pow_version = version == 2 ? mercahash::Version::V2 : mercahash::Version::V1;
         auto backend{mining::CreateGpuBackend(selected, requested)};
+        // BatchContexts() is the next contiguous window, which can shrink at
+        // the end of the rotating pool. Capture the full execution window on
+        // the fresh backend before any correctness checks advance that pool.
+        const unsigned benchmark_contexts{backend->BatchContexts()};
         mining::VerifyGpuBackend(*backend, [] { return false; });
         const unsigned contexts{backend->Contexts()};
         if (const auto description{backend->ExecutionDescription()}; !description.empty())
@@ -148,11 +152,22 @@ int main(int argc, char** argv)
                   << repetitions << " repetitions\n";
         if (version == 2)
             std::cout << "V2 resident contexts=" << contexts << " estimated=" << backend->EstimatedContexts()
-                      << " execution_window=" << backend->BatchContexts() << " allocated_buffer_bytes=" << backend->MemoryBytes() << '\n';
+                      << " execution_window=" << benchmark_contexts << " allocated_buffer_bytes=" << backend->MemoryBytes() << '\n';
         if (benchmark_seconds) {
             // Explicit manual measurement after parity. No count selection,
             // automatic tuning, node connection or block submission occurs.
-            std::vector<mining::GpuHeader> headers(backend->BatchContexts());
+            // Advance to a pool boundary before timing. Otherwise a fixed
+            // full-pool input starting partway through the pool would keep
+            // splitting at that same offset on every measured Hash() call.
+            // At most one resident pool is visited; a short tail ends the pass.
+            for (unsigned visited{0}; visited < contexts;) {
+                const unsigned count{backend->BatchContexts()};
+                const auto hashes{backend->Hash(std::vector<mining::GpuHeader>(count), [] { return false; })};
+                if (hashes.size() != count) throw std::runtime_error{"Incomplete GPU measurement alignment batch"};
+                visited += count;
+                if (count < benchmark_contexts) break;
+            }
+            std::vector<mining::GpuHeader> headers(benchmark_contexts);
             const auto start{std::chrono::steady_clock::now()};
             const auto deadline{start + std::chrono::seconds{benchmark_seconds}};
             const auto cancelled = [&] { return std::chrono::steady_clock::now() >= deadline; };
