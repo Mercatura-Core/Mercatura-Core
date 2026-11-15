@@ -21,8 +21,10 @@
 #include <consensus/validation.h>
 #include <core_memusage.h>
 #include <crypto/siphash.h>
+#include <cuckoocache.h>
 #include <deploymentstatus.h>
 #include <flatfile.h>
+#include <hash.h>
 #include <headerssync.h>
 #include <index/blockfilterindex.h>
 #include <kernel/types.h>
@@ -61,6 +63,7 @@
 #include <txmempool.h>
 #include <uint256.h>
 #include <util/check.h>
+#include <util/hasher.h>
 #include <util/strencodings.h>
 #include <util/time.h>
 #include <util/trace.h>
@@ -1171,12 +1174,17 @@ private:
     void LogBlockHeader(const CBlockIndex& index, const CNode& peer, bool via_compact_block);
 
     /**
-     * Reusable MercaHash-v1 context for inbound headers.
+     * Reusable MercaHash context for inbound headers.
      *
      * ProcessHeadersMessage() is serialized by g_msgproc_mutex, so this
      * single context is never used concurrently.
      */
     PoWHashContext m_pow_hash_context;
+    /** Bounded successful PoW checks, including headers not admitted to the index.
+     * Keys commit to a private salt, verified height and the complete header.
+     * Like the context, access is serialized by g_msgproc_mutex. */
+    const uint256 m_headers_pow_salt{GetRandHash()};
+    CuckooCache::cache<uint256, SignatureCacheHasher> m_headers_pow_cache GUARDED_BY(g_msgproc_mutex);
 
     /// The transactions to be broadcast privately.
     PrivateBroadcast m_tx_for_private_broadcast;
@@ -2130,6 +2138,7 @@ PeerManagerImpl::PeerManagerImpl(CConnman& connman, AddrMan& addrman,
       m_warnings{warnings},
       m_opts{opts}
 {
+    m_headers_pow_cache.setup_bytes(2 << 20);
     // While Erlay support is incomplete, it must be enabled explicitly via -txreconciliation.
     // This argument can go away after Erlay support is complete.
     if (opts.reconcile_txs) {
@@ -2943,21 +2952,33 @@ bool PeerManagerImpl::CheckHeadersPoW(const std::vector<CBlockHeader>& headers, 
         LOCK(peer.m_headers_sync_mutex);
         if (peer.m_headers_sync) first_height = peer.m_headers_sync->NextHeaderHeight(headers.front());
     }
-    if (!first_height && m_chainparams.GetConsensus().nMercaHashV2Height) {
-        // Unknown ancestry cannot select a version. Request ancestors and return
-        // before presync, claimed-work accounting, caching or header admission.
-        // Existing getheaders rate limits bound this unconnected-header path.
+    if (!first_height) {
+        // Unknown ancestry cannot be admitted (or select a PoW version).
+        // Request ancestors before spending memory-hard work, including on V1.
+        // HandleUnconnectingHeaders rate-limits the ancestor request.
         HandleUnconnectingHeaders(pfrom, peer, headers);
         return false;
     }
     // Verify the height-selected proof before low-work synchronization uses it.
     const uint64_t hashes_before{m_pow_hash_context.HashesComputed()};
-    const bool valid{HasValidProofOfWork(
-            headers,
-            m_chainparams.GetConsensus(),
-            m_pow_hash_context,
-            m_chainman.m_blockman,
-            first_height)};
+    bool valid{*first_height >= 0 &&
+        *first_height <= std::numeric_limits<int>::max() - static_cast<int64_t>(headers.size() - 1)};
+    for (size_t i{0}; valid && i < headers.size(); ++i) {
+        const int64_t height{*first_height + static_cast<int64_t>(i)};
+        const uint256 key{(HashWriter{} << m_headers_pow_salt << height << headers[i]).GetHash()};
+        if (m_headers_pow_cache.contains(key, false)) continue;
+        const uint64_t before{m_pow_hash_context.HashesComputed()};
+        if (!HasValidProofOfWork(std::span{&headers[i], 1}, m_chainparams.GetConsensus(),
+                                 m_pow_hash_context, m_chainman.m_blockman, height)) {
+            valid = false;
+            break;
+        }
+        // Cache only the PoW result. All contextual and chainwork checks still
+        // run, even if a low-work chain is replayed or its presync was reset.
+        // Indexed headers already have reusable PoW; don't let cheap replays
+        // of them evict the checks that actually required hashing.
+        if (m_pow_hash_context.HashesComputed() != before) m_headers_pow_cache.insert(key);
+    }
     LogDebug(BCLog::NET, "headers proof-of-work: checked=%u total=%u peer=%d\n",
              m_pow_hash_context.HashesComputed() - hashes_before, headers.size(), peer.m_id);
     if (!valid) {

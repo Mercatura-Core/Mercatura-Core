@@ -15,7 +15,7 @@ from test_framework.util import p2p_port
 
 
 class PQP2PBridge:
-    def __init__(self, test, node, chain):
+    def __init__(self, test, node, chain, *, mercahash_v2_height=None):
         build = Path(test.config['environment']['BUILDDIR']) / 'bin'
         filename = 'pq-test-peer.exe' if os.name == 'nt' else 'pq-test-peer'
         # Native MSVC is a multi-configuration build; other toolchains use bin/.
@@ -24,6 +24,8 @@ class PQP2PBridge:
         if binary is None:
             raise RuntimeError('Build the test-only pq_test_peer target before this fixture')
         self.command = [str(binary), chain, str(p2p_port(node.index))]
+        if mercahash_v2_height is not None:
+            self.command.append(str(mercahash_v2_height))
         root = Path(test.options.tmpdir)
         index = len(list(root.glob('pq-test-peer-*.port')))
         self.port_file = root / f'pq-test-peer-{index}.port'

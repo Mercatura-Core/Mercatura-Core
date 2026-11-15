@@ -6,8 +6,13 @@
 #include <chain.h>
 #include <chainparams.h>
 #include <consensus/validation.h>
+#include <net_processing.h>
+#include <node/kernel_notifications.h>
 #include <pow.h>
+#include <test/util/logging.h>
+#include <test/util/net.h>
 #include <test/util/setup_common.h>
+#include <tinyformat.h>
 #include <validation.h>
 
 #include <array>
@@ -214,3 +219,152 @@ BOOST_AUTO_TEST_CASE(side_branches_and_concurrent_processing)
 }
 
 BOOST_AUTO_TEST_SUITE_END()
+
+namespace {
+template<int Activation>
+struct HeaderAdmissionSetup : TestingSetup {
+    HeaderAdmissionSetup()
+        : TestingSetup{ChainType::REGTEST, {.extra_args={Activation < 0 ? "-mercahashv2height=-1" :
+              Activation == 0 ? "-mercahashv2height=0" : "-mercahashv2height=3", "-debug=net"}}}
+    {
+        // A small work threshold and message limit exercise the real network
+        // presync/redownload path without mining thousands of memory-hard PoWs.
+        m_node.peerman.reset();
+        m_node.chainman.reset();
+        ChainstateManager::Options options{
+            .chainparams = Params(), .datadir = m_args.GetDataDirNet(),
+            .minimum_chain_work = arith_uint256{18},
+            .notifications = *m_node.notifications, .signals = m_node.validation_signals.get(),
+        };
+        node::BlockManager::Options block_options{
+            .chainparams = Params(), .blocks_dir = m_args.GetBlocksDirPath(),
+            .notifications = *m_node.notifications,
+            .block_tree_db_params = {.path = m_args.GetDataDirNet() / "blocks" / "index",
+                                    .cache_bytes = 1 << 20, .memory_only = true},
+        };
+        m_node.chainman = std::make_unique<ChainstateManager>(*m_node.shutdown_signal, options, block_options);
+        LoadVerifyActivateChainstate();
+        m_node.peerman = PeerManager::make(*m_node.connman, *m_node.addrman, m_node.banman.get(),
+            *m_node.chainman, *m_node.mempool, *m_node.warnings,
+            {.deterministic_rng = true, .max_headers_result = 4});
+        static_cast<ConnmanTestMsg&>(*m_node.connman).SetMsgProc(m_node.peerman.get());
+    }
+
+    ~HeaderAdmissionSetup()
+    {
+        LOCK(NetEventsInterface::g_msgproc_mutex);
+        for (const auto& peer : peers) m_node.peerman->FinalizeNode(*peer);
+    }
+
+    std::vector<std::unique_ptr<CNode>> peers;
+    PoWHashContext miner;
+
+    CNode& AddPeer()
+    {
+        peers.push_back(std::make_unique<CNode>(peers.size(), nullptr, CAddress{}, 0, 0,
+            CAddress{}, "", ConnectionType::INBOUND, false, 0));
+        auto& peer{*peers.back()};
+        static_cast<ConnmanTestMsg&>(*m_node.connman).Handshake(peer, true,
+            ServiceFlags(NODE_NETWORK | NODE_WITNESS), ServiceFlags(NODE_NETWORK | NODE_WITNESS),
+            PROTOCOL_VERSION, true);
+        return peer;
+    }
+
+    void Solve(CBlockHeader& header, int height)
+    {
+        for (unsigned attempts{0}; attempts < 64; ++attempts, ++header.nNonce) {
+            if (CheckProofOfWork(header, Params().GetConsensus(), miner, height)) return;
+        }
+        BOOST_FAIL("Regtest header did not solve within 64 hashes");
+    }
+
+    void Send(CNode& peer, std::span<const CBlockHeader> headers, std::optional<unsigned> checks)
+    {
+        std::vector<CBlock> blocks;
+        for (const auto& header : headers) blocks.emplace_back(header);
+        std::vector<std::string> logs;
+        DebugLogHelper log{"headers proof-of-work:", [&](const std::string* line) {
+            if (line) logs.push_back(*line);
+            return false;
+        }};
+        auto& connman{static_cast<ConnmanTestMsg&>(*m_node.connman)};
+        connman.FlushSendBuffer(peer);
+        peer.fPauseSend = false;
+        BOOST_REQUIRE(connman.ReceiveMsgFrom(peer, NetMsg::Make(NetMsgType::HEADERS, TX_WITH_WITNESS(blocks))));
+        connman.ProcessMessagesOnce(peer);
+        if (checks) {
+            BOOST_REQUIRE_EQUAL(logs.size(), 1);
+            BOOST_CHECK(logs[0].find(strprintf("checked=%u total=%u", *checks, headers.size())) != std::string::npos);
+        } else {
+            BOOST_CHECK(logs.empty());
+        }
+    }
+
+    void CheckAdmission()
+    {
+        LOCK(NetEventsInterface::g_msgproc_mutex);
+        auto& first{AddPeer()};
+        auto& second{AddPeer()};
+        std::vector<CBlockHeader> headers;
+        CBlockHeader parent{Params().GenesisBlock()};
+        for (int height{1}; height <= 8; ++height) {
+            CBlockHeader header{parent};
+            header.nVersion = 0x20000000;
+            header.hashPrevBlock = parent.GetHash();
+            header.nTime += 150;
+            header.nNonce = 0;
+            Solve(header, height);
+            headers.push_back(header);
+            parent = header;
+        }
+        auto unknown{headers[0]};
+        unknown.hashPrevBlock = uint256::ONE;
+        Solve(unknown, 1);
+        for (int replay{0}; replay < 3; ++replay) Send(first, {&unknown, 1}, std::nullopt);
+
+        const std::span batch{headers};
+        Send(first, batch.first(4), 4);
+        BOOST_CHECK(WITH_LOCK(cs_main, return m_node.chainman->m_blockman.LookupBlockIndex(headers[3].GetHash())) == nullptr);
+        for (int replay{0}; replay < 3; ++replay) Send(first, batch.first(4), 0);
+        Send(first, {}, std::nullopt); // Clearing sync state must not clear PoW knowledge.
+        Send(first, batch.first(4), 0);
+        Send(second, batch.first(4), 0); // Shared across peers and batch boundaries.
+        Send(second, batch.first(2), 0);
+        Send(second, batch.first(3), 0);
+
+        CNodeStateStats stats;
+        BOOST_REQUIRE(m_node.peerman->GetNodeStateStats(first.GetId(), stats));
+        BOOST_CHECK_EQUAL(stats.presync_height, 4);
+        Send(first, batch.subspan(4), 4); // Reach the work threshold.
+        Send(first, batch.first(4), 0); // Legitimate redownload uses the same PoW.
+        Send(first, batch.subspan(4), 0);
+        {
+            LOCK(cs_main);
+            BOOST_REQUIRE(m_node.chainman->m_best_header);
+            BOOST_CHECK(m_node.chainman->m_best_header->GetBlockHash() == headers.back().GetHash());
+            BOOST_CHECK_EQUAL(m_node.chainman->ActiveChain().Height(), 0);
+        }
+        // Cached proof never authorizes altered fields or bypasses contextual checks.
+        auto invalid{headers[0]};
+        invalid.nBits = 0;
+        Send(second, {&invalid, 1}, 1);
+        auto& third{AddPeer()};
+        Send(third, {&invalid, 1}, 1); // Invalid PoW is never cached as success.
+        const std::array broken{headers[0], headers[2]};
+        Send(third, broken, std::nullopt); // Cached entries cannot bypass linkage.
+        BOOST_CHECK(WITH_LOCK(cs_main, return m_node.chainman->m_blockman.LookupBlockIndex(invalid.GetHash())) == nullptr);
+        auto too_old{headers.back()};
+        too_old.hashPrevBlock = headers.back().GetHash();
+        too_old.nTime = Params().GenesisBlock().nTime;
+        too_old.nNonce = 0;
+        Solve(too_old, 9);
+        Send(first, {&too_old, 1}, 1);
+        Send(first, {&too_old, 1}, 0);
+        BOOST_CHECK(WITH_LOCK(cs_main, return m_node.chainman->m_blockman.LookupBlockIndex(too_old.GetHash())) == nullptr);
+    }
+};
+} // namespace
+
+BOOST_FIXTURE_TEST_CASE(header_admission_v1, HeaderAdmissionSetup<-1>) { CheckAdmission(); }
+BOOST_FIXTURE_TEST_CASE(header_admission_v2_genesis, HeaderAdmissionSetup<0>) { CheckAdmission(); }
+BOOST_FIXTURE_TEST_CASE(header_admission_v2_transition, HeaderAdmissionSetup<3>) { CheckAdmission(); }
