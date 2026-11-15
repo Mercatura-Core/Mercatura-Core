@@ -28,6 +28,7 @@
 #include <qt/transactiontablemodel.h>
 #include <qt/transactionview.h>
 #include <qt/walletmodel.h>
+#include <qt/walletmodeltransaction.h>
 #include <script/solver.h>
 #include <test/util/setup_common.h>
 #include <validation.h>
@@ -55,6 +56,7 @@
 #include <QHeaderView>
 #include <QRadioButton>
 #include <QScrollBar>
+#include <QSignalSpy>
 #include <QStandardItemModel>
 #include <QTreeWidgetItemIterator>
 
@@ -291,6 +293,21 @@ void TestGUI(interfaces::Node& node, const std::shared_ptr<CWallet>& wallet)
     // Check balance in send dialog
     CompareBalance(walletModel, walletModel.wallet().getBalance(), sendCoinsDialog.findChild<QLabel*>("labelBalance"));
 
+    // A syntactically valid classical address must produce an understandable
+    // wallet error instead of preparing a payment to disabled ownership.
+    QSignalSpy payment_errors{&walletModel, &WalletModel::message};
+    for (const CTxDestination& dest : std::vector<CTxDestination>{PKHash{}, WitnessV0KeyHash{}}) {
+        SendCoinsRecipient recipient;
+        recipient.address = QString::fromStdString(EncodeDestination(dest));
+        recipient.amount = COIN;
+        QVERIFY(walletModel.validateAddress(recipient.address));
+        WalletModelTransaction transaction{{recipient}};
+        QCOMPARE(walletModel.prepareTransaction(transaction, {}).status, WalletModel::TransactionCreationFailed);
+        QVERIFY(!transaction.getWtx());
+        QCOMPARE(payment_errors.count(), 1);
+        QVERIFY(payment_errors.takeFirst().at(1).toString().contains("disabled classical signature authorization"));
+    }
+
     // Check 'UseAvailableBalance' functionality
     VerifyUseAvailableBalance(sendCoinsDialog, walletModel);
 
@@ -421,7 +438,7 @@ void TestGUIWatchOnly(interfaces::Node& node, TestChain100Setup& test)
                    sendCoinsDialog.findChild<QLabel*>("labelBalance"));
 
     // Set change address
-    sendCoinsDialog.getCoinControl()->destChange = PKHash{test.coinbaseKey.GetPubKey()};
+    sendCoinsDialog.getCoinControl()->destChange = WitnessV2MercaturaPQ{};
 
     // Time to reject "save" PSBT dialog ('SendCoins' locks the main thread until the dialog receives the event).
     QTimer timer;
@@ -441,7 +458,7 @@ void TestGUIWatchOnly(interfaces::Node& node, TestChain100Setup& test)
     timer.start(500);
 
     // Send tx and verify PSBT copied to the clipboard.
-    SendCoins(*wallet.get(), sendCoinsDialog, PKHash(), 5 * COIN, /*rbf=*/false, QMessageBox::Save);
+    SendCoins(*wallet.get(), sendCoinsDialog, WitnessV2MercaturaPQ{}, 5 * COIN, /*rbf=*/false, QMessageBox::Save);
     const std::string& psbt_string = QApplication::clipboard()->text().toStdString();
     QVERIFY(!psbt_string.empty());
 

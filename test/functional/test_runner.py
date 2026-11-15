@@ -98,6 +98,7 @@ MERCATURA_SCRIPTS = [
     'mercatura_witness_resource.py',
     'mercatura_chain_reorg.py',
     'mercatura_classical_ownership_shutdown.py',
+    'mercatura_classical_payment_safety.py',
     'mercatura_coinbase_maturity.py',
     'mercatura_coinbase_subsidy.py',
     'mercatura_dgw.py',

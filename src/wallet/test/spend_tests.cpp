@@ -5,6 +5,7 @@
 #include <consensus/amount.h>
 #include <key.h>
 #include <policy/fees/block_policy_estimator.h>
+#include <psbt.h>
 #include <script/solver.h>
 #include <validation.h>
 #include <wallet/coincontrol.h>
@@ -16,6 +17,61 @@
 
 namespace wallet {
 BOOST_FIXTURE_TEST_SUITE(spend_tests, WalletTestingSetup)
+
+BOOST_AUTO_TEST_CASE(disabled_classical_outputs_are_rejected_before_funding)
+{
+    const auto pubkey{GenerateRandomKey().GetPubKey()};
+    const CTxDestination pq{WitnessV2MercaturaPQ{}};
+    const std::vector<CTxDestination> disabled{
+        PKHash{pubkey}, WitnessV0KeyHash{pubkey}, PubKeyDestination{pubkey},
+        CNoDestination{GetScriptForMultisig(1, {pubkey})},
+        CNoDestination{GetScriptForDestination(PKHash{pubkey})},
+        CNoDestination{GetScriptForDestination(WitnessV0KeyHash{pubkey})},
+        CNoDestination{GetScriptForRawPubKey(pubkey)},
+    };
+    const auto check = [](const auto& result) {
+        BOOST_REQUIRE(!result);
+        BOOST_CHECK_EQUAL(util::ErrorString(result).original,
+            "Recipient or change output uses disabled classical signature authorization");
+    };
+    for (const auto& dest : disabled) {
+        const std::vector<CRecipient> recipients{{pq, COIN, false}, {dest, COIN, false}};
+        for (bool sign : {false, true}) {
+            check(CreateTransaction(m_wallet, {{dest, COIN, false}}, {}, {}, sign));
+            check(CreateTransaction(m_wallet, recipients, {}, {}, sign));
+        }
+        check(FundTransaction(m_wallet, CMutableTransaction{}, recipients, {}, false, {}));
+        CMutableTransaction tx;
+        tx.vout.emplace_back(COIN, GetScriptForDestination(dest));
+        PartiallySignedTransaction psbt{tx};
+        bool complete{false};
+        BOOST_CHECK(m_wallet.FillPSBT(psbt, complete, {}, true, false) == PSBTError::UNSUPPORTED);
+        BOOST_CHECK(m_wallet.FillPSBT(psbt, complete, {}, false, false) != PSBTError::UNSUPPORTED);
+        std::map<int, bilingual_str> errors;
+        {
+            LOCK(m_wallet.cs_wallet);
+            BOOST_CHECK(!m_wallet.SignTransaction(tx, {}, SIGHASH_DEFAULT, errors));
+        }
+        BOOST_REQUIRE(errors.contains(0));
+        BOOST_CHECK_EQUAL(errors.at(0).original,
+            "Recipient or change output uses disabled classical signature authorization");
+        if (!std::holds_alternative<CNoDestination>(dest)) {
+            CCoinControl control;
+            control.destChange = dest;
+            check(CreateTransaction(m_wallet, {{pq, COIN, false}}, {}, control, false));
+        }
+    }
+    // Hash wrappers and Taproot can contain non-signature spending paths.
+    // Future witness versions and explicit raw scripts are not a blanket denylist.
+    const CScript anyone{CScript{} << OP_TRUE};
+    for (const auto& dest : std::vector<CTxDestination>{
+             pq, ScriptHash{anyone}, WitnessV0ScriptHash{anyone},
+             WitnessV1Taproot{XOnlyPubKey{pubkey}}, WitnessUnknown{3, std::vector<unsigned char>(32, 1)},
+             WitnessUnknown{4, std::vector<unsigned char>(32, 1)}, PayToAnchor{},
+             CNoDestination{anyone}, CNoDestination{CScript{} << OP_RETURN << std::vector<unsigned char>{1}}}) {
+        BOOST_CHECK(!IsDisabledClassicalOutput(GetScriptForDestination(dest)));
+    }
+}
 
 BOOST_AUTO_TEST_CASE(pq_spending_modes_match_native_input_scripts)
 {

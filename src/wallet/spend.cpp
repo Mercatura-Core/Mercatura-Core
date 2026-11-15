@@ -1295,6 +1295,14 @@ uint64_t GetSerializeSizeForRecipient(const CRecipient& recipient)
     return ::GetSerializeSize(CTxOut(recipient.nAmount, GetScriptForDestination(recipient.dest)));
 }
 
+bool IsDisabledClassicalOutput(const CScript& script)
+{
+    std::vector<std::vector<unsigned char>> solutions;
+    const auto type{Solver(script, solutions)};
+    return type == TxoutType::PUBKEY || type == TxoutType::PUBKEYHASH ||
+           type == TxoutType::WITNESS_V0_KEYHASH || type == TxoutType::MULTISIG;
+}
+
 bool IsDust(const CRecipient& recipient, const CFeeRate& dustRelayFee)
 {
     return ::IsDust(CTxOut(recipient.nAmount, GetScriptForDestination(recipient.dest)), dustRelayFee);
@@ -1698,6 +1706,15 @@ util::Result<CreatedTransactionResult> CreateTransaction(
 
     if (std::any_of(vecSend.cbegin(), vecSend.cend(), [](const auto& recipient){ return recipient.nAmount < 0; })) {
         return util::Error{_("Transaction amounts must not be negative")};
+    }
+
+    // Classify scripts, not just destination variants: raw funding can carry
+    // the same disabled templates. Script hashes may protect non-signature scripts.
+    if (std::any_of(vecSend.begin(), vecSend.end(), [&](const auto& recipient) {
+            return IsDisabledClassicalOutput(GetScriptForDestination(recipient.dest));
+        }) || (!std::holds_alternative<CNoDestination>(coin_control.destChange) &&
+               IsDisabledClassicalOutput(GetScriptForDestination(coin_control.destChange)))) {
+        return util::Error{_("Recipient or change output uses disabled classical signature authorization")};
     }
 
     for (const auto& recipient : vecSend) {
