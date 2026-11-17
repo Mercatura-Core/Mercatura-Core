@@ -30,6 +30,8 @@
 
 #include <algorithm>
 #include <array>
+#include <memory>
+#include <type_traits>
 #include <vector>
 
 #include <boost/test/unit_test.hpp>
@@ -1172,6 +1174,34 @@ BOOST_AUTO_TEST_CASE(mercatura_pq_child_derivation_tests)
         "f280f0d1f51c03a40521a37946a33837053fa0022720a7bbae18d0f4eccb674d");
 
     BOOST_CHECK(*other_network != derive(0, 0, 0));
+}
+
+BOOST_AUTO_TEST_CASE(mercatura_hkdf_sha3_384_lifetime)
+{
+    using HKDF = CHKDF_HMAC_SHA3_384_L32;
+    static_assert(!std::is_copy_constructible_v<HKDF> && !std::is_copy_assignable_v<HKDF>);
+    static_assert(!std::is_move_constructible_v<HKDF> && !std::is_move_assignable_v<HKDF>);
+    static_assert(std::is_nothrow_destructible_v<HKDF>);
+    static_assert(sizeof(HKDF) == HKDF::PRK_SIZE); // The PRK is the entire stored state.
+    const std::array<unsigned char, 3> ikm{1, 2, 3}, salt{4, 5, 6};
+    for (bool exceptional : {false, true}) {
+        alignas(HKDF) std::array<unsigned char, sizeof(HKDF)> storage;
+        storage.fill(0xa5);
+        try {
+            const auto destroy = [](HKDF* ptr) { std::destroy_at(ptr); };
+            std::unique_ptr<HKDF, decltype(destroy)> hkdf{
+                std::construct_at(reinterpret_cast<HKDF*>(storage.data()), std::span{ikm}, std::span{salt}), destroy};
+            BOOST_CHECK(std::any_of(hkdf->GetPRK().begin(), hkdf->GetPRK().end(), [](auto b) { return b != 0; }));
+            std::array<unsigned char, HKDF::OUTPUT_SIZE> output{};
+            hkdf->Expand32({}, output);
+            if (exceptional) throw 1;
+        } catch (int marker) {
+            BOOST_CHECK_EQUAL(marker, 1);
+        }
+        // Inspect still-live backing storage, never the destroyed HKDF object.
+        // Inputs are synthetic, and assertions never print PRK bytes.
+        BOOST_CHECK(std::all_of(storage.begin(), storage.end(), [](auto b) { return b == 0; }));
+    }
 }
 
 BOOST_AUTO_TEST_CASE(mercatura_hkdf_sha3_384_l32_tests)

@@ -30,6 +30,10 @@ public:
     CHKDF_HMAC_SHA3_384_L32(
         std::span<const unsigned char> ikm,
         std::span<const unsigned char> salt);
+    ~CHKDF_HMAC_SHA3_384_L32();
+
+    CHKDF_HMAC_SHA3_384_L32(const CHKDF_HMAC_SHA3_384_L32&) = delete;
+    CHKDF_HMAC_SHA3_384_L32& operator=(const CHKDF_HMAC_SHA3_384_L32&) = delete;
 
     void Expand32(
         std::span<const unsigned char> info,
