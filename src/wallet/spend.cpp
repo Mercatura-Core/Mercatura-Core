@@ -1341,6 +1341,9 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
     CAmount recipients_sum = 0;
     unsigned int outputs_to_subtract_fee_from = 0; // The number of outputs which we are subtracting the fee from
     for (const auto& recipient : vecSend) {
+        if (recipient.nAmount > MAX_MONEY - recipients_sum) {
+            return util::Error{_("Transaction amounts exceed the monetary safety limit")};
+        }
         if (IsDust(recipient, wallet.chain().relayDustFee())) {
             return util::Error{_("Transaction amount too small")};
         }

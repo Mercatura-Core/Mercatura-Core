@@ -309,6 +309,59 @@ void TestGUI(interfaces::Node& node, const std::shared_ptr<CWallet>& wallet)
     }
 
     // Check 'UseAvailableBalance' functionality
+    const auto pq_recipient = [](int tag, CAmount amount, bool subtract) {
+        WitnessV2MercaturaPQ dest;
+        dest.begin()[0] = tag;
+        SendCoinsRecipient recipient;
+        recipient.address = QString::fromStdString(EncodeDestination(dest));
+        recipient.amount = amount;
+        recipient.fSubtractFeeFromAmount = subtract;
+        return recipient;
+    };
+    for (bool subtract : {false, true}) {
+        for (const auto& amounts : std::vector<std::vector<CAmount>>{{COIN}, {COIN, 2 * COIN}}) {
+            QList<SendCoinsRecipient> recipients;
+            CAmount expected{0};
+            for (CAmount amount : amounts) {
+                recipients.push_back(pq_recipient(recipients.size() + 1, amount, subtract));
+                expected += amount;
+            }
+            WalletModelTransaction tx{recipients};
+            QCOMPARE(walletModel.prepareTransaction(tx, {}).status, WalletModel::OK);
+            QVERIFY(tx.getWtx());
+            QCOMPARE(tx.getTotalTransactionAmount() + (subtract ? tx.getTransactionFee() : 0), expected);
+        }
+        for (const auto& [amounts, status] : std::vector<std::pair<std::vector<CAmount>, WalletModel::StatusCode>>{
+                 {{0}, WalletModel::InvalidAmount}, {{-1}, WalletModel::InvalidAmount},
+                 {{MAX_MONEY}, WalletModel::AmountExceedsBalance},
+                 {{MAX_MONEY / 2, MAX_MONEY - MAX_MONEY / 2}, WalletModel::AmountExceedsBalance},
+                 {{MAX_MONEY + 1}, WalletModel::InvalidAmount},
+                 {{MAX_MONEY - 2, 3}, WalletModel::InvalidAmount},
+                 {std::vector<CAmount>(10, MAX_MONEY), WalletModel::InvalidAmount}}) {
+            QList<SendCoinsRecipient> recipients;
+            for (CAmount amount : amounts) recipients.push_back(pq_recipient(recipients.size() + 1, amount, subtract));
+            WalletModelTransaction tx{recipients};
+            QCOMPARE(walletModel.prepareTransaction(tx, {}).status, status);
+            QVERIFY(!tx.getWtx());
+        }
+    }
+    {
+        SendCoinsDialog excessive{platformStyle.get()};
+        excessive.setModel(&walletModel);
+        for (int i = 1; i <= 10; ++i) excessive.pasteEntry(pq_recipient(i, MAX_MONEY, false));
+        QSignalSpy errors{&excessive, &SendCoinsDialog::message};
+        QVERIFY(QMetaObject::invokeMethod(&excessive, "sendButtonClicked", Q_ARG(bool, false)));
+        QCOMPARE(errors.count(), 1);
+        QVERIFY(errors.first().at(1).toString().contains("monetary safety limit"));
+        CoinControlDialog::payAmounts = QList<CAmount>(10, MAX_MONEY);
+        auto* fee = excessive.findChild<QLabel*>("labelCoinControlFee");
+        QVERIFY(fee);
+        fee->setText("Not calculated");
+        CoinControlDialog::updateLabels(*excessive.getCoinControl(), &walletModel, &excessive);
+        QCOMPARE(fee->text(), QString{"Not calculated"});
+        CoinControlDialog::payAmounts.clear();
+    }
+
     VerifyUseAvailableBalance(sendCoinsDialog, walletModel);
 
     // Send two transactions, and verify they are added to transaction list.

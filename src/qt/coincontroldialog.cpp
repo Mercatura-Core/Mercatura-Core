@@ -399,6 +399,8 @@ void CoinControlDialog::updateLabels(CCoinControl& m_coin_control, WalletModel *
     // nPayAmount
     CAmount nPayAmount = 0;
     for (const CAmount &amount : CoinControlDialog::payAmounts) {
+        // Invalid totals have no fee estimate; transaction preparation reports the error.
+        if (!MoneyRange(amount) || amount > MAX_MONEY - nPayAmount) return;
         nPayAmount += amount;
     }
 
