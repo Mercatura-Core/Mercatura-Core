@@ -13,6 +13,7 @@
 #include <txmempool.h>
 #include <uint256.h>
 #include <util/check.h>
+#include <util/overflow.h>
 
 #include <algorithm>
 #include <numeric>
@@ -374,14 +375,24 @@ std::map<COutPoint, CAmount> MiniMiner::CalculateBumpFees(const CFeeRate& target
         Assume(it != m_entries_by_txid.end());
         if (it != m_entries_by_txid.end()) {
             Assume(target_feerate.GetFee(it->second.GetSizeWithAncestors()) > std::min(it->second.GetModifiedFee(), it->second.GetModFeesWithAncestors()));
-            CAmount bump_fee_with_ancestors = target_feerate.GetFee(it->second.GetSizeWithAncestors()) - it->second.GetModFeesWithAncestors();
-            CAmount bump_fee_individual = target_feerate.GetFee(it->second.GetTxSize()) - it->second.GetModifiedFee();
-            const CAmount bump_fee{std::max(bump_fee_with_ancestors, bump_fee_individual)};
+            // Mempool fee exposure excludes INT64_MIN modified fees. A bump
+            // still need not fit, or be payable by a consensus-valid transaction.
+            const auto ancestors_fee{CheckedAdd(target_feerate.GetFee(it->second.GetSizeWithAncestors()), -it->second.GetModFeesWithAncestors())};
+            const auto individual_fee{CheckedAdd(target_feerate.GetFee(it->second.GetTxSize()), -it->second.GetModifiedFee())};
+            if (!ancestors_fee || !individual_fee) return {};
+            const CAmount bump_fee{std::max(*ancestors_fee, *individual_fee)};
+            if (!MoneyRange(bump_fee)) return {};
             Assume(bump_fee >= 0);
             for (const auto& outpoint : outpoints) {
                 m_bump_fees.emplace(outpoint, bump_fee);
             }
         }
+    }
+    CAmount total_bump_fees{0};
+    for (const auto& [outpoint, fee] : m_bump_fees) {
+        const auto total{CheckedAdd(total_bump_fees, fee)};
+        if (!total || !MoneyRange(*total)) return {};
+        total_bump_fees = *total;
     }
     return m_bump_fees;
 }
@@ -424,6 +435,7 @@ std::optional<CAmount> MiniMiner::CalculateTotalBumpFees(const CFeeRate& target_
         [](int64_t sum, const auto it) {return sum + it->second.GetTxSize();});
     const auto ancestor_package_fee = std::accumulate(ancestors.cbegin(), ancestors.cend(), CAmount{0},
         [](CAmount sum, const auto it) {return sum + it->second.GetModifiedFee();});
-    return target_feerate.GetFee(ancestor_package_size) - ancestor_package_fee;
+    const auto bump_fee{CheckedAdd(target_feerate.GetFee(ancestor_package_size), -ancestor_package_fee)};
+    return bump_fee && MoneyRange(*bump_fee) ? bump_fee : std::nullopt;
 }
 } // namespace node

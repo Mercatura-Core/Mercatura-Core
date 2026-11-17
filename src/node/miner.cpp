@@ -26,6 +26,7 @@
 #include <pow.h>
 #include <primitives/transaction.h>
 #include <util/moneystr.h>
+#include <util/overflow.h>
 #include <util/signalinterrupt.h>
 #include <util/time.h>
 #include <validation.h>
@@ -237,7 +238,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock()
     const CAmount block_reward{
         std::min<CAmount>(
             MAX_MONEY,
-            nFees + *Assert(block_subsidy))};
+            SaturatingAdd(nFees, *Assert(block_subsidy)))};
 
     // If subsidy itself is at MAX_MONEY, transaction-level monetary limits
     // can make some fees unclaimable. Such value is simply left unclaimed;

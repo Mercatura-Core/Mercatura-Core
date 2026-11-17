@@ -45,6 +45,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <stdexcept>
 
 using interfaces::BlockRef;
 using interfaces::BlockTemplate;
@@ -636,7 +637,11 @@ static RPCHelpMan prioritisetransaction()
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Priority is not supported for transactions with dust outputs.");
     }
 
-    mempool.PrioritiseTransaction(txid, nAmount);
+    try {
+        mempool.PrioritiseTransaction(txid, nAmount);
+    } catch (const std::overflow_error& e) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, e.what());
+    }
     return true;
 },
     };

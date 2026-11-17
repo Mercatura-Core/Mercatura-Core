@@ -21,6 +21,7 @@
 #include <script/solver.h>
 #include <util/check.h>
 #include <util/moneystr.h>
+#include <util/overflow.h>
 #include <util/rbf.h>
 #include <util/trace.h>
 #include <util/translation.h>
@@ -458,6 +459,7 @@ util::Result<CoinsResult> FetchSelectedInputs(const CWallet& wallet, const CCoin
     CoinsResult result;
     const bool can_grind_r = wallet.CanGrindR();
     std::map<COutPoint, CAmount> map_of_bump_fees = wallet.chain().calculateIndividualBumpFees(coin_control.ListSelected(), coin_selection_params.m_effective_feerate);
+    CAmount input_fees{0};
     for (const COutPoint& outpoint : coin_control.ListSelected()) {
         // CoinControl overrides are BIP141 weight units. Preserve that value
         // for transaction-weight limits. Without the original witness/non-witness
@@ -516,7 +518,12 @@ util::Result<CoinsResult> FetchSelectedInputs(const CWallet& wallet, const CCoin
 
         /* Set some defaults for depth, solvable, safe, time, and from_me as these don't matter for preset inputs since no selection is being done. */
         COutput output(outpoint, txout, /*depth=*/0, input_bytes, /*solvable=*/true, /*safe=*/true, /*time=*/0, /*from_me=*/false, coin_selection_params.m_effective_feerate, input_weight);
-        output.ApplyBumpFee(map_of_bump_fees.at(output.outpoint));
+        const auto bump{map_of_bump_fees.find(output.outpoint)};
+        const auto fee{bump != map_of_bump_fees.end() ? CheckedAdd(output.GetFee(), bump->second) : std::nullopt};
+        const auto total{fee ? CheckedAdd(input_fees, *fee) : std::nullopt};
+        if (!total || !MoneyRange(*total)) return util::Error{_("Selected input fees are out of range")};
+        input_fees = *total;
+        output.ApplyBumpFee(bump->second);
         result.Add(OutputType::UNKNOWN, output);
     }
     return result;
@@ -727,10 +734,15 @@ CoinsResult AvailableCoins(const CWallet& wallet,
 
     if (feerate.has_value()) {
         std::map<COutPoint, CAmount> map_of_bump_fees = wallet.chain().calculateIndividualBumpFees(outpoints, feerate.value());
-
+        CAmount input_fees{0};
         for (auto& [_, outputs] : result.coins) {
             for (auto& output : outputs) {
-                output.ApplyBumpFee(map_of_bump_fees.at(output.outpoint));
+                const auto bump{map_of_bump_fees.find(output.outpoint)};
+                const auto fee{bump != map_of_bump_fees.end() ? CheckedAdd(output.GetFee(), bump->second) : std::nullopt};
+                const auto total{fee ? CheckedAdd(input_fees, *fee) : std::nullopt};
+                if (!total || !MoneyRange(*total)) return {};
+                input_fees = *total;
+                output.ApplyBumpFee(bump->second);
             }
         }
     }
@@ -1585,7 +1597,9 @@ static util::Result<CreatedTransactionResult> CreateTransactionInternal(
     if (nBytes == -1) {
         return util::Error{_("Missing solving data for estimating transaction size")};
     }
-    CAmount fee_needed = coin_selection_params.m_effective_feerate.GetFee(nBytes) + result.GetTotalBumpFees();
+    const auto checked_fee{CheckedAdd(coin_selection_params.m_effective_feerate.GetFee(nBytes), result.GetTotalBumpFees())};
+    if (!checked_fee || !MoneyRange(*checked_fee)) return util::Error{_("Transaction fee is out of range")};
+    CAmount fee_needed{*checked_fee};
     const CAmount output_value = CalculateOutputValue(txNew);
     Assume(recipients_sum + change_amount == output_value);
     CAmount current_fee = result.GetSelectedValue() - output_value;

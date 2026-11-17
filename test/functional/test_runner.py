@@ -106,6 +106,7 @@ MERCATURA_SCRIPTS = [
     'mercatura_dgw.py',
     'mercatura_fee_boundary.py',
     'mercatura_fee_policy.py',
+    'mercatura_modified_fees.py',
     'mercatura_headers_replay.py',
     'mercatura_headers_lowwork.py',
     'mercatura_headers_lowwork.py --mercahash-v2-height=0',
