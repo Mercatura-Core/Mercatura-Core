@@ -2800,6 +2800,10 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
     }
 
     CBlockUndo blockundo;
+    const bool enforce_undo_limit{params.GetConsensus().nBlockUndoHeight >= 0 &&
+        pindex->nHeight >= params.GetConsensus().nBlockUndoHeight};
+    const uint64_t max_undo_bytes{GetMaxBlockUndoBytes(params.GetConsensus(), pindex->nHeight)};
+    uint64_t undo_size{GetSizeOfCompactSize(block.vtx.size() - 1)};
 
     // Precomputed transaction data pointers must not be invalidated
     // until after `control` has run the script checks (potentially
@@ -2824,6 +2828,12 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
 
         if (!tx.IsCoinBase())
         {
+            // Bound UTXO loading, precomputed spent-output copies and undo accumulation.
+            // This must run even when script verification is cached or assumed valid.
+            if (enforce_undo_limit && !CheckTxUndoSize(tx, view, undo_size, max_undo_bytes)) {
+                state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-undo-size");
+                break;
+            }
             CAmount txfee = 0;
             TxValidationState tx_state;
             if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee)) {

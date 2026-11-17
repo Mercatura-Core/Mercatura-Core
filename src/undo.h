@@ -67,4 +67,24 @@ public:
     SERIALIZE_METHODS(CBlockUndo, obj) { READWRITE(obj.vtxundo); }
 };
 
+/** Charge one transaction's exact undo bytes before loading/copying all its inputs.
+ * The caller includes the outer CBlockUndo vector prefix. Missing inputs are
+ * left to CheckTxInputs; no undo is constructed for a failed transaction. */
+inline bool CheckTxUndoSize(const CTransaction& tx, const CCoinsViewCache& inputs,
+                            uint64_t& undo_size, uint64_t limit)
+{
+    const auto charge = [&](uint64_t bytes) {
+        if (undo_size > limit || bytes > limit - undo_size) return false;
+        undo_size += bytes;
+        return true;
+    };
+    if (!charge(GetSizeOfCompactSize(tx.vin.size()))) return false;
+    for (const auto& input : tx.vin) {
+        const Coin& coin{inputs.AccessCoin(input.prevout)};
+        if (coin.IsSpent()) return true;
+        if (!charge(GetSerializeSize(Using<TxInUndoFormatter>(coin)))) return false;
+    }
+    return true;
+}
+
 #endif // BITCOIN_UNDO_H

@@ -61,6 +61,13 @@ constexpr uint64_t GetMaxBlockCapacityBytes(const Consensus::Params& params, int
     return capacity;
 }
 
+/** Exact CBlockUndo payload budget. The capacity ceiling bounds this to 2 GiB,
+ * so multiplication in uint64_t is safe and the uint32_t disk length still fits. */
+constexpr uint64_t GetMaxBlockUndoBytes(const Consensus::Params& params, int64_t height)
+{
+    return uint64_t{2} * GetMaxBlockCapacityBytes(params, height);
+}
+
 static const size_t MIN_TRANSACTION_WEIGHT = WITNESS_SCALE_FACTOR * 60; // 60 is the lower bound for the size of a valid serialized CTransaction
 static const size_t MIN_SERIALIZABLE_TRANSACTION_WEIGHT = WITNESS_SCALE_FACTOR * 10; // 10 is the lower bound for the size of a serialized CTransaction
 

@@ -150,6 +150,8 @@ public:
     struct RegTestOptions {
         std::unordered_map<Consensus::DeploymentPos, VersionBitsParameters> version_bits_parameters{};
         std::unordered_map<Consensus::BuriedDeployment, int> activation_heights{};
+        /** Isolated -testactivationheight=undo@height override; default active from genesis. */
+        int block_undo_height{0};
         /** Unset: V1 only; zero: isolated V2 genesis; positive: V1-to-V2 transition. */
         std::optional<int> mercahash_v2_height{};
         /** Isolated grouped-authorization tests only; no public deployment. */

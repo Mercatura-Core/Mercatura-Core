@@ -92,6 +92,7 @@ MERCATURA_SCRIPTS = [
     'mercatura_spending_modes.py',
     'mercatura_mercaweave.py',
     'mercatura_block_capacity.py',
+    'mercatura_undo_limits.py',
     'mercatura_pq_capacity.py',
     'mercatura_pq_capacity.py --pq',
     'mercatura_testnet_capacity.py',

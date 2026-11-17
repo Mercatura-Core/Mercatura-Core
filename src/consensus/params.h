@@ -92,6 +92,8 @@ struct Params {
     /** Witness resource rules: negative disables; mainnet activates from genesis.
      * No CLI override. A future testnet deployment requires an explicit consensus change. */
     int nWitnessResourceHeight{-1};
+    /** Exact serialized block-undo budget: negative disables; mainnet starts at genesis. */
+    int nBlockUndoHeight{-1};
     /**
      * Hashes of blocks that
      * - are known to be consensus valid, and
