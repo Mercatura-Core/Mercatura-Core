@@ -12,7 +12,6 @@
 namespace wallet {
 #else
 #include <wallet/wallet.h>
-#include <wallet/spend.h>
 #include <chainparams.h>
 #include <crypto/mercatura_mldsa.h>
 #include <crypto/mercatura_pqderive.h>

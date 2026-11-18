@@ -8,8 +8,17 @@
 #include <common/args.h>
 #include <key_io.h>
 #include <logging.h>
+#include <script/solver.h>
 
 namespace wallet {
+bool IsDisabledClassicalOutput(const CScript& script)
+{
+    std::vector<std::vector<unsigned char>> solutions;
+    const auto type{Solver(script, solutions)};
+    return type == TxoutType::PUBKEY || type == TxoutType::PUBKEYHASH ||
+           type == TxoutType::WITNESS_V0_KEYHASH || type == TxoutType::MULTISIG;
+}
+
 fs::path GetWalletDir()
 {
     fs::path path;

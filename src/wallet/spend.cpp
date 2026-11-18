@@ -31,6 +31,7 @@
 #include <wallet/spend.h>
 #include <wallet/transaction.h>
 #include <wallet/wallet.h>
+#include <wallet/walletutil.h>
 
 #include <cmath>
 
@@ -1305,14 +1306,6 @@ void DiscourageFeeSniping(CMutableTransaction& tx, FastRandomContext& rng_fast,
 uint64_t GetSerializeSizeForRecipient(const CRecipient& recipient)
 {
     return ::GetSerializeSize(CTxOut(recipient.nAmount, GetScriptForDestination(recipient.dest)));
-}
-
-bool IsDisabledClassicalOutput(const CScript& script)
-{
-    std::vector<std::vector<unsigned char>> solutions;
-    const auto type{Solver(script, solutions)};
-    return type == TxoutType::PUBKEY || type == TxoutType::PUBKEYHASH ||
-           type == TxoutType::WITNESS_V0_KEYHASH || type == TxoutType::MULTISIG;
 }
 
 bool IsDust(const CRecipient& recipient, const CFeeRate& dustRelayFee)

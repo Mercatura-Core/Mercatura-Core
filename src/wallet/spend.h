@@ -21,9 +21,6 @@
 #include <vector>
 
 namespace wallet {
-/** Output templates that unconditionally require disabled classical signatures. */
-bool IsDisabledClassicalOutput(const CScript& script);
-
 /** Get the marginal bytes if spending the specified output from this transaction.
  * Use CoinControl to determine whether to expect signature grinding when calculating the size of the input spend. */
 int CalculateMaximumSignedInputSize(const CTxOut& txout, const CWallet* pwallet, const CCoinControl* coin_control);
