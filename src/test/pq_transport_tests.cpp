@@ -555,7 +555,18 @@ BOOST_AUTO_TEST_CASE(persistent_identity_storage_failures)
     BOOST_CHECK_THROW(LoadIdentity(name,false,net),std::runtime_error);
     fs::permissions(file,fs::perms::owner_read|fs::perms::owner_write);
     auto link=directory/"link.dat"; fs::create_symlink(file,link); BOOST_CHECK_THROW(LoadIdentity(fs::PathToString(link),false,net),std::runtime_error);
-    std::fstream stream(name,std::ios::in|std::ios::out|std::ios::binary); stream.seekp(95); stream.put(char{1}); stream.close();
+    // Flip a bit in the randomized seed rather than writing a fixed byte;
+    // the original byte can already equal 1, leaving the file unmodified.
+    std::fstream stream(name, std::ios::in | std::ios::out | std::ios::binary);
+    BOOST_REQUIRE(stream.is_open());
+    stream.seekg(95);
+    char original{};
+    stream.get(original);
+    BOOST_REQUIRE(stream.good());
+    stream.seekp(95);
+    stream.put(static_cast<char>(static_cast<unsigned char>(original) ^ 0x01U));
+    BOOST_REQUIRE(stream.good());
+    stream.close();
     BOOST_CHECK_THROW(LoadIdentity(name,false,net),std::runtime_error);
     BOOST_CHECK_THROW(LoadIdentity(fs::PathToString(directory/"missing"),false,net),std::runtime_error);
 }
