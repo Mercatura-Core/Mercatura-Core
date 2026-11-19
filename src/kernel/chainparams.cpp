@@ -92,6 +92,7 @@ public:
         m_chain_type = ChainType::MAIN;
         consensus.nInitialBlockCapacityBytes = MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES;
         consensus.nWitnessResourceHeight = 0;
+        consensus.nBlockUndoHeight = 0;
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
         // Mercatura has no inherited Bitcoin historical script exceptions.
@@ -553,6 +554,7 @@ public:
             throw std::runtime_error{"-regtestminingstress requires -mercahashv2height=0 and a separate datadir"};
         m_chain_type = ChainType::REGTEST;
         consensus.nInitialBlockCapacityBytes = MERCATURA_INITIAL_BLOCK_CAPACITY_BYTES;
+        consensus.nBlockUndoHeight = opts.block_undo_height;
         consensus.signet_blocks = false;
         consensus.signet_challenge.clear();
         consensus.BIP34Height = 1; // Always active unless overridden

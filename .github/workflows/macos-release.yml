@@ -2,7 +2,7 @@ name: macOS Public Testnet Development Package
 
 on:
   workflow_dispatch:
-# Manual development validation only. No artifact upload or release publication.
+# Manual release candidate build: uploads an artifact; does not publish a GitHub release.
 permissions:
   contents: read
 
@@ -15,6 +15,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: b5403534c92401b9a46ac55751de3420f0ff8335
+
+      - name: Verify approved release source and ARM64
+        run: |
+          test "$(git rev-parse HEAD)" = "b5403534c92401b9a46ac55751de3420f0ff8335"
+          test "$(uname -m)" = "arm64"
 
       - name: Install dependencies
         run: |
@@ -52,4 +59,12 @@ jobs:
           shasum -a 256 build-macos-release/mercatura-macos-app.zip
 
           mv build-macos-release/mercatura-macos-app.zip \
-            Mercatura-Core-p9p11-dev-${{ github.sha }}-macos-arm64.zip
+            Mercatura-Core-v0.1.4-testnet-macos-arm64.zip
+
+      - name: Upload macOS release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: mercatura-v0.1.4-testnet-macos-arm64
+          path: Mercatura-Core-v0.1.4-testnet-macos-arm64.zip
+          if-no-files-found: error
+          retention-days: 7

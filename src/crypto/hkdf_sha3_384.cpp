@@ -18,6 +18,11 @@ CHKDF_HMAC_SHA3_384_L32::CHKDF_HMAC_SHA3_384_L32(
         .Finalize(m_prk);
 }
 
+CHKDF_HMAC_SHA3_384_L32::~CHKDF_HMAC_SHA3_384_L32()
+{
+    memory_cleanse(m_prk.data(), m_prk.size());
+}
+
 void CHKDF_HMAC_SHA3_384_L32::Expand32(
     std::span<const unsigned char> info,
     std::span<unsigned char> output) const

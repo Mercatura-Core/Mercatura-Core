@@ -2827,6 +2827,10 @@ bool CWallet::SignTransaction(CMutableTransaction& tx, const std::map<COutPoint,
 {
     AssertLockHeld(cs_wallet);
     for (const auto& output : tx.vout) {
+        if (IsDisabledClassicalOutput(output.scriptPubKey)) {
+            input_errors[0] = _("Recipient or change output uses disabled classical signature authorization");
+            return false;
+        }
         int version;
         std::vector<unsigned char> program;
         if (output.scriptPubKey.IsWitnessProgram(version, program) && version == 3 &&
@@ -3142,6 +3146,7 @@ std::optional<PSBTError> CWallet::FillPSBT(PartiallySignedTransaction& psbtx, bo
         LOCK(cs_wallet);
         if (psbtx.tx) {
             for (const auto& output : psbtx.tx->vout) {
+                if (sign && IsDisabledClassicalOutput(output.scriptPubKey)) return PSBTError::UNSUPPORTED;
                 int version;
                 std::vector<unsigned char> program;
                 if (output.scriptPubKey.IsWitnessProgram(version, program) && version == 3 &&

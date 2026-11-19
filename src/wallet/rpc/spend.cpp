@@ -1531,6 +1531,9 @@ RPCHelpMan sendall()
 
             CAmount output_amounts_claimed{0};
             for (const CTxOut& out : rawTx.vout) {
+                if (out.nValue > MAX_MONEY - output_amounts_claimed) {
+                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Transaction amounts exceed the monetary safety limit");
+                }
                 output_amounts_claimed += out.nValue;
             }
 

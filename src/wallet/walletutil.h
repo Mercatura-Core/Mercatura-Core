@@ -10,7 +10,12 @@
 
 #include <vector>
 
+class CScript;
+
 namespace wallet {
+
+/** Output templates that unconditionally require disabled classical signatures. */
+bool IsDisabledClassicalOutput(const CScript& script);
 
 enum WalletFlags : uint64_t {
     // wallet flags in the upper section (> 1 << 31) will lead to not opening the wallet if flag is unknown

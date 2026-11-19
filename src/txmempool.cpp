@@ -28,14 +28,32 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <numeric>
 #include <optional>
 #include <ranges>
+#include <stdexcept>
 #include <string_view>
 #include <utility>
 
 TRACEPOINT_SEMAPHORE(mempool, added);
 TRACEPOINT_SEMAPHORE(mempool, removed);
+
+CAmount CTxMemPool::FeeExposure(CAmount fee, CAmount modified_fee, int32_t size)
+{
+    // E = base fee + |modified fee - base fee|. Sum(E) bounds every subset
+    // sum, including real fees, and main/staging diagram differences. Also keep
+    // per-kvB fee reporting representable (FeeFrac::Div requires this).
+    const auto delta{fee >= 0 ? CheckedAdd(modified_fee, -fee) : std::nullopt};
+    if (!delta || *delta == std::numeric_limits<CAmount>::min() || size <= 0 ||
+        FeeFrac{modified_fee, size} >> FeeFrac{std::numeric_limits<CAmount>::max(), 1000} ||
+        FeeFrac{modified_fee, size} << FeeFrac{-std::numeric_limits<CAmount>::max(), 1000}) {
+        throw std::overflow_error{"Modified fee is out of range"};
+    }
+    const auto exposure{CheckedAdd(fee, std::abs(*delta))};
+    if (!exposure) throw std::overflow_error{"Modified fee is out of range"};
+    return *exposure;
+}
 
 bool TestLockPointValidity(CChain& active_chain, const LockPoints& lp)
 {
@@ -300,6 +318,7 @@ void CTxMemPool::removeUnchecked(txiter it, MemPoolRemovalReason reason)
 
     totalTxSize -= it->GetTxSize();
     m_total_fee -= it->GetFee();
+    m_fee_exposure -= FeeExposure(it->GetFee(), it->GetModifiedFee(), it->GetTxSize());
     cachedInnerUsage -= it->DynamicMemoryUsage();
     mapTx.erase(it);
     nTransactionsUpdated++;
@@ -443,6 +462,7 @@ void CTxMemPool::check(const CCoinsViewCache& active_coins_tip, int64_t spendhei
     uint64_t checkTotal = 0;
     CAmount check_total_fee{0};
     CAmount check_total_modified_fee{0};
+    CAmount check_fee_exposure{0};
     int64_t check_total_adjusted_weight{0};
     uint64_t innerUsage = 0;
 
@@ -477,6 +497,7 @@ void CTxMemPool::check(const CCoinsViewCache& active_coins_tip, int64_t spendhei
         check_total_adjusted_weight += it->GetAdjustedWeight();
         check_total_fee += it->GetFee();
         check_total_modified_fee += it->GetModifiedFee();
+        check_fee_exposure += FeeExposure(it->GetFee(), it->GetModifiedFee(), it->GetTxSize());
         innerUsage += it->DynamicMemoryUsage();
         const CTransaction& tx = it->GetTx();
 
@@ -548,6 +569,7 @@ void CTxMemPool::check(const CCoinsViewCache& active_coins_tip, int64_t spendhei
 
     assert(totalTxSize == checkTotal);
     assert(m_total_fee == check_total_fee);
+    if (!m_have_changeset) assert(m_fee_exposure == check_fee_exposure);
     assert(diagram.back().fee == check_total_modified_fee);
     assert(diagram.back().size == check_total_adjusted_weight);
     assert(innerUsage == cachedInnerUsage);
@@ -631,13 +653,22 @@ void CTxMemPool::PrioritiseTransaction(const Txid& hash, const CAmount& nFeeDelt
 {
     {
         LOCK(cs);
+        txiter it = mapTx.find(hash);
+        CAmount exposure{m_fee_exposure};
+        if (it != mapTx.end()) {
+            const auto updated{CheckedAdd(
+                exposure - FeeExposure(it->GetFee(), it->GetModifiedFee(), it->GetTxSize()),
+                FeeExposure(it->GetFee(), SaturatingAdd(it->GetModifiedFee(), nFeeDelta), it->GetTxSize()))};
+            if (!updated) throw std::overflow_error{"Modified fee aggregate is out of range"};
+            exposure = *updated;
+        }
         CAmount &delta = mapDeltas[hash];
         delta = SaturatingAdd(delta, nFeeDelta);
-        txiter it = mapTx.find(hash);
         if (it != mapTx.end()) {
             // PrioritiseTransaction calls stack on previous ones. Set the new
             // transaction fee to be current modified fee + feedelta.
             it->UpdateModifiedFee(nFeeDelta);
+            m_fee_exposure = exposure;
             m_txgraph->SetTransactionFee(*it, it->GetModifiedFee());
             ++nTransactionsUpdated;
         }
@@ -828,8 +859,14 @@ int CTxMemPool::Expire(std::chrono::seconds time)
 
 CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const {
     LOCK(cs);
+    // A removed chunk's modified feerate can exceed the range usable for
+    // fee estimates. Leave room to evaluate any int32_t transaction size.
+    const auto bounded_rate = [](double rate) {
+        constexpr CAmount max_rate{(std::numeric_limits<CAmount>::max() / std::numeric_limits<int32_t>::max()) * 1000};
+        return CFeeRate(rate >= max_rate ? max_rate : llround(rate));
+    };
     if (!blockSinceLastRollingFeeBump || rollingMinimumFeeRate == 0)
-        return CFeeRate(llround(rollingMinimumFeeRate));
+        return bounded_rate(rollingMinimumFeeRate);
 
     int64_t time = GetTime();
     if (time > lastRollingFeeUpdate + 10) {
@@ -847,7 +884,7 @@ CFeeRate CTxMemPool::GetMinFee(size_t sizelimit) const {
             return CFeeRate(0);
         }
     }
-    return std::max(CFeeRate(llround(rollingMinimumFeeRate)), m_opts.incremental_relay_feerate);
+    return std::max(bounded_rate(rollingMinimumFeeRate), m_opts.incremental_relay_feerate);
 }
 
 void CTxMemPool::trackPackageRemoved(const CFeeRate& rate) {
@@ -874,7 +911,7 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint>* pvNoSpends
         // "minimum reasonable fee rate" (ie some value under which we consider txn
         // to have 0 fee). This way, we don't allow txn to enter mempool with feerate
         // equal to txn which were removed with no block in between.
-        removed += m_opts.incremental_relay_feerate;
+        removed = CFeeRate(SaturatingAdd(removed.GetFeePerK(), m_opts.incremental_relay_feerate.GetFeePerK()));
         trackPackageRemoved(removed);
         maxFeeRateRemoved = std::max(maxFeeRateRemoved, removed);
 
@@ -1013,6 +1050,9 @@ CTxMemPool::ChangeSet::TxHandle CTxMemPool::ChangeSet::StageAddition(const CTran
 
     CAmount delta{0};
     m_pool->ApplyDelta(tx->GetHash(), delta);
+    const auto exposure{CheckedAdd(m_pool->m_fee_exposure, FeeExposure(
+        fee, SaturatingAdd(fee, delta), GetTransactionFeeSize(*tx, sigops_cost, ::nBytesPerSigOp)))};
+    if (!exposure) throw std::overflow_error{"Modified fee aggregate is out of range"};
 
     // Mercatura deliberately uses full serialized size for fee economics,
     // while inherited cluster policy remains based on BIP141/sigops-adjusted
@@ -1029,6 +1069,7 @@ CTxMemPool::ChangeSet::TxHandle CTxMemPool::ChangeSet::StageAddition(const CTran
     };
 
     auto newit = m_to_add.emplace(tx, fee, time, entry_height, entry_sequence, spends_coinbase, sigops_cost, lp).first;
+    m_pool->m_fee_exposure = *exposure;
     m_pool->m_txgraph->AddTransaction(
         const_cast<CTxMemPoolEntry&>(*newit),
         feerate,

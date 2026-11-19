@@ -79,6 +79,7 @@
 #include <optional>
 #include <ranges>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -981,7 +982,11 @@ bool MemPoolAccept::PreChecks(ATMPArgs& args, Workspace& ws)
     if (!m_subpackage.m_changeset) {
         m_subpackage.m_changeset = m_pool.GetChangeSet();
     }
-    ws.m_tx_handle = m_subpackage.m_changeset->StageAddition(ptx, ws.m_base_fees, nAcceptTime, m_active_chainstate.m_chain.Height(), entry_sequence, fSpendsCoinbase, nSigOpsCost, lock_points.value());
+    try {
+        ws.m_tx_handle = m_subpackage.m_changeset->StageAddition(ptx, ws.m_base_fees, nAcceptTime, m_active_chainstate.m_chain.Height(), entry_sequence, fSpendsCoinbase, nSigOpsCost, lock_points.value());
+    } catch (const std::overflow_error& e) {
+        return state.Invalid(TxValidationResult::TX_MEMPOOL_POLICY, "modified-fee-out-of-range", e.what());
+    }
 
     // ws.m_modified_fees includes any fee deltas from PrioritiseTransaction
     ws.m_modified_fees = ws.m_tx_handle->GetModifiedFee();
@@ -2800,6 +2805,10 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
     }
 
     CBlockUndo blockundo;
+    const bool enforce_undo_limit{params.GetConsensus().nBlockUndoHeight >= 0 &&
+        pindex->nHeight >= params.GetConsensus().nBlockUndoHeight};
+    const uint64_t max_undo_bytes{GetMaxBlockUndoBytes(params.GetConsensus(), pindex->nHeight)};
+    uint64_t undo_size{GetSizeOfCompactSize(block.vtx.size() - 1)};
 
     // Precomputed transaction data pointers must not be invalidated
     // until after `control` has run the script checks (potentially
@@ -2824,6 +2833,12 @@ bool Chainstate::ConnectBlock(const CBlock& block, BlockValidationState& state, 
 
         if (!tx.IsCoinBase())
         {
+            // Bound UTXO loading, precomputed spent-output copies and undo accumulation.
+            // This must run even when script verification is cached or assumed valid.
+            if (enforce_undo_limit && !CheckTxUndoSize(tx, view, undo_size, max_undo_bytes)) {
+                state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-blk-undo-size");
+                break;
+            }
             CAmount txfee = 0;
             TxValidationState tx_state;
             if (!Consensus::CheckTxInputs(tx, tx_state, view, pindex->nHeight, txfee)) {

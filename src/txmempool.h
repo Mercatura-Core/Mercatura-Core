@@ -190,6 +190,10 @@ protected:
 
     uint64_t totalTxSize GUARDED_BY(cs){0};      //!< sum of all mempool tx's virtual sizes. Differs from serialized tx size since witness data is discounted. Defined in BIP 141.
     CAmount m_total_fee GUARDED_BY(cs){0};       //!< sum of all mempool tx's fees (NOT modified fee)
+    // Includes staged additions until applied or rolled back. Bounds base fees,
+    // absolute modified fees, fee deltas, and differences between disjoint sets.
+    CAmount m_fee_exposure GUARDED_BY(cs){0};
+    static CAmount FeeExposure(CAmount fee, CAmount modified_fee, int32_t size);
     uint64_t cachedInnerUsage GUARDED_BY(cs){0}; //!< sum of dynamic memory usage of all the map elements (NOT the maps themselves)
 
     mutable int64_t lastRollingFeeUpdate GUARDED_BY(cs){GetTime()};
@@ -622,6 +626,9 @@ public:
             AssertLockHeld(m_pool->cs);
             if (m_pool->m_txgraph->HaveStaging()) {
                 m_pool->m_txgraph->AbortStaging();
+            }
+            for (const auto& entry : m_to_add) {
+                m_pool->m_fee_exposure -= FeeExposure(entry.GetFee(), entry.GetModifiedFee(), entry.GetTxSize());
             }
             m_pool->m_have_changeset = false;
         }

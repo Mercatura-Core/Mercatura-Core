@@ -73,6 +73,7 @@ add_executable(test_bitcoin
   key_tests.cpp
   logging_tests.cpp
   mempool_tests.cpp
+  modified_fee_tests.cpp
   merkle_tests.cpp
   merkleblock_tests.cpp
   miner_tests.cpp
@@ -149,6 +150,7 @@ add_executable(test_bitcoin
   txvalidation_tests.cpp
   txvalidationcache_tests.cpp
   uint256_tests.cpp
+  undo_limits_tests.cpp
   util_check_tests.cpp
   util_expected_tests.cpp
   util_string_tests.cpp

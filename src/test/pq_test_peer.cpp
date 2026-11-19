@@ -3,6 +3,7 @@
 // Test-only loopback bridge: Python's message injector -> authenticated PQ peer.
 // Never installed or selected by a production node. No fallback path exists.
 #include <chainparams.h>
+#include <common/args.h>
 #include <common/system.h>
 #include <net_pq.h>
 #include <random.h>
@@ -94,12 +95,16 @@ bool Write(Transport& transport, Sock& socket)
 int main(int argc, char** argv)
 {
     try {
-        Require(argc == 3, "usage: pq-test-peer main|test|regtest OWNED_LOOPBACK_PORT");
+        Require(argc == 3 || argc == 4, "usage: pq-test-peer main|test|regtest OWNED_LOOPBACK_PORT [REGTEST_V2_HEIGHT]");
         const std::string_view chain{argv[1]}, port_text{argv[2]};
         unsigned port{0};
         const auto parsed = std::from_chars(port_text.data(), port_text.data() + port_text.size(), port);
         Require(parsed.ec == std::errc{} && parsed.ptr == port_text.data() + port_text.size() && port > 0 && port <= 65535, "invalid owned port");
         Require(chain == "main" || chain == "test" || chain == "regtest", "unsupported test chain");
+        if (argc == 4) {
+            Require(chain == "regtest", "PoW activation override is regtest-only");
+            gArgs.ForceSetArg("-mercahashv2height", argv[3]);
+        }
         Require(SetupNetworking(), "test networking initialization failed");
         RandomInit();
         SelectParams(chain == "main" ? ChainType::MAIN : chain == "test" ? ChainType::TESTNET : ChainType::REGTEST);

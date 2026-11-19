@@ -28,6 +28,7 @@
 #include <qt/transactiontablemodel.h>
 #include <qt/transactionview.h>
 #include <qt/walletmodel.h>
+#include <qt/walletmodeltransaction.h>
 #include <script/solver.h>
 #include <test/util/setup_common.h>
 #include <validation.h>
@@ -55,6 +56,7 @@
 #include <QHeaderView>
 #include <QRadioButton>
 #include <QScrollBar>
+#include <QSignalSpy>
 #include <QStandardItemModel>
 #include <QTreeWidgetItemIterator>
 
@@ -291,7 +293,75 @@ void TestGUI(interfaces::Node& node, const std::shared_ptr<CWallet>& wallet)
     // Check balance in send dialog
     CompareBalance(walletModel, walletModel.wallet().getBalance(), sendCoinsDialog.findChild<QLabel*>("labelBalance"));
 
+    // A syntactically valid classical address must produce an understandable
+    // wallet error instead of preparing a payment to disabled ownership.
+    QSignalSpy payment_errors{&walletModel, &WalletModel::message};
+    for (const CTxDestination& dest : std::vector<CTxDestination>{PKHash{}, WitnessV0KeyHash{}}) {
+        SendCoinsRecipient recipient;
+        recipient.address = QString::fromStdString(EncodeDestination(dest));
+        recipient.amount = COIN;
+        QVERIFY(walletModel.validateAddress(recipient.address));
+        WalletModelTransaction transaction{{recipient}};
+        QCOMPARE(walletModel.prepareTransaction(transaction, {}).status, WalletModel::TransactionCreationFailed);
+        QVERIFY(!transaction.getWtx());
+        QCOMPARE(payment_errors.count(), 1);
+        QVERIFY(payment_errors.takeFirst().at(1).toString().contains("disabled classical signature authorization"));
+    }
+
     // Check 'UseAvailableBalance' functionality
+    const auto pq_recipient = [](int tag, CAmount amount, bool subtract) {
+        WitnessV2MercaturaPQ dest;
+        dest.begin()[0] = tag;
+        SendCoinsRecipient recipient;
+        recipient.address = QString::fromStdString(EncodeDestination(dest));
+        recipient.amount = amount;
+        recipient.fSubtractFeeFromAmount = subtract;
+        return recipient;
+    };
+    for (bool subtract : {false, true}) {
+        for (const auto& amounts : std::vector<std::vector<CAmount>>{{COIN}, {COIN, 2 * COIN}}) {
+            QList<SendCoinsRecipient> recipients;
+            CAmount expected{0};
+            for (CAmount amount : amounts) {
+                recipients.push_back(pq_recipient(recipients.size() + 1, amount, subtract));
+                expected += amount;
+            }
+            WalletModelTransaction tx{recipients};
+            QCOMPARE(walletModel.prepareTransaction(tx, {}).status, WalletModel::OK);
+            QVERIFY(tx.getWtx());
+            QCOMPARE(tx.getTotalTransactionAmount() + (subtract ? tx.getTransactionFee() : 0), expected);
+        }
+        for (const auto& [amounts, status] : std::vector<std::pair<std::vector<CAmount>, WalletModel::StatusCode>>{
+                 {{0}, WalletModel::InvalidAmount}, {{-1}, WalletModel::InvalidAmount},
+                 {{MAX_MONEY}, WalletModel::AmountExceedsBalance},
+                 {{MAX_MONEY / 2, MAX_MONEY - MAX_MONEY / 2}, WalletModel::AmountExceedsBalance},
+                 {{MAX_MONEY + 1}, WalletModel::InvalidAmount},
+                 {{MAX_MONEY - 2, 3}, WalletModel::InvalidAmount},
+                 {std::vector<CAmount>(10, MAX_MONEY), WalletModel::InvalidAmount}}) {
+            QList<SendCoinsRecipient> recipients;
+            for (CAmount amount : amounts) recipients.push_back(pq_recipient(recipients.size() + 1, amount, subtract));
+            WalletModelTransaction tx{recipients};
+            QCOMPARE(walletModel.prepareTransaction(tx, {}).status, status);
+            QVERIFY(!tx.getWtx());
+        }
+    }
+    {
+        SendCoinsDialog excessive{platformStyle.get()};
+        excessive.setModel(&walletModel);
+        for (int i = 1; i <= 10; ++i) excessive.pasteEntry(pq_recipient(i, MAX_MONEY, false));
+        QSignalSpy errors{&excessive, &SendCoinsDialog::message};
+        QVERIFY(QMetaObject::invokeMethod(&excessive, "sendButtonClicked", Q_ARG(bool, false)));
+        QCOMPARE(errors.count(), 1);
+        QVERIFY(errors.first().at(1).toString().contains("monetary safety limit"));
+        CoinControlDialog::payAmounts = QList<CAmount>(10, MAX_MONEY);
+        auto* fee = excessive.findChild<QLabel*>("labelCoinControlFee");
+        QVERIFY(fee);
+        fee->setText("Not calculated");
+        CoinControlDialog::updateLabels(*excessive.getCoinControl(), &walletModel, &excessive);
+        QCOMPARE(fee->text(), QString{"Not calculated"});
+        CoinControlDialog::payAmounts.clear();
+    }
+
     VerifyUseAvailableBalance(sendCoinsDialog, walletModel);
 
     // Send two transactions, and verify they are added to transaction list.
@@ -421,7 +491,7 @@ void TestGUIWatchOnly(interfaces::Node& node, TestChain100Setup& test)
                    sendCoinsDialog.findChild<QLabel*>("labelBalance"));
 
     // Set change address
-    sendCoinsDialog.getCoinControl()->destChange = PKHash{test.coinbaseKey.GetPubKey()};
+    sendCoinsDialog.getCoinControl()->destChange = WitnessV2MercaturaPQ{};
 
     // Time to reject "save" PSBT dialog ('SendCoins' locks the main thread until the dialog receives the event).
     QTimer timer;
@@ -441,7 +511,7 @@ void TestGUIWatchOnly(interfaces::Node& node, TestChain100Setup& test)
     timer.start(500);
 
     // Send tx and verify PSBT copied to the clipboard.
-    SendCoins(*wallet.get(), sendCoinsDialog, PKHash(), 5 * COIN, /*rbf=*/false, QMessageBox::Save);
+    SendCoins(*wallet.get(), sendCoinsDialog, WitnessV2MercaturaPQ{}, 5 * COIN, /*rbf=*/false, QMessageBox::Save);
     const std::string& psbt_string = QApplication::clipboard()->text().toStdString();
     QVERIFY(!psbt_string.empty());
 
