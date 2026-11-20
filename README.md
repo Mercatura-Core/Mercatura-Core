@@ -13,7 +13,7 @@ Mercatura Core is derived from the modern Bitcoin Core codebase and is being ada
 - **Mandatory post-quantum networking:** All upgraded public-testnet nodes use authenticated, encrypted **PQ-v1** P2P transport (ML-KEM-768 key establishment and ML-DSA-65 peer authentication). Classical and BIP324 fallback are not accepted. Older nodes cannot connect until upgraded.
 - **PQ-v1 interoperability:** v0.1.4 retains mandatory authenticated, encrypted PQ-v1 peer sessions. Public-testnet interoperability observations do not constitute an independent security audit.
 - **MercaHash V2 activation:** **Public-testnet block height 17,000** is the first V2 block; height 16,999 is the final V1 block. Upgrade before the transition. The historic chain is unchanged.
-- **Current testnet capacity:** 4 MiB effective block cap since height 8,000. The separate 1 MiB-to-1024 MiB scheduled capacity policy below describes the planned initial mainnet baseline.
+- **Current testnet capacity:** 4 MiB effective block cap since height 8,000. Mainnet is configured to start at 4 MiB (4,194,304 full serialized bytes), with scheduled growth up to 1024 MiB; final release qualification remains pending.
 - **Built-in mining:** Mercatura Core Qt includes optional native CPU solo mining, with experimental GPU support on compatible builds and devices. The Mining tab uses the existing wallet/full node, pays rewards to a wallet-owned post-quantum address, and has no mining software or developer fee. Physical GPU qualification is still limited.
 - **v0.1.4 mining optimizations:** Improved CPU batch mining, NVIDIA CUDA kernels, GPU scheduling and memory management, and Windows OpenCL compatibility. Published performance gains are hardware-dependent, not guaranteed live-network hashrates.
 - **MercaWeave development:** Witness-v3 grouped post-quantum authorization continues in development and testing; the public-testnet release is not a claim of production qualification.
@@ -43,7 +43,7 @@ Public-testnet software is experimental. Testnet MCA has **no monetary value**. 
 | Base unit | 1 MCA = 100 base units |
 | Minimum fee policy | 0.01 MCA per started 1,000 bytes |
 | Recommended dust threshold | 0.02 MCA |
-| Initial planned mainnet effective block cap | 1 MiB |
+| Initial mainnet effective block cap (current consensus configuration) | 4 MiB (4,194,304 bytes) |
 | Public-testnet effective block cap | 4 MiB from block 8,000 |
 | Scheduled block-cap growth | Doubles approximately every 5 years |
 | Maximum scheduled block cap | 1024 MiB |
@@ -205,14 +205,14 @@ Witness and non-witness bytes therefore count equally for Mercatura block-cap ac
 
 The planned **initial mainnet** capacity schedule is:
 
-- **1 MiB at launch**
+- **4 MiB (4,194,304 full serialized bytes) at launch**
 - doubles every **1,051,200 blocks**
 - approximately one doubling every **5 years** at 150-second block spacing
 - maximum scheduled cap of **1024 MiB**
 
 The growth schedule is intended to follow long-term improvements in ordinary node bandwidth, storage, propagation capacity, and home-node viability.
 
-**Current public testnet:** The effective block cap increased to **4 MiB at block 8,000**. The planned initial mainnet schedule above should not be mistaken for the current testnet ceiling.
+**Current public testnet:** The effective block cap increased to **4 MiB at block 8,000**, after a 1 MiB historical baseline through block 7,999. The mainnet schedule begins at 4 MiB from genesis; mainnet release qualification is separate.
 
 A consensus ceiling is not a requirement that miners fill blocks to the maximum size.
 
